@@ -2,9 +2,13 @@ import requests
 import json
 import math
 import time 
-import alpaca_trade_api as tradeapi 
+import alpaca_trade_api as tradeapi   # pip3 install alpaca-trade-api
 
+## Enter description
 class Portfolio:
+
+
+    ##
     def __init__(self,assets=dict()):
         self.assets = assets
         if isinstance(self.assets,list):
@@ -14,7 +18,9 @@ class Portfolio:
             self.assets = temp 
         print("assets:")
         print(str(self.assets))
-    #returns two dicts the first contains stocks to sell the second contains stocks to buy
+
+
+    ## Returns two dicts the first contains stocks to sell the second contains stocks to buy
     def compare(self,other):
         sell  = self.assets.copy()
         buy  = dict()
@@ -22,6 +28,8 @@ class Portfolio:
             if sell.pop(asset,True):
                 buy[asset] = other.assets[asset]
         return sell, buy
+
+
     def adjust(self,symbols,buy):
         for asset in symbols:
             if not buy:
@@ -29,7 +37,11 @@ class Portfolio:
             else:
                 self.assets[asset] = None
 
-class AlpacaAPI:
+## Enter description
+class alpaca_private:
+
+
+    ##
     def __init__(self):
         self.history = dict()
         self.holdings = Portfolio()
@@ -43,6 +55,8 @@ class AlpacaAPI:
         self.active_orders = []
         self.current_id = 0
 
+
+    ##
     def signal(self,signals):
         signals  = Portfolio(signals)
         sell, buy  = self.holdings.compare(signals)
@@ -60,6 +74,8 @@ class AlpacaAPI:
         while len(self.getActiveOrders()) > 0:
             time.sleep(1)
 
+
+    ##
     def getActiveOrders(self):
         try:
             return self.core.list_orders(
@@ -68,12 +84,17 @@ class AlpacaAPI:
         except:
             return 1
     
+    ##
     def getCash(self):
         return self.core.get_account().cash
 
+
+    ##
     def printState(self):
         print(str(self.core.list_positions()))
 
+
+    ##
     def action(self,symbols,buy):
         direction = "buy"
         if not buy:
@@ -94,6 +115,8 @@ class AlpacaAPI:
         #print("Trade")
         self.printState()
 
+
+    ##
     def order(self,symbol,quat,side): 
         self.core.submit_order(    
             symbol=symbol,
