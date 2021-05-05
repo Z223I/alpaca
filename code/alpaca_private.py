@@ -1,7 +1,7 @@
 import requests
 import json
 import math
-import time 
+import time
 import alpaca_trade_api as tradeapi   # pip3 install alpaca-trade-api
 
 ## Enter description
@@ -15,7 +15,7 @@ class Portfolio:
             temp = dict()
             for asset in self.assets:
                 temp[asset] = None
-            self.assets = temp 
+            self.assets = temp
         print("assets:")
         print(str(self.assets))
 
@@ -72,8 +72,9 @@ class alpaca_private:
 
         print("Buy:")
         print(str(buy.keys()))
+
         self.action(buy, True)
-        
+
         self.holdings.adjust(sell, False)
         self.holdings.adjust(buy, True)
 
@@ -90,7 +91,7 @@ class alpaca_private:
                 limit=100)
         except:
             return 1
-    
+
     ##
     def getCash(self):
         return self.core.get_account().cash
@@ -110,7 +111,7 @@ class alpaca_private:
             cash  = float(self.core.get_account().cash)
             print("cash")
             print(cash)
-            if cash<1:
+            if cash < 1:
                 return
         for asset in symbols:
             if not buy:
@@ -118,19 +119,26 @@ class alpaca_private:
             else:
                 self.order(asset, (cash/len(symbols))/symbols[asset], direction)
             self.active_orders.append(self.current_id)
-            self.current_id +=1
-        #print("Trade")
+            self.current_id += 1
+
+        print("Trade")
         self.printState()
 
 
     ##
-    def order(self, symbol, quat, side): 
-        self.core.submit_order(    
+    def order(self, symbol, quat, side):
+
+        #print(f'Order {symbol} {quat} {side} skipped.')
+
+        self.core.submit_order(
             symbol=symbol,
             qty=math.floor(quat),
             side=side,
             type='market',
             time_in_force='gtc' )
+
+
+
         #orderObject = {
         #"symbol":symbol,
         #"notional":quat,
