@@ -78,25 +78,24 @@ def setupParser():
    return parser
 
 def displayArgs( argparseNamespace, stream = None ):
-   """
+      """
       Displays user args.
    """
 
-   if ( None is stream ):
-      stream = sys.stdout
+      if ( None is stream ):
+         stream = sys.stdout
 
-   print( "#%s" % ( '=' * 79 ), file = stream )
+      print( "#%s" % ( '=' * 79 ), file = stream )
 
-   maxKeyWidth = 0
-   for key in vars( argparseNamespace ):
-      if( maxKeyWidth <= len( key ) ):
-         maxKeyWidth = len( key )
+      maxKeyWidth = 0
+      for key in vars( argparseNamespace ):
+            maxKeyWidth = max(maxKeyWidth, len( key ))
 
-   for key in sorted( vars( argparseNamespace ) ):
-      print( "# %*s: %s" % ( maxKeyWidth, key, eval( "argparseNamespace.%s" %
-         ( key ) ) ), file = stream )
+      for key in sorted( vars( argparseNamespace ) ):
+         print( "# %*s: %s" % ( maxKeyWidth, key, eval( "argparseNamespace.%s" %
+            ( key ) ) ), file = stream )
 
-   print( "#%s" % ( '=' * 79 ), file = stream )
+      print( "#%s" % ( '=' * 79 ), file = stream )
 
 def validateArgs( userArgs, parser ):
    """

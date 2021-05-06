@@ -6,6 +6,20 @@
     Asset class: Equities, Futures, ETFs, Currencies and Commodities
     Dataset: NYSE Daily or NYSE Minute
 """
+
+
+
+
+
+
+
+
+"""
+lookback amount of time
+"""
+
+
+
 # Zipline
 from zipline.api import(    symbol,
                             order_target_percent,

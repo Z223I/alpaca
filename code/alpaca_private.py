@@ -1,4 +1,4 @@
-import requests
+#import requests
 import json
 import math
 import time
@@ -15,9 +15,7 @@ class Portfolio:
     def __init__(self, assets=dict()):
         self.assets = assets
         if isinstance(self.assets, list):
-            temp = dict()
-            for asset in self.assets:
-                temp[asset] = None
+            temp = {asset: None for asset in self.assets}
             self.assets = temp
         print("assets:")
         print(str(self.assets))
@@ -26,10 +24,12 @@ class Portfolio:
     ## Returns two dicts the first contains stocks to sell the second contains stocks to buy
     def compare(self, other):
         sell  = self.assets.copy()
-        buy  = dict()
-        for asset in other.assets:
-            if sell.pop(asset, True):
-                buy[asset] = other.assets[asset]
+        buy = {
+            asset: other.assets[asset]
+            for asset in other.assets
+            if sell.pop(asset, True)
+        }
+
         return sell, buy
 
 
@@ -46,7 +46,7 @@ class alpaca_private:
 
     ##
     def __init__(self):
-        self.history = dict()
+        self.history = {}
         self.holdings = Portfolio()
 
         self.key = "PKE2MB78HZHHEGSWYM36"
@@ -67,19 +67,19 @@ class alpaca_private:
 
         signals  = Portfolio(signals)
 
-        sell, buy  = self.holdings.compare(signals)
+        sellStocksDict, buyStocksDict  = self.holdings.compare(signals)
         print("Sell:")
-        print(str(sell.keys()))
-        self.action(sell, False)
+        print(str(sellStocksDict.keys()))
+        self.action(sellStocksDict, False)
         self.delay()
 
         print("Buy:")
-        print(str(buy.keys()))
+        print(str(buyStocksDict.keys()))
 
-        self.action(buy, True)
+        self.action(buyStocksDict, True)
 
-        self.holdings.adjust(sell, False)
-        self.holdings.adjust(buy, True)
+        self.holdings.adjust(sellStocksDict, False)
+        self.holdings.adjust(buyStocksDict, True)
 
     def delay(self):
         while len(self.getActiveOrders()) > 0:
@@ -99,28 +99,34 @@ class alpaca_private:
     def getCash(self):
         return self.core.get_account().cash
 
+    ##
+    def getState(self):
+        return self.core.list_positions()
 
     ##
     def printState(self):
-        print(str(self.core.list_positions()))
+        state = self.getState()
+        print(f"state: {state}")
 
 
     ##
     def action(self, symbols, buy):
-        direction = "buy"
-        if not buy:
-            direction="sell"
-        else:
+        if buy:
+            direction = "buy"
             cash  = float(self.core.get_account().cash)
             print("cash")
             print(cash)
             if cash < 1:
                 return
+        else:
+            direction = "sell"
+
         for asset in symbols:
-            if not buy:
-                self.order(asset, self.core.get_position(asset).qty, direction)
-            else:
+            if buy:
                 self.order(asset, (cash/len(symbols))/symbols[asset], direction)
+            else:
+                self.order(asset, self.core.get_position(asset).qty, direction)
+
             self.active_orders.append(self.current_id)
             self.current_id += 1
 
@@ -129,16 +135,14 @@ class alpaca_private:
 
 
     ##
-    def order(self, symbol, quat, side):
-
-        #print(f'Order {symbol} {quat} {side} skipped.')
+    def order(self, symbol, quat, side, type="market", time_in_force="gtc"):
 
         self.core.submit_order(
             symbol=symbol,
             qty=math.floor(quat),
             side=side,
-            type='market',
-            time_in_force='gtc' )
+            type=type,
+            time_in_force=time_in_force )
 
 
 
