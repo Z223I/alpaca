@@ -2,11 +2,14 @@ import requests
 import json
 import math
 import time
+import sys
+
 import alpaca_trade_api as tradeapi   # pip3 install alpaca-trade-api
+
+import parseArgs
 
 ## Enter description
 class Portfolio:
-
 
     ##
     def __init__(self, assets=dict()):
@@ -148,8 +151,30 @@ class alpaca_private:
         #}
         #return json.loads(requests.post(self.ordersURL, headers=self.headers, json=orderObject).content)
 
+
+    ## @brief Main code of the alpaca_private object.
+    def main( self, userArgs=None ):
+
+        self.printState()
+        print(self.getActiveOrders())
+
+        return 0
+
+
+## Parse CLI arguments.
+def getArgs(userArgs=None):
+    # sourcery skip: inline-immediately-returned-variable
+
+    print(f'userArgs: {userArgs}')
+
+    parser = parseArgs.setupParser()
+
+    args = parseArgs.parseArgs( parser, userArgs )
+
+    return args
+
 """
-api = AlpacaAPI()
+api = alpaca_private()
 #api.printState()
 #api.signal({"AAPL":134, "NKE":131})
 #api.signal({"AAPL":134, "NKE":131})
@@ -164,4 +189,39 @@ api.printState()
 print(api.getActiveOrders())
 api.delay()
 #print(str(api.getCash()))
+"""
+
+"""
+api = alpaca_private()
+"""
+
+
+
+## @brief Main exec of the file.
+def execMain( userArgs=None ):
+    # sourcery skip: inline-immediately-returned-variable
+
+    alpacaObj = alpaca_private()
+
+    exitValue = alpacaObj.main()
+
+    return exitValue
+
+if __name__ == '__main__':
+   try:
+      retVal = execMain()
+   except KeyboardInterrupt:
+      print('Received <Ctrl+c>')
+      sys.exit(-1)
+
+   sys.exit(retVal)
+
+"""
+python3 -m pdb code/alpaca_private.py
+"""
+
+
+"""
+Can use <F5> or <Ctrl+F5> by doing the following:
+dlvenv
 """
