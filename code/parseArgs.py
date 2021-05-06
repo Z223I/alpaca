@@ -13,6 +13,7 @@ def isValidDir( parser, argName, directory ):
             os.makedirs( directory, exist_ok=True )
          except OSError as e:
             parser.error( "Can't create directory (--%s=%s)" % ( argName, directory ) )
+            print(f'\n\n{e}')
 
       return os.path.realpath( os.path.abspath( directory ) )
 
@@ -31,8 +32,8 @@ def setupParser():
       Setup the parser.
    """
 
-   epilog = "Stocks 1.0 epilog."
-   description = "Builds databases from stock feeds."
+   epilog = "Alpaca API 1.0 epilog."
+   description = "Provides access to Alpaca brokerage accounts."
 
    class CustomHelpFormatter( argparse.ArgumentDefaultsHelpFormatter,
                               argparse.RawDescriptionHelpFormatter ):
@@ -54,10 +55,12 @@ def setupParser():
 
    optionalGroup = parser.add_argument_group( "Optional" )
 
+   """
    optionalGroup.add_argument( '-k', '--apiKey',
                                help = 'API Key',
                                default = 'demo',
                                required = False )
+   """
 
    # Verbose option
    optionalGroup.add_argument( "-v", "--verbose",
