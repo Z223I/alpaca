@@ -32,11 +32,11 @@ def initialize(context):
                                symbol('AXP')
                              ]
 
-    # Data is for predictions from 5/5 to 5/7.
+    # Data is for predictions from 5/5 to 5/7.  Need NYSE.
     context.buyListOfDicts = [
-        {'AKAM': 105.0, 'COMM': 16.57, 'DDD': 19.53, 'DXC': 32.71, 'GPRO': 10.92, 'INTC': 56.94, 'MSI': 186.57, 'ORCL': 78.54, 'SNPS': 237.07, 'SPWR': 23.0, 'VIAV': 15.99, 'WDAY': 237.15, 'STX': 88.47, 'PSTG': 18.89, 'BB': 8.36},
-        {'AVYA': 29.57, 'CLDR': 11.86, 'COMM': 16.65, 'FTV': 71.74, 'GRPN': 51.11, 'HPE': 15.985, 'INTC': 56.9, 'LSCC': 48.67, 'OKTA': 242.28, 'SPWR': 23.34, 'SSNC': 73.05, 'VMW': 159.66, 'XRX': 23.98, 'TRMB': 81.14, 'IIVI': 65.15},
-        {'ACN': 291.17, 'ADSK': 284.21, 'BB': 8.14, 'COMM': 17.21, 'CTSH': 75.11, 'DBX': 24.52, 'FEYE': 19.08, 'FIS': 151.81, 'FTNT': 206.37, 'GPRO': 10.45, 'HPQ': 34.99, 'INFY': 18.6, 'LSCC': 49.52, 'NOW': 485.84, 'NTAP': 77.9, 'OKTA': 234.35, 'SABR': 12.39, 'SPLK': 116.78, 'VIAV': 16.2, 'VMW': 162.36},
+        {'AAPL': 105.0, 'MSFT': 16.57, 'NVDA': 19.53, 'INTC': 32.71, 'ADBE': 10.92, 'CSCO': 56.94},
+        {'AAPL': 105.0, 'AVGO': 16.57, 'TXN': 19.53, 'QCOM': 32.71, 'INTU': 10.92},
+        {'AAPL': 105.0, 'AVGO': 16.57, 'TXN': 19.53, 'QCOM': 32.71, 'INTU': 10.92},
     ]
 
 
