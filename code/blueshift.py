@@ -46,14 +46,7 @@ def initialize(context):
 
     context.tradeDayCounter = 0
 
-
-    """
-    # Call rebalance function on the first trading day of each month after 2.5 hours from market open
-    schedule_function(rebalance,
-                    date_rules.month_start(days_offset=0),
-                    time_rules.market_close(hours=2, minutes=30))
-    """
-
+    # Call rebalance function at market open
     # Trade at the start of every day
     schedule_function(rebalance, date_rules.every_day(), time_rules.market_open(minutes=1))
 
