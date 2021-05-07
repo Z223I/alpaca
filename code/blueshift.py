@@ -20,7 +20,7 @@ def initialize(context):
     """
 
     # universe selection
-    # This will be overwritten.
+    # This will be overwritten daily.
     context.AT_portfolio = [
                                symbol('AMZN'),
                                symbol('AAPL'),
