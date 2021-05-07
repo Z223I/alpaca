@@ -35,10 +35,10 @@ class Portfolio:
 
     def adjust(self, symbols, buy):
         for asset in symbols:
-            if not buy:
-                del self.assets[asset]
-            else:
+            if buy:
                 self.assets[asset] = None
+            else:
+                del self.assets[asset]
 
 ## Enter description
 class alpaca_private:
@@ -68,8 +68,10 @@ class alpaca_private:
         signals  = Portfolio(signals)
 
         sellStocksDict, buyStocksDict  = self.holdings.compare(signals)
+
         print("Sell:")
         print(str(sellStocksDict.keys()))
+        
         self.action(sellStocksDict, False)
         self.delay()
 
