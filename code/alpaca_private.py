@@ -14,9 +14,10 @@ class Portfolio:
     ##
     def __init__(self, assets=dict()):
         self.assets = assets
+        
         if isinstance(self.assets, list):
-            temp = {asset: None for asset in self.assets}
-            self.assets = temp
+            self.assets = {asset: None for asset in self.assets}
+
         print("assets:")
         print(str(self.assets))
 
@@ -71,7 +72,7 @@ class alpaca_private:
 
         print("Sell:")
         print(str(sellStocksDict.keys()))
-        
+
         self.action(sellStocksDict, False)
         self.delay()
 
