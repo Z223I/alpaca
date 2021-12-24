@@ -50,11 +50,11 @@ class alpaca_private:
         self.history = {}
         self.holdings = Portfolio()
 
-        self.key = "PKE2MB78HZHHEGSWYM36"
-        self.secret = "ihWtpSr1hzTK4lAWyEBZAPQF9841aiATY8zWEQUy"
+        self.key = 'AKS04WXLXNUF9LX4XD1Y'
+        self.secret = '3kCOo9dblurb9CMIyhArbHvFofnKWoumeZ4tTO8b'
         self.headers = {'APCA-API-KEY-ID':self.key, 'APCA-API-SECRET-KEY':self.secret}
 
-        self.baseURL = "https://paper-api.alpaca.markets"
+        self.baseURL = 'https://api.alpaca.markets'
         self.accountURL = "{}/v2/account".format(self.baseURL)
         self.ordersURL = "{}/v2/orders".format(self.baseURL)
 
