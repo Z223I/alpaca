@@ -4,7 +4,7 @@ import math
 import time
 import sys
 
-import alpaca_trade_api as tradeapi   # pip3 install alpaca-trade-api
+import alpaca_trade_api as tradeapi   # pip3 install alpaca-trade-api -U
 
 import parseArgs
 
@@ -14,7 +14,7 @@ class Portfolio:
     ##
     def __init__(self, assets=dict()):
         self.assets = assets
-        
+
         if isinstance(self.assets, list):
             self.assets = {asset: None for asset in self.assets}
 
