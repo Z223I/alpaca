@@ -14,3 +14,12 @@ print('The market opened at {} and closed at {} on {}.'.format(
     calendar.close,
     date
 ))
+
+# Check when the market was open in Dec. 2021
+startDate = '2021-12-01'
+stopDate  = '2021-12-31'
+calendars = api.get_calendar(start=startDate, end=stopDate)
+
+for calendar in calendars:
+    print(f'calendar: {calendar}')
+    print(f'The market opened at {calendar.open} and closed at {calendar.close} on {calendar.date}.')
