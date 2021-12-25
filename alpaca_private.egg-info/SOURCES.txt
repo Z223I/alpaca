@@ -1,0 +1,16 @@
+setup.cfg
+setup.py
+alpaca_private/__init__.py
+alpaca_private/alpaca-private-old.py
+alpaca_private/alpaca_private.py
+alpaca_private/blueshift.py
+alpaca_private/market_open.py
+alpaca_private/parseArgs.py
+alpaca_private/test_TA.py
+alpaca_private/zipline01.py
+alpaca_private.egg-info/PKG-INFO
+alpaca_private.egg-info/SOURCES.txt
+alpaca_private.egg-info/dependency_links.txt
+alpaca_private.egg-info/requires.txt
+alpaca_private.egg-info/top_level.txt
+test/test_Alpaca.py

@@ -1,0 +1,28 @@
+Metadata-Version: 1.2
+Name: alpaca-private
+Version: 0.11.1
+Summary: Trading stocks
+Home-page: https://github.com/z223i/alpaca
+Author: brucewilson
+Author-email: BruceWilsonUS@gmail.com
+Maintainer: Bruce
+Maintainer-email: BruceWilsonUS@gmail.com
+License: Private Use
+Description: UNKNOWN
+Platform: any
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Classifier: Topic :: Office/Business :: Scheduling
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Requires-Python: >=3.6
