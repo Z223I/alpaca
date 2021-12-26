@@ -6,7 +6,7 @@ import sys
 
 import alpaca_trade_api as tradeapi   # pip3 install alpaca-trade-api -U
 
-import parseArgs
+import alpaca_private.parseArgs
 
 ## Enter description
 class Portfolio:

@@ -1,4 +1,4 @@
-Metadata-Version: 1.2
+Metadata-Version: 2.1
 Name: alpaca-private
 Version: 0.11.1
 Summary: Trading stocks
@@ -8,7 +8,6 @@ Author-email: BruceWilsonUS@gmail.com
 Maintainer: Bruce
 Maintainer-email: BruceWilsonUS@gmail.com
 License: Private Use
-Description: UNKNOWN
 Platform: any
 Classifier: Development Status :: 4 - Beta
 Classifier: Intended Audience :: Developers
@@ -26,3 +25,6 @@ Classifier: Programming Language :: Python :: Implementation :: PyPy
 Classifier: Topic :: Office/Business :: Scheduling
 Classifier: Topic :: Software Development :: Libraries :: Python Modules
 Requires-Python: >=3.6
+
+UNKNOWN
+

@@ -7,8 +7,8 @@ from unittest.mock import MagicMock
 import requests
 import json
 
-from alpaca_private import getArgs
-from alpaca_private import alpaca_private
+from alpaca_private import alpaca_private as ap
+#from alpaca_private import getArgs
 
 
 
@@ -23,7 +23,7 @@ class TestAlpaca(unittest.TestCase):
         #print(f'userArgs: {userArgs}')
 
         #self.test_alpacaObj = alpaca_private(args)
-        self.test_alpacaObj = alpaca_private()
+        self.test_alpacaObj = ap.alpaca_private()
 
 
         #paper trade
