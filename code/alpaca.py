@@ -3,10 +3,15 @@ import json
 import math
 import time
 import sys
+import os
+from dotenv import load_dotenv
 
 import alpaca_trade_api as tradeapi   # pip3 install alpaca-trade-api -U
 
 import parseArgs
+
+# Load environment variables from .env file
+load_dotenv()
 
 ## Enter description
 class Portfolio:
@@ -50,8 +55,8 @@ class alpaca_private:
         self.history = {}
         self.holdings = Portfolio()
 
-        self.key = 'AKAFYL1FLVY0K7LA3W61'
-        self.secret = 'lJZqa0ppULedNsA8ARYuUZ9YJkthDYcN5gGO6aCL'
+        self.key = os.getenv('ALPACA_API_KEY')
+        self.secret = os.getenv('ALPACA_SECRET_KEY')
         self.headers = {'APCA-API-KEY-ID':self.key, 'APCA-API-SECRET-KEY':self.secret}
 
         self.baseURL = 'https://api.alpaca.markets'
