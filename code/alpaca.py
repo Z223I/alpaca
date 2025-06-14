@@ -134,18 +134,22 @@ class alpaca_private:
     ##
     def printActiveOrders(self):
         orders = self.getActiveOrders()
-        print(f"orders: {orders}")
+        
+        if orders:
+            print(f"orders: {orders}")
 
-        for order in orders:
-            print(f"order: {order}")
-            print(f"symbol: {order.symbol}")
-            print(f"qty: {order.qty}")
-            print(f"side: {order.side}")
-            print(f"status: {order.status}")
-            print(f"filled_qty: {order.filled_qty}")
-            print(f"remaining_qty: {order.remaining_qty}")
-            print(f"created_at: {order.created_at}")
-            print(f"updated_at: {order.updated_at}")
+            for order in orders:
+                print(f"order: {order}")
+                print(f"symbol: {order.symbol}")
+                print(f"qty: {order.qty}")
+                print(f"side: {order.side}")
+                print(f"status: {order.status}")
+                print(f"filled_qty: {order.filled_qty}")
+                print(f"remaining_qty: {order.remaining_qty}")
+                print(f"created_at: {order.created_at}")
+                print(f"updated_at: {order.updated_at}")
+        else:
+            print("No current orders")
 
     ##
     def getCash(self):
