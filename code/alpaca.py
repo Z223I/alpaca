@@ -85,14 +85,14 @@ class alpaca_private:
                           help='Current market price for bracket order')
         parser.add_argument('--submit', action='store_true',
                           help='Actually submit the bracket order (default: False)')
-        
+
         args = parser.parse_args(userArgs)
-        
+
         # Validate bracket order arguments
         if args.bracket_order:
             if not all([args.symbol, args.quantity, args.market_price]):
                 parser.error("--bracket_order requires --symbol, --quantity, and --market_price")
-        
+
         return args
 
 
@@ -129,19 +129,40 @@ class alpaca_private:
                 status='open',
                 limit=100)
         except:
-            return 1
+            return {}
+
+    ##
+    def printActiveOrders(self):
+        orders = self.getActiveOrders()
+        print(f"orders: {orders}")
+
+        for order in orders:
+            print(f"order: {order}")
+            print(f"symbol: {order.symbol}")
+            print(f"qty: {order.qty}")
+            print(f"side: {order.side}")
+            print(f"status: {order.status}")
+            print(f"filled_qty: {order.filled_qty}")
+            print(f"remaining_qty: {order.remaining_qty}")
+            print(f"created_at: {order.created_at}")
+            print(f"updated_at: {order.updated_at}")
 
     ##
     def getCash(self):
         return self.core.get_account().cash
 
     ##
-    def getState(self):
+    def printCash(self):
+        cash = self.getCash()
+        print(f"cash: {cash}")
+
+    ##
+    def getPositions_(self):
         return self.core.list_positions()
 
     ##
-    def printState(self):
-        state = self.getState()
+    def printPositions(self):
+        state = self.getPositions_()
         print(f"state: {state}")
 
 
@@ -167,7 +188,7 @@ class alpaca_private:
             self.current_id += 1
 
         print("Trade")
-        self.printState()
+        self.printPositions()
 
 
     ##
@@ -233,7 +254,11 @@ class alpaca_private:
 
 
     ## @brief Main code of the alpaca_private object.
-    def Exec( self, userArgs=None ):
+    def Exec( self ):
+
+        self.printPositions()
+        self.printCash()
+        print(self.getActiveOrders())
 
         # Handle bracket order if requested
         if self.args.bracket_order:
@@ -243,9 +268,6 @@ class alpaca_private:
                 market_price=self.args.market_price,
                 submit_order=self.args.submit
             )
-        else:
-            self.printState()
-            print(self.getActiveOrders())
 
         return 0
 
@@ -256,7 +278,7 @@ def execMain( userArgs=None ):
 
     alpacaObj = alpaca_private(userArgs)
 
-    exitValue = alpacaObj.Exec(userArgs)
+    exitValue = alpacaObj.Exec()
 
     return exitValue
 
