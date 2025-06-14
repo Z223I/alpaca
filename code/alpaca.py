@@ -49,6 +49,7 @@ class Portfolio:
 ## Enter description
 class alpaca_private:
 
+    RISK = 0.10  # 10% risk constant
 
     ##
     def __init__(self):
