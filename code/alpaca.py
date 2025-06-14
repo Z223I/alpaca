@@ -167,7 +167,15 @@ class alpaca_private:
     def bracketOrder_(self, symbol, quantity, market_price):
         stop_price = market_price * (1 - self.RISK)
 
-        print(f"submit_order(symbol={symbol}, qty={quantity}, side='buy', type='market', time_in_force='gtc', order_class='bracket', stop_loss={{'stop_price': {stop_price}}})")
+        print(f"submit_order(\n"
+              f"    symbol={symbol},\n"
+              f"    qty={quantity},\n"
+              f"    side='buy',\n"
+              f"    type='market',\n"
+              f"    time_in_force='gtc',\n"
+              f"    order_class='bracket',\n"
+              f"    stop_loss={{'stop_price': {stop_price}}}\n"
+              f")")
 
         self.core.submit_order(
             symbol=symbol,
