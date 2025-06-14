@@ -164,7 +164,16 @@ class alpaca_private:
         #}
         #return json.loads(requests.post(self.ordersURL, headers=self.headers, json=orderObject).content)
 
-    def bracketOrder_(self, symbol, quantity, market_price, submit_order=False):
+    def bracketOrder_(self, symbol: str, quantity: int, market_price: float, submit_order: bool = False) -> None:
+        """
+        Create a bracket order with stop loss protection.
+        
+        Args:
+            symbol: The stock symbol to trade
+            quantity: Number of shares to buy
+            market_price: Current market price of the stock
+            submit_order: Whether to actually submit the order (default: False)
+        """
         stop_price = market_price * (1 - self.RISK)
 
         print(f"submit_order(\n"
@@ -177,21 +186,22 @@ class alpaca_private:
               f"    stop_loss={{'stop_price': {stop_price}}}\n"
               f")")
 
-        self.core.submit_order(
-            symbol=symbol,
-            qty=quantity,
-            side='buy',
-            type='market',  # or 'limit'
-            time_in_force='gtc',
-            order_class='bracket',
-            stop_loss={
-                'stop_price': stop_price,  # Triggers a stop order
-            }
-            #,
-            # take_profit={
-            #     'limit_price': 160.00  # Required for take-profit
-            # }
-        )
+        if submit_order:
+            self.core.submit_order(
+                symbol=symbol,
+                qty=quantity,
+                side='buy',
+                type='market',  # or 'limit'
+                time_in_force='gtc',
+                order_class='bracket',
+                stop_loss={
+                    'stop_price': stop_price,  # Triggers a stop order
+                }
+                #,
+                # take_profit={
+                #     'limit_price': 160.00  # Required for take-profit
+                # }
+            )
 
 
 
