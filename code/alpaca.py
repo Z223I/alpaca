@@ -143,11 +143,11 @@ class alpaca_private:
 
 
     ##
-    def order(self, symbol, quat, side, type="market", time_in_force="gtc"):
+    def order(self, symbol, quantity, side, type="market", time_in_force="gtc"):
 
         self.core.submit_order(
             symbol=symbol,
-            qty=math.floor(quat),
+            qty=math.floor(quantity),
             side=side,
             type=type,
             time_in_force=time_in_force )
@@ -162,6 +162,24 @@ class alpaca_private:
         #"time_in_force":"gtc"
         #}
         #return json.loads(requests.post(self.ordersURL, headers=self.headers, json=orderObject).content)
+
+    def bracketOrder_(self, symbol, quantity, side, type="market", time_in_force="gtc"):
+
+        self.core.submit_order(
+            symbol='AAPL',
+            qty=1,
+            side='buy',
+            type='market',  # or 'limit'
+            time_in_force='gtc',
+            order_class='bracket',
+            stop_loss={
+                'stop_price': 150.00,  # Triggers a stop order
+            },
+            take_profit={
+                'limit_price': 160.00  # Required for take-profit
+            }
+        )
+
 
 
     ## @brief Main code of the alpaca_private object.
