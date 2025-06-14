@@ -7,6 +7,7 @@ import os
 from dotenv import load_dotenv
 
 import alpaca_trade_api as tradeapi   # pip3 install alpaca-trade-api -U
+import argparse
 
 import parseArgs
 
@@ -52,9 +53,12 @@ class alpaca_private:
     RISK = 0.10  # 10% risk constant
 
     ##
-    def __init__(self):
+    def __init__(self, userArgs=None):
         self.history = {}
         self.holdings = Portfolio()
+
+        # Parse arguments
+        self.args = self._parse_args(userArgs)
 
         self.key = os.getenv('ALPACA_API_KEY')
         self.secret = os.getenv('ALPACA_SECRET_KEY')
@@ -67,6 +71,29 @@ class alpaca_private:
         self.core =  tradeapi.REST(self.key, self.secret, self.baseURL)
         self.active_orders = []
         self.current_id = 0
+
+    def _parse_args(self, userArgs):
+        """Parse command line arguments"""
+        parser = argparse.ArgumentParser(description='Alpaca Trading Bot')
+        parser.add_argument('-b', '--bracket_order', action='store_true',
+                          help='Execute bracket order')
+        parser.add_argument('--symbol', type=str, required=False,
+                          help='Stock symbol for bracket order')
+        parser.add_argument('--quantity', type=int, required=False,
+                          help='Number of shares for bracket order')
+        parser.add_argument('--market_price', type=float, required=False,
+                          help='Current market price for bracket order')
+        parser.add_argument('--submit', action='store_true',
+                          help='Actually submit the bracket order (default: False)')
+        
+        args = parser.parse_args(userArgs)
+        
+        # Validate bracket order arguments
+        if args.bracket_order:
+            if not all([args.symbol, args.quantity, args.market_price]):
+                parser.error("--bracket_order requires --symbol, --quantity, and --market_price")
+        
+        return args
 
 
     ##
@@ -208,8 +235,17 @@ class alpaca_private:
     ## @brief Main code of the alpaca_private object.
     def Exec( self, userArgs=None ):
 
-        self.printState()
-        print(self.getActiveOrders())
+        # Handle bracket order if requested
+        if self.args.bracket_order:
+            self.bracketOrder_(
+                symbol=self.args.symbol,
+                quantity=self.args.quantity,
+                market_price=self.args.market_price,
+                submit_order=self.args.submit
+            )
+        else:
+            self.printState()
+            print(self.getActiveOrders())
 
         return 0
 
@@ -218,15 +254,15 @@ class alpaca_private:
 def execMain( userArgs=None ):
     # sourcery skip: inline-immediately-returned-variable
 
-    alpacaObj = alpaca_private()
+    alpacaObj = alpaca_private(userArgs)
 
-    exitValue = alpacaObj.Exec()
+    exitValue = alpacaObj.Exec(userArgs)
 
     return exitValue
 
 if __name__ == '__main__':
    try:
-      retVal = execMain()
+      retVal = execMain(sys.argv[1:])
    except KeyboardInterrupt:
       print('Received <Ctrl+c>')
       sys.exit(-1)
