@@ -167,7 +167,7 @@ class alpaca_private:
     def bracketOrder_(self, symbol: str, quantity: int, market_price: float, submit_order: bool = False) -> None:
         """
         Create a bracket order with stop loss protection.
-        
+
         Args:
             symbol: The stock symbol to trade
             quantity: Number of shares to buy
@@ -234,11 +234,11 @@ if __name__ == '__main__':
    sys.exit(retVal)
 
 """
-python3 -m pdb code/alpaca_private.py
+python3 -m pdb code/alpaca.py
 """
 
 
 """
 Can use <F5> or <Ctrl+F5> by doing the following:
-dlvenv
+conda activate alpaca
 """
