@@ -164,7 +164,7 @@ class alpaca_private:
         #}
         #return json.loads(requests.post(self.ordersURL, headers=self.headers, json=orderObject).content)
 
-    def bracketOrder_(self, symbol, quantity, market_price):
+    def bracketOrder_(self, symbol, quantity, market_price, submit_order=False):
         stop_price = market_price * (1 - self.RISK)
 
         print(f"submit_order(\n"
