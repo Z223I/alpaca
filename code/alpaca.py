@@ -164,68 +164,34 @@ class alpaca_private:
         #}
         #return json.loads(requests.post(self.ordersURL, headers=self.headers, json=orderObject).content)
 
-    def bracketOrder_(self, symbol, quantity, side, type="market", time_in_force="gtc"):
+    def bracketOrder_(self, symbol, quantity, market_price):
+        stop_price = market_price * (1 - self.RISK)
 
         self.core.submit_order(
-            symbol='AAPL',
-            qty=1,
+            symbol=symbol,
+            qty=quantity,
             side='buy',
             type='market',  # or 'limit'
             time_in_force='gtc',
             order_class='bracket',
             stop_loss={
-                'stop_price': 150.00,  # Triggers a stop order
-            },
-            take_profit={
-                'limit_price': 160.00  # Required for take-profit
+                'stop_price': stop_price,  # Triggers a stop order
             }
+            #,
+            # take_profit={
+            #     'limit_price': 160.00  # Required for take-profit
+            # }
         )
 
 
 
     ## @brief Main code of the alpaca_private object.
-    def main( self, userArgs=None ):
+    def Exec( self, userArgs=None ):
 
         self.printState()
         print(self.getActiveOrders())
 
         return 0
-
-
-## Parse CLI arguments.
-def getArgs(userArgs=None):
-    # sourcery skip: inline-immediately-returned-variable
-
-    print(f'userArgs: {userArgs}')
-
-    parser = parseArgs.setupParser()
-
-    args = parseArgs.parseArgs( parser, userArgs )
-
-    return args
-
-"""
-api = alpaca_private()
-#api.printState()
-#api.signal({"AAPL":134, "NKE":131})
-#api.signal({"AAPL":134, "NKE":131})
-#api.signal({"AAPL":134, "GME":170})
-#api.signal({"AMC":11.5, "GME":170})
-#api.signal({"AAPL":134, "NKE":131})
-#api.order("AAPL", 1, "sell")
-
-#api.order("AAPL", 390, "sell")
-#api.order("NKE", 380, "sell")
-api.printState()
-print(api.getActiveOrders())
-api.delay()
-#print(str(api.getCash()))
-"""
-
-"""
-api = alpaca_private()
-"""
-
 
 
 ## @brief Main exec of the file.
@@ -234,7 +200,7 @@ def execMain( userArgs=None ):
 
     alpacaObj = alpaca_private()
 
-    exitValue = alpacaObj.main()
+    exitValue = alpacaObj.Exec()
 
     return exitValue
 
