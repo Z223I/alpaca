@@ -134,7 +134,7 @@ class alpaca_private:
     ##
     def printActiveOrders(self):
         orders = self.getActiveOrders()
-        
+
         if orders:
             print(f"orders: {orders}")
 
@@ -166,8 +166,8 @@ class alpaca_private:
 
     ##
     def printPositions(self):
-        state = self.getPositions_()
-        print(f"state: {state}")
+        positions = self.getPositions_()
+        print(f"positions: {positions}")
 
 
     ##
@@ -262,7 +262,7 @@ class alpaca_private:
 
         self.printPositions()
         self.printCash()
-        print(self.getActiveOrders())
+        self.printActiveOrders()
 
         # Handle bracket order if requested
         if self.args.bracket_order:
