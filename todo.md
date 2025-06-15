@@ -8,8 +8,9 @@
 
         self.baseURL = 'https://api.alpaca.markets'
 
+## Bash
 
-
-
-
-python code/alpaca.py --bracket_order --symbol AAPL --quantity 10 --market_price 150.00
+        ```bash
+        python code/alpaca.py --bracket_order --symbol AAPL --quantity 10 --market_price 150.00
+        python code/alpaca.py --get_latest_quote --symbol AAPL
+        ```
