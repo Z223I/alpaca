@@ -69,11 +69,11 @@ class alpaca_private:
     def _buy(self, symbol: str, submit_order: bool = False) -> None:
         """
         Execute a buy order with bracket order protection.
-        
+
         This method retrieves the latest quote, calculates position size based on
         available cash and existing positions, and submits a bracket order with
         stop loss protection.
-        
+
         Args:
             symbol: The stock symbol to buy
             submit_order: Whether to actually submit the order (default: False for dry run)
@@ -81,8 +81,8 @@ class alpaca_private:
         # Get current market data for the symbol
         latest_quote = get_latest_quote(self.api, symbol)
         market_price = latest_quote.ask_price
-        
-        # Calculate stop loss price (10% below market price)
+
+        # Calculate stop loss price
         stop_price = market_price * (1 - self.STOP_LOSS_PERCENT)
 
         # Get current account information
