@@ -35,7 +35,7 @@ class alpaca_private:
         self.accountURL = "{}/v2/account".format(self.baseURL)
         self.ordersURL = "{}/v2/orders".format(self.baseURL)
 
-        self.core =  tradeapi.REST(self.key, self.secret, self.baseURL)
+        self.api =  tradeapi.REST(self.key, self.secret, self.baseURL)
         self.active_orders = []
 
     def _parse_args(self, userArgs):
@@ -69,7 +69,7 @@ class alpaca_private:
     ##
     def getActiveOrders(self):
         try:
-            return self.core.list_orders(
+            return self.api.list_orders(
                 status='open',
                 limit=100)
         except:
@@ -97,7 +97,7 @@ class alpaca_private:
 
     ##
     def getCash(self):
-        return self.core.get_account().cash
+        return self.api.get_account().cash
 
     ##
     def printCash(self):
@@ -106,7 +106,7 @@ class alpaca_private:
 
     ##
     def _getPositions(self):
-        return self.core.list_positions()
+        return self.api.list_positions()
 
     ##
     def printPositions(self):
@@ -136,7 +136,7 @@ class alpaca_private:
               f")")
 
         if submit_order:
-            self.core.submit_order(
+            self.api.submit_order(
                 symbol=symbol,
                 qty=quantity,
                 side='buy',
