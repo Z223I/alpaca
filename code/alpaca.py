@@ -70,16 +70,45 @@ class alpaca_private:
         latest_quote = get_latest_quote(self.api, symbol)
         market_price = latest_quote.ask_price
         stop_price = market_price * (1 - self.STOP_LOSS_PERCENT)
-        
+
         cash = get_cash(self.api)
         positions = get_positions(self.api)
-        
+
+        if self.PORTFOLIO_RISK != 0.50:
+            print("_buy() logic must be changed to use the new portfolio risk value")
+
         if not positions:
-            quantity = math.floor(cash / market_price)
+            quantity = math.floor(cash * self.PORTFOLIO_RISK / market_price)
         else:
-            quantity = 1
-        
-        pass
+            quantity = math.floor(cash / market_price)
+
+        print(f"submit_order(\n"
+                f"    symbol={symbol},\n"
+                f"    qty={quantity},\n"
+                f"    side='buy',\n"
+                f"    type='market',\n"
+                f"    time_in_force='gtc',\n"
+                f"    order_class='bracket',\n"
+                f"    stop_loss={{'stop_price': {stop_price}}}\n"
+                f")")
+
+
+        if submit_order:
+            self.api.submit_order(
+                symbol=symbol,
+                qty=quantity,
+                side='buy',
+                type='market',  # or 'limit'
+                time_in_force='gtc',
+                order_class='bracket',
+                stop_loss={
+                    'stop_price': stop_price,  # Triggers a stop order
+                }
+                #,
+                # take_profit={
+                #     'limit_price': 160.00  # Required for take-profit
+                # }
+            )
 
 
     def _bracketOrder(self, symbol: str, quantity: int, market_price: float, submit_order: bool = False) -> None:
