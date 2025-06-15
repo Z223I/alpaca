@@ -200,6 +200,10 @@ class alpaca_private:
         if self.args.get_latest_quote:
             print_quote(self.api, self.args.symbol)
 
+        # Handle buy order if requested
+        if self.args.buy:
+            self._buy(symbol=self.args.symbol, submit_order=self.args.submit)
+
         return 0
 
 
