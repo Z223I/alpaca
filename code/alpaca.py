@@ -35,7 +35,7 @@ class alpaca_private:
     including order management, position tracking, and bracket order execution.
     """
 
-    RISK = 0.10  # 10% risk constant
+    STOP_LOSS_PERCENT = 0.10  # 10% stop loss constant
 
     def __init__(self, userArgs: Optional[List[str]] = None) -> None:
         """
@@ -71,7 +71,7 @@ class alpaca_private:
             market_price: Current market price of the stock
             submit_order: Whether to actually submit the order (default: False)
         """
-        stop_price = market_price * (1 - self.RISK)
+        stop_price = market_price * (1 - self.STOP_LOSS_PERCENT)
 
         print(f"submit_order(\n"
               f"    symbol={symbol},\n"
