@@ -7,3 +7,9 @@
         self.headers = {'APCA-API-KEY-ID':self.key, 'APCA-API-SECRET-KEY':self.secret}
 
         self.baseURL = 'https://api.alpaca.markets'
+
+
+
+
+
+python code/alpaca.py --bracket_order --symbol AAPL --quantity 10 --market_price 150.00
