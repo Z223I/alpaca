@@ -67,21 +67,41 @@ class alpaca_private:
 
 
     def _buy(self, symbol: str, submit_order: bool = False) -> None:
+        """
+        Execute a buy order with bracket order protection.
+        
+        This method retrieves the latest quote, calculates position size based on
+        available cash and existing positions, and submits a bracket order with
+        stop loss protection.
+        
+        Args:
+            symbol: The stock symbol to buy
+            submit_order: Whether to actually submit the order (default: False for dry run)
+        """
+        # Get current market data for the symbol
         latest_quote = get_latest_quote(self.api, symbol)
         market_price = latest_quote.ask_price
+        
+        # Calculate stop loss price (10% below market price)
         stop_price = market_price * (1 - self.STOP_LOSS_PERCENT)
 
+        # Get current account information
         cash = get_cash(self.api)
         positions = get_positions(self.api)
 
+        # TODO: Update logic to properly handle different portfolio risk values
         if self.PORTFOLIO_RISK != 0.50:
             print("_buy() logic must be changed to use the new portfolio risk value")
 
+        # Calculate quantity based on portfolio state
         if not positions:
+            # First position: use portfolio risk percentage of available cash
             quantity = math.floor(cash * self.PORTFOLIO_RISK / market_price)
         else:
+            # Subsequent positions: use all remaining cash
             quantity = math.floor(cash / market_price)
 
+        # Display the order details that would be submitted
         print(f"submit_order(\n"
                 f"    symbol={symbol},\n"
                 f"    qty={quantity},\n"
@@ -92,17 +112,17 @@ class alpaca_private:
                 f"    stop_loss={{'stop_price': {stop_price}}}\n"
                 f")")
 
-
+        # Submit the actual order if requested
         if submit_order:
             self.api.submit_order(
                 symbol=symbol,
                 qty=quantity,
                 side='buy',
-                type='market',  # or 'limit'
-                time_in_force='gtc',
-                order_class='bracket',
+                type='market',  # Market order for immediate execution
+                time_in_force='gtc',  # Good till cancelled
+                order_class='bracket',  # Bracket order with stop loss
                 stop_loss={
-                    'stop_price': stop_price,  # Triggers a stop order
+                    'stop_price': stop_price,  # Triggers a stop order at 10% loss
                 }
                 #,
                 # take_profit={
