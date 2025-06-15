@@ -31,7 +31,7 @@ class alpaca_private:
         self.secret = os.getenv('ALPACA_SECRET_KEY')
         self.headers = {'APCA-API-KEY-ID':self.key, 'APCA-API-SECRET-KEY':self.secret}
 
-        self.baseURL = 'https://api.alpaca.markets'
+        self.baseURL = os.getenv('ALPACA_BASE_URL', 'https://api.alpaca.markets')
         self.accountURL = "{}/v2/account".format(self.baseURL)
         self.ordersURL = "{}/v2/orders".format(self.baseURL)
 
