@@ -5,6 +5,7 @@ import time
 import sys
 import os
 from dotenv import load_dotenv
+from typing import Optional, List, Dict, Any
 
 import alpaca_trade_api as tradeapi   # pip3 install alpaca-trade-api -U
 import argparse
@@ -15,13 +16,23 @@ import parseArgs
 load_dotenv()
 
 
-## Enter description
 class alpaca_private:
+    """
+    Alpaca trading API wrapper for automated trading operations.
+    
+    This class provides methods for interacting with the Alpaca trading API,
+    including order management, position tracking, and bracket order execution.
+    """
 
     RISK = 0.10  # 10% risk constant
 
-    ##
-    def __init__(self, userArgs=None):
+    def __init__(self, userArgs: Optional[List[str]] = None) -> None:
+        """
+        Initialize the Alpaca trading client.
+        
+        Args:
+            userArgs: Optional command line arguments for configuration
+        """
         self.history = {}
 
         # Parse arguments
@@ -38,8 +49,19 @@ class alpaca_private:
         self.api =  tradeapi.REST(self.key, self.secret, self.baseURL)
         self.active_orders = []
 
-    def _parse_args(self, userArgs):
-        """Parse command line arguments"""
+    def _parse_args(self, userArgs: Optional[List[str]]) -> argparse.Namespace:
+        """
+        Parse command line arguments for the trading bot.
+        
+        Args:
+            userArgs: List of command line arguments to parse
+            
+        Returns:
+            Parsed arguments namespace
+            
+        Raises:
+            SystemExit: If required arguments are missing for bracket orders
+        """
         parser = argparse.ArgumentParser(description='Alpaca Trading Bot')
         parser.add_argument('-b', '--bracket_order', action='store_true',
                           help='Execute bracket order')
@@ -61,13 +83,23 @@ class alpaca_private:
 
         return args
 
-    def delay(self):
+    def delay(self) -> None:
+        """
+        Wait until all active orders are completed.
+        
+        Continuously polls for active orders and sleeps until none remain.
+        """
         while len(self.getActiveOrders()) > 0:
             time.sleep(1)
 
 
-    ##
-    def getActiveOrders(self):
+    def getActiveOrders(self) -> List[Any]:
+        """
+        Retrieve all active (open) orders from Alpaca.
+        
+        Returns:
+            List of active order objects, or empty dict if an error occurs
+        """
         try:
             return self.api.list_orders(
                 status='open',
@@ -75,8 +107,13 @@ class alpaca_private:
         except:
             return {}
 
-    ##
-    def printActiveOrders(self):
+    def printActiveOrders(self) -> None:
+        """
+        Print details of all active orders to console.
+        
+        Displays order information including symbol, quantity, side, status,
+        filled quantity, remaining quantity, and timestamps.
+        """
         orders = self.getActiveOrders()
 
         if orders:
@@ -95,21 +132,35 @@ class alpaca_private:
         else:
             print("No current orders")
 
-    ##
-    def getCash(self):
+    def getCash(self) -> float:
+        """
+        Get the current cash balance in the trading account.
+        
+        Returns:
+            Current cash balance as a float
+        """
         return self.api.get_account().cash
 
-    ##
-    def printCash(self):
+    def printCash(self) -> None:
+        """
+        Print the current cash balance to console.
+        """
         cash = self.getCash()
         print(f"cash: {cash}")
 
-    ##
-    def _getPositions(self):
+    def _getPositions(self) -> List[Any]:
+        """
+        Get all current positions in the trading account.
+        
+        Returns:
+            List of position objects from Alpaca API
+        """
         return self.api.list_positions()
 
-    ##
-    def printPositions(self):
+    def printPositions(self) -> None:
+        """
+        Print all current positions to console.
+        """
         positions = self._getPositions()
         print(f"positions: {positions}")
 
@@ -154,8 +205,16 @@ class alpaca_private:
 
 
 
-    ## @brief Main code of the alpaca_private object.
-    def Exec( self ):
+    def Exec(self) -> int:
+        """
+        Execute the main trading logic.
+        
+        Prints current positions, cash balance, and active orders.
+        If bracket order arguments are provided, executes a bracket order.
+        
+        Returns:
+            Exit code (0 for success)
+        """
 
         self.printPositions()
         self.printCash()
@@ -173,8 +232,16 @@ class alpaca_private:
         return 0
 
 
-## @brief Main exec of the file.
-def execMain( userArgs=None ):
+def execMain(userArgs: Optional[List[str]] = None) -> int:
+    """
+    Main execution function for the Alpaca trading script.
+    
+    Args:
+        userArgs: Optional command line arguments
+        
+    Returns:
+        Exit code from the trading execution
+    """
     # sourcery skip: inline-immediately-returned-variable
 
     alpacaObj = alpaca_private(userArgs)
