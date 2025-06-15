@@ -10,6 +10,9 @@ from typing import Optional, List, Dict, Any
 import alpaca_trade_api as tradeapi   # pip3 install alpaca-trade-api -U
 import argparse
 
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import parseArgs
 from atoms.api.get_cash import get_cash
 from atoms.api.get_active_orders import get_active_orders
