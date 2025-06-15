@@ -64,6 +64,13 @@ class alpaca_private:
         self.active_orders = []
 
 
+    def _buy(self, symbol: str, submit_order: bool = False) -> None:
+
+        
+        #stop_price = market_price * (1 - self.STOP_LOSS_PERCENT)
+        pass
+
+
     def _bracketOrder(self, symbol: str, quantity: int, market_price: float, submit_order: bool = False) -> None:
         """
         Create a bracket order with stop loss protection.
