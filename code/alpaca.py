@@ -4,6 +4,7 @@
 # import time
 import sys
 import os
+import math
 from dotenv import load_dotenv
 from typing import Optional, List, Dict, Any
 
@@ -13,9 +14,9 @@ import argparse
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# from atoms.api.get_cash import get_cash
+from atoms.api.get_cash import get_cash
 # from atoms.api.get_active_orders import get_active_orders
-# from atoms.api.get_positions import get_positions
+from atoms.api.get_positions import get_positions
 from atoms.api.get_latest_quote import get_latest_quote
 from atoms.display.print_cash import print_cash
 from atoms.display.print_orders import print_active_orders
@@ -69,6 +70,15 @@ class alpaca_private:
         latest_quote = get_latest_quote(self.api, symbol)
         market_price = latest_quote.ask_price
         stop_price = market_price * (1 - self.STOP_LOSS_PERCENT)
+        
+        cash = get_cash(self.api)
+        positions = get_positions(self.api)
+        
+        if not positions:
+            quantity = math.floor(cash / market_price)
+        else:
+            quantity = 1
+        
         pass
 
 
