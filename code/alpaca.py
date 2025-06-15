@@ -19,6 +19,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from atoms.display.print_cash import print_cash
 from atoms.display.print_orders import print_active_orders
 from atoms.display.print_positions import print_positions
+from atoms.display.print_quote import print_quote
 from atoms.utils.delay import delay
 from atoms.utils.parse_args import parse_args
 
@@ -124,6 +125,10 @@ class alpaca_private:
                 market_price=self.args.market_price,
                 submit_order=self.args.submit
             )
+
+        # Handle quote request if requested
+        if self.args.get_latest_quote:
+            print_quote(self.api, self.args.symbol)
 
         return 0
 

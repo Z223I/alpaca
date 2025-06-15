@@ -26,6 +26,8 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
                       help='Current market price for bracket order')
     parser.add_argument('--submit', action='store_true',
                       help='Actually submit the bracket order (default: False)')
+    parser.add_argument('-q', '--get_latest_quote', action='store_true',
+                      help='Get latest quote for a symbol')
 
     args = parser.parse_args(userArgs)
 
@@ -33,5 +35,10 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
     if args.bracket_order:
         if not all([args.symbol, args.quantity, args.market_price]):
             parser.error("--bracket_order requires --symbol, --quantity, and --market_price")
+    
+    # Validate quote arguments
+    if args.get_latest_quote:
+        if not args.symbol:
+            parser.error("--get_latest_quote requires --symbol")
 
     return args
