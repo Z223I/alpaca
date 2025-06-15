@@ -50,7 +50,7 @@ class alpaca_private:
         self.args = parse_args(userArgs)
 
         # Set portfolio risk from environment variable or use default
-        self.PORTFOLIO_RISK = float(os.getenv('PORTFOLIO_RISK', '0.05'))
+        self.PORTFOLIO_RISK = float(os.getenv('PORTFOLIO_RISK', '0.10'))
 
         self.key = os.getenv('ALPACA_API_KEY')
         self.secret = os.getenv('ALPACA_SECRET_KEY')
