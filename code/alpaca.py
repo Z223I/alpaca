@@ -86,7 +86,7 @@ class alpaca_private:
         stop_price = market_price * (1 - self.STOP_LOSS_PERCENT)
 
         # Get current account information
-        cash = float(get_cash(self.api))
+        cash = get_cash(self.api)
         positions = get_positions(self.api)
 
         # TODO: Update logic to properly handle different portfolio risk values

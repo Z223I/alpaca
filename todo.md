@@ -14,4 +14,5 @@
         ```bash
         python code/alpaca.py --bracket_order --symbol AAPL --quantity 10 --market_price 150.00
         python code/alpaca.py --get_latest_quote --symbol AAPL
+        python code/alpaca.py --buy --symbol AAPL
         ```
