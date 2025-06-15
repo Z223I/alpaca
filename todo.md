@@ -1,6 +1,6 @@
 # TODO
 
-- [ ] Create underscore masterBracketOrder to do the math necessary to call underscore bracket order.  New new argument for this.
+- [X] Create underscore buy.  New cli argument for this.
 - [ ] Update .env to use both paper and live trading.  Include the URLs.
 - [ ] Update code/alpaca.py to take --live arg which defaults to False. and create paper and live versions of
         self.key = os.getenv('ALPACA_API_KEY')
