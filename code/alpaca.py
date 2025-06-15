@@ -16,6 +16,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # from atoms.api.get_cash import get_cash
 # from atoms.api.get_active_orders import get_active_orders
 # from atoms.api.get_positions import get_positions
+from atoms.api.get_latest_quote import get_latest_quote
 from atoms.display.print_cash import print_cash
 from atoms.display.print_orders import print_active_orders
 from atoms.display.print_positions import print_positions
@@ -65,9 +66,9 @@ class alpaca_private:
 
 
     def _buy(self, symbol: str, submit_order: bool = False) -> None:
-
-        
-        #stop_price = market_price * (1 - self.STOP_LOSS_PERCENT)
+        latest_quote = get_latest_quote(self.api, symbol)
+        market_price = latest_quote.ask_price
+        stop_price = market_price * (1 - self.STOP_LOSS_PERCENT)
         pass
 
 
