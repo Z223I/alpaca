@@ -14,38 +14,6 @@ import parseArgs
 # Load environment variables from .env file
 load_dotenv()
 
-## Enter description
-class Portfolio:
-
-    ##
-    def __init__(self, assets=dict()):
-        self.assets = assets
-
-        if isinstance(self.assets, list):
-            self.assets = {asset: None for asset in self.assets}
-
-        print("assets:")
-        print(str(self.assets))
-
-
-    ## Returns two dicts the first contains stocks to sell the second contains stocks to buy
-    def compare(self, other):
-        sell  = self.assets.copy()
-        buy = {
-            asset: other.assets[asset]
-            for asset in other.assets
-            if sell.pop(asset, True)
-        }
-
-        return sell, buy
-
-
-    def adjust(self, symbols, buy):
-        for asset in symbols:
-            if buy:
-                self.assets[asset] = None
-            else:
-                del self.assets[asset]
 
 ## Enter description
 class alpaca_private:
@@ -55,7 +23,6 @@ class alpaca_private:
     ##
     def __init__(self, userArgs=None):
         self.history = {}
-        self.holdings = Portfolio()
 
         # Parse arguments
         self.args = self._parse_args(userArgs)
@@ -70,7 +37,6 @@ class alpaca_private:
 
         self.core =  tradeapi.REST(self.key, self.secret, self.baseURL)
         self.active_orders = []
-        self.current_id = 0
 
     def _parse_args(self, userArgs):
         """Parse command line arguments"""
@@ -94,28 +60,6 @@ class alpaca_private:
                 parser.error("--bracket_order requires --symbol, --quantity, and --market_price")
 
         return args
-
-
-    ##
-    def signal(self, signals):
-
-        signals  = Portfolio(signals)
-
-        sellStocksDict, buyStocksDict  = self.holdings.compare(signals)
-
-        print("Sell:")
-        print(str(sellStocksDict.keys()))
-
-        self.action(sellStocksDict, False)
-        self.delay()
-
-        print("Buy:")
-        print(str(buyStocksDict.keys()))
-
-        self.action(buyStocksDict, True)
-
-        self.holdings.adjust(sellStocksDict, False)
-        self.holdings.adjust(buyStocksDict, True)
 
     def delay(self):
         while len(self.getActiveOrders()) > 0:
@@ -161,62 +105,15 @@ class alpaca_private:
         print(f"cash: {cash}")
 
     ##
-    def getPositions_(self):
+    def _getPositions(self):
         return self.core.list_positions()
 
     ##
     def printPositions(self):
-        positions = self.getPositions_()
+        positions = self._getPositions()
         print(f"positions: {positions}")
 
-
-    ##
-    def action(self, symbols, buy):
-        if buy:
-            direction = "buy"
-            cash  = float(self.core.get_account().cash)
-            print("cash")
-            print(cash)
-            if cash < 1:
-                return
-        else:
-            direction = "sell"
-
-        for asset in symbols:
-            if buy:
-                self.order(asset, (cash/len(symbols))/symbols[asset], direction)
-            else:
-                self.order(asset, self.core.get_position(asset).qty, direction)
-
-            self.active_orders.append(self.current_id)
-            self.current_id += 1
-
-        print("Trade")
-        self.printPositions()
-
-
-    ##
-    def order(self, symbol, quantity, side, type="market", time_in_force="gtc"):
-
-        self.core.submit_order(
-            symbol=symbol,
-            qty=math.floor(quantity),
-            side=side,
-            type=type,
-            time_in_force=time_in_force )
-
-
-
-        #orderObject = {
-        #"symbol":symbol,
-        #"notional":quat,
-        #"side":side,
-        #"type":"market",
-        #"time_in_force":"gtc"
-        #}
-        #return json.loads(requests.post(self.ordersURL, headers=self.headers, json=orderObject).content)
-
-    def bracketOrder_(self, symbol: str, quantity: int, market_price: float, submit_order: bool = False) -> None:
+    def _bracketOrder(self, symbol: str, quantity: int, market_price: float, submit_order: bool = False) -> None:
         """
         Create a bracket order with stop loss protection.
 
@@ -266,7 +163,7 @@ class alpaca_private:
 
         # Handle bracket order if requested
         if self.args.bracket_order:
-            self.bracketOrder_(
+            self._bracketOrder(
                 symbol=self.args.symbol,
                 quantity=self.args.quantity,
                 market_price=self.args.market_price,
