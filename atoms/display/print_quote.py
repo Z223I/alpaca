@@ -11,5 +11,6 @@ def print_quote(api_client: Any, symbol: str) -> None:
         symbol: Stock symbol to get quote for
     """
     latest_quote = get_latest_quote(api_client, symbol)
+    print("Symbol:", symbol)
     print("Bid price:", latest_quote.bid_price)
     print("Ask price:", latest_quote.ask_price)
