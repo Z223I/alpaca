@@ -5,7 +5,6 @@
 import sys
 import os
 import math
-from dotenv import load_dotenv
 from typing import Optional, List, Dict, Any
 
 import alpaca_trade_api as tradeapi   # pip3 install alpaca-trade-api -U
@@ -25,8 +24,12 @@ from atoms.display.print_quote import print_quote
 from atoms.utils.delay import delay
 from atoms.utils.parse_args import parse_args
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from .env file (optional)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    print("Warning: python-dotenv not installed. Using system environment variables only.")
 
 
 class alpaca_private:
