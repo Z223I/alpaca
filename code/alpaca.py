@@ -69,7 +69,7 @@ class alpaca_private:
         self.active_orders = []
 
 
-    def _buy(self, symbol: str, submit_order: bool = False) -> None:
+    def _buy(self, symbol: str, take_profit: float, submit_order: bool = False) -> None:
         """
         Execute a buy order with bracket order protection.
 
@@ -79,6 +79,7 @@ class alpaca_private:
 
         Args:
             symbol: The stock symbol to buy
+            take_profit: The take profit price for the bracket order
             submit_order: Whether to actually submit the order (default: False for dry run)
         """
         # Get current market data for the symbol
@@ -112,7 +113,8 @@ class alpaca_private:
                 f"    type='market',\n"
                 f"    time_in_force='gtc',\n"
                 f"    order_class='bracket',\n"
-                f"    stop_loss={{'stop_price': {stop_price}}}\n"
+                f"    stop_loss={{'stop_price': {stop_price}}},\n"
+                f"    take_profit={{'limit_price': {take_profit}}}\n"
                 f")")
 
         # Submit the actual order if requested
@@ -128,12 +130,12 @@ class alpaca_private:
                     'stop_price': stop_price,  # Triggers a stop order at 10% loss
                 },
                 take_profit={
-                    'limit_price': 160.00
+                    'limit_price': take_profit
                 }
             )
 
 
-    def _bracketOrder(self, symbol: str, quantity: int, market_price: float, submit_order: bool = False) -> None:
+    def _bracketOrder(self, symbol: str, quantity: int, market_price: float, take_profit: float, submit_order: bool = False) -> None:
         """
         Create a bracket order with stop loss protection.
 
@@ -141,6 +143,7 @@ class alpaca_private:
             symbol: The stock symbol to trade
             quantity: Number of shares to buy
             market_price: Current market price of the stock
+            take_profit: The take profit price for the bracket order
             submit_order: Whether to actually submit the order (default: False)
         """
         stop_price = market_price * (1 - self.STOP_LOSS_PERCENT)
@@ -152,7 +155,8 @@ class alpaca_private:
               f"    type='market',\n"
               f"    time_in_force='gtc',\n"
               f"    order_class='bracket',\n"
-              f"    stop_loss={{'stop_price': {stop_price}}}\n"
+              f"    stop_loss={{'stop_price': {stop_price}}},\n"
+              f"    take_profit={{'limit_price': {take_profit}}}\n"
               f")")
 
         if submit_order:
@@ -167,7 +171,7 @@ class alpaca_private:
                     'stop_price': stop_price,  # Triggers a stop order
                 },
                 take_profit={
-                    'limit_price': 160.00  # Required for take-profit
+                    'limit_price': take_profit  # Required for take-profit
                 }
             )
 
@@ -194,6 +198,7 @@ class alpaca_private:
                 symbol=self.args.symbol,
                 quantity=self.args.quantity,
                 market_price=self.args.market_price,
+                take_profit=self.args.take_profit,
                 submit_order=self.args.submit
             )
 
@@ -203,7 +208,7 @@ class alpaca_private:
 
         # Handle buy order if requested
         if self.args.buy:
-            self._buy(symbol=self.args.symbol, submit_order=self.args.submit)
+            self._buy(symbol=self.args.symbol, take_profit=self.args.take_profit, submit_order=self.args.submit)
 
         return 0
 
