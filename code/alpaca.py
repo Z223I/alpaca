@@ -87,7 +87,7 @@ class alpaca_private:
         market_price = latest_quote.ask_price
 
         # Calculate stop loss price
-        stop_price = market_price * (1 - self.STOP_LOSS_PERCENT)
+        stop_price = round(market_price * (1 - self.STOP_LOSS_PERCENT), 2)
 
         # Get current account information
         cash = get_cash(self.api)
@@ -146,7 +146,7 @@ class alpaca_private:
             take_profit: The take profit price for the bracket order
             submit_order: Whether to actually submit the order (default: False)
         """
-        stop_price = market_price * (1 - self.STOP_LOSS_PERCENT)
+        stop_price = round(market_price * (1 - self.STOP_LOSS_PERCENT), 2)
 
         print(f"submit_order(\n"
               f"    symbol={symbol},\n"
