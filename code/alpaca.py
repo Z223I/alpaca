@@ -126,11 +126,10 @@ class alpaca_private:
                 order_class='bracket',  # Bracket order with stop loss
                 stop_loss={
                     'stop_price': stop_price,  # Triggers a stop order at 10% loss
+                },
+                take_profit={
+                    'limit_price': 160.00
                 }
-                #,
-                # take_profit={
-                #     'limit_price': 160.00  # Required for take-profit
-                # }
             )
 
 
@@ -166,11 +165,10 @@ class alpaca_private:
                 order_class='bracket',
                 stop_loss={
                     'stop_price': stop_price,  # Triggers a stop order
+                },
+                take_profit={
+                    'limit_price': 160.00  # Required for take-profit
                 }
-                #,
-                # take_profit={
-                #     'limit_price': 160.00  # Required for take-profit
-                # }
             )
 
 
