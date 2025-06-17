@@ -40,7 +40,7 @@ class alpaca_private:
     including order management, position tracking, and bracket order execution.
     """
 
-    STOP_LOSS_PERCENT = 0.10  # 10% stop loss constant
+    STOP_LOSS_PERCENT = 0.075 # Default stop loss percentage (7.5%)
 
     def __init__(self, userArgs: Optional[List[str]] = None) -> None:
         """
@@ -84,7 +84,7 @@ class alpaca_private:
         """
         # Get current market data for the symbol
         latest_quote = get_latest_quote(self.api, symbol)
-        market_price = latest_quote.ask_price
+        market_price = latest_quote.bid_price
 
         # Calculate stop loss price
         stop_price = round(market_price * (1 - self.STOP_LOSS_PERCENT), 2)
