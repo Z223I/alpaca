@@ -64,17 +64,17 @@ python3 code/alpaca.py --buy --symbol AAPL --submit --take_profit 200.00
 
 Create a bracket order:
 ```bash
-python3 code/alpaca.py --bracket-order --symbol AAPL --quantity 10 --market-price 150.00 --submit
+python3 code/alpaca.py --bracket_order --symbol AAPL --quantity 10 --market_price 150.00 --submit
 ```
 
 Create a future bracket order with limit entry:
 ```bash
-python3 code/alpaca.py --future-bracket-order --symbol AAPL --quantity 10 --limit-price 145.00 --stop-price 140.00 --take-profit 160.00 --submit
+python3 code/alpaca.py --future_bracket_order --symbol AAPL --quantity 10 --limit_price 145.00 --stop_price 140.00 --take_profit 160.00 --submit
 ```
 
 Create a future bracket order with automatic quantity calculation:
 ```bash
-python3 code/alpaca.py --future-bracket-order --symbol AAPL --limit-price 145.00 --stop-price 140.00 --take-profit 160.00 --submit
+python3 code/alpaca.py --future_bracket_order --symbol AAPL --limit_price 145.00 --stop_price 140.00 --take_profit 160.00 --submit
 ```
 
 ### Command Line Arguments
