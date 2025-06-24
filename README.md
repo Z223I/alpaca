@@ -6,6 +6,7 @@ A Python wrapper for automated trading operations using the Alpaca trading API. 
 
 - **Automated Trading**: Execute buy orders with automatic stop-loss protection
 - **Bracket Orders**: Create bracket orders with configurable stop-loss percentages
+- **Future Bracket Orders**: Create limit entry bracket orders with automatic quantity calculation
 - **Portfolio Management**: View positions, cash balance, and active orders
 - **Risk Management**: Built-in 7.5% stop-loss protection and configurable portfolio risk
 - **Quote Retrieval**: Get latest market quotes for symbols
@@ -66,16 +67,29 @@ Create a bracket order:
 python3 code/alpaca.py --bracket-order --symbol AAPL --quantity 10 --market-price 150.00 --submit
 ```
 
+Create a future bracket order with limit entry:
+```bash
+python3 code/alpaca.py --future-bracket-order --symbol AAPL --quantity 10 --limit-price 145.00 --stop-price 140.00 --take-profit 160.00 --submit
+```
+
+Create a future bracket order with automatic quantity calculation:
+```bash
+python3 code/alpaca.py --future-bracket-order --symbol AAPL --limit-price 145.00 --stop-price 140.00 --take-profit 160.00 --submit
+```
+
 ### Command Line Arguments
 
 - `--buy`: Execute a buy order with automatic position sizing
 - `--symbol SYMBOL`: Specify the stock symbol to trade
 - `--submit`: Actually submit orders (without this flag, orders are displayed but not executed)
 - `--get-latest-quote`: Retrieve the latest quote for a symbol
-- `--bracket-order`: Create a bracket order
-- `--quantity N`: Number of shares for bracket orders
+- `--bracket-order`: Create a bracket order with market entry
+- `--future-bracket-order`: Create a future bracket order with limit entry
+- `--quantity N`: Number of shares for bracket orders (optional for future bracket orders - will auto-calculate if omitted)
 - `--market-price PRICE`: Market price for bracket order calculations
-- `--take_profit PRICE`: Optional take profit price for buy orders
+- `--limit-price PRICE`: Limit price for future bracket order entry
+- `--stop-price PRICE`: Stop loss price for future bracket orders
+- `--take_profit PRICE`: Take profit price for bracket orders
 
 ## Risk Management
 
@@ -103,6 +117,7 @@ python3 code/alpaca.py --bracket-order --symbol AAPL --quantity 10 --market-pric
 
 - `_buy()`: Execute buy orders with automatic bracket order protection
 - `_bracketOrder()`: Create bracket orders with stop-loss protection
+- `_futureBracketOrder()`: Create future bracket orders with limit entry and stop-loss protection
 - `Exec()`: Main execution logic that handles command-line operations
 
 ### Dependencies

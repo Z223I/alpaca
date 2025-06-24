@@ -69,6 +69,35 @@ class alpaca_private:
         self.active_orders = []
 
 
+    def _calculateQuantity(self, price: float, method_name: str = "method") -> int:
+        """
+        Calculate the quantity of shares to buy based on portfolio risk and available cash.
+
+        Args:
+            price: The price per share to use for calculation
+            method_name: Name of the calling method for logging purposes
+
+        Returns:
+            The calculated quantity of shares to buy
+        """
+        # Get current account information
+        cash = get_cash(self.api)
+        positions = get_positions(self.api)
+
+        # TODO: Update logic to properly handle different portfolio risk values
+        if self.PORTFOLIO_RISK != 0.50:
+            print(f"{method_name}() logic must be changed to use the new portfolio risk value")
+
+        # Calculate quantity based on portfolio state
+        if not positions:
+            # First position: use portfolio risk percentage of available cash
+            quantity = math.floor(cash * self.PORTFOLIO_RISK / price)
+        else:
+            # Subsequent positions: use all remaining cash
+            quantity = math.floor(cash / price)
+
+        return quantity
+
     def _buy(self, symbol: str, take_profit: float, submit_order: bool = False) -> None:
         """
         Execute a buy order with bracket order protection.
@@ -89,21 +118,8 @@ class alpaca_private:
         # Calculate stop loss price
         stop_price = round(market_price * (1 - self.STOP_LOSS_PERCENT), 2)
 
-        # Get current account information
-        cash = get_cash(self.api)
-        positions = get_positions(self.api)
-
-        # TODO: Update logic to properly handle different portfolio risk values
-        if self.PORTFOLIO_RISK != 0.50:
-            print("_buy() logic must be changed to use the new portfolio risk value")
-
-        # Calculate quantity based on portfolio state
-        if not positions:
-            # First position: use portfolio risk percentage of available cash
-            quantity = math.floor(cash * self.PORTFOLIO_RISK / market_price)
-        else:
-            # Subsequent positions: use all remaining cash
-            quantity = math.floor(cash / market_price)
+        # Calculate quantity using shared logic
+        quantity = self._calculateQuantity(market_price, "_buy")
 
         # Display the order details that would be submitted
         print(f"submit_order(\n"
@@ -177,6 +193,51 @@ class alpaca_private:
 
 
 
+    def _futureBracketOrder(self, symbol: str, quantity: int, limit_price: float, stop_price: float, take_profit: float, submit_order: bool = False) -> None:
+        """
+        Create a future bracket order with limit entry and stop loss protection.
+
+        Args:
+            symbol: The stock symbol to trade
+            quantity: Number of shares to buy (if 0, calculates automatically based on portfolio risk)
+            limit_price: The limit price for the entry order
+            stop_price: The stop loss price for the bracket order
+            take_profit: The take profit price for the bracket order
+            submit_order: Whether to actually submit the order (default: False)
+        """
+        # Calculate quantity if not provided (quantity == 0)
+        if quantity == 0:
+            quantity = self._calculateQuantity(limit_price, "_futureBracketOrder")
+
+        print(f"submit_order(\n"
+              f"    symbol='{symbol}',\n"
+              f"    qty={quantity},\n"
+              f"    side='buy',\n"
+              f"    type='limit',\n"
+              f"    time_in_force='day',\n"
+              f"    limit_price={limit_price},\n"
+              f"    order_class='bracket',\n"
+              f"    stop_loss={{'stop_price': {stop_price}}},\n"
+              f"    take_profit={{'limit_price': {take_profit}}}\n"
+              f")")
+
+        if submit_order:
+            self.api.submit_order(
+                symbol=symbol,
+                qty=quantity,
+                side='buy',
+                type='limit',
+                time_in_force='day',
+                limit_price=limit_price,
+                order_class='bracket',
+                stop_loss={
+                    'stop_price': stop_price,
+                },
+                take_profit={
+                    'limit_price': take_profit
+                }
+            )
+
     def Exec(self) -> int:
         """
         Execute the main trading logic.
@@ -198,6 +259,17 @@ class alpaca_private:
                 symbol=self.args.symbol,
                 quantity=self.args.quantity,
                 market_price=self.args.market_price,
+                take_profit=self.args.take_profit,
+                submit_order=self.args.submit
+            )
+
+        # Handle future bracket order if requested
+        if self.args.future_bracket_order:
+            self._futureBracketOrder(
+                symbol=self.args.symbol,
+                quantity=self.args.quantity,
+                limit_price=self.args.limit_price,
+                stop_price=self.args.stop_price,
                 take_profit=self.args.take_profit,
                 submit_order=self.args.submit
             )
