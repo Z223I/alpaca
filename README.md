@@ -7,7 +7,7 @@ A Python wrapper for automated trading operations using the Alpaca trading API. 
 - **Automated Trading**: Execute buy orders with automatic stop-loss protection
 - **Bracket Orders**: Create bracket orders with configurable stop-loss percentages
 - **Portfolio Management**: View positions, cash balance, and active orders
-- **Risk Management**: Built-in 10% stop-loss protection and configurable portfolio risk
+- **Risk Management**: Built-in 7.5% stop-loss protection and configurable portfolio risk
 - **Quote Retrieval**: Get latest market quotes for symbols
 - **Environment Configuration**: Secure API key management via environment variables
 
@@ -56,6 +56,11 @@ Execute a buy order (actual submission):
 python3 code/alpaca.py --buy --symbol AAPL --submit
 ```
 
+Execute a buy order with take profit:
+```bash
+python3 code/alpaca.py --buy --symbol AAPL --submit --take_profit 200.00
+```
+
 Create a bracket order:
 ```bash
 python3 code/alpaca.py --bracket-order --symbol AAPL --quantity 10 --market-price 150.00 --submit
@@ -70,11 +75,12 @@ python3 code/alpaca.py --bracket-order --symbol AAPL --quantity 10 --market-pric
 - `--bracket-order`: Create a bracket order
 - `--quantity N`: Number of shares for bracket orders
 - `--market-price PRICE`: Market price for bracket order calculations
+- `--take_profit PRICE`: Optional take profit price for buy orders
 
 ## Risk Management
 
 ### Stop Loss Protection
-- All buy orders automatically include a 10% stop-loss order
+- All buy orders automatically include a 7.5% stop-loss order
 - Stop-loss percentage is configurable via the `STOP_LOSS_PERCENT` class constant
 
 ### Position Sizing
