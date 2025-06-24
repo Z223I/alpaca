@@ -82,13 +82,13 @@ python3 code/alpaca.py --future_bracket_order --symbol AAPL --limit_price 145.00
 - `--buy`: Execute a buy order with automatic position sizing
 - `--symbol SYMBOL`: Specify the stock symbol to trade
 - `--submit`: Actually submit orders (without this flag, orders are displayed but not executed)
-- `--get-latest-quote`: Retrieve the latest quote for a symbol
-- `--bracket-order`: Create a bracket order with market entry
-- `--future-bracket-order`: Create a future bracket order with limit entry
+- `--get_latest_quote`: Retrieve the latest quote for a symbol
+- `--bracket_order`: Create a bracket order with market entry
+- `--future_bracket_order`: Create a future bracket order with limit entry
 - `--quantity N`: Number of shares for bracket orders (optional for future bracket orders - will auto-calculate if omitted)
-- `--market-price PRICE`: Market price for bracket order calculations
-- `--limit-price PRICE`: Limit price for future bracket order entry
-- `--stop-price PRICE`: Stop loss price for future bracket orders
+- `--market_price PRICE`: Market price for bracket order calculations
+- `--limit_price PRICE`: Limit price for future bracket order entry
+- `--stop_price PRICE`: Stop loss price for future bracket orders
 - `--take_profit PRICE`: Take profit price for bracket orders
 
 ## Risk Management
