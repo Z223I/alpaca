@@ -118,7 +118,9 @@ class ORB:
         Returns:
             True if successful, False otherwise
         """
-        return self._load_and_process_csv_data()
+        success = self._load_and_process_csv_data()
+
+        return success
 
 
 def main():
