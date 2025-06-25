@@ -1,5 +1,5 @@
 import csv
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
 
 def read_csv(filename: str, delimiter: str = ',', encoding: str = 'utf-8') -> List[Dict[str, Any]]:
@@ -60,6 +60,6 @@ def read_csv(filename: str, delimiter: str = ',', encoding: str = 'utf-8') -> Li
     except FileNotFoundError:
         raise FileNotFoundError(f"CSV file not found: {filename}")
     except UnicodeDecodeError as e:
-        raise UnicodeDecodeError(f"Error decoding file {filename}: {e}")
+        raise UnicodeDecodeError(e.encoding, e.object, e.start, e.end, f"Error decoding file {filename}: {e.reason}")
     except csv.Error as e:
         raise csv.Error(f"Error parsing CSV file {filename}: {e}")
