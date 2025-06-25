@@ -58,9 +58,9 @@ class ORB:
         except (EOFError, KeyboardInterrupt):
             return False
     
-    def Exec(self) -> bool:
+    def _load_and_process_csv_data(self) -> bool:
         """
-        Execute the ORB analysis process.
+        Load and process CSV data from the most recent file.
         
         This method:
         1. Finds the most current CSV file in the data directory
@@ -110,6 +110,15 @@ class ORB:
         except Exception as e:
             print(f"Error reading CSV file: {e}")
             return False
+
+    def Exec(self) -> bool:
+        """
+        Execute the ORB analysis process.
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        return self._load_and_process_csv_data()
 
 
 def main():
