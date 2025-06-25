@@ -1,5 +1,6 @@
 # TODO
 
+- [ ] Create ORB.py to monitor ORB trading strategy.
 - [X] Create .envpaper
 - [ ] Create .envlive
 - [X] Create '_future_bracket_order()'
@@ -19,4 +20,9 @@
 
         # quantity will be automatically calculated.
         python3 code/alpaca.py --future_bracket_order --symbol AAPL --limit_price 145.00 --stop_price 140.00 --take_profit 160.00 --submit
+        ```
+
+## MCP
+        ```bash
+        claude mcp add --transport http context7 https://mcp.context7.com/mcp
         ```
