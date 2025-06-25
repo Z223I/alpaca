@@ -120,6 +120,10 @@ class ORB:
         """
         success = self._load_and_process_csv_data()
 
+        if not success:
+            print("Failed to load and process CSV data.")
+            return False
+
         return success
 
 
