@@ -2,6 +2,14 @@ import os
 import glob
 import sys
 from typing import List, Dict, Any, Optional
+from datetime import datetime, time
+import pytz
+from dotenv import load_dotenv
+
+import alpaca_trade_api as tradeapi   # pip3 install alpaca-trade-api -U
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Add the project root to the path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -16,6 +24,23 @@ class ORB:
     
     def __init__(self):
         """Initialize the ORB class."""
+
+        # Get api key and secret from environment variables
+
+        # Set portfolio risk from environment variable or use default
+        self.PORTFOLIO_RISK = float(os.getenv('PORTFOLIO_RISK', '0.10'))
+
+        self.key = os.getenv('ALPACA_API_KEY')
+        self.secret = os.getenv('ALPACA_SECRET_KEY')
+        self.headers = {'APCA-API-KEY-ID':self.key, 'APCA-API-SECRET-KEY':self.secret}
+
+        self.baseURL = os.getenv('ALPACA_BASE_URL')
+        self.accountURL = "{}/v2/account".format(self.baseURL)
+        self.ordersURL = "{}/v2/orders".format(self.baseURL)
+
+        self.api =  tradeapi.REST(self.key, self.secret, self.baseURL)
+
+        # Other initializations
         self.data_directory = 'data'
         self.csv_data: Optional[List[Dict[str, Any]]] = None
         self.current_file: Optional[str] = None
@@ -110,6 +135,69 @@ class ORB:
         except Exception as e:
             print(f"Error reading CSV file: {e}")
             return False
+    
+    def _get_orb_market_data(self) -> bool:
+        """
+        Get market data for symbols from CSV between 9:30 AM and 10:00 AM ET.
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.csv_data:
+            print("No CSV data loaded.")
+            return False
+        
+        try:
+            # Extract symbols from CSV data
+            symbols = []
+            for row in self.csv_data:
+                if 'symbol' in row and row['symbol']:
+                    symbols.append(row['symbol'])
+                elif 'Symbol' in row and row['Symbol']:
+                    symbols.append(row['Symbol'])
+            
+            if not symbols:
+                print("No symbols found in CSV data.")
+                return False
+            
+            print(f"Getting market data for {len(symbols)} symbols: {symbols[:5]}{'...' if len(symbols) > 5 else ''}")
+            
+            # Get today's date with 9:30 AM and 10:00 AM ET
+            et_tz = pytz.timezone('America/New_York')
+            today = datetime.now(et_tz).date()
+            
+            start_time = datetime.combine(today, time(9, 30), tzinfo=et_tz)
+            end_time = datetime.combine(today, time(10, 0), tzinfo=et_tz)
+            
+            print(f"Fetching 1-minute data from {start_time} to {end_time}")
+            
+            # Get stock data using 1-minute timeframe with legacy API
+            market_data = {}
+            for symbol in symbols:
+                try:
+                    bars = self.api.get_bars(
+                        symbol,
+                        tradeapi.TimeFrame.Minute,
+                        start=start_time.isoformat(),
+                        end=end_time.isoformat()
+                    )
+                    market_data[symbol] = bars
+                except Exception as e:
+                    print(f"Error getting data for {symbol}: {e}")
+                    continue
+            
+            if market_data:
+                print(f"Successfully retrieved market data for ORB analysis.")
+                # Store the market data for further analysis
+                self.market_data = market_data
+                return True
+            else:
+                print("No market data retrieved.")
+                return False
+                
+        except Exception as e:
+            print(f"Error getting market data: {e}")
+            return False
 
     def Exec(self) -> bool:
         """
@@ -123,8 +211,15 @@ class ORB:
         if not success:
             print("Failed to load and process CSV data.")
             return False
+        
+        # Get market data for ORB analysis
+        market_data_success = self._get_orb_market_data()
+        
+        if not market_data_success:
+            print("Failed to get market data for ORB analysis.")
+            return False
 
-        return success
+        return True
 
 
 def main():
