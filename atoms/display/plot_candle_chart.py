@@ -21,7 +21,7 @@ def _calculate_orb_levels(symbol_data: pd.DataFrame) -> Tuple[Optional[float], O
     Returns:
         Tuple of (orb_high, orb_low) or (None, None) if insufficient data
     """
-    isDebugging = True
+    isDebugging = False  # Set to True for debugging output
     
     if isDebugging:
         print("=== ORB Calculation Debug ===")
@@ -142,14 +142,21 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') 
         
         # Add ORB rectangle if ORB levels were calculated
         if orb_high is not None and orb_low is not None:
-            # Get time range for ORB rectangle (full chart width)
+            # Get time range for ORB rectangle (first 15 candlesticks or all available data)
             x_min = mdates.date2num(symbol_data['timestamp'].min())
-            x_max = mdates.date2num(symbol_data['timestamp'].max())
-            chart_width = x_max - x_min
             
-            # Draw ORB rectangle (filled with thick edge)
-            orb_rect = Rectangle((x_min, orb_low), chart_width, orb_high - orb_low,
-                               facecolor='yellow', edgecolor='red', alpha=0.6, linewidth=6)
+            # Calculate width to cover first 15 candlesticks (or all if less than 15)
+            orb_candlesticks = min(15, len(symbol_data))
+            if orb_candlesticks > 1:
+                x_max = mdates.date2num(symbol_data['timestamp'].iloc[orb_candlesticks - 1])
+            else:
+                x_max = mdates.date2num(symbol_data['timestamp'].iloc[0])
+            
+            orb_width = x_max - x_min + 0.0012  # Add small padding to cover the last candlestick
+            
+            # Draw ORB rectangle (filled with thinner edge)
+            orb_rect = Rectangle((x_min - 0.0006, orb_low), orb_width, orb_high - orb_low,
+                               facecolor='yellow', edgecolor='red', alpha=0.6, linewidth=3)
             ax1.add_patch(orb_rect)
             
             # Add ORB level lines
