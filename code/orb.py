@@ -17,6 +17,7 @@ load_dotenv()
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from atoms.utils.read_csv import read_csv
 from atoms.api.init_alpaca_client import init_alpaca_client
+from atoms.display.plot_candle_chart import plot_candle_chart
 
 
 class ORB:
@@ -312,6 +313,41 @@ class ORB:
         except Exception as e:
             print(f"Error processing market data: {e}")
             return False
+    
+    def _generate_candle_charts(self) -> bool:
+        """
+        Generate candlestick charts with volume for each stock symbol.
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        if not hasattr(self, 'market_df') or self.market_df is None:
+            print("No market DataFrame available for charting.")
+            return False
+        
+        try:
+            # Get unique symbols
+            symbols = self.market_df['symbol'].unique()
+            
+            print(f"\nGenerating candlestick charts for {len(symbols)} symbols...")
+            
+            # Create plots directory if it doesn't exist
+            plots_dir = 'plots'
+            os.makedirs(plots_dir, exist_ok=True)
+            
+            # Generate chart for each symbol
+            success_count = 0
+            for symbol in symbols:
+                if plot_candle_chart(self.market_df, symbol, plots_dir):
+                    success_count += 1
+            
+            print(f"Successfully generated {success_count}/{len(symbols)} charts in '{plots_dir}' directory.")
+            
+            return success_count > 0
+            
+        except Exception as e:
+            print(f"Error generating charts: {e}")
+            return False
 
     def Exec(self) -> bool:
         """
@@ -338,6 +374,13 @@ class ORB:
         
         if not process_success:
             print("Failed to process market data.")
+            return False
+
+        # Generate candlestick charts for all symbols
+        chart_success = self._generate_candle_charts()
+        
+        if not chart_success:
+            print("Failed to generate charts.")
             return False
 
         return True
