@@ -5,6 +5,7 @@ import json
 from typing import List, Dict, Any, Optional
 from datetime import datetime, time, date
 import pytz
+import pandas as pd
 from dotenv import load_dotenv
 
 import alpaca_trade_api as tradeapi   # pip3 install alpaca-trade-api -U
@@ -256,6 +257,61 @@ class ORB:
         except Exception as e:
             print(f"Error saving market data: {e}")
             return False
+    
+    def _load_market_dataframe(self) -> bool:
+        """
+        Load market data from saved JSON file and convert to pandas DataFrame.
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.current_file:
+            print("No current file to process.")
+            return False
+        
+        try:
+            # Construct JSON filepath
+            stock_data_dir = 'stock_data'
+            filename = os.path.basename(self.current_file)
+            json_filename = filename.replace('.csv', '.json')
+            json_filepath = os.path.join(stock_data_dir, json_filename)
+            
+            # Check if JSON file exists
+            if not os.path.exists(json_filepath):
+                print(f"JSON file not found: {json_filepath}")
+                return False
+            
+            # Read JSON data
+            with open(json_filepath, 'r') as f:
+                market_data = json.load(f)
+            
+            # Convert to DataFrame
+            all_data = []
+            for symbol, bars in market_data.items():
+                for bar in bars:
+                    bar_data = bar.copy()
+                    bar_data['symbol'] = symbol
+                    all_data.append(bar_data)
+            
+            if not all_data:
+                print("No market data found in JSON file.")
+                return False
+            
+            df = pd.DataFrame(all_data)
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            
+            print(f"\nMarket Data DataFrame ({len(df)} rows):")
+            print("=" * 50)
+            print(df.head())
+            
+            # Store DataFrame for further analysis
+            self.market_df = df
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error processing market data: {e}")
+            return False
 
     def Exec(self) -> bool:
         """
@@ -275,6 +331,13 @@ class ORB:
         
         if not market_data_success:
             print("Failed to get market data for ORB analysis.")
+            return False
+
+        # Process market data from saved JSON file
+        process_success = self._load_market_dataframe()
+        
+        if not process_success:
+            print("Failed to process market data.")
             return False
 
         return True
