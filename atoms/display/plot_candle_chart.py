@@ -136,7 +136,7 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') 
             
             rect = Rectangle((mdates.date2num(timestamp) - 0.0003, bottom), 
                            0.0006, height, 
-                           facecolor=color, edgecolor='black', alpha=0.8,
+                           facecolor=color, edgecolor='none', alpha=0.8,
                            zorder=2)
             ax1.add_patch(rect)
         
