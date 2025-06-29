@@ -147,7 +147,7 @@ class ORB:
     
     def _get_orb_market_data(self) -> bool:
         """
-        Get market data for symbols from CSV between 9:30 AM and 10:00 AM ET.
+        Get market data for symbols from CSV between 9:30 AM and 3:00 PM ET.
         
         Returns:
             True if successful, False otherwise
@@ -171,12 +171,12 @@ class ORB:
             
             print(f"Getting market data for {len(symbols)} symbols: {symbols[:5]}{'...' if len(symbols) > 5 else ''}")
             
-            # Use date from CSV filename with 9:30 AM and 10:00 AM ET
+            # Use date from CSV filename with 9:30 AM and 3:00 PM ET
             et_tz = pytz.timezone('America/New_York')
             target_date = self.csv_date if self.csv_date else datetime.now(et_tz).date()
             
             start_time = datetime.combine(target_date, time(9, 30), tzinfo=et_tz)
-            end_time = datetime.combine(target_date, time(10, 0), tzinfo=et_tz)
+            end_time = datetime.combine(target_date, time(15, 0), tzinfo=et_tz)
             
             print(f"Fetching 1-minute data from {start_time} to {end_time}")
             
