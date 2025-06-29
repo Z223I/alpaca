@@ -17,6 +17,7 @@ from atoms.api.get_cash import get_cash
 # from atoms.api.get_active_orders import get_active_orders
 from atoms.api.get_positions import get_positions
 from atoms.api.get_latest_quote import get_latest_quote
+from atoms.api.init_alpaca_client import init_alpaca_client
 from atoms.display.print_cash import print_cash
 from atoms.display.print_orders import print_active_orders
 from atoms.display.print_positions import print_positions
@@ -57,15 +58,11 @@ class alpaca_private:
         # Set portfolio risk from environment variable or use default
         self.PORTFOLIO_RISK = float(os.getenv('PORTFOLIO_RISK', '0.10'))
 
-        self.key = os.getenv('ALPACA_API_KEY')
-        self.secret = os.getenv('ALPACA_SECRET_KEY')
-        self.headers = {'APCA-API-KEY-ID':self.key, 'APCA-API-SECRET-KEY':self.secret}
 
-        self.baseURL = os.getenv('ALPACA_BASE_URL')
-        self.accountURL = "{}/v2/account".format(self.baseURL)
-        self.ordersURL = "{}/v2/orders".format(self.baseURL)
+        # Initialize Alpaca API client using atom
+        self.api = init_alpaca_client()
 
-        self.api =  tradeapi.REST(self.key, self.secret, self.baseURL)
+
         self.active_orders = []
 
 

@@ -14,6 +14,7 @@ load_dotenv()
 # Add the project root to the path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from atoms.utils.read_csv import read_csv
+from atoms.api.init_alpaca_client import init_alpaca_client
 
 
 class ORB:
@@ -30,15 +31,9 @@ class ORB:
         # Set portfolio risk from environment variable or use default
         self.PORTFOLIO_RISK = float(os.getenv('PORTFOLIO_RISK', '0.10'))
 
-        self.key = os.getenv('ALPACA_API_KEY')
-        self.secret = os.getenv('ALPACA_SECRET_KEY')
-        self.headers = {'APCA-API-KEY-ID':self.key, 'APCA-API-SECRET-KEY':self.secret}
 
-        self.baseURL = os.getenv('ALPACA_BASE_URL')
-        self.accountURL = "{}/v2/account".format(self.baseURL)
-        self.ordersURL = "{}/v2/orders".format(self.baseURL)
-
-        self.api =  tradeapi.REST(self.key, self.secret, self.baseURL)
+        # Initialize Alpaca API client using atom
+        self.api = init_alpaca_client()
 
         # Other initializations
         self.data_directory = 'data'
