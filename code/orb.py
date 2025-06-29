@@ -1,8 +1,9 @@
 import os
 import glob
 import sys
+import json
 from typing import List, Dict, Any, Optional
-from datetime import datetime, time
+from datetime import datetime, time, date
 import pytz
 from dotenv import load_dotenv
 
@@ -39,6 +40,7 @@ class ORB:
         self.data_directory = 'data'
         self.csv_data: Optional[List[Dict[str, Any]]] = None
         self.current_file: Optional[str] = None
+        self.csv_date: Optional[date] = None
     
     def _get_most_recent_csv(self) -> Optional[str]:
         """
@@ -73,8 +75,8 @@ class ORB:
             True if user confirms, False otherwise
         """
         try:
-            response = input(f"Use file '{filename}'? (y/n): ").strip().lower()
-            return response in ['y', 'yes']
+            response = input(f"Use file '{filename}'? (Y/n): ").strip().lower()
+            return response in ['y', 'yes', '']
         except (EOFError, KeyboardInterrupt):
             return False
     
@@ -112,6 +114,16 @@ class ORB:
             print(f"Reading file: {most_recent_file}")
             self.csv_data = read_csv(most_recent_file)
             self.current_file = most_recent_file
+            
+            # Extract date from filename (YYYYMMDD.csv format)
+            filename = os.path.basename(most_recent_file)
+            date_str = filename.replace('.csv', '')
+            try:
+                self.csv_date = datetime.strptime(date_str, '%Y%m%d').date()
+                print(f"Extracted date from filename: {self.csv_date}")
+            except ValueError:
+                print(f"Warning: Could not parse date from filename '{filename}'. Expected YYYYMMDD.csv format.")
+                self.csv_date = None
             
             if not self.csv_data:
                 print("Warning: CSV file is empty or contains no data.")
@@ -157,12 +169,12 @@ class ORB:
             
             print(f"Getting market data for {len(symbols)} symbols: {symbols[:5]}{'...' if len(symbols) > 5 else ''}")
             
-            # Get today's date with 9:30 AM and 10:00 AM ET
+            # Use date from CSV filename with 9:30 AM and 10:00 AM ET
             et_tz = pytz.timezone('America/New_York')
-            today = datetime.now(et_tz).date()
+            target_date = self.csv_date if self.csv_date else datetime.now(et_tz).date()
             
-            start_time = datetime.combine(today, time(9, 30), tzinfo=et_tz)
-            end_time = datetime.combine(today, time(10, 0), tzinfo=et_tz)
+            start_time = datetime.combine(target_date, time(9, 30), tzinfo=et_tz)
+            end_time = datetime.combine(target_date, time(10, 0), tzinfo=et_tz)
             
             print(f"Fetching 1-minute data from {start_time} to {end_time}")
             
@@ -185,6 +197,10 @@ class ORB:
                 print(f"Successfully retrieved market data for ORB analysis.")
                 # Store the market data for further analysis
                 self.market_data = market_data
+                
+                # Save market data to stock_data directory
+                self._save_market_data()
+                
                 return True
             else:
                 print("No market data retrieved.")
@@ -192,6 +208,53 @@ class ORB:
                 
         except Exception as e:
             print(f"Error getting market data: {e}")
+            return False
+    
+    def _save_market_data(self) -> bool:
+        """
+        Save market data to JSON file in stock_data directory using the same CSV filename.
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.market_data or not self.current_file:
+            print("No market data or current file to save.")
+            return False
+        
+        try:
+            # Create stock_data directory if it doesn't exist
+            stock_data_dir = 'stock_data'
+            os.makedirs(stock_data_dir, exist_ok=True)
+            
+            # Get filename without extension and create JSON filename
+            filename = os.path.basename(self.current_file)
+            json_filename = filename.replace('.csv', '.json')
+            json_filepath = os.path.join(stock_data_dir, json_filename)
+            
+            # Convert market data to serializable format
+            serializable_data = {}
+            for symbol, bars in self.market_data.items():
+                serializable_data[symbol] = []
+                for bar in bars:
+                    bar_data = {
+                        'timestamp': bar.t.isoformat(),
+                        'open': float(bar.o),
+                        'high': float(bar.h),
+                        'low': float(bar.l),
+                        'close': float(bar.c),
+                        'volume': int(bar.v)
+                    }
+                    serializable_data[symbol].append(bar_data)
+            
+            # Save to JSON file
+            with open(json_filepath, 'w') as f:
+                json.dump(serializable_data, f, indent=2)
+            
+            print(f"Market data saved to: {json_filepath}")
+            return True
+            
+        except Exception as e:
+            print(f"Error saving market data: {e}")
             return False
 
     def Exec(self) -> bool:
