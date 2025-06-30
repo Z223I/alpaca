@@ -154,19 +154,21 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') 
             
             orb_width = x_max - x_min + 0.0012  # Add small padding to cover the last candlestick
             
-            # Draw ORB rectangle (filled with thinner edge)
+            # Draw ORB rectangle (no fill with thin edge)
             orb_rect = Rectangle((x_min - 0.0006, orb_low), orb_width, orb_high - orb_low,
-                               facecolor='yellow', edgecolor='red', alpha=0.6, linewidth=3)
+                               facecolor='none', edgecolor='black', alpha=1.0, linewidth=1.5)
             ax1.add_patch(orb_rect)
             
             # Add ORB level lines
-            ax1.axhline(y=orb_high, color='orange', linestyle='--', linewidth=2, alpha=0.8, label=f'ORB High: ${orb_high:.2f}')
-            ax1.axhline(y=orb_low, color='orange', linestyle='--', linewidth=2, alpha=0.8, label=f'ORB Low: ${orb_low:.2f}')
+            ax1.axhline(y=orb_high, color='black', linestyle='--', linewidth=1, alpha=0.8, label=f'ORB High: ${orb_high:.2f}')
+            ax1.axhline(y=orb_low, color='black', linestyle='--', linewidth=1, alpha=0.8, label=f'ORB Low: ${orb_low:.2f}')
             
-            # Add legend for ORB levels
-            ax1.legend(loc='upper left', fontsize=10)
-            
-            print(f"ORB levels for {symbol}: High=${orb_high:.2f}, Low=${orb_low:.2f}")
+            isDebugging = False  # Set to True for debugging output
+            if isDebugging:
+                # Add legend for ORB levels
+                ax1.legend(loc='upper left', fontsize=10)
+                
+                print(f"ORB levels for {symbol}: High=${orb_high:.2f}, Low=${orb_low:.2f}")
         
         # Format price chart
         title = f'{symbol} - Candlestick Chart with Volume'
