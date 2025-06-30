@@ -1,0 +1,55 @@
+{
+ "date": "20250630",
+ "stocks": [
+   {
+     "stock_symbol": "ARTL",
+     "support_resistance_lines": [
+       {
+         "value": 25.4215,
+         "color": "green",
+         "type": "resistance"
+       },
+       {
+         "value": 18.2722,
+         "color": "gold",
+         "type": "support"
+       },
+       {
+         "value": 15.3526,
+         "color": "green",
+         "type": "support"
+       },
+       {
+         "value": 12.6108,
+         "color": "gold",
+         "type": "support"
+       },
+       {
+         "value": 11.1299,
+         "color": "green",
+         "type": "support"
+       }
+     ]
+   },
+   {
+     "stock_symbol": "BBAI",
+     "support_resistance_lines": [
+       {
+         "value": 6.9302,
+         "color": "green",
+         "type": "resistance"
+       },
+       {
+         "value": 6.30,
+         "color": "green",
+         "type": "support"
+       },
+       {
+         "value": 6.4952,
+         "color": "green",
+         "type": "support"
+       }
+     ]
+   }
+ ]
+}
