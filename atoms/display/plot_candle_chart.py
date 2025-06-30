@@ -171,11 +171,14 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') 
                 print(f"ORB levels for {symbol}: High=${orb_high:.2f}, Low=${orb_low:.2f}")
         
         # Format price chart
-        title = f'{symbol} - Candlestick Chart with Volume'
-        if orb_high is not None and orb_low is not None:
-            title += f' (ORB: ${orb_low:.2f}-${orb_high:.2f})'
+        title = symbol
         
-        ax1.set_title(title, fontsize=14, fontweight='bold')
+        # Get date from first timestamp and format for US (MM/DD/YYYY)
+        chart_date = symbol_data['timestamp'].iloc[0].strftime('%m/%d/%Y')
+        
+        ax1.set_title(title, fontsize=16, fontweight='bold')
+        ax1.text(0.5, 0.95, chart_date, transform=ax1.transAxes, fontsize=12, 
+                ha='center', va='top', style='italic')
         ax1.set_ylabel('Price ($)', fontsize=12)
         ax1.grid(True, alpha=0.3)
         ax1.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
