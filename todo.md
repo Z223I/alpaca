@@ -2,7 +2,8 @@
 
 - [X] Create ORB.py to monitor ORB trading strategy.
 - [X] Create ORB._get_orb_market_data()
-- [ ] Calculate the ORB for each stock in the first 15 minutes.
+- [X] Calculate the ORB for each stock in the first 15 minutes.
+- [ ] Add float rotation calculator.  
 - [X] Create .envpaper
 - [ ] Create .envlive
 - [X] Create '_future_bracket_order()'
