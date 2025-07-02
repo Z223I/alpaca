@@ -29,3 +29,76 @@
         ```bash
         claude mcp add --transport http context7 https://mcp.context7.com/mcp
         ```
+
+
+
+## PCA
+Use the ORB class in orb.py.
+Create a private method for PCA analysis.
+For each stock:
+Mirror
+def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') -> bool:
+   """
+   Create a candlestick chart with volume and ORB rectangle for a single stock symbol.
+  
+   Args:
+       df: DataFrame with columns ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+       symbol: Stock symbol name
+       output_dir: Directory to save the chart
+      
+   Returns:
+       True if successful, False otherwise
+   """
+   try:
+       # Filter data for the specific symbol
+       symbol_data = df[df['symbol'] == symbol].copy()
+      
+       if symbol_data.empty:
+           print(f"No data found for symbol: {symbol}")
+           return False
+      
+       # Sort by timestamp
+       symbol_data = symbol_data.sort_values('timestamp')
+      
+       # Calculate ORB levels
+       orb_high, orb_low = calculate_orb_levels(symbol_data)
+Use df and symbol as parameters.
+Call calculate_orb_levels
+Filter the data from 9:30 to 10:15 ET
+Verify there are 45 lines of data and return if not.
+
+Stack the data in each candlestick
+Independent Variables
+Use ‘close’ to calculate ratios
+Resistance ratio
+Gold support ratio
+Support ratio
+VWAP ratio
+EMA 9 ratio
+ORB low ratio
+ORB high ratio
+bool met ORB
+bool met VWAP
+bool met gold resistance
+volume/float
+
+TBD
+Moving volume
+, bool not too far above VWAP, bool above EMA 9, bool below next higher resistance line, use only 5 or 10 candlestick for AI training , not bool but ratios, moving volume ratio, where is the price within resistance lines, ratio to gold resistance, is there a momentum indicator? Yes, the change in VWAP and the candle color.
+
+Dependent Variable
+Price 5, 10 candlesticks ahead
+Methodology
+Build upon orb.py
+Create a private method for PCA preparation
+
+
+
+For each of the first 30 lines:
+Get the close price;
+
+
+Create lksdfjlsdkfj
+And call the new method on a per stock basis.
+Mirror lksdfjlsdkjf
+Accumulate the PCA prep data to an object variable for later use
