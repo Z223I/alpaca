@@ -186,7 +186,7 @@ class ORB:
                 try:
                     bars = self.api.get_bars(
                         symbol,
-                        tradeapi.TimeFrame.Min,
+                        tradeapi.TimeFrame.Minute,
                         start=start_time.isoformat(),
                         end=end_time.isoformat()
                     )
