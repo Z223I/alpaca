@@ -11,6 +11,7 @@ from typing import Optional, Tuple
 from datetime import time
 
 from ..utils.calculate_orb_levels import calculate_orb_levels
+from ..utils.extract_symbol_data import extract_symbol_data
 
 
 def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') -> bool:
@@ -26,15 +27,12 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') 
         True if successful, False otherwise
     """
     try:
-        # Filter data for the specific symbol
-        symbol_data = df[df['symbol'] == symbol].copy()
+        # Extract symbol data using the dedicated atom
+        symbol_data = extract_symbol_data(df, symbol)
         
-        if symbol_data.empty:
+        if symbol_data is None:
             print(f"No data found for symbol: {symbol}")
             return False
-        
-        # Sort by timestamp
-        symbol_data = symbol_data.sort_values('timestamp')
         
         # Calculate ORB levels
         orb_high, orb_low = calculate_orb_levels(symbol_data)
