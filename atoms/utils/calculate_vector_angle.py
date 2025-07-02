@@ -39,14 +39,13 @@ def calculate_vector_angle(df: pd.DataFrame, price_column: str = 'close', num_ca
         
         # Create x values (time points: 0, 1, 2, ..., num_candles-1)
         x = np.arange(num_candles)
-        y = subset[price_column].values
         
         # Check for non-numeric data and NaN values
         try:
-            y_numeric = pd.to_numeric(y, errors='raise')
-            if np.isnan(y_numeric).any():
+            y_series = pd.to_numeric(subset[price_column], errors='raise')
+            if y_series.isna().any():
                 raise ValueError(f"Column '{price_column}' contains NaN values")
-            y = y_numeric
+            y = np.array(y_series.values, dtype=float)
         except (ValueError, TypeError):
             raise ValueError(f"Column '{price_column}' contains non-numeric data")
         

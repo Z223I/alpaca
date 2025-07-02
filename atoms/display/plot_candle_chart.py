@@ -61,7 +61,7 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') 
             height = abs(close_price - open_price)
             bottom = min(open_price, close_price)
             
-            rect = Rectangle((mdates.date2num(timestamp) - 0.0003, bottom), 
+            rect = Rectangle((float(mdates.date2num(timestamp)) - 0.0003, bottom), 
                            0.0006, height, 
                            facecolor=color, edgecolor='none', alpha=0.8,
                            zorder=2)
