@@ -225,7 +225,7 @@ class alpaca_private:
                 side='buy',
                 type='limit',
                 time_in_force='day',
-                limit_price=limit_price,
+                limit_price=str(limit_price),
                 order_class='bracket',
                 stop_loss={
                     'stop_price': stop_price,

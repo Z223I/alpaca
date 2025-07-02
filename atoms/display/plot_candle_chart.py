@@ -70,14 +70,14 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') 
         # Add ORB rectangle if ORB levels were calculated
         if orb_high is not None and orb_low is not None:
             # Get time range for ORB rectangle (first 15 candlesticks or all available data)
-            x_min = mdates.date2num(symbol_data['timestamp'].min())
+            x_min = float(mdates.date2num(symbol_data['timestamp'].min()))
             
             # Calculate width to cover first 15 candlesticks (or all if less than 15)
             orb_candlesticks = min(15, len(symbol_data))
             if orb_candlesticks > 1:
-                x_max = mdates.date2num(symbol_data['timestamp'].iloc[orb_candlesticks - 1])
+                x_max = float(mdates.date2num(symbol_data['timestamp'].iloc[orb_candlesticks - 1]))
             else:
-                x_max = mdates.date2num(symbol_data['timestamp'].iloc[0])
+                x_max = float(mdates.date2num(symbol_data['timestamp'].iloc[0]))
             
             orb_width = x_max - x_min + 0.0012  # Add small padding to cover the last candlestick
             
