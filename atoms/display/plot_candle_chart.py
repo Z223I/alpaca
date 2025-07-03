@@ -7,6 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.patches import Rectangle
+from matplotlib.ticker import FuncFormatter
 from typing import Optional, Tuple
 from datetime import time
 
@@ -117,7 +118,18 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') 
         
         # Add legend if any indicators were calculated
         if ema_success or vwap_success:
-            ax1.legend(loc='upper right', fontsize=10)
+            # Determine legend position based on price trend
+            # If closing price is higher than opening price, put legend at bottom right
+            # Otherwise, put it at top right to avoid overlapping with rising prices
+            first_close = symbol_data['close'].iloc[0]
+            last_close = symbol_data['close'].iloc[-1]
+            
+            if last_close > first_close:
+                legend_location = 'lower right'
+            else:
+                legend_location = 'upper right'
+            
+            ax1.legend(loc=legend_location, fontsize=10)
         
         # Format price chart
         title = symbol
@@ -131,6 +143,9 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') 
         ax1.set_ylabel('Price ($)', fontsize=12)
         ax1.grid(True, alpha=0.3)
         ax1.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+        
+        # Format Y-axis to show prices with 2 decimal places
+        ax1.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'${x:.2f}'))
         
         # Plot volume on bottom subplot
         ax2.bar(symbol_data['timestamp'], symbol_data['volume'], 
