@@ -1,9 +1,12 @@
 # TODO
-- [ ] Create atom to calculate a momentum vector from ORB candlesticks.  Hmm. Is this two values? Yes.  Fit a line and use the angle.
-- [X] Method extract as an atom the symbol_data calculation in atoms/display/plot_candle_chart.py
-- [X] Create ORB.py to monitor ORB trading strategy.
-- [X] Create ORB._get_orb_market_data()
-- [X] Calculate the ORB for each stock in the first 15 minutes.
+- [ ] Focus on creating ORB filter.
+- [ ] Create VWAP atom.
+- [ ] Create EMA with 9 as the default parameter atom.
+- [ ] ORB Create atom to calculate a momentum vector from ORB candlesticks.  Hmm. Is this two values? Yes.  Fit a line and use the angle.
+- [X] ORB Method extract as an atom the symbol_data calculation in atoms/display/plot_candle_chart.py
+- [X] ORB Create ORB.py to monitor ORB trading strategy.
+- [X] ORB Create ORB._get_orb_market_data()
+- [X] ORB Calculate the ORB for each stock in the first 15 minutes.
 - [ ] Add float rotation calculator.  
 - [X] Create .envpaper
 - [ ] Create .envlive
