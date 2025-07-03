@@ -12,6 +12,7 @@ from datetime import time
 
 from ..utils.calculate_orb_levels import calculate_orb_levels
 from ..utils.extract_symbol_data import extract_symbol_data
+from ..utils.calculate_ema import calculate_ema
 
 
 def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') -> bool:
@@ -36,6 +37,9 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') 
         
         # Calculate ORB levels
         orb_high, orb_low = calculate_orb_levels(symbol_data)
+        
+        # Calculate EMA (9-period) for close prices
+        ema_success, ema_values = calculate_ema(symbol_data, price_column='close', period=9)
         
         # Create figure with subplots (price and volume)
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), 
@@ -96,6 +100,12 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') 
                 ax1.legend(loc='upper left', fontsize=10)
                 
                 print(f"ORB levels for {symbol}: High=${orb_high:.2f}, Low=${orb_low:.2f}")
+        
+        # Add EMA line if calculation was successful
+        if ema_success:
+            ax1.plot(symbol_data['timestamp'], ema_values, 
+                    color='blue', linewidth=2, alpha=0.8, label='EMA(9)')
+            ax1.legend(loc='upper right', fontsize=10)
         
         # Format price chart
         title = symbol

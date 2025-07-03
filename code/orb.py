@@ -326,8 +326,8 @@ class ORB:
             return False
         
         try:
-            # Get unique symbols
-            symbols = self.market_df['symbol'].unique()
+            # Get unique symbols and sort them
+            symbols = sorted(self.market_df['symbol'].unique())
             
             print(f"\nGenerating candlestick charts for {len(symbols)} symbols...")
             
