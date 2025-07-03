@@ -1,6 +1,6 @@
 # TODO
 - [ ] Focus on creating ORB filter.
-- [ ] ORB Create VWAP atom.
+- [X] ORB Create VWAP atom.
 - [X] ORB Create EMA with 9 as the default parameter atom.
 - [ ] ORB Create atom to calculate a momentum vector from ORB candlesticks.  Hmm. Is this two values? Yes.  Fit a line and use the angle.
 - [X] ORB Method extract as an atom the symbol_data calculation in atoms/display/plot_candle_chart.py

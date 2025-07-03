@@ -6,7 +6,7 @@ You are a highly skilled Python developer and architect.
 
 ## Mid Level Requirements
 
-Create a new new atom in this repo.
+Create a new atom in this repo.
 Update it to conform to repo standards.
 Check linting compliance.
 Check for VS Code integration errors.

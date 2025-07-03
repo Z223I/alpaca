@@ -13,6 +13,7 @@ from datetime import time
 from ..utils.calculate_orb_levels import calculate_orb_levels
 from ..utils.extract_symbol_data import extract_symbol_data
 from ..utils.calculate_ema import calculate_ema
+from ..utils.calculate_vwap import calculate_vwap_typical
 
 
 def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') -> bool:
@@ -40,6 +41,9 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') 
         
         # Calculate EMA (9-period) for close prices
         ema_success, ema_values = calculate_ema(symbol_data, price_column='close', period=9)
+        
+        # Calculate VWAP using typical price (HLC/3)
+        vwap_success, vwap_values = calculate_vwap_typical(symbol_data)
         
         # Create figure with subplots (price and volume)
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), 
@@ -105,6 +109,14 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') 
         if ema_success:
             ax1.plot(symbol_data['timestamp'], ema_values, 
                     color='blue', linewidth=2, alpha=0.8, label='EMA(9)')
+        
+        # Add VWAP line if calculation was successful
+        if vwap_success:
+            ax1.plot(symbol_data['timestamp'], vwap_values, 
+                    color='purple', linewidth=2, alpha=0.8, label='VWAP')
+        
+        # Add legend if any indicators were calculated
+        if ema_success or vwap_success:
             ax1.legend(loc='upper right', fontsize=10)
         
         # Format price chart
