@@ -111,7 +111,7 @@ def main():
     
     # Add coverage if requested
     if args.coverage:
-        pytest_cmd.extend(["--cov=code", "--cov=atoms", "--cov-report=html", "--cov-report=term"])
+        pytest_cmd.extend(["--cov", "code", "--cov", "atoms", "--cov-report", "html", "--cov-report", "term"])
     
     # Run pytest
     if not run_command(pytest_cmd, "Running tests"):

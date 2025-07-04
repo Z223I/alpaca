@@ -19,7 +19,7 @@ run_tests() {
     if [[ "$1" == "verbose" ]]; then
         python -m pytest tests/ -v
     elif [[ "$1" == "coverage" ]]; then
-        python -m pytest tests/ --cov=code --cov=atoms --cov-report=html --cov-report=term
+        python -m pytest tests/ --cov code --cov atoms --cov-report html --cov-report term
     elif [[ "$1" == "specific" ]]; then
         python -m pytest tests/"$2" -v
     else

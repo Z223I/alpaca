@@ -64,7 +64,9 @@ python run_tests.py -k "test_filter"   # Run tests matching pattern
 ```bash
 python -m pytest tests/                                                          # Run all tests
 python -m pytest tests/test_orb.py -v                                            # Run ORB tests with verbose output
-python -m pytest tests/ --cov=code --cov=atoms --cov-report=html --cov-report=term  # Run with coverage
+python -m pytest tests/ --cov code --cov atoms --cov-report html --cov-report term  # Run with coverage (HTML + terminal)
+python -m pytest tests/ --cov code --cov-report html                             # Run with HTML coverage only
+python -m pytest tests/ --cov code --cov-report term                             # Run with terminal coverage only
 ```
 
 **Legacy unittest:**

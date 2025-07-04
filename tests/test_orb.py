@@ -6,7 +6,8 @@ import pytest
 import pandas as pd
 import json
 import os
-from datetime import datetime, time, timedelta
+import time as time_module
+from datetime import datetime, time, timedelta, date
 from unittest.mock import Mock, patch, MagicMock
 import pytz
 
@@ -284,3 +285,363 @@ class TestORB:
             # The result depends on whether the real data has exactly 45 rows
             # in the 9:30-10:15 timeframe, which it likely doesn't
             assert isinstance(result, bool)
+
+    # File Operations Tests
+    def test_get_most_recent_csv_success(self, orb_instance, tmp_path):
+        """Test successful retrieval of most recent CSV file."""
+        # Create temporary CSV files with different modification times
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        
+        # Create CSV files with different timestamps
+        old_file = data_dir / "20250625.csv"
+        new_file = data_dir / "20250630.csv"
+        newest_file = data_dir / "20250701.csv"
+        
+        old_file.write_text("symbol,data\nAAPL,test")
+        new_file.write_text("symbol,data\nTSLA,test")
+        newest_file.write_text("symbol,data\nMSFT,test")
+        
+        # Modify file times to ensure newest_file is most recent
+        os.utime(old_file, (time_module.time() - 200, time_module.time() - 200))
+        os.utime(new_file, (time_module.time() - 100, time_module.time() - 100))
+        os.utime(newest_file, (time_module.time(), time_module.time()))
+        
+        # Update the data directory path
+        orb_instance.data_directory = str(data_dir)
+        
+        result = orb_instance._get_most_recent_csv()
+        
+        assert result == str(newest_file)
+
+    def test_get_most_recent_csv_no_files(self, orb_instance, tmp_path):
+        """Test when no CSV files exist in directory."""
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        
+        # Update the data directory path
+        orb_instance.data_directory = str(data_dir)
+        
+        result = orb_instance._get_most_recent_csv()
+        
+        assert result is None
+
+    def test_get_most_recent_csv_directory_not_exist(self, orb_instance, tmp_path):
+        """Test when data directory doesn't exist."""
+        # Set non-existent directory
+        orb_instance.data_directory = str(tmp_path / "nonexistent")
+        
+        result = orb_instance._get_most_recent_csv()
+        
+        assert result is None
+
+    def test_prompt_user_for_file_yes(self, orb_instance, monkeypatch):
+        """Test user confirmation with 'yes' response."""
+        monkeypatch.setattr('builtins.input', lambda _: 'yes')
+        
+        result = orb_instance._prompt_user_for_file("test.csv")
+        
+        assert result is True
+
+    def test_prompt_user_for_file_y(self, orb_instance, monkeypatch):
+        """Test user confirmation with 'y' response."""
+        monkeypatch.setattr('builtins.input', lambda _: 'y')
+        
+        result = orb_instance._prompt_user_for_file("test.csv")
+        
+        assert result is True
+
+    def test_prompt_user_for_file_empty(self, orb_instance, monkeypatch):
+        """Test user confirmation with empty response (default yes)."""
+        monkeypatch.setattr('builtins.input', lambda _: '')
+        
+        result = orb_instance._prompt_user_for_file("test.csv")
+        
+        assert result is True
+
+    def test_prompt_user_for_file_no(self, orb_instance, monkeypatch):
+        """Test user confirmation with 'no' response."""
+        monkeypatch.setattr('builtins.input', lambda _: 'no')
+        
+        result = orb_instance._prompt_user_for_file("test.csv")
+        
+        assert result is False
+
+    def test_prompt_user_for_file_eof_error(self, orb_instance, monkeypatch):
+        """Test user prompt with EOF error (Ctrl+D)."""
+        def mock_input(_):
+            raise EOFError()
+        
+        monkeypatch.setattr('builtins.input', mock_input)
+        
+        result = orb_instance._prompt_user_for_file("test.csv")
+        
+        assert result is False
+
+    def test_prompt_user_for_file_keyboard_interrupt(self, orb_instance, monkeypatch):
+        """Test user prompt with keyboard interrupt (Ctrl+C)."""
+        def mock_input(_):
+            raise KeyboardInterrupt()
+        
+        monkeypatch.setattr('builtins.input', mock_input)
+        
+        result = orb_instance._prompt_user_for_file("test.csv")
+        
+        assert result is False
+
+    def test_save_market_data_success(self, orb_instance, tmp_path):
+        """Test successful saving of market data to JSON."""
+        # Setup mock market data
+        mock_bar = Mock()
+        mock_bar.t = datetime(2025, 6, 30, 10, 0, tzinfo=pytz.UTC)
+        mock_bar.o = 150.0
+        mock_bar.h = 155.0
+        mock_bar.l = 149.0
+        mock_bar.c = 152.0
+        mock_bar.v = 1000
+        
+        orb_instance.market_data = {
+            'AAPL': [mock_bar],
+            'TSLA': [mock_bar]
+        }
+        orb_instance.current_file = "test_20250630.csv"
+        
+        # Change working directory to tmp_path
+        original_cwd = os.getcwd()
+        os.chdir(tmp_path)
+        
+        try:
+            result = orb_instance._save_market_data()
+            
+            assert result is True
+            
+            # Check that JSON file was created
+            json_file = tmp_path / "stock_data" / "test_20250630.json"
+            assert json_file.exists()
+            
+            # Verify JSON content
+            with open(json_file, 'r') as f:
+                data = json.load(f)
+            
+            assert 'AAPL' in data
+            assert 'TSLA' in data
+            assert len(data['AAPL']) == 1
+            assert data['AAPL'][0]['open'] == 150.0
+            assert data['AAPL'][0]['close'] == 152.0
+            
+        finally:
+            os.chdir(original_cwd)
+
+    def test_save_market_data_no_data(self, orb_instance):
+        """Test saving when no market data exists."""
+        orb_instance.market_data = None
+        orb_instance.current_file = "test.csv"
+        
+        result = orb_instance._save_market_data()
+        
+        assert result is False
+
+    def test_save_market_data_no_current_file(self, orb_instance):
+        """Test saving when no current file is set."""
+        orb_instance.market_data = {'AAPL': []}
+        orb_instance.current_file = None
+        
+        result = orb_instance._save_market_data()
+        
+        assert result is False
+
+    def test_load_market_dataframe_success(self, orb_instance, tmp_path):
+        """Test successful loading of market data from JSON."""
+        # Create test JSON file
+        stock_data_dir = tmp_path / "stock_data"
+        stock_data_dir.mkdir()
+        
+        test_data = {
+            'AAPL': [
+                {
+                    'timestamp': '2025-06-30T10:00:00+00:00',
+                    'open': 150.0,
+                    'high': 155.0,
+                    'low': 149.0,
+                    'close': 152.0,
+                    'volume': 1000
+                }
+            ],
+            'TSLA': [
+                {
+                    'timestamp': '2025-06-30T10:00:00+00:00',
+                    'open': 250.0,
+                    'high': 255.0,
+                    'low': 249.0,
+                    'close': 252.0,
+                    'volume': 2000
+                }
+            ]
+        }
+        
+        json_file = stock_data_dir / "test_20250630.json"
+        with open(json_file, 'w') as f:
+            json.dump(test_data, f)
+        
+        # Setup instance
+        orb_instance.current_file = "test_20250630.csv"
+        
+        # Change working directory to tmp_path
+        original_cwd = os.getcwd()
+        os.chdir(tmp_path)
+        
+        try:
+            result = orb_instance._load_market_dataframe()
+            
+            assert result is True
+            assert hasattr(orb_instance, 'market_df')
+            assert orb_instance.market_df is not None
+            assert len(orb_instance.market_df) == 2
+            assert 'symbol' in orb_instance.market_df.columns
+            assert 'AAPL' in orb_instance.market_df['symbol'].values
+            assert 'TSLA' in orb_instance.market_df['symbol'].values
+            
+        finally:
+            os.chdir(original_cwd)
+
+    def test_load_market_dataframe_no_current_file(self, orb_instance):
+        """Test loading when no current file is set."""
+        orb_instance.current_file = None
+        
+        result = orb_instance._load_market_dataframe()
+        
+        assert result is False
+
+    def test_load_market_dataframe_file_not_found(self, orb_instance, tmp_path):
+        """Test loading when JSON file doesn't exist."""
+        orb_instance.current_file = "nonexistent_20250630.csv"
+        
+        # Change working directory to tmp_path
+        original_cwd = os.getcwd()
+        os.chdir(tmp_path)
+        
+        try:
+            result = orb_instance._load_market_dataframe()
+            
+            assert result is False
+            
+        finally:
+            os.chdir(original_cwd)
+
+    def test_load_market_dataframe_empty_data(self, orb_instance, tmp_path):
+        """Test loading when JSON file contains no market data."""
+        # Create empty JSON file
+        stock_data_dir = tmp_path / "stock_data"
+        stock_data_dir.mkdir()
+        
+        json_file = stock_data_dir / "test_20250630.json"
+        with open(json_file, 'w') as f:
+            json.dump({}, f)
+        
+        orb_instance.current_file = "test_20250630.csv"
+        
+        # Change working directory to tmp_path
+        original_cwd = os.getcwd()
+        os.chdir(tmp_path)
+        
+        try:
+            result = orb_instance._load_market_dataframe()
+            
+            assert result is False
+            
+        finally:
+            os.chdir(original_cwd)
+
+    @patch.object(orb_module, 'read_csv')
+    def test_load_and_process_csv_data_success(self, mock_read_csv, orb_instance, tmp_path, monkeypatch):
+        """Test successful loading and processing of CSV data."""
+        # Setup mock data
+        mock_read_csv.return_value = [
+            {'symbol': 'AAPL', 'data': 'test1'},
+            {'symbol': 'TSLA', 'data': 'test2'}
+        ]
+        
+        # Create test CSV file
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        test_file = data_dir / "20250630.csv"
+        test_file.write_text("symbol,data\nAAPL,test1\nTSLA,test2")
+        
+        # Setup instance
+        orb_instance.data_directory = str(data_dir)
+        
+        # Mock user input to confirm file selection
+        monkeypatch.setattr('builtins.input', lambda _: 'yes')
+        
+        result = orb_instance._load_and_process_csv_data()
+        
+        assert result is True
+        assert orb_instance.csv_data is not None
+        assert len(orb_instance.csv_data) == 2
+        assert orb_instance.current_file == str(test_file)
+        assert orb_instance.csv_date == date(2025, 6, 30)
+
+    def test_load_and_process_csv_data_no_files(self, orb_instance, tmp_path):
+        """Test when no CSV files are found."""
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        
+        orb_instance.data_directory = str(data_dir)
+        
+        result = orb_instance._load_and_process_csv_data()
+        
+        assert result is False
+
+    def test_load_and_process_csv_data_user_cancels(self, orb_instance, tmp_path, monkeypatch):
+        """Test when user cancels file selection."""
+        # Create test CSV file
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        test_file = data_dir / "20250630.csv"
+        test_file.write_text("symbol,data\nAAPL,test")
+        
+        orb_instance.data_directory = str(data_dir)
+        
+        # Mock user input to cancel file selection
+        monkeypatch.setattr('builtins.input', lambda _: 'no')
+        
+        result = orb_instance._load_and_process_csv_data()
+        
+        assert result is False
+
+    @patch.object(orb_module, 'read_csv')
+    def test_load_and_process_csv_data_empty_file(self, mock_read_csv, orb_instance, tmp_path, monkeypatch):
+        """Test when CSV file is empty."""
+        mock_read_csv.return_value = []
+        
+        # Create test CSV file
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        test_file = data_dir / "20250630.csv"
+        test_file.write_text("symbol,data")
+        
+        orb_instance.data_directory = str(data_dir)
+        monkeypatch.setattr('builtins.input', lambda _: 'yes')
+        
+        result = orb_instance._load_and_process_csv_data()
+        
+        assert result is False
+
+    @patch.object(orb_module, 'read_csv')
+    def test_load_and_process_csv_data_invalid_filename(self, mock_read_csv, orb_instance, tmp_path, monkeypatch):
+        """Test with invalid filename format that can't be parsed for date."""
+        mock_read_csv.return_value = [{'symbol': 'AAPL', 'data': 'test'}]
+        
+        # Create test CSV file with invalid date format
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        test_file = data_dir / "invalid_filename.csv"
+        test_file.write_text("symbol,data\nAAPL,test")
+        
+        orb_instance.data_directory = str(data_dir)
+        monkeypatch.setattr('builtins.input', lambda _: 'yes')
+        
+        result = orb_instance._load_and_process_csv_data()
+        
+        assert result is True
+        assert orb_instance.csv_date is None  # Date parsing should fail gracefully
