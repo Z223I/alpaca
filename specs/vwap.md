@@ -3,6 +3,7 @@
 ## High Level Requirements
 
 You are a highly skilled Python developer and architect.
+You are working in an atom - molecules architecture.
 
 ## Mid Level Requirements
 
