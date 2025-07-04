@@ -40,6 +40,9 @@ class ORB:
 
         # Set portfolio risk from environment variable or use default
         self.PORTFOLIO_RISK = float(os.getenv('PORTFOLIO_RISK', '0.10'))
+        
+        # Set debugging flag from environment variable or use default
+        self.isDebugging = os.getenv('ORB_DEBUG', 'false').lower() in ['true', '1', 'yes']
 
         # Initialize Alpaca API client using atom
         self.api = init_alpaca_client()
@@ -333,7 +336,15 @@ class ORB:
         Returns:
             True if successful, False otherwise
         """
+        # Local debugging flag - set to True for detailed debug output
+        isDebugging = True
+        
         try:
+            if isDebugging:
+                print(f"\nDEBUG: Starting PCA data prep for symbol: {symbol}")
+                print(f"DEBUG: Input DataFrame shape: {df.shape}")
+                print(f"DEBUG: Input DataFrame columns: {list(df.columns)}")
+            
             # Extract symbol data using the dedicated atom
             symbol_data = extract_symbol_data(df, symbol)
 
@@ -341,37 +352,77 @@ class ORB:
                 print(f"No data found for symbol: {symbol}")
                 return False
 
-            # Filter the data from 9:30 to 10:15 ET using the dedicated method
-            start_time = time(9, 30)
-            end_time = time(10, 15)
-            filtered_data = self._filter_stock_data_by_time(
-                symbol_data, start_time, end_time)
+            if isDebugging:
+                print(f"DEBUG: Extracted symbol data shape: {symbol_data.shape}")
+                print(f"DEBUG: Date range in symbol data: {symbol_data['timestamp'].min()} to {symbol_data['timestamp'].max()}")
 
-            if filtered_data is None:
-                print(f"No data found after filtering for symbol: {symbol}")
+            # Take the first 45 lines of data instead of time filtering
+            if isDebugging:
+                print(f"DEBUG: Taking first 45 lines of data")
+                
+            filtered_data = symbol_data.head(45).copy()
+
+            if filtered_data is None or filtered_data.empty:
+                print(f"No data available for symbol: {symbol}")
                 return False
+
+            if isDebugging:
+                print(f"DEBUG: First 45 lines data shape: {filtered_data.shape}")
+                print(f"DEBUG: Time range in first 45 lines: {filtered_data['timestamp'].min()} to {filtered_data['timestamp'].max()}")
 
             # Verify there are 45 lines of data and return if not
             if len(filtered_data) != 45:
                 print(f"Expected 45 lines of data for {symbol}, "
                       f"got {len(filtered_data)}")
+                if isDebugging:
+                    print(f"DEBUG: Data length validation failed - expected 45, got {len(filtered_data)}")
                 return False
 
+            if isDebugging:
+                print(f"DEBUG: Data length validation passed - found 45 rows")
+
             # Calculate ORB levels
+            if isDebugging:
+                print(f"DEBUG: Calculating ORB levels...")
+                
             orb_high, orb_low = calculate_orb_levels(filtered_data)
+            
+            if isDebugging:
+                print(f"DEBUG: ORB levels calculated - High: {orb_high}, Low: {orb_low}")
 
             # Calculate EMA (9-period) for close prices
+            if isDebugging:
+                print(f"DEBUG: Calculating EMA (9-period)...")
+                
             ema_success, ema_values = calculate_ema(
                 filtered_data, price_column='close', period=9)
+                
+            if isDebugging:
+                print(f"DEBUG: EMA calculation - Success: {ema_success}, Values count: {len(ema_values) if ema_values else 0}")
 
             # Calculate VWAP using typical price (HLC/3)
+            if isDebugging:
+                print(f"DEBUG: Calculating VWAP...")
+                
             vwap_success, vwap_values = calculate_vwap_typical(filtered_data)
+            
+            if isDebugging:
+                print(f"DEBUG: VWAP calculation - Success: {vwap_success}, Values count: {len(vwap_values) if vwap_values else 0}")
 
-            # Calculate vector angle using the first 15 candlesticks
+            # Calculate vector angle using all 45 candlesticks
+            if isDebugging:
+                print(f"DEBUG: Calculating vector angle (all 45 candles)...")
+                
             vector_angle = calculate_vector_angle(
-                filtered_data, price_column='close', num_candles=15)
+                filtered_data, price_column='close', num_candles=45)
+                
+            if isDebugging:
+                print(f"DEBUG: Vector angle calculated: {vector_angle}")
 
             # Create a dataframe with all collected data
+            if isDebugging:
+                print(f"DEBUG: Creating PCA DataFrame with all collected data...")
+                
             pca_row_data = []
             for idx, row in filtered_data.iterrows():
                 pca_row = {
@@ -403,17 +454,40 @@ class ORB:
 
                 pca_row_data.append(pca_row)
 
+            if isDebugging:
+                print(f"DEBUG: Created {len(pca_row_data)} PCA data rows")
+
             # Create or append to the class variable dataframe
             new_pca_df = pd.DataFrame(pca_row_data)
 
+            if isDebugging:
+                print(f"DEBUG: New PCA DataFrame created with shape: {new_pca_df.shape}")
+                print(f"DEBUG: Columns in new DataFrame: {list(new_pca_df.columns)}")
+
             if self.pca_data is None:
                 self.pca_data = new_pca_df
+                if isDebugging:
+                    print(f"DEBUG: Initialized class pca_data with new DataFrame")
             else:
+                prev_shape = self.pca_data.shape
                 self.pca_data = pd.concat(
                     [self.pca_data, new_pca_df], ignore_index=True)
+                if isDebugging:
+                    print(f"DEBUG: Appended to existing pca_data - Previous shape: {prev_shape}, New shape: {self.pca_data.shape}")
 
             print(f"PCA data prepared for {symbol}: "
                   f"{len(new_pca_df)} rows added")
+            
+            # Print prepared DataFrame if debugging is enabled (using local isDebugging)
+            if isDebugging:
+                print(f"\nDEBUG: Prepared PCA DataFrame for {symbol}:")
+                print("=" * 60)
+                print(new_pca_df.to_string(index=False))
+                print("=" * 60)
+                print(f"DataFrame shape: {new_pca_df.shape}")
+                print(f"DataFrame columns: {list(new_pca_df.columns)}")
+                print()
+            
             return True
 
         except Exception as e:
@@ -473,6 +547,58 @@ class ORB:
 
         except Exception as e:
             print(f"Error processing market data: {e}")
+            return False
+
+    def _perform_pca_analysis(self) -> bool:
+        """
+        Perform PCA analysis on all symbols in the market DataFrame.
+        
+        This method iterates through all unique symbols in the market_df
+        and calls _pca_data_prep for each symbol to collect PCA data.
+        
+        Returns:
+            True if successful for at least one symbol, False otherwise
+        """
+        if not hasattr(self, 'market_df') or self.market_df is None:
+            print("No market DataFrame available for PCA analysis.")
+            return False
+            
+        try:
+            # Get unique symbols from the DataFrame
+            symbols = self.market_df['symbol'].unique()
+            
+            if len(symbols) == 0:
+                print("No symbols found in market DataFrame.")
+                return False
+                
+            print(f"\nStarting PCA analysis for {len(symbols)} symbols...")
+            print("=" * 50)
+            
+            # Initialize success counter
+            success_count = 0
+            
+            # Process each symbol
+            for symbol in symbols:
+                print(f"\nProcessing symbol: {symbol}")
+                success = self._pca_data_prep(self.market_df, symbol)
+                
+                if success:
+                    success_count += 1
+                    print(f"✓ PCA data preparation successful for {symbol}")
+                else:
+                    print(f"✗ PCA data preparation failed for {symbol}")
+            
+            print(f"\nPCA Analysis Summary:")
+            print(f"Successful: {success_count}/{len(symbols)} symbols")
+            
+            if hasattr(self, 'pca_data') and self.pca_data is not None:
+                print(f"Total PCA data rows collected: {len(self.pca_data)}")
+                print("PCA data columns:", list(self.pca_data.columns))
+            
+            return success_count > 0
+            
+        except Exception as e:
+            print(f"Error performing PCA analysis: {e}")
             return False
 
     def _generate_candle_charts(self) -> bool:
@@ -544,6 +670,13 @@ class ORB:
 
         if not chart_success:
             print("Failed to generate charts.")
+            return False
+
+        # Perform PCA analysis on all symbols
+        pca_success = self._perform_pca_analysis()
+
+        if not pca_success:
+            print("Failed to perform PCA analysis.")
             return False
 
         return True

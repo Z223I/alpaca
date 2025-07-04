@@ -1,5 +1,7 @@
 # TODO
 - [ ] Focus on creating ORB filter.
+- [ ] Create some more ORB PyTests.
+- [X] Create some ORB PyTests.
 - [X] ORB Create VWAP atom.
 - [X] ORB Create EMA with 9 as the default parameter atom.
 - [ ] ORB Create atom to calculate a momentum vector from ORB candlesticks.  Hmm. Is this two values? Yes.  Fit a line and use the angle.
@@ -7,7 +9,7 @@
 - [X] ORB Create ORB.py to monitor ORB trading strategy.
 - [X] ORB Create ORB._get_orb_market_data()
 - [X] ORB Calculate the ORB for each stock in the first 15 minutes.
-- [ ] Add float rotation calculator.  
+- [ ] Add float rotation calculator.
 - [X] Create .envpaper
 - [ ] Create .envlive
 - [X] Create '_future_bracket_order()'
@@ -44,26 +46,26 @@ Mirror
 def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') -> bool:
    """
    Create a candlestick chart with volume and ORB rectangle for a single stock symbol.
-  
+
    Args:
        df: DataFrame with columns ['timestamp', 'open', 'high', 'low', 'close', 'volume']
        symbol: Stock symbol name
        output_dir: Directory to save the chart
-      
+
    Returns:
        True if successful, False otherwise
    """
    try:
        # Filter data for the specific symbol
        symbol_data = df[df['symbol'] == symbol].copy()
-      
+
        if symbol_data.empty:
            print(f"No data found for symbol: {symbol}")
            return False
-      
+
        # Sort by timestamp
        symbol_data = symbol_data.sort_values('timestamp')
-      
+
        # Calculate ORB levels
        orb_high, orb_low = calculate_orb_levels(symbol_data)
 Use df and symbol as parameters.
