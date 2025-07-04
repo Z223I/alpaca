@@ -398,7 +398,14 @@ class ORB:
                 filtered_data, price_column='close', period=9)
                 
             if isDebugging:
-                print(f"DEBUG: EMA calculation - Success: {ema_success}, Values count: {len(ema_values) if ema_values else 0}")
+                print(f"DEBUG: EMA calculation - Success: {ema_success}")
+                print(f"DEBUG: EMA values type: {type(ema_values)}")
+                if ema_values is not None:
+                    print(f"DEBUG: EMA values count: {len(ema_values)}")
+                    # Convert to list if it's a pandas Series
+                    if hasattr(ema_values, 'tolist'):
+                        ema_values = ema_values.tolist()
+                        print(f"DEBUG: Converted EMA values to list")
 
             # Calculate VWAP using typical price (HLC/3)
             if isDebugging:
@@ -407,7 +414,14 @@ class ORB:
             vwap_success, vwap_values = calculate_vwap_typical(filtered_data)
             
             if isDebugging:
-                print(f"DEBUG: VWAP calculation - Success: {vwap_success}, Values count: {len(vwap_values) if vwap_values else 0}")
+                print(f"DEBUG: VWAP calculation - Success: {vwap_success}")
+                print(f"DEBUG: VWAP values type: {type(vwap_values)}")
+                if vwap_values is not None:
+                    print(f"DEBUG: VWAP values count: {len(vwap_values)}")
+                    # Convert to list if it's a pandas Series
+                    if hasattr(vwap_values, 'tolist'):
+                        vwap_values = vwap_values.tolist()
+                        print(f"DEBUG: Converted VWAP values to list")
 
             # Calculate vector angle using all 45 candlesticks
             if isDebugging:
@@ -439,16 +453,17 @@ class ORB:
                 }
 
                 # Add EMA values if available
-                if (ema_success and
-                        idx - filtered_data.index[0] < len(ema_values)):
-                    pca_row['ema_9'] = ema_values[idx - filtered_data.index[0]]
+                row_index = idx - filtered_data.index[0]
+                if (ema_success and ema_values is not None and 
+                        row_index < len(ema_values)):
+                    pca_row['ema_9'] = ema_values[row_index]
                 else:
                     pca_row['ema_9'] = None
 
                 # Add VWAP values if available
-                if (vwap_success and
-                        idx - filtered_data.index[0] < len(vwap_values)):
-                    pca_row['vwap'] = vwap_values[idx - filtered_data.index[0]]
+                if (vwap_success and vwap_values is not None and
+                        row_index < len(vwap_values)):
+                    pca_row['vwap'] = vwap_values[row_index]
                 else:
                     pca_row['vwap'] = None
 

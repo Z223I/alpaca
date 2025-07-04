@@ -1,5 +1,6 @@
 # TODO
 - [ ] Focus on creating ORB filter.
+- [ ] Finish establishing the PCA data.
 - [ ] Create some more ORB PyTests.
 - [X] Create some ORB PyTests.
 - [X] ORB Create VWAP atom.
