@@ -274,6 +274,52 @@ class ORB:
             print(f"Error saving market data: {e}")
             return False
 
+    def _filter_stock_data_by_time(self, symbol_data: pd.DataFrame,
+                                   start_time: time,
+                                   end_time: time) -> Optional[pd.DataFrame]:
+        """
+        Filter stock data by time range in ET timezone.
+
+        Args:
+            symbol_data: DataFrame with stock data including timestamp column
+            start_time: Start time for filtering (e.g., time(9, 30))
+            end_time: End time for filtering (e.g., time(10, 15))
+
+        Returns:
+            Filtered DataFrame or None if no data or error
+        """
+        try:
+            if symbol_data is None or symbol_data.empty:
+                return None
+
+            # Ensure timestamp is datetime
+            symbol_data_copy = symbol_data.copy()
+            symbol_data_copy['timestamp'] = pd.to_datetime(
+                symbol_data_copy['timestamp'])
+
+            # Convert timestamps to ET timezone and filter
+            et_tz = pytz.timezone('America/New_York')
+            symbol_data_copy['timestamp_et'] = symbol_data_copy[
+                'timestamp'].dt.tz_convert(et_tz)
+            symbol_data_copy['time_only'] = symbol_data_copy[
+                'timestamp_et'].dt.time
+
+            # Filter by time range
+            filtered_data = symbol_data_copy[
+                (symbol_data_copy['time_only'] >= start_time) &
+                (symbol_data_copy['time_only'] <= end_time)
+            ].copy()
+
+            # Clean up temporary columns
+            filtered_data = filtered_data.drop(
+                columns=['timestamp_et', 'time_only'])
+
+            return filtered_data if not filtered_data.empty else None
+
+        except Exception as e:
+            print(f"Error filtering stock data by time: {e}")
+            return None
+
     def _pca_data_prep(self, df: pd.DataFrame, symbol: str) -> bool:
         """
         Prepare data for PCA analysis by filtering to 9:30-10:15 ET and
@@ -295,25 +341,15 @@ class ORB:
                 print(f"No data found for symbol: {symbol}")
                 return False
 
-            # Filter the data from 9:30 to 10:15 ET
-            symbol_data['timestamp'] = pd.to_datetime(symbol_data['timestamp'])
-
-            # Create time masks for 9:30 to 10:15 ET
-            et_tz = pytz.timezone('America/New_York')
+            # Filter the data from 9:30 to 10:15 ET using the dedicated method
             start_time = time(9, 30)
             end_time = time(10, 15)
+            filtered_data = self._filter_stock_data_by_time(
+                symbol_data, start_time, end_time)
 
-            # Convert timestamps to ET timezone and filter
-            symbol_data_et = symbol_data.copy()
-            symbol_data_et['timestamp_et'] = symbol_data_et[
-                'timestamp'].dt.tz_convert(et_tz)
-            symbol_data_et['time_only'] = symbol_data_et[
-                'timestamp_et'].dt.time
-
-            filtered_data = symbol_data_et[
-                (symbol_data_et['time_only'] >= start_time) &
-                (symbol_data_et['time_only'] <= end_time)
-            ].copy()
+            if filtered_data is None:
+                print(f"No data found after filtering for symbol: {symbol}")
+                return False
 
             # Verify there are 45 lines of data and return if not
             if len(filtered_data) != 45:
