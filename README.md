@@ -22,7 +22,7 @@ A Python wrapper for automated trading operations using the Alpaca trading API. 
 
 1. Install required dependencies:
 ```bash
-pip3 install alpaca-trade-api python-dotenv
+pip3 install alpaca-trade-api python-dotenv matplotlib pytest pytest-cov
 ```
 
 2. Set up environment variables by creating a `.env` file in the project root:
@@ -31,6 +31,74 @@ ALPACA_API_KEY=your_api_key_here
 ALPACA_SECRET_KEY=your_secret_key_here
 ALPACA_BASE_URL=https://paper-api.alpaca.markets  # For paper trading
 PORTFOLIO_RISK=0.10  # Optional: default is 0.10 (10%)
+```
+
+## Testing
+
+This project includes comprehensive test suites for all components. Two convenient test runners are provided for easy testing.
+
+### Quick Testing
+
+**Using the shell script (recommended for quick testing):**
+```bash
+./test.sh                    # Run all tests
+./test.sh verbose            # Run tests with verbose output
+./test.sh orb               # Run only ORB tests
+./test.sh coverage          # Run tests with coverage report
+./test.sh lint              # Run linting then tests
+```
+
+**Using the Python test runner (more options):**
+```bash
+python run_tests.py                    # Run all tests
+python run_tests.py -v                 # Run tests with verbose output
+python run_tests.py -f test_orb.py     # Run specific test file
+python run_tests.py -c                 # Run tests with coverage
+python run_tests.py -l                 # Run linting before tests
+python run_tests.py -k "test_filter"   # Run tests matching pattern
+```
+
+### Direct Testing Commands
+
+**Pytest (recommended):**
+```bash
+python -m pytest tests/                                                          # Run all tests
+python -m pytest tests/test_orb.py -v                                            # Run ORB tests with verbose output
+python -m pytest tests/ --cov=code --cov=atoms --cov-report=html --cov-report=term  # Run with coverage
+```
+
+**Legacy unittest:**
+```bash
+python -m unittest discover -s test        # Run old unittest tests
+python test/test_Alpaca.py TestAlpaca.test_order  # Run specific test
+```
+
+### Test Structure
+
+- **`tests/test_orb.py`**: Comprehensive tests for ORB (Opening Range Breakout) functionality
+  - Data filtering and time range validation
+  - PCA data preparation and validation
+  - Integration tests with real market data
+  - Mock testing for external API dependencies
+
+- **`test/test_Alpaca.py`**: Legacy tests for main trading functionality
+  - Order execution and validation
+  - Portfolio management
+  - API interaction tests
+
+### Testing Features
+
+- **Mocked Dependencies**: All external API calls are mocked for consistent testing
+- **Timezone Handling**: Proper EST/EDT timezone testing for market hours
+- **Real Data Integration**: Tests use actual market data from `stock_data/` directory
+- **Coverage Reports**: HTML and terminal coverage reports available
+- **Linting Integration**: Optional code quality checks before testing
+
+### Debugging Tests
+
+```bash
+python -m pdb test/test_Alpaca.py TestAlpaca.test_order  # Debug specific test
+python -m pytest tests/test_orb.py::TestORB::test_filter_stock_data_by_time_success --pdb  # Debug with pytest
 ```
 
 ## Usage
