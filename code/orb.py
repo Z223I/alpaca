@@ -323,7 +323,8 @@ class ORB:
             print(f"Error filtering stock data by time: {e}")
             return None
 
-    def _pca_data_prep(self, df: pd.DataFrame, symbol: str, data_samples: int = 45) -> bool:
+    def _pca_data_prep(self, df: pd.DataFrame, symbol: str,
+                       data_samples: int = 45) -> bool:
         """
         Prepare data for PCA analysis by taking the first N samples of data
         and collecting metrics.
@@ -629,6 +630,148 @@ class ORB:
             
         except Exception as e:
             print(f"Error performing PCA analysis: {e}")
+            return False
+
+    def _standardize_pca_data(self) -> bool:
+        """
+        Standardize PCA data by removing symbol and timestamp columns,
+        extracting volume and vector_angle, and performing statistical
+        standardization on price columns.
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        # Local debugging flag - set to True for detailed debug output
+        is_debugging = True
+        
+        if not hasattr(self, 'pca_data') or self.pca_data is None:
+            print("No PCA data available for standardization.")
+            return False
+            
+        try:
+            if is_debugging:
+                print(f"\nDEBUG: Starting PCA data standardization...")
+                print(f"DEBUG: Original PCA data shape: {self.pca_data.shape}")
+                print(f"DEBUG: Original columns: {list(self.pca_data.columns)}")
+            
+            # Step 1: Remove symbol and timestamp, extract volume and vector_angle
+            working_df = self.pca_data.copy()
+            
+            # Remove symbol and timestamp columns
+            columns_to_remove = ['symbol', 'timestamp']
+            for col in columns_to_remove:
+                if col in working_df.columns:
+                    working_df = working_df.drop(columns=[col])
+                    if is_debugging:
+                        print(f"DEBUG: Removed column: {col}")
+            
+            # Extract volume and vector_angle separately
+            volume_data = (working_df['volume'].copy()
+                          if 'volume' in working_df.columns else None)
+            vector_angle_data = (working_df['vector_angle'].copy()
+                                if 'vector_angle' in working_df.columns
+                                else None)
+            
+            if is_debugging:
+                print(f"DEBUG: Extracted volume data: "
+                      f"{volume_data is not None}")
+                print(f"DEBUG: Extracted vector_angle data: "
+                      f"{vector_angle_data is not None}")
+            
+            # Remove volume and vector_angle from working dataframe
+            if 'volume' in working_df.columns:
+                working_df = working_df.drop(columns=['volume'])
+            if 'vector_angle' in working_df.columns:
+                working_df = working_df.drop(columns=['vector_angle'])
+            
+            if is_debugging:
+                print(f"DEBUG: Remaining price columns: "
+                      f"{list(working_df.columns)}")
+                print(f"DEBUG: Price data shape: {working_df.shape}")
+            
+            # Step 2: Perform statistical standardization
+            try:
+                from sklearn.preprocessing import StandardScaler
+            except ImportError:
+                print("Error: scikit-learn not installed. "
+                      "Install with: pip install scikit-learn")
+                return False
+            
+            # Standardize price columns
+            scaler_prices = StandardScaler()
+            price_columns = working_df.columns.tolist()
+            standardized_prices = scaler_prices.fit_transform(working_df)
+            standardized_prices_df = pd.DataFrame(
+                standardized_prices, 
+                columns=price_columns,
+                index=working_df.index
+            )
+            
+            if is_debugging:
+                print(f"DEBUG: Standardized price columns shape: "
+                      f"{standardized_prices_df.shape}")
+                print("DEBUG: Price standardization completed")
+            
+            # Standardize volume if available
+            if volume_data is not None:
+                scaler_volume = StandardScaler()
+                volume_array = volume_data.to_numpy().reshape(-1, 1)
+                volume_standardized = scaler_volume.fit_transform(volume_array)
+                volume_standardized_series = pd.Series(
+                    volume_standardized.flatten(),
+                    index=volume_data.index,
+                    name='volume_standardized'
+                )
+                if is_debugging:
+                    print("DEBUG: Volume standardization completed")
+            else:
+                volume_standardized_series = None
+            
+            # Standardize vector_angle if available
+            if vector_angle_data is not None:
+                scaler_vector = StandardScaler()
+                vector_array = vector_angle_data.to_numpy().reshape(-1, 1)
+                vector_standardized = scaler_vector.fit_transform(vector_array)
+                vector_angle_standardized_series = pd.Series(
+                    vector_standardized.flatten(),
+                    index=vector_angle_data.index,
+                    name='vector_angle_standardized'
+                )
+                if is_debugging:
+                    print("DEBUG: Vector angle standardization completed")
+            else:
+                vector_angle_standardized_series = None
+            
+            # Combine all standardized data
+            standardized_df = standardized_prices_df.copy()
+            
+            if volume_standardized_series is not None:
+                standardized_df['volume_standardized'] = volume_standardized_series
+            if vector_angle_standardized_series is not None:
+                standardized_df['vector_angle_standardized'] = vector_angle_standardized_series
+            
+            # Store the standardized data
+            self.pca_data_standardized = standardized_df
+            
+            if is_debugging:
+                print(f"DEBUG: Final standardized data shape: "
+                      f"{standardized_df.shape}")
+                print(f"DEBUG: Final columns: {list(standardized_df.columns)}")
+                
+                # Step 3: Print the resulting dataframe if debugging
+                print("\nDEBUG: Standardized PCA Data:")
+                print("=" * 80)
+                print(standardized_df.to_string(index=False))
+                print("=" * 80)
+                print(f"Total rows: {len(standardized_df)}")
+                print(f"Columns: {list(standardized_df.columns)}")
+                print()
+            
+            print("PCA data standardization completed successfully.")
+            return True
+            
+        except Exception as e:
+            print(f"Error standardizing PCA data: {e}")
             return False
 
     def _generate_candle_charts(self) -> bool:

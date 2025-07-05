@@ -169,12 +169,8 @@ class TestORB:
         mock_vwap.return_value = (True, [100.15] * 45)
         mock_vector_angle.return_value = 5.5
 
-        # Mock the filtering method to return exactly 45 rows
-        with patch.object(orb_instance,
-                          '_filter_stock_data_by_time') as mock_filter:
-            mock_filter.return_value = sample_symbol_data
-
-            result = orb_instance._pca_data_prep(sample_symbol_data, 'TEST')
+        # The method now uses head(data_samples) directly, no filtering needed
+        result = orb_instance._pca_data_prep(sample_symbol_data, 'TEST')
 
         assert result is True
         assert orb_instance.pca_data is not None
@@ -209,25 +205,20 @@ class TestORB:
         short_data = sample_symbol_data.head(30)  # Only 30 rows instead of 45
         mock_extract_symbol.return_value = short_data
 
-        with patch.object(orb_instance,
-                          '_filter_stock_data_by_time') as mock_filter:
-            mock_filter.return_value = short_data
-
-            result = orb_instance._pca_data_prep(pd.DataFrame(), 'TEST')
+        # The method now uses head(data_samples) directly
+        result = orb_instance._pca_data_prep(pd.DataFrame(), 'TEST')
 
         assert result is False
 
     @patch.object(orb_module, 'extract_symbol_data')
     def test_pca_data_prep_no_filtered_data(self, mock_extract_symbol,
-                                            orb_instance, sample_symbol_data):
-        """Test PCA data prep when filtering returns no data."""
-        mock_extract_symbol.return_value = sample_symbol_data
+                                            orb_instance):
+        """Test PCA data prep when extract_symbol_data returns empty data."""
+        # Return empty DataFrame to simulate no data scenario
+        empty_df = pd.DataFrame()
+        mock_extract_symbol.return_value = empty_df
 
-        with patch.object(orb_instance,
-                          '_filter_stock_data_by_time') as mock_filter:
-            mock_filter.return_value = None
-
-            result = orb_instance._pca_data_prep(sample_symbol_data, 'TEST')
+        result = orb_instance._pca_data_prep(pd.DataFrame(), 'TEST')
 
         assert result is False
 
@@ -238,13 +229,10 @@ class TestORB:
              patch.object(orb_module, 'calculate_orb_levels') as mock_orb, \
              patch.object(orb_module, 'calculate_ema') as mock_ema, \
              patch.object(orb_module, 'calculate_vwap_typical') as mock_vwap, \
-             patch.object(orb_module, 'calculate_vector_angle') as mock_vector, \
-             patch.object(orb_instance,
-                          '_filter_stock_data_by_time') as mock_filter:
+             patch.object(orb_module, 'calculate_vector_angle') as mock_vector:
 
             # Setup mocks
             mock_extract.return_value = sample_symbol_data
-            mock_filter.return_value = sample_symbol_data
             mock_orb.return_value = (101.0, 99.0)
             mock_ema.return_value = (True, [100.1] * 45)
             mock_vwap.return_value = (True, [100.15] * 45)
@@ -645,3 +633,93 @@ class TestORB:
         
         assert result is True
         assert orb_instance.csv_date is None  # Date parsing should fail gracefully
+
+    def test_standardize_pca_data_success(self, orb_instance):
+        """Test successful PCA data standardization."""
+        # Create mock PCA data
+        mock_pca_data = pd.DataFrame({
+            'symbol': ['TEST'] * 5,
+            'timestamp': pd.date_range('2025-01-01', periods=5, freq='min'),
+            'open': [100.0, 101.0, 102.0, 103.0, 104.0],
+            'high': [100.5, 101.5, 102.5, 103.5, 104.5],
+            'low': [99.5, 100.5, 101.5, 102.5, 103.5],
+            'close': [100.2, 101.2, 102.2, 103.2, 104.2],
+            'volume': [1000, 1100, 1200, 1300, 1400],
+            'orb_high': [101.0] * 5,
+            'orb_low': [99.0] * 5,
+            'vector_angle': [5.5] * 5,
+            'ema_9': [100.1, 101.1, 102.1, 103.1, 104.1],
+            'vwap': [100.15, 101.15, 102.15, 103.15, 104.15]
+        })
+        
+        orb_instance.pca_data = mock_pca_data
+        
+        # Mock sklearn import and StandardScaler
+        import numpy as np
+        mock_scaler_class = Mock()
+        mock_scaler_instance = Mock()
+        # Return 5 rows x 8 columns for price data standardization
+        price_standardized = np.array([
+            [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
+            [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
+            [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+            [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+            [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1]
+        ])
+        volume_standardized = np.array([[0.0], [0.1], [0.2], [0.3], [0.4]])
+        
+        # Configure the mock to return different values for different calls
+        mock_scaler_instance.fit_transform.side_effect = [
+            price_standardized,  # First call for price data
+            volume_standardized,  # Second call for volume
+            volume_standardized   # Third call for vector_angle
+        ]
+        mock_scaler_class.return_value = mock_scaler_instance
+        
+        # Mock the sklearn module structure
+        sklearn_mock = Mock()
+        sklearn_mock.preprocessing.StandardScaler = mock_scaler_class
+        
+        with patch.dict('sys.modules', {'sklearn': sklearn_mock, 'sklearn.preprocessing': sklearn_mock.preprocessing}):
+            result = orb_instance._standardize_pca_data()
+            
+        assert result is True
+        assert hasattr(orb_instance, 'pca_data_standardized')
+        assert orb_instance.pca_data_standardized is not None
+        
+        # Check that symbol and timestamp columns are removed
+        assert 'symbol' not in orb_instance.pca_data_standardized.columns
+        assert 'timestamp' not in orb_instance.pca_data_standardized.columns
+        
+        # Check that standardized volume and vector_angle columns exist
+        assert 'volume_standardized' in orb_instance.pca_data_standardized.columns
+        assert 'vector_angle_standardized' in orb_instance.pca_data_standardized.columns
+
+    def test_standardize_pca_data_no_data(self, orb_instance):
+        """Test standardization when no PCA data exists."""
+        orb_instance.pca_data = None
+        
+        result = orb_instance._standardize_pca_data()
+        
+        assert result is False
+
+    def test_standardize_pca_data_missing_sklearn(self, orb_instance):
+        """Test standardization when scikit-learn is not available."""
+        # Create mock PCA data
+        mock_pca_data = pd.DataFrame({
+            'symbol': ['TEST'],
+            'open': [100.0],
+            'volume': [1000]
+        })
+        orb_instance.pca_data = mock_pca_data
+        
+        # Mock the import to raise ImportError
+        def mock_import(name, *args, **kwargs):
+            if name == 'sklearn.preprocessing':
+                raise ImportError("No module named 'sklearn'")
+            return __import__(name, *args, **kwargs)
+        
+        with patch('builtins.__import__', side_effect=mock_import):
+            result = orb_instance._standardize_pca_data()
+            
+        assert result is False
