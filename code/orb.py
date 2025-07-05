@@ -576,6 +576,9 @@ class ORB:
         Returns:
             True if successful for at least one symbol, False otherwise
         """
+        # Local debugging flag - set to True for detailed debug output
+        is_debugging = True
+        
         if not hasattr(self, 'market_df') or self.market_df is None:
             print("No market DataFrame available for PCA analysis.")
             return False
@@ -611,6 +614,16 @@ class ORB:
             if hasattr(self, 'pca_data') and self.pca_data is not None:
                 print(f"Total PCA data rows collected: {len(self.pca_data)}")
                 print("PCA data columns:", list(self.pca_data.columns))
+            
+            # Print PCA data if debugging is enabled
+            if is_debugging and hasattr(self, 'pca_data') and self.pca_data is not None:
+                print(f"\nDEBUG: Complete PCA Data:")
+                print("=" * 80)
+                print(self.pca_data.to_string(index=False))
+                print("=" * 80)
+                print(f"Total rows: {len(self.pca_data)}")
+                print(f"Columns: {list(self.pca_data.columns)}")
+                print()
             
             return success_count > 0
             
