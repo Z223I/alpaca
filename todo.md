@@ -1,4 +1,10 @@
 # TODO
+
+The remaining tasks are lower priority documentation and deployment tools:
+  - Production configuration and deployment tools
+  - Comprehensive API documentation
+
+  
 - [ ] Focus on creating ORB filter.
 - [ ] Finish establishing the PCA data.
 - [ ] Create some more ORB PyTests.
