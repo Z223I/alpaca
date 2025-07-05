@@ -626,6 +626,15 @@ class ORB:
                 print(f"Columns: {list(self.pca_data.columns)}")
                 print()
             
+            # Standardize the PCA data
+            if success_count > 0:
+                print("\nStarting PCA data standardization...")
+                standardize_success = self._standardize_pca_data()
+                if standardize_success:
+                    print("PCA data standardization completed successfully.")
+                else:
+                    print("PCA data standardization failed.")
+            
             return success_count > 0
             
         except Exception as e:
