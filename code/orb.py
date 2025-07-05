@@ -323,15 +323,17 @@ class ORB:
             print(f"Error filtering stock data by time: {e}")
             return None
 
-    def _pca_data_prep(self, df: pd.DataFrame, symbol: str) -> bool:
+    def _pca_data_prep(self, df: pd.DataFrame, symbol: str, data_samples: int = 45) -> bool:
         """
-        Prepare data for PCA analysis by filtering to 9:30-10:15 ET and
-        collecting metrics.
+        Prepare data for PCA analysis by taking the first N samples of data
+        and collecting metrics.
 
         Args:
             df: DataFrame with columns ['timestamp', 'open', 'high', 'low',
                 'close', 'volume']
             symbol: Stock symbol name
+            data_samples: Number of data samples to take from the beginning
+                (default: 45)
 
         Returns:
             True if successful, False otherwise
@@ -356,30 +358,30 @@ class ORB:
                 print(f"DEBUG: Extracted symbol data shape: {symbol_data.shape}")
                 print(f"DEBUG: Date range in symbol data: {symbol_data['timestamp'].min()} to {symbol_data['timestamp'].max()}")
 
-            # Take the first 45 lines of data instead of time filtering
+            # Take the first N lines of data instead of time filtering
             if isDebugging:
-                print(f"DEBUG: Taking first 45 lines of data")
+                print(f"DEBUG: Taking first {data_samples} lines of data")
                 
-            filtered_data = symbol_data.head(45).copy()
+            filtered_data = symbol_data.head(data_samples).copy()
 
             if filtered_data is None or filtered_data.empty:
                 print(f"No data available for symbol: {symbol}")
                 return False
 
             if isDebugging:
-                print(f"DEBUG: First 45 lines data shape: {filtered_data.shape}")
-                print(f"DEBUG: Time range in first 45 lines: {filtered_data['timestamp'].min()} to {filtered_data['timestamp'].max()}")
+                print(f"DEBUG: First {data_samples} lines data shape: {filtered_data.shape}")
+                print(f"DEBUG: Time range in first {data_samples} lines: {filtered_data['timestamp'].min()} to {filtered_data['timestamp'].max()}")
 
-            # Verify there are 45 lines of data and return if not
-            if len(filtered_data) != 45:
-                print(f"Expected 45 lines of data for {symbol}, "
+            # Verify there are the expected number of lines of data and return if not
+            if len(filtered_data) != data_samples:
+                print(f"Expected {data_samples} lines of data for {symbol}, "
                       f"got {len(filtered_data)}")
                 if isDebugging:
-                    print(f"DEBUG: Data length validation failed - expected 45, got {len(filtered_data)}")
+                    print(f"DEBUG: Data length validation failed - expected {data_samples}, got {len(filtered_data)}")
                 return False
 
             if isDebugging:
-                print(f"DEBUG: Data length validation passed - found 45 rows")
+                print(f"DEBUG: Data length validation passed - found {data_samples} rows")
 
             # Calculate ORB levels
             if isDebugging:
@@ -423,12 +425,12 @@ class ORB:
                         vwap_values = vwap_values.tolist()
                         print(f"DEBUG: Converted VWAP values to list")
 
-            # Calculate vector angle using all 45 candlesticks
+            # Calculate vector angle using all candlesticks
             if isDebugging:
-                print(f"DEBUG: Calculating vector angle (all 45 candles)...")
+                print(f"DEBUG: Calculating vector angle (all {data_samples} candles)...")
                 
             vector_angle = calculate_vector_angle(
-                filtered_data, price_column='close', num_candles=45)
+                filtered_data, price_column='close', num_candles=data_samples)
                 
             if isDebugging:
                 print(f"DEBUG: Vector angle calculated: {vector_angle}")
@@ -449,7 +451,7 @@ class ORB:
                     'volume': row['volume'],
                     'orb_high': orb_high,
                     'orb_low': orb_low,
-                    'vector_angle': vector_angle  # Repeat for all 45 lines
+                    'vector_angle': vector_angle  # Repeat for all lines
                 }
 
                 # Add EMA values if available
