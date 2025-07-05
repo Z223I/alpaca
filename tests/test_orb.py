@@ -63,12 +63,12 @@ class TestORB:
     @pytest.fixture
     def sample_symbol_data(self):
         """Fixture that provides sample data for a single symbol."""
-        # Create 45 minutes of data from 9:30 to 10:15 ET
+        # Create 90 minutes of data from 9:30 to 11:00 ET
         et_tz = pytz.timezone('America/New_York')
         base_time = et_tz.localize(datetime(2025, 6, 30, 9, 30))
 
         data = []
-        for i in range(45):
+        for i in range(90):
             # Use timedelta to add minutes properly
             timestamp = base_time + timedelta(minutes=i)
             data.append({
@@ -94,7 +94,7 @@ class TestORB:
         )
 
         assert result is not None
-        assert len(result) == 45
+        assert len(result) == 90
         assert 'symbol' in result.columns
         assert 'timestamp' in result.columns
         # Ensure temporary columns are cleaned up
@@ -165,8 +165,8 @@ class TestORB:
         # Setup mocks
         mock_extract_symbol.return_value = sample_symbol_data
         mock_orb_levels.return_value = (101.0, 99.0)
-        mock_ema.return_value = (True, [100.1] * 45)
-        mock_vwap.return_value = (True, [100.15] * 45)
+        mock_ema.return_value = (True, [100.1] * 90)
+        mock_vwap.return_value = (True, [100.15] * 90)
         mock_vector_angle.return_value = 5.5
 
         # The method now uses head(data_samples) directly, no filtering needed
@@ -174,18 +174,27 @@ class TestORB:
 
         assert result is True
         assert orb_instance.pca_data is not None
-        assert len(orb_instance.pca_data) == 45
+        assert len(orb_instance.pca_data) == 90
 
-        # Check that all expected columns are present
+        # Check that all expected independent feature columns are present
         expected_columns = [
-            'symbol', 'timestamp', 'open', 'high', 'low', 'close', 'volume',
-            'orb_high', 'orb_low', 'vector_angle', 'ema_9', 'vwap'
+            'symbol', 'timestamp', 'return_open_close', 'return_prev_close',
+            'intraday_range', 'upper_wick', 'lower_wick', 'volume_ratio',
+            'momentum_5', 'close_vs_orb_high', 'close_vs_orb_low',
+            'high_vs_orb_high', 'low_vs_orb_low', 'close_vs_ema', 'close_vs_vwap',
+            'vector_angle', 'session_progress'
         ]
         for col in expected_columns:
             assert col in orb_instance.pca_data.columns
 
         # Check that vector angle is repeated for all rows
         assert all(orb_instance.pca_data['vector_angle'] == 5.5)
+        
+        # Check that features are independent (not raw prices)
+        assert 'open' not in orb_instance.pca_data.columns
+        assert 'high' not in orb_instance.pca_data.columns
+        assert 'low' not in orb_instance.pca_data.columns
+        assert 'close' not in orb_instance.pca_data.columns
 
     @patch.object(orb_module, 'extract_symbol_data')
     def test_pca_data_prep_no_symbol_data(self, mock_extract_symbol,
@@ -234,19 +243,19 @@ class TestORB:
             # Setup mocks
             mock_extract.return_value = sample_symbol_data
             mock_orb.return_value = (101.0, 99.0)
-            mock_ema.return_value = (True, [100.1] * 45)
-            mock_vwap.return_value = (True, [100.15] * 45)
+            mock_ema.return_value = (True, [100.1] * 90)
+            mock_vwap.return_value = (True, [100.15] * 90)
             mock_vector.return_value = 5.5
 
             # First call
             result1 = orb_instance._pca_data_prep(sample_symbol_data, 'TEST1')
             assert result1 is True
-            assert len(orb_instance.pca_data) == 45
+            assert len(orb_instance.pca_data) == 90
 
             # Second call with different symbol
             result2 = orb_instance._pca_data_prep(sample_symbol_data, 'TEST2')
             assert result2 is True
-            assert len(orb_instance.pca_data) == 90  # Should accumulate
+            assert len(orb_instance.pca_data) == 180  # Should accumulate (90+90)
 
     def test_integration_with_real_data(self, orb_instance, sample_stock_data):
         """Integration test using real data from stock_data/20250630.json."""
@@ -636,20 +645,21 @@ class TestORB:
 
     def test_standardize_pca_data_success(self, orb_instance):
         """Test successful PCA data standardization."""
-        # Create mock PCA data
+        # Create mock PCA data with independent features
         mock_pca_data = pd.DataFrame({
             'symbol': ['TEST'] * 5,
             'timestamp': pd.date_range('2025-01-01', periods=5, freq='min'),
-            'open': [100.0, 101.0, 102.0, 103.0, 104.0],
-            'high': [100.5, 101.5, 102.5, 103.5, 104.5],
-            'low': [99.5, 100.5, 101.5, 102.5, 103.5],
-            'close': [100.2, 101.2, 102.2, 103.2, 104.2],
-            'volume': [1000, 1100, 1200, 1300, 1400],
-            'orb_high': [101.0] * 5,
-            'orb_low': [99.0] * 5,
+            'return_open_close': [0.001, 0.002, 0.001, 0.003, 0.0],
+            'return_prev_close': [0.0, 0.001, 0.002, 0.001, 0.002],
+            'intraday_range': [0.01, 0.012, 0.008, 0.015, 0.011],
+            'upper_wick': [0.002, 0.003, 0.001, 0.004, 0.002],
+            'lower_wick': [0.003, 0.002, 0.004, 0.001, 0.003],
+            'volume_ratio': [1.0, 1.1, 0.9, 1.2, 1.05],
+            'momentum_5': [0.0, 0.0, 0.0, 0.0, 0.005],
+            'close_vs_orb_high': [-0.5, 0.0, 0.2, 0.8, 1.2],
+            'close_vs_orb_low': [0.5, 1.0, 1.2, 1.8, 2.2],
             'vector_angle': [5.5] * 5,
-            'ema_9': [100.1, 101.1, 102.1, 103.1, 104.1],
-            'vwap': [100.15, 101.15, 102.15, 103.15, 104.15]
+            'session_progress': [0.0, 0.25, 0.5, 0.75, 1.0]
         })
         
         orb_instance.pca_data = mock_pca_data
@@ -658,22 +668,18 @@ class TestORB:
         import numpy as np
         mock_scaler_class = Mock()
         mock_scaler_instance = Mock()
-        # Return 5 rows x 8 columns for price data standardization
-        price_standardized = np.array([
-            [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
-            [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
-            [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
-            [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
-            [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1]
-        ])
-        volume_standardized = np.array([[0.0], [0.1], [0.2], [0.3], [0.4]])
         
-        # Configure the mock to return different values for different calls
-        mock_scaler_instance.fit_transform.side_effect = [
-            price_standardized,  # First call for price data
-            volume_standardized,  # Second call for volume
-            volume_standardized   # Third call for vector_angle
-        ]
+        # Return 5 rows x 11 columns for independent features (excluding symbol/timestamp)
+        n_features = 11
+        standardized_features = np.array([
+            [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+            [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1],
+            [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2],
+            [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3],
+            [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4]
+        ])
+        
+        mock_scaler_instance.fit_transform.return_value = standardized_features
         mock_scaler_class.return_value = mock_scaler_instance
         
         # Mock the sklearn module structure
@@ -691,9 +697,13 @@ class TestORB:
         assert 'symbol' not in orb_instance.pca_data_standardized.columns
         assert 'timestamp' not in orb_instance.pca_data_standardized.columns
         
-        # Check that standardized volume and vector_angle columns exist
-        assert 'volume_standardized' in orb_instance.pca_data_standardized.columns
-        assert 'vector_angle_standardized' in orb_instance.pca_data_standardized.columns
+        # Check that independent features are present
+        assert 'return_open_close' in orb_instance.pca_data_standardized.columns
+        assert 'intraday_range' in orb_instance.pca_data_standardized.columns
+        assert 'volume_ratio' in orb_instance.pca_data_standardized.columns
+        
+        # Verify shape
+        assert orb_instance.pca_data_standardized.shape == (5, n_features)
 
     def test_standardize_pca_data_no_data(self, orb_instance):
         """Test standardization when no PCA data exists."""
@@ -723,3 +733,143 @@ class TestORB:
             result = orb_instance._standardize_pca_data()
             
         assert result is False
+
+    def test_perform_pca_computation_success(self, orb_instance):
+        """Test successful PCA computation."""
+        import numpy as np
+        
+        # Create mock standardized PCA data
+        mock_standardized_data = pd.DataFrame({
+            'open': [0.0, 0.1, 0.2, 0.3, 0.4],
+            'high': [0.1, 0.2, 0.3, 0.4, 0.5],
+            'low': [-0.1, 0.0, 0.1, 0.2, 0.3],
+            'close': [0.05, 0.15, 0.25, 0.35, 0.45],
+            'volume_standardized': [-1.0, -0.5, 0.0, 0.5, 1.0],
+            'vector_angle_standardized': [0.2, 0.3, 0.4, 0.5, 0.6]
+        })
+        
+        orb_instance.pca_data_standardized = mock_standardized_data
+        
+        # Mock sklearn PCA
+        mock_pca_class = Mock()
+        mock_pca_instance = Mock()
+        
+        # Configure PCA mock
+        mock_pca_instance.components_ = np.array([
+            [0.5, 0.3, 0.2, 0.4, 0.1, 0.3],
+            [0.2, 0.4, 0.3, 0.1, 0.5, 0.2]
+        ])
+        mock_pca_instance.explained_variance_ = np.array([2.5, 1.8])
+        mock_pca_instance.explained_variance_ratio_ = np.array([0.6, 0.4])
+        mock_pca_instance.fit_transform.return_value = np.array([
+            [1.2, 0.8], [1.0, 0.6], [0.8, 0.4], [0.6, 0.2], [0.4, 0.0]
+        ])
+        
+        mock_pca_class.return_value = mock_pca_instance
+        
+        # Mock the sklearn module structure
+        sklearn_mock = Mock()
+        sklearn_mock.decomposition.PCA = mock_pca_class
+        
+        with patch.dict('sys.modules', {
+            'sklearn': sklearn_mock, 
+            'sklearn.decomposition': sklearn_mock.decomposition
+        }):
+            result = orb_instance._perform_pca_computation()
+            
+        assert result is True
+        assert hasattr(orb_instance, 'pca_components')
+        assert hasattr(orb_instance, 'pca_explained_variance')
+        assert hasattr(orb_instance, 'pca_explained_variance_ratio')
+        assert hasattr(orb_instance, 'pca_transformed_data')
+        assert hasattr(orb_instance, 'pca_feature_names')
+        
+        # Check that PCA results are stored correctly
+        assert orb_instance.pca_components.shape == (2, 6)
+        assert len(orb_instance.pca_explained_variance) == 2
+        assert len(orb_instance.pca_explained_variance_ratio) == 2
+        assert orb_instance.pca_transformed_data.shape == (5, 2)
+
+    def test_perform_pca_computation_no_data(self, orb_instance):
+        """Test PCA computation when no standardized data exists."""
+        orb_instance.pca_data_standardized = None
+        
+        result = orb_instance._perform_pca_computation()
+        
+        assert result is False
+
+    def test_perform_pca_computation_empty_data(self, orb_instance):
+        """Test PCA computation when standardized data is empty after NaN removal."""
+        import numpy as np
+        # Create DataFrame with all NaN values
+        mock_standardized_data = pd.DataFrame({
+            'open': [np.nan, np.nan, np.nan],
+            'high': [np.nan, np.nan, np.nan],
+            'volume_standardized': [np.nan, np.nan, np.nan]
+        })
+        
+        orb_instance.pca_data_standardized = mock_standardized_data
+        
+        result = orb_instance._perform_pca_computation()
+        
+        assert result is False
+
+    def test_perform_pca_computation_missing_sklearn(self, orb_instance):
+        """Test PCA computation when scikit-learn is not available."""
+        # Create mock standardized data
+        mock_standardized_data = pd.DataFrame({
+            'open': [0.0, 0.1, 0.2],
+            'high': [0.1, 0.2, 0.3]
+        })
+        orb_instance.pca_data_standardized = mock_standardized_data
+        
+        # Mock the import to raise ImportError
+        def mock_import(name, *args, **kwargs):
+            if name == 'sklearn.decomposition':
+                raise ImportError("No module named 'sklearn'")
+            return __import__(name, *args, **kwargs)
+        
+        with patch('builtins.__import__', side_effect=mock_import):
+            result = orb_instance._perform_pca_computation()
+            
+        assert result is False
+
+    def test_perform_pca_computation_with_nan_values(self, orb_instance):
+        """Test PCA computation with some NaN values that get removed."""
+        import numpy as np
+        
+        # Create mock standardized data with some NaN values
+        mock_standardized_data = pd.DataFrame({
+            'open': [0.0, 0.1, np.nan, 0.3, 0.4],
+            'high': [0.1, 0.2, 0.3, np.nan, 0.5],
+            'low': [-0.1, 0.0, 0.1, 0.2, 0.3],
+            'volume_standardized': [-1.0, -0.5, 0.0, 0.5, 1.0]
+        })
+        
+        orb_instance.pca_data_standardized = mock_standardized_data
+        
+        # Mock sklearn PCA
+        mock_pca_class = Mock()
+        mock_pca_instance = Mock()
+        
+        # Configure PCA mock for remaining 3 valid rows
+        mock_pca_instance.components_ = np.array([[0.5, 0.3, 0.2, 0.4]])
+        mock_pca_instance.explained_variance_ = np.array([1.5])
+        mock_pca_instance.explained_variance_ratio_ = np.array([0.8])
+        mock_pca_instance.fit_transform.return_value = np.array([[1.0], [0.5], [0.2]])
+        
+        mock_pca_class.return_value = mock_pca_instance
+        
+        # Mock the sklearn module structure
+        sklearn_mock = Mock()
+        sklearn_mock.decomposition.PCA = mock_pca_class
+        
+        with patch.dict('sys.modules', {
+            'sklearn': sklearn_mock, 
+            'sklearn.decomposition': sklearn_mock.decomposition
+        }):
+            result = orb_instance._perform_pca_computation()
+            
+        assert result is True
+        # Should have 3 rows after NaN removal
+        assert orb_instance.pca_transformed_data.shape == (3, 1)

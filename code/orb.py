@@ -324,7 +324,7 @@ class ORB:
             return None
 
     def _pca_data_prep(self, df: pd.DataFrame, symbol: str,
-                       data_samples: int = 45) -> bool:
+                       data_samples: int = 90) -> bool:
         """
         Prepare data for PCA analysis by taking the first N samples of data
         and collecting metrics.
@@ -334,7 +334,7 @@ class ORB:
                 'close', 'volume']
             symbol: Stock symbol name
             data_samples: Number of data samples to take from the beginning
-                (default: 45)
+                (default: 90)
 
         Returns:
             True if successful, False otherwise
@@ -436,40 +436,87 @@ class ORB:
             if isDebugging:
                 print(f"DEBUG: Vector angle calculated: {vector_angle}")
 
-            # Create a dataframe with all collected data
+            # Create independent features for PCA analysis
             if isDebugging:
-                print(f"DEBUG: Creating PCA DataFrame with all collected data...")
-                
+                print(f"DEBUG: Creating independent features for PCA analysis...")
+            
+            # Calculate independent features
             pca_row_data = []
-            for idx, row in filtered_data.iterrows():
+            
+            # Create a copy with reset index for easier processing
+            data_reset = filtered_data.reset_index(drop=True)
+            
+            for i in range(len(data_reset)):
+                row = data_reset.iloc[i]
+                
+                # Independent feature calculations
                 pca_row = {
                     'symbol': symbol,
-                    'timestamp': row['timestamp'],
-                    'open': row['open'],
-                    'high': row['high'],
-                    'low': row['low'],
-                    'close': row['close'],
-                    'volume': row['volume'],
-                    'orb_high': orb_high,
-                    'orb_low': orb_low,
-                    'vector_angle': vector_angle  # Repeat for all lines
+                    'timestamp': row['timestamp']
                 }
-
-                # Add EMA values if available
-                row_index = idx - filtered_data.index[0]
+                
+                # 1. Return features (price-independent)
+                if i > 0:
+                    prev_close = data_reset.iloc[i-1]['close']
+                    pca_row['return_open_close'] = (row['close'] - row['open']) / row['open']
+                    pca_row['return_prev_close'] = (row['open'] - prev_close) / prev_close
+                else:
+                    pca_row['return_open_close'] = 0.0
+                    pca_row['return_prev_close'] = 0.0
+                
+                # 2. Volatility features
+                pca_row['intraday_range'] = (row['high'] - row['low']) / row['open']
+                pca_row['upper_wick'] = (row['high'] - max(row['open'], row['close'])) / row['open']
+                pca_row['lower_wick'] = (min(row['open'], row['close']) - row['low']) / row['open']
+                
+                # 3. Volume features
+                if i >= 5:  # Need at least 5 periods for rolling average
+                    avg_volume = data_reset.iloc[max(0, i-4):i+1]['volume'].mean()
+                    pca_row['volume_ratio'] = row['volume'] / avg_volume if avg_volume > 0 else 1.0
+                else:
+                    pca_row['volume_ratio'] = 1.0
+                
+                # 4. Momentum features
+                if i >= 4:  # 5-period momentum
+                    prev_close_5 = data_reset.iloc[i-4]['close']
+                    pca_row['momentum_5'] = (row['close'] - prev_close_5) / prev_close_5
+                else:
+                    pca_row['momentum_5'] = 0.0
+                
+                # 5. ORB-specific features
+                orb_range = orb_high - orb_low
+                if orb_range > 0:
+                    pca_row['close_vs_orb_high'] = (row['close'] - orb_high) / orb_range
+                    pca_row['close_vs_orb_low'] = (row['close'] - orb_low) / orb_range
+                    pca_row['high_vs_orb_high'] = (row['high'] - orb_high) / orb_range
+                    pca_row['low_vs_orb_low'] = (row['low'] - orb_low) / orb_range
+                else:
+                    pca_row['close_vs_orb_high'] = 0.0
+                    pca_row['close_vs_orb_low'] = 0.0
+                    pca_row['high_vs_orb_high'] = 0.0
+                    pca_row['low_vs_orb_low'] = 0.0
+                
+                # 6. Technical indicator deviations
+                row_index = i
                 if (ema_success and ema_values is not None and 
-                        row_index < len(ema_values)):
-                    pca_row['ema_9'] = ema_values[row_index]
+                        row_index < len(ema_values) and ema_values[row_index] is not None):
+                    pca_row['close_vs_ema'] = (row['close'] - ema_values[row_index]) / row['close']
                 else:
-                    pca_row['ema_9'] = None
-
-                # Add VWAP values if available
+                    pca_row['close_vs_ema'] = 0.0
+                
                 if (vwap_success and vwap_values is not None and
-                        row_index < len(vwap_values)):
-                    pca_row['vwap'] = vwap_values[row_index]
+                        row_index < len(vwap_values) and vwap_values[row_index] is not None):
+                    pca_row['close_vs_vwap'] = (row['close'] - vwap_values[row_index]) / row['close']
                 else:
-                    pca_row['vwap'] = None
-
+                    pca_row['close_vs_vwap'] = 0.0
+                
+                # 7. Vector angle (directional momentum)
+                pca_row['vector_angle'] = vector_angle
+                
+                # 8. Time-based features
+                minute_of_session = i  # 0-based minute from start
+                pca_row['session_progress'] = minute_of_session / (data_samples - 1)
+                
                 pca_row_data.append(pca_row)
 
             if isDebugging:
@@ -632,6 +679,14 @@ class ORB:
                 standardize_success = self._standardize_pca_data()
                 if standardize_success:
                     print("PCA data standardization completed successfully.")
+                    
+                    # Perform PCA analysis on standardized data
+                    print("\nPerforming PCA analysis...")
+                    pca_analysis_success = self._perform_pca_computation()
+                    if pca_analysis_success:
+                        print("PCA computation completed successfully.")
+                    else:
+                        print("PCA computation failed.")
                 else:
                     print("PCA data standardization failed.")
             
@@ -666,7 +721,7 @@ class ORB:
             # Step 1: Remove symbol and timestamp, extract volume and vector_angle
             working_df = self.pca_data.copy()
             
-            # Remove symbol and timestamp columns
+            # Remove symbol and timestamp columns (non-feature columns)
             columns_to_remove = ['symbol', 'timestamp']
             for col in columns_to_remove:
                 if col in working_df.columns:
@@ -674,31 +729,19 @@ class ORB:
                     if is_debugging:
                         print(f"DEBUG: Removed column: {col}")
             
-            # Extract volume and vector_angle separately
-            volume_data = (working_df['volume'].copy()
-                          if 'volume' in working_df.columns else None)
-            vector_angle_data = (working_df['vector_angle'].copy()
-                                if 'vector_angle' in working_df.columns
-                                else None)
+            # All remaining columns are independent features - standardize them all together
+            if is_debugging:
+                print(f"DEBUG: All features will be standardized together")
+                print(f"DEBUG: Feature columns: {list(working_df.columns)}")
+            
+            # No need to separate features - they are all independent now
             
             if is_debugging:
-                print(f"DEBUG: Extracted volume data: "
-                      f"{volume_data is not None}")
-                print(f"DEBUG: Extracted vector_angle data: "
-                      f"{vector_angle_data is not None}")
-            
-            # Remove volume and vector_angle from working dataframe
-            if 'volume' in working_df.columns:
-                working_df = working_df.drop(columns=['volume'])
-            if 'vector_angle' in working_df.columns:
-                working_df = working_df.drop(columns=['vector_angle'])
-            
-            if is_debugging:
-                print(f"DEBUG: Remaining price columns: "
+                print(f"DEBUG: Independent feature columns: "
                       f"{list(working_df.columns)}")
-                print(f"DEBUG: Price data shape: {working_df.shape}")
+                print(f"DEBUG: Feature data shape: {working_df.shape}")
             
-            # Step 2: Perform statistical standardization
+            # Step 2: Perform statistical standardization on all features
             try:
                 from sklearn.preprocessing import StandardScaler
             except ImportError:
@@ -706,58 +749,20 @@ class ORB:
                       "Install with: pip install scikit-learn")
                 return False
             
-            # Standardize price columns
-            scaler_prices = StandardScaler()
-            price_columns = working_df.columns.tolist()
-            standardized_prices = scaler_prices.fit_transform(working_df)
-            standardized_prices_df = pd.DataFrame(
-                standardized_prices, 
-                columns=price_columns,
+            # Standardize all independent features together
+            scaler = StandardScaler()
+            feature_columns = working_df.columns.tolist()
+            standardized_features = scaler.fit_transform(working_df)
+            standardized_df = pd.DataFrame(
+                standardized_features, 
+                columns=feature_columns,
                 index=working_df.index
             )
             
             if is_debugging:
-                print(f"DEBUG: Standardized price columns shape: "
-                      f"{standardized_prices_df.shape}")
-                print("DEBUG: Price standardization completed")
-            
-            # Standardize volume if available
-            if volume_data is not None:
-                scaler_volume = StandardScaler()
-                volume_array = volume_data.to_numpy().reshape(-1, 1)
-                volume_standardized = scaler_volume.fit_transform(volume_array)
-                volume_standardized_series = pd.Series(
-                    volume_standardized.flatten(),
-                    index=volume_data.index,
-                    name='volume_standardized'
-                )
-                if is_debugging:
-                    print("DEBUG: Volume standardization completed")
-            else:
-                volume_standardized_series = None
-            
-            # Standardize vector_angle if available
-            if vector_angle_data is not None:
-                scaler_vector = StandardScaler()
-                vector_array = vector_angle_data.to_numpy().reshape(-1, 1)
-                vector_standardized = scaler_vector.fit_transform(vector_array)
-                vector_angle_standardized_series = pd.Series(
-                    vector_standardized.flatten(),
-                    index=vector_angle_data.index,
-                    name='vector_angle_standardized'
-                )
-                if is_debugging:
-                    print("DEBUG: Vector angle standardization completed")
-            else:
-                vector_angle_standardized_series = None
-            
-            # Combine all standardized data
-            standardized_df = standardized_prices_df.copy()
-            
-            if volume_standardized_series is not None:
-                standardized_df['volume_standardized'] = volume_standardized_series
-            if vector_angle_standardized_series is not None:
-                standardized_df['vector_angle_standardized'] = vector_angle_standardized_series
+                print(f"DEBUG: Standardized features shape: "
+                      f"{standardized_df.shape}")
+                print("DEBUG: All features standardization completed")
             
             # Store the standardized data
             self.pca_data_standardized = standardized_df
@@ -781,6 +786,112 @@ class ORB:
             
         except Exception as e:
             print(f"Error standardizing PCA data: {e}")
+            return False
+
+    def _perform_pca_computation(self) -> bool:
+        """
+        Perform Principal Component Analysis on standardized data.
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        # Local debugging flag - set to True for detailed debug output
+        is_debugging = True
+        
+        if not hasattr(self, 'pca_data_standardized') or self.pca_data_standardized is None:
+            print("No standardized PCA data available for computation.")
+            return False
+            
+        try:
+            if is_debugging:
+                print("\nDEBUG: Starting PCA computation...")
+                print(f"DEBUG: Standardized data shape: {self.pca_data_standardized.shape}")
+                print(f"DEBUG: Standardized data columns: {list(self.pca_data_standardized.columns)}")
+            
+            # Import PCA from sklearn
+            try:
+                from sklearn.decomposition import PCA
+            except ImportError:
+                print("Error: scikit-learn not installed. "
+                      "Install with: pip install scikit-learn")
+                return False
+            
+            # Prepare data for PCA (remove any NaN values)
+            pca_input_data = self.pca_data_standardized.dropna()
+            
+            if pca_input_data.empty:
+                print("No valid data remaining after removing NaN values.")
+                return False
+                
+            if is_debugging:
+                print(f"DEBUG: Data shape after NaN removal: {pca_input_data.shape}")
+                print(f"DEBUG: Input data ready for PCA")
+            
+            # Determine number of components (use min of features or samples)
+            n_features = pca_input_data.shape[1]
+            n_samples = pca_input_data.shape[0]
+            n_components = min(n_features, n_samples, 10)  # Limit to 10 components max
+            
+            if is_debugging:
+                print(f"DEBUG: Number of features: {n_features}")
+                print(f"DEBUG: Number of samples: {n_samples}")
+                print(f"DEBUG: Using {n_components} components for PCA")
+            
+            # Create and fit PCA
+            pca = PCA(n_components=n_components)
+            pca_result = pca.fit_transform(pca_input_data)
+            
+            # Store PCA results
+            self.pca_components = pca.components_
+            self.pca_explained_variance = pca.explained_variance_
+            self.pca_explained_variance_ratio = pca.explained_variance_ratio_
+            self.pca_transformed_data = pca_result
+            self.pca_feature_names = list(pca_input_data.columns)
+            
+            if is_debugging:
+                print(f"DEBUG: PCA transformation completed")
+                print(f"DEBUG: Transformed data shape: {pca_result.shape}")
+                print(f"DEBUG: Explained variance ratio: {pca.explained_variance_ratio_}")
+                print(f"DEBUG: Cumulative explained variance: {pca.explained_variance_ratio_.cumsum()}")
+                
+                # Print detailed results
+                print("\nDEBUG: PCA Analysis Results:")
+                print("=" * 60)
+                print("Component\tExplained Variance\tExplained Variance Ratio")
+                print("-" * 60)
+                actual_n_components = len(pca.explained_variance_)
+                for i in range(actual_n_components):
+                    print(f"PC{i+1}\t\t{pca.explained_variance_[i]:.4f}\t\t"
+                          f"{pca.explained_variance_ratio_[i]:.4f}")
+                print("=" * 60)
+                
+                # Print feature loadings for first few components
+                print("\nDEBUG: Feature Loadings (First 3 Components):")
+                print("=" * 80)
+                feature_names = list(pca_input_data.columns)
+                actual_components = min(3, len(pca.explained_variance_ratio_))
+                for i in range(actual_components):
+                    print(f"\nPrincipal Component {i+1} "
+                          f"(explains {pca.explained_variance_ratio_[i]:.2%} variance):")
+                    loadings = [(feature_names[j], pca.components_[i, j]) 
+                               for j in range(len(feature_names))]
+                    # Sort by absolute loading value
+                    loadings.sort(key=lambda x: abs(x[1]), reverse=True)
+                    for feature, loading in loadings:
+                        print(f"  {feature}: {loading:.4f}")
+                print("=" * 80)
+                print()
+            
+            # Summary for user
+            total_variance_explained = pca.explained_variance_ratio_.sum()
+            print(f"PCA completed with {n_components} components")
+            print(f"Total variance explained: {total_variance_explained:.2%}")
+            print(f"First component explains: {pca.explained_variance_ratio_[0]:.2%}")
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error performing PCA computation: {e}")
             return False
 
     def _generate_candle_charts(self) -> bool:
