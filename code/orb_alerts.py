@@ -21,41 +21,35 @@ from datetime import datetime
 sys.path.append('/home/wilsonb/dl/github.com/Z223I/alpaca')
 
 from atoms.config.alert_config import config
-from atoms.config.symbol_manager import SymbolManager
-from atoms.websocket.connection_manager import ConnectionManager
-from atoms.websocket.alpaca_stream import MarketData
-from atoms.indicators.orb_calculator import ORBCalculator
+from molecules.orb_alert_engine import ORBAlertEngine
+from atoms.alerts.alert_formatter import ORBAlert
 
 
 class ORBAlertSystem:
     """Main ORB Alert System orchestrator."""
     
-    def __init__(self, symbols: List[str] = None):
+    def __init__(self, symbols_file: str = None, test_mode: bool = False):
         """
         Initialize ORB Alert System.
         
         Args:
-            symbols: Optional list of symbols to monitor
+            symbols_file: Path to symbols CSV file
+            test_mode: Run in test mode (no actual alerts)
         """
         # Setup logging
         self.logger = self._setup_logging()
         
-        # Load symbols
-        self.symbol_manager = SymbolManager(config.symbols_file)
-        self.symbols = symbols or self.symbol_manager.get_symbols()
+        # Initialize alert engine
+        self.alert_engine = ORBAlertEngine(symbols_file)
+        self.test_mode = test_mode
         
-        # Initialize components
-        self.connection_manager = ConnectionManager(self.symbols)
-        self.orb_calculator = ORBCalculator(config.orb_period_minutes)
-        
-        # Add data handler
-        self.connection_manager.add_data_handler(self._handle_market_data)
+        # Add alert callback
+        self.alert_engine.add_alert_callback(self._handle_alert)
         
         # Statistics
-        self.alerts_generated = 0
         self.start_time = None
         
-        self.logger.info(f"ORB Alert System initialized for {len(self.symbols)} symbols")
+        self.logger.info(f"ORB Alert System initialized in {'TEST' if test_mode else 'LIVE'} mode")
     
     def _setup_logging(self) -> logging.Logger:
         """Setup logging configuration."""
@@ -65,48 +59,19 @@ class ORBAlertSystem:
         )
         return logging.getLogger(__name__)
     
-    def _handle_market_data(self, market_data: MarketData) -> None:
+    def _handle_alert(self, alert: ORBAlert) -> None:
         """
-        Handle incoming market data and check for ORB alerts.
+        Handle generated ORB alert.
         
         Args:
-            market_data: Market data from stream
+            alert: Generated ORB alert
         """
-        symbol = market_data.symbol
-        
-        # Get opening range data
-        orb_data = self.connection_manager.get_opening_range_data(symbol)
-        
-        if orb_data is not None and not orb_data.empty:
-            # Calculate ORB levels
-            orb_level = self.orb_calculator.calculate_orb_levels(symbol, orb_data)
-            
-            if orb_level:
-                # Check for breakout
-                if self.orb_calculator.is_breakout(symbol, market_data.close):
-                    self._generate_alert(symbol, market_data, orb_level)
-    
-    def _generate_alert(self, symbol: str, market_data: MarketData, orb_level) -> None:
-        """
-        Generate ORB breakout alert.
-        
-        Args:
-            symbol: Symbol that broke out
-            market_data: Current market data
-            orb_level: ORB level information
-        """
-        breakout_pct = ((market_data.close - orb_level.orb_high) / orb_level.orb_high) * 100
-        
-        alert_message = (
-            f"[{datetime.now().strftime('%H:%M:%S')}] ORB ALERT: {symbol} @ ${market_data.close:.2f} "
-            f"(+{breakout_pct:.2f}% vs ORB High: ${orb_level.orb_high:.2f}) "
-            f"Volume: {market_data.volume:,}"
-        )
-        
-        print(alert_message)
-        self.logger.info(alert_message)
-        
-        self.alerts_generated += 1
+        if self.test_mode:
+            print(f"[TEST MODE] {alert.alert_message}")
+            self.logger.info(f"Test alert: {alert.symbol} - {alert.priority.value}")
+        else:
+            # Alert is already printed by the engine
+            pass
     
     async def start(self) -> None:
         """Start the ORB Alert System."""
@@ -120,77 +85,59 @@ class ORBAlertSystem:
                 self.logger.error(f"Configuration errors: {config_errors}")
                 return
             
-            # Start connection manager
-            if not await self.connection_manager.start():
-                self.logger.error("Failed to start connection manager")
-                return
+            # Start alert engine
+            symbols = self.alert_engine.get_monitored_symbols()
+            self.logger.info(f"Monitoring {len(symbols)} symbols: {', '.join(symbols[:10])}")
+            if len(symbols) > 10:
+                self.logger.info(f"... and {len(symbols) - 10} more symbols")
             
-            self.logger.info("ORB Alert System started successfully")
-            self.logger.info(f"Monitoring {len(self.symbols)} symbols: {', '.join(self.symbols[:10])}")
-            if len(self.symbols) > 10:
-                self.logger.info(f"... and {len(self.symbols) - 10} more symbols")
-            
-            # Main loop
-            await self._main_loop()
+            # Start the alert engine
+            await self.alert_engine.start()
             
         except KeyboardInterrupt:
             self.logger.info("Received interrupt signal, shutting down...")
         except Exception as e:
-            self.logger.error(f"Error in main loop: {e}")
+            self.logger.error(f"Error in alert engine: {e}")
         finally:
             await self.stop()
-    
-    async def _main_loop(self) -> None:
-        """Main monitoring loop."""
-        while True:
-            try:
-                # Health check
-                if not self.connection_manager.is_healthy():
-                    self.logger.warning("Connection not healthy, checking status...")
-                
-                # Print periodic statistics
-                if self.start_time:
-                    uptime = (datetime.now() - self.start_time).total_seconds()
-                    if uptime > 0 and int(uptime) % 300 == 0:  # Every 5 minutes
-                        self._print_statistics()
-                
-                await asyncio.sleep(30)  # Check every 30 seconds
-                
-            except Exception as e:
-                self.logger.error(f"Error in main loop: {e}")
-                await asyncio.sleep(5)
-    
-    def _print_statistics(self) -> None:
-        """Print system statistics."""
-        stats = self.connection_manager.get_statistics()
-        
-        print("\n" + "="*50)
-        print(f"ORB Alert System Statistics")
-        print(f"Uptime: {stats['uptime_seconds']:.0f} seconds")
-        print(f"Alerts Generated: {self.alerts_generated}")
-        print(f"Symbols Monitored: {stats['symbols_count']}")
-        print(f"Connection State: {stats['stream_state']}")
-        print(f"Data Buffer Stats: {stats['data_buffer_stats']['total_messages_received']} messages")
-        print("="*50 + "\n")
     
     async def stop(self) -> None:
         """Stop the ORB Alert System."""
         self.logger.info("Stopping ORB Alert System...")
         
         try:
-            await self.connection_manager.stop()
+            await self.alert_engine.stop()
             self.logger.info("ORB Alert System stopped")
         except Exception as e:
             self.logger.error(f"Error stopping system: {e}")
     
     def get_statistics(self) -> dict:
         """Get system statistics."""
+        engine_stats = self.alert_engine.get_stats()
         return {
-            'alerts_generated': self.alerts_generated,
-            'symbols_count': len(self.symbols),
+            'alerts_generated': engine_stats.total_alerts_generated,
+            'symbols_count': engine_stats.symbols_monitored,
             'start_time': self.start_time,
-            'connection_stats': self.connection_manager.get_statistics()
+            'engine_stats': engine_stats
         }
+    
+    def print_daily_summary(self) -> None:
+        """Print daily summary statistics."""
+        summary = self.alert_engine.get_daily_summary()
+        
+        print("\n" + "="*60)
+        print(f"ORB Alert System - Daily Summary")
+        print(f"Date: {summary.get('date', 'N/A')}")
+        print(f"Total Alerts: {summary.get('total_alerts', 0)}")
+        print(f"Average Confidence: {summary.get('avg_confidence', 0):.3f}")
+        print(f"Max Confidence: {summary.get('max_confidence', 0):.3f}")
+        
+        priority_breakdown = summary.get('priority_breakdown', {})
+        print(f"Priority Breakdown:")
+        for priority, count in priority_breakdown.items():
+            print(f"  {priority}: {count}")
+        
+        print("="*60 + "\n")
 
 
 def parse_arguments():
@@ -198,9 +145,9 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="ORB Trading Alerts System")
     
     parser.add_argument(
-        "--symbols",
+        "--symbols-file",
         type=str,
-        help="Comma-separated list of symbols to monitor (default: all from symbols.csv)"
+        help="Path to symbols CSV file (default: data/symbols.csv)"
     )
     
     parser.add_argument(
@@ -215,6 +162,12 @@ def parse_arguments():
         help="Enable verbose logging"
     )
     
+    parser.add_argument(
+        "--summary",
+        action="store_true",
+        help="Show daily summary and exit"
+    )
+    
     return parser.parse_args()
 
 
@@ -226,18 +179,20 @@ async def main():
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
     
-    # Parse symbols
-    symbols = None
-    if args.symbols:
-        symbols = [s.strip().upper() for s in args.symbols.split(",")]
-    
     # Create and start system
     try:
-        system = ORBAlertSystem(symbols)
+        system = ORBAlertSystem(
+            symbols_file=args.symbols_file,
+            test_mode=args.test
+        )
+        
+        if args.summary:
+            # Show summary and exit
+            system.print_daily_summary()
+            return
         
         if args.test:
-            print("Running in test mode - no actual alerts will be generated")
-            # Could add test mode functionality here
+            print("Running in test mode - alerts will be marked as [TEST MODE]")
         
         await system.start()
         
