@@ -11,8 +11,8 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
 
-from ..config.alert_config import config
-from ..indicators.orb_calculator import ORBLevel, ORBCalculator
+from atoms.config.alert_config import config
+from atoms.indicators.orb_calculator import ORBLevel, ORBCalculator
 
 
 class BreakoutType(Enum):

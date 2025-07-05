@@ -13,9 +13,9 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 from pathlib import Path
 
-from .breakout_detector import BreakoutSignal, BreakoutType
-from .confidence_scorer import ConfidenceComponents
-from ..config.alert_config import config
+from atoms.alerts.breakout_detector import BreakoutSignal, BreakoutType
+from atoms.alerts.confidence_scorer import ConfidenceComponents
+from atoms.config.alert_config import config
 
 
 class AlertPriority(Enum):

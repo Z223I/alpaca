@@ -13,8 +13,8 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 
-from ..config.alert_config import config
-from .breakout_detector import BreakoutSignal, BreakoutType
+from atoms.config.alert_config import config
+from atoms.alerts.breakout_detector import BreakoutSignal, BreakoutType
 
 
 @dataclass
