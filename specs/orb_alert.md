@@ -1,5 +1,9 @@
 # ORB Alerts
 
+## Thinking Logic
+
+Use ultrathink for maximum reasoning.
+
 ## Background
 
 Here are the results of the ORB trading strategy performed in this repo:
@@ -47,43 +51,24 @@ PCA Analysis Results - July 3, 2025 Data
 
 ## High Level Requirements
 
+You are highly skilled at creating PRD using markdown formatting.
 You are a highly skilled Python developer and architect.
 You are a highly skilled statistician.
 You are working in an atom - molecules architecture.
+Create a PRD, Product Requirements Document to create a Python script to issue ORB trading strategies alerts for buying stock.
+The output file is to be specs/orb_alert_prd.md.
 
 ## Mid Level Requirements
 
+### Specify in the PRD
+
+Create one or more variables as you see fit to control the sensitivity of the ORB alerts to buy stocks for daytrading.
 Use websockets to retrive stock data using the Alpaca.markets API.
-
-
-It is to conform to repo standards.
+All software is to conform to repo standards.
 Check linting compliance.
 Check for VS Code integration errors.
 Create PyTests.
 Test.
 
 ## Low Level Requirements
-
-We will create another method later to call this new method.
-
-### Step 1
-
-Use self.pca_data.
-Remove the symbol and timestamp fields.
-Extract the volume
-Extract the vector_angle
-
-### Step 2
-
-Perform the same statistical standardization across the remaining columns.  They are all prices.
-Standardize the volume.
-Standardize the vector_angle.
-Put all the columns back together side by side.
-
-### Step 3
-
-Create local is_debugging variable and set it to True.
-If debugging, print the resulting dataframe.
-
-
 
