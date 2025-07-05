@@ -8,17 +8,16 @@ You are working in an atom - molecules architecture.
 
 ## Mid Level Requirements
 
-Use the ORB class in orb.py.
-Create a private method for PCA data standardization.
+Use websockets to retrive stock data using the Alpaca.markets API.
+
+
 It is to conform to repo standards.
 Check linting compliance.
 Check for VS Code integration errors.
-Create PyTest.
+Create PyTests.
 Test.
 
 ## Low Level Requirements
-
-We will create another method later to call this new method.
 
 ### Step 1
 
