@@ -72,3 +72,4 @@ Test.
 
 ## Low Level Requirements
 
+You are to create the low level requirements for creating an ORB alert Python scripts and place them in the PRD.
