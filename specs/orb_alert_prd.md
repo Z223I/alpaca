@@ -6,6 +6,10 @@ This document outlines the requirements for developing a real-time Opening Range
 
 ## Background & Market Analysis
 
+### Conda Environment
+
+Use the 'alpaca' conda environment.
+
 ### Statistical Foundation
 Recent PCA analysis on July 3, 2025 data demonstrates:
 - **82.31% variance explained by ORB patterns** (PC1), validating ORB strategy effectiveness
@@ -46,17 +50,17 @@ class ORBAlertConfig:
     orb_period_minutes: int = 15          # Opening range period
     breakout_threshold: float = 0.002     # 0.2% above ORB high
     volume_multiplier: float = 1.5        # 1.5x average volume required
-    
+
     # Statistical Confidence (based on PCA analysis)
     pc1_weight: float = 0.8231           # PC1 variance weight
     pc2_weight: float = 0.0854           # PC2 variance weight
     pc3_weight: float = 0.0378           # PC3 variance weight
-    
+
     # Risk Management
     min_price: float = 0.01              # Minimum stock price
     max_price: float = 10.00             # Maximum stock price
     min_volume: int = 1000000            # Minimum daily volume
-    
+
     # Alert Timing
     alert_window_start: str = "09:45"    # Post-ORB period
     alert_window_end: str = "15:30"      # Before close
@@ -78,31 +82,31 @@ def detect_orb_breakout(symbol_data: Dict) -> Optional[ORBAlert]:
     # Calculate ORB levels (9:30-9:45 AM ET)
     orb_high = max(symbol_data.high[:15])
     orb_low = min(symbol_data.low[:15])
-    
+
     # Current price analysis
     current_price = symbol_data.close[-1]
     price_vs_orb_high = (current_price - orb_high) / orb_high
-    
+
     # Volume confirmation (PC2 component)
     volume_ratio = symbol_data.volume[-1] / symbol_data.avg_volume_20d
-    
+
     # Technical indicator divergence (PC3 component)
     ema_deviation = abs(current_price - symbol_data.ema_9) / current_price
     vwap_deviation = abs(current_price - symbol_data.vwap) / current_price
-    
+
     # PCA-weighted confidence score
     confidence_score = (
         config.pc1_weight * price_vs_orb_high +
         config.pc2_weight * volume_ratio +
         config.pc3_weight * (ema_deviation + vwap_deviation)
     )
-    
+
     # Generate alert if thresholds met
     if (price_vs_orb_high >= config.breakout_threshold and
         volume_ratio >= config.volume_multiplier and
         confidence_score >= config.min_confidence_score):
         return ORBAlert(symbol, current_price, confidence_score)
-    
+
     return None
 ```
 
@@ -272,7 +276,7 @@ conservative_config = ORBAlertConfig(
     min_confidence_score=0.80    # High confidence only
 )
 
-# Aggressive Settings  
+# Aggressive Settings
 aggressive_config = ORBAlertConfig(
     breakout_threshold=0.001,    # 0.1% breakout
     volume_multiplier=1.2,       # 1.2x volume required
