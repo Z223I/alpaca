@@ -87,14 +87,14 @@ class TestORB:
                                                sample_symbol_data):
         """Test successful filtering of stock data by time range."""
         start_time = time(9, 30)
-        end_time = time(10, 15)  # This should include data up to 10:14
+        end_time = time(10, 15)  # This includes data from 9:30 to 10:15 (inclusive)
 
         result = orb_instance._filter_stock_data_by_time(
             sample_symbol_data, start_time, end_time
         )
 
         assert result is not None
-        assert len(result) == 90
+        assert len(result) == 46  # 9:30 to 10:15 inclusive = 46 minutes
         assert 'symbol' in result.columns
         assert 'timestamp' in result.columns
         # Ensure temporary columns are cleaned up
