@@ -484,13 +484,20 @@ class ORB:
                     pca_row['momentum_5'] = 0.0
                 
                 # 5. ORB-specific features
-                orb_range = orb_high - orb_low
-                if orb_range > 0:
-                    pca_row['close_vs_orb_high'] = (row['close'] - orb_high) / orb_range
-                    pca_row['close_vs_orb_low'] = (row['close'] - orb_low) / orb_range
-                    pca_row['high_vs_orb_high'] = (row['high'] - orb_high) / orb_range
-                    pca_row['low_vs_orb_low'] = (row['low'] - orb_low) / orb_range
+                if orb_high is not None and orb_low is not None:
+                    orb_range = orb_high - orb_low
+                    if orb_range > 0:
+                        pca_row['close_vs_orb_high'] = (row['close'] - orb_high) / orb_range
+                        pca_row['close_vs_orb_low'] = (row['close'] - orb_low) / orb_range
+                        pca_row['high_vs_orb_high'] = (row['high'] - orb_high) / orb_range
+                        pca_row['low_vs_orb_low'] = (row['low'] - orb_low) / orb_range
+                    else:
+                        pca_row['close_vs_orb_high'] = 0.0
+                        pca_row['close_vs_orb_low'] = 0.0
+                        pca_row['high_vs_orb_high'] = 0.0
+                        pca_row['low_vs_orb_low'] = 0.0
                 else:
+                    # Handle case where ORB levels couldn't be calculated
                     pca_row['close_vs_orb_high'] = 0.0
                     pca_row['close_vs_orb_low'] = 0.0
                     pca_row['high_vs_orb_high'] = 0.0
