@@ -8,8 +8,6 @@ This module implements confidence scoring based on PCA analysis showing:
 """
 
 import numpy as np
-import pandas as pd
-from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 
@@ -265,17 +263,17 @@ class ConfidenceScorer:
         pc3_scores = [comp.pc3_score for comp in history]
         
         return {
-            'total_mean': np.mean(total_scores),
-            'total_std': np.std(total_scores),
-            'total_max': np.max(total_scores),
-            'total_min': np.min(total_scores),
-            'pc1_mean': np.mean(pc1_scores),
-            'pc2_mean': np.mean(pc2_scores),
-            'pc3_mean': np.mean(pc3_scores),
+            'total_mean': float(np.mean(total_scores)),
+            'total_std': float(np.std(total_scores)),
+            'total_max': float(np.max(total_scores)),
+            'total_min': float(np.min(total_scores)),
+            'pc1_mean': float(np.mean(pc1_scores)),
+            'pc2_mean': float(np.mean(pc2_scores)),
+            'pc3_mean': float(np.mean(pc3_scores)),
             'score_count': len(history)
         }
     
-    def clear_history(self, symbol: str = None) -> None:
+    def clear_history(self, symbol: Optional[str] = None) -> None:
         """
         Clear confidence score history.
         
