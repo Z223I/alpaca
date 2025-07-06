@@ -7,9 +7,9 @@ This test suite uses real BMNR data to validate the ORB alert system's ability t
 - Generate appropriate alert priorities
 - Handle high-volume scenarios
 
-Based on BMNR data analysis:
-- ORB High: $25.65, ORB Low: $17.64, Range: $8.01
-- Max breakout: $45.97 (79.22% above ORB high)
+Based on BMNR data analysis (15-minute ORB):
+- ORB High: $23.80, ORB Low: $17.64, Range: $6.16
+- Max breakout: $45.97 (93.19% above ORB high)
 - High volume scenarios with 3x+ average volume
 """
 
@@ -55,7 +55,7 @@ class TestBMNRORBAlerts:
     def bmnr_orb_levels(self, bmnr_data):
         """Calculate ORB levels from BMNR data."""
         orb_start = bmnr_data.timestamp.min()
-        orb_end = orb_start + pd.Timedelta(minutes=30)
+        orb_end = orb_start + pd.Timedelta(minutes=15)
         orb_data = bmnr_data[bmnr_data.timestamp <= orb_end]
         
         orb_high = orb_data['high'].max()
@@ -89,10 +89,10 @@ class TestBMNRORBAlerts:
     
     def test_bmnr_orb_level_calculation(self, bmnr_data, bmnr_orb_levels):
         """Test ORB level calculation matches expected values."""
-        # Expected values from data analysis
-        expected_orb_high = 25.65
+        # Expected values from data analysis (15-minute ORB)
+        expected_orb_high = 23.80
         expected_orb_low = 17.64
-        expected_orb_range = 8.01
+        expected_orb_range = 6.16
         
         assert abs(bmnr_orb_levels.orb_high - expected_orb_high) < 0.01
         assert abs(bmnr_orb_levels.orb_low - expected_orb_low) < 0.01
@@ -122,7 +122,7 @@ class TestBMNRORBAlerts:
         assert breakout_signal.current_price == current_price
         assert breakout_signal.orb_high == bmnr_orb_levels.orb_high
         
-        # Check breakout percentage (~79.22%)
+        # Check breakout percentage (~93.19%)
         expected_breakout_pct = ((current_price - bmnr_orb_levels.orb_high) / bmnr_orb_levels.orb_high) * 100
         assert abs(breakout_signal.breakout_percentage - expected_breakout_pct) < 0.1
     
@@ -223,7 +223,7 @@ class TestBMNRORBAlerts:
         
         # Find all potential breakouts
         orb_start = bmnr_data.timestamp.min()
-        orb_end = orb_start + pd.Timedelta(minutes=30)
+        orb_end = orb_start + pd.Timedelta(minutes=15)
         post_orb_data = bmnr_data[bmnr_data.timestamp > orb_end]
         
         bullish_breakouts = post_orb_data[post_orb_data['high'] > bmnr_orb_levels.orb_high]
@@ -316,7 +316,7 @@ class TestBMNRORBAlerts:
         assert 'BMNR' in alert.alert_message
         assert '35.50' in alert.alert_message
         assert '↑' in alert.alert_message  # Bullish indicator
-        assert '38.' in alert.alert_message  # Breakout percentage (approximately)
+        assert '49.' in alert.alert_message  # Breakout percentage (approximately)
         assert '3.2x' in alert.alert_message  # Volume ratio
         assert 'MEDIUM' in alert.alert_message  # Priority
         assert 'Stop:' in alert.alert_message

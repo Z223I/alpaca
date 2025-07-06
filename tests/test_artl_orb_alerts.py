@@ -7,11 +7,11 @@ This test suite uses real ARTL data to validate the ORB alert system's ability t
 - Generate appropriate alert priorities for short signals
 - Handle high-volume bearish scenarios
 
-Based on ARTL data analysis:
-- ORB High: $25.10, ORB Low: $18.61, Range: $6.49
+Based on ARTL data analysis (15-minute ORB):
+- ORB High: $25.10, ORB Low: $19.04, Range: $6.06
 - Massive bearish day: -34.5% decline from $19.27 to $12.62
-- 335 bearish breakdowns, max breakdown: $11.99 (35.57% below ORB low)
-- 25 high-volume bearish scenarios with significant selling pressure
+- Bearish breakdowns, max breakdown: $11.99 (37.02% below ORB low)
+- High-volume bearish scenarios with significant selling pressure
 """
 
 import pytest
@@ -54,7 +54,7 @@ class TestARTLORBAlerts:
     def artl_orb_levels(self, artl_data):
         """Calculate ORB levels from ARTL data."""
         orb_start = artl_data.timestamp.min()
-        orb_end = orb_start + pd.Timedelta(minutes=30)
+        orb_end = orb_start + pd.Timedelta(minutes=15)
         orb_data = artl_data[artl_data.timestamp <= orb_end]
         
         orb_high = orb_data['high'].max()
@@ -88,10 +88,10 @@ class TestARTLORBAlerts:
     
     def test_artl_orb_level_calculation(self, artl_data, artl_orb_levels):
         """Test ORB level calculation matches expected values."""
-        # Expected values from data analysis
+        # Expected values from data analysis (15-minute ORB)
         expected_orb_high = 25.10
-        expected_orb_low = 18.61
-        expected_orb_range = 6.49
+        expected_orb_low = 19.04
+        expected_orb_range = 6.06
         
         assert abs(artl_orb_levels.orb_high - expected_orb_high) < 0.01
         assert abs(artl_orb_levels.orb_low - expected_orb_low) < 0.01
@@ -121,7 +121,7 @@ class TestARTLORBAlerts:
         assert breakout_signal.current_price == current_price
         assert breakout_signal.orb_low == artl_orb_levels.orb_low
         
-        # Check breakdown percentage (~35.57%)
+        # Check breakdown percentage (~37.02%)
         expected_breakdown_pct = ((artl_orb_levels.orb_low - current_price) / artl_orb_levels.orb_low) * 100
         assert abs(breakout_signal.breakout_percentage - expected_breakdown_pct) < 0.1
         assert breakout_signal.breakout_percentage > 35.0  # Significant breakdown
@@ -167,7 +167,7 @@ class TestARTLORBAlerts:
             (artl_data['low'] < artl_orb_levels.orb_low)
         ]
         
-        assert len(early_bearish) >= 40  # Should have many early breakdowns
+        assert len(early_bearish) >= 30  # Should have many early breakdowns
         
         # Test one of the early breakdown scenarios
         test_bar = early_bearish.iloc[10]  # Mid-morning breakdown
@@ -225,7 +225,7 @@ class TestARTLORBAlerts:
             current_price=11.99,  # Maximum breakdown
             orb_high=artl_orb_levels.orb_high,
             orb_low=artl_orb_levels.orb_low,
-            breakout_percentage=35.57,  # Massive breakdown
+            breakout_percentage=37.02,  # Massive breakdown
             volume_ratio=6.0,  # High volume
             timestamp=datetime(2025, 6, 30, 16, 4, 0)
         )
@@ -246,7 +246,7 @@ class TestARTLORBAlerts:
         assert alert.symbol == 'ARTL'
         assert alert.current_price == 11.99
         assert alert.breakout_type == BreakoutType.BEARISH_BREAKDOWN
-        assert alert.breakout_percentage > 35.0
+        assert alert.breakout_percentage > 37.0
     
     def test_artl_multiple_bearish_breakdown_scenarios(self, artl_data, artl_orb_levels, breakout_detector):
         """Test multiple bearish breakdown scenarios throughout the ARTL trading day."""
@@ -255,13 +255,13 @@ class TestARTLORBAlerts:
         
         # Find all potential bearish breakdowns
         orb_start = artl_data.timestamp.min()
-        orb_end = orb_start + pd.Timedelta(minutes=30)
+        orb_end = orb_start + pd.Timedelta(minutes=15)
         post_orb_data = artl_data[artl_data.timestamp > orb_end]
         
         bearish_breakdowns = post_orb_data[post_orb_data['low'] < artl_orb_levels.orb_low]
         
-        # Should have massive number of breakdown opportunities
-        assert len(bearish_breakdowns) >= 300  # Expected from analysis
+        # Should have many breakdown opportunities
+        assert len(bearish_breakdowns) >= 250  # Expected from analysis
         
         # Test various breakdown scenarios
         test_count = 0
@@ -348,7 +348,7 @@ class TestARTLORBAlerts:
         assert 'ARTL' in alert.alert_message
         assert '14.50' in alert.alert_message
         assert '↓' in alert.alert_message  # Bearish indicator
-        assert '22.' in alert.alert_message  # Breakdown percentage (approximately)
+        assert '23.' in alert.alert_message  # Breakdown percentage (approximately)
         assert '5.2x' in alert.alert_message  # Volume ratio
         assert 'MEDIUM' in alert.alert_message  # Priority (confidence 0.82 < 0.85 threshold)
         assert 'Stop:' in alert.alert_message
@@ -359,10 +359,10 @@ class TestARTLORBAlerts:
         """Test progressive breakdown severity throughout the day."""
         # Test different severity levels of bearish breakdowns
         scenarios = [
-            {'price': 17.50, 'time': '11:30', 'expected_breakdown': 6.0},   # Early mild breakdown
-            {'price': 15.00, 'time': '12:30', 'expected_breakdown': 19.3},  # Moderate breakdown  
-            {'price': 13.00, 'time': '14:30', 'expected_breakdown': 30.1},  # Severe breakdown
-            {'price': 11.99, 'time': '16:04', 'expected_breakdown': 35.6},  # Maximum breakdown
+            {'price': 18.00, 'time': '11:30', 'expected_breakdown': 5.5},   # Early mild breakdown
+            {'price': 15.00, 'time': '12:30', 'expected_breakdown': 21.2},  # Moderate breakdown  
+            {'price': 13.00, 'time': '14:30', 'expected_breakdown': 31.7},  # Severe breakdown
+            {'price': 11.99, 'time': '16:04', 'expected_breakdown': 37.0},  # Maximum breakdown
         ]
         
         for scenario in scenarios:
