@@ -58,20 +58,21 @@ class ORBAlert:
         self.alert_message = self._generate_alert_message()
     
     def _calculate_risk_levels(self) -> None:
-        """Calculate recommended stop loss and take profit levels."""
-        risk_percentage = 0.075  # 7.5% risk
-        reward_ratio = 2.0  # 2:1 reward to risk ratio
+        """Calculate recommended stop loss and take profit levels using config percentages."""
+        # Use configuration percentages
+        stop_loss_percentage = config.stop_loss_percent / 100.0  # Convert to decimal
+        take_profit_percentage = config.take_profit_percent / 100.0  # Convert to decimal
         
         if self.breakout_type == BreakoutType.BULLISH_BREAKOUT:
-            # For bullish breakout, stop loss below ORB low
-            self.recommended_stop_loss = self.orb_low * (1 - risk_percentage)
-            stop_distance = self.current_price - self.recommended_stop_loss
-            self.recommended_take_profit = self.current_price + (stop_distance * reward_ratio)
+            # For bullish breakout, stop loss below current price
+            self.recommended_stop_loss = self.current_price * (1 - stop_loss_percentage)
+            # Take profit as percentage above current price
+            self.recommended_take_profit = self.current_price * (1 + take_profit_percentage)
         elif self.breakout_type == BreakoutType.BEARISH_BREAKDOWN:
-            # For bearish breakdown, stop loss above ORB high
-            self.recommended_stop_loss = self.orb_high * (1 + risk_percentage)
-            stop_distance = self.recommended_stop_loss - self.current_price
-            self.recommended_take_profit = self.current_price - (stop_distance * reward_ratio)
+            # For bearish breakdown, stop loss above current price
+            self.recommended_stop_loss = self.current_price * (1 + stop_loss_percentage)
+            # Take profit as percentage below current price
+            self.recommended_take_profit = self.current_price * (1 - take_profit_percentage)
         else:
             self.recommended_stop_loss = self.current_price
             self.recommended_take_profit = self.current_price

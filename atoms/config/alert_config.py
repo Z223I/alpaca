@@ -32,6 +32,8 @@ class ORBAlertConfig:
     min_price: float = 0.01              # Minimum stock price
     max_price: float = 10.00             # Maximum stock price
     min_volume: int = 1000000            # Minimum daily volume
+    stop_loss_percent: float = 7.5       # Stop loss percentage (7.5%)
+    take_profit_percent: float = 4.0     # Take profit percentage (4%)
     
     # Alert Timing
     alert_window_start: str = "09:45"    # Post-ORB period
@@ -83,6 +85,12 @@ class ORBAlertConfig:
         
         if not (0 <= self.min_confidence_score <= 1):
             errors.append("min_confidence_score must be between 0 and 1")
+        
+        if self.stop_loss_percent <= 0:
+            errors.append("stop_loss_percent must be positive")
+        
+        if self.take_profit_percent <= 0:
+            errors.append("take_profit_percent must be positive")
         
         return errors
 
