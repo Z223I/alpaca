@@ -41,7 +41,7 @@ class alpaca_private:
     including order management, position tracking, and bracket order execution.
     """
 
-    STOP_LOSS_PERCENT = 0.05 # Default stop loss percentage (7.5%)
+    STOP_LOSS_PERCENT = 0.05 # Default stop loss percentage (5.0%)
 
     def __init__(self, userArgs: Optional[List[str]] = None) -> None:
         """
