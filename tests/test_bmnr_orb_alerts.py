@@ -438,3 +438,121 @@ class TestBMNRORBAlerts:
             assert alert.alert_message != ""
             assert alert.recommended_stop_loss > 0
             assert alert.recommended_take_profit > alert.current_price
+    
+    def test_bmnr_historical_data_storage_integration(self, tmp_path, bmnr_data, bmnr_orb_levels):
+        """Test historical data storage functionality with BMNR alerts."""
+        # Import ORB alerts module
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("orb_alerts", os.path.join(project_root, "code", "orb_alerts.py"))
+        orb_alerts_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(orb_alerts_module)
+        ORBAlertSystem = orb_alerts_module.ORBAlertSystem
+        from unittest.mock import Mock, patch, AsyncMock
+        
+        # Create mocked alert engine
+        mock_engine = Mock()
+        mock_engine.get_monitored_symbols = Mock(return_value=['BMNR'])
+        mock_engine.add_alert_callback = Mock()
+        mock_engine.start = AsyncMock()
+        mock_engine.stop = AsyncMock()
+        mock_engine.get_stats = Mock(return_value=Mock(total_alerts_generated=5, symbols_monitored=1))
+        mock_engine.get_daily_summary = Mock(return_value={'date': '2025-06-30', 'total_alerts': 5})
+        
+        # Mock data buffer with BMNR data (add required columns for data storage)
+        bmnr_data_with_symbol = bmnr_data.copy()
+        bmnr_data_with_symbol['symbol'] = 'BMNR'
+        bmnr_data_with_symbol['price'] = bmnr_data_with_symbol['close']  # Use close as price
+        bmnr_data_with_symbol['vwap'] = bmnr_data_with_symbol['close'] * 1.001  # Mock VWAP
+        bmnr_data_with_symbol['trade_count'] = 100  # Mock trade count
+        mock_engine.data_buffer = Mock()
+        mock_engine.data_buffer.get_symbol_data = Mock(return_value=bmnr_data_with_symbol)
+        
+        # Create ORB alert system with temp directory
+        with patch('molecules.orb_alert_engine.ORBAlertEngine', return_value=mock_engine):
+            with patch.object(ORBAlertSystem, '__init__', lambda self, **kwargs: None):
+                system = ORBAlertSystem()
+                system.alert_engine = mock_engine
+                system.test_mode = True
+                system.historical_data_dir = tmp_path / "historical_data"
+                system.logger = Mock()
+                system.start_time = datetime.now()
+                system.last_data_save = None
+                system.data_save_interval = timedelta(minutes=5)
+                
+                # Setup data storage
+                system._setup_data_storage()
+                
+                # Test historical data saving
+                system._save_historical_data()
+                
+                # Verify directory structure
+                today = datetime.now().strftime("%Y-%m-%d")
+                daily_dir = system.historical_data_dir / today
+                assert daily_dir.exists()
+                assert (daily_dir / "market_data").exists()
+                assert (daily_dir / "alerts").exists()
+                assert (daily_dir / "summary").exists()
+                
+                # Verify BMNR market data was saved
+                market_data_files = list((daily_dir / "market_data").glob("BMNR_*.csv"))
+                assert len(market_data_files) > 0
+                
+                # Verify saved data content
+                saved_data = pd.read_csv(market_data_files[0])
+                assert len(saved_data) > 0
+                assert all(saved_data['symbol'] == 'BMNR')
+                assert 'timestamp' in saved_data.columns
+                assert 'price' in saved_data.columns
+                assert 'high' in saved_data.columns
+                assert 'low' in saved_data.columns
+                assert 'close' in saved_data.columns
+                assert 'volume' in saved_data.columns
+                assert 'vwap' in saved_data.columns
+                assert 'trade_count' in saved_data.columns
+                
+                # Test alert saving
+                alert = ORBAlert(
+                    symbol='BMNR',
+                    timestamp=datetime(2025, 6, 30, 16, 37, 0),
+                    current_price=45.97,
+                    orb_high=bmnr_orb_levels.orb_high,
+                    orb_low=bmnr_orb_levels.orb_low,
+                    orb_range=bmnr_orb_levels.orb_range,
+                    orb_midpoint=(bmnr_orb_levels.orb_high + bmnr_orb_levels.orb_low) / 2,
+                    breakout_type=BreakoutType.BULLISH_BREAKOUT,
+                    breakout_percentage=79.22,
+                    volume_ratio=5.0,
+                    confidence_score=0.95,
+                    priority=AlertPriority.HIGH,
+                    confidence_level='VERY_HIGH',
+                    recommended_stop_loss=42.52,  # 7.5% below current price
+                    recommended_take_profit=47.81,  # 4% above current price
+                    alert_message='Test BMNR alert'
+                )
+                
+                system._save_alert_data(alert)
+                
+                # Verify alert was saved
+                alert_files = list((daily_dir / "alerts").glob("alert_BMNR_*.json"))
+                assert len(alert_files) > 0
+                
+                # Verify alert JSON content
+                with open(alert_files[0], 'r') as f:
+                    saved_alert = json.load(f)
+                
+                assert saved_alert['symbol'] == 'BMNR'
+                assert saved_alert['current_price'] == 45.97
+                assert saved_alert['breakout_type'] == 'bullish_breakout'
+                assert saved_alert['priority'] == 'HIGH'
+                assert saved_alert['confidence_score'] == 0.95
+                
+                # Verify metadata summary
+                metadata_files = list((daily_dir / "summary").glob("save_metadata_*.json"))
+                assert len(metadata_files) > 0
+                
+                with open(metadata_files[0], 'r') as f:
+                    metadata = json.load(f)
+                
+                assert metadata['symbols_count'] == 1
+                assert metadata['symbols'] == ['BMNR']
+                assert metadata['format'] == 'CSV'
