@@ -442,7 +442,9 @@ class ORBAlertSystem:
     def _fetch_with_legacy_api(self, symbols, start_time, end_time):
         """Fetch historical data using legacy alpaca-trade-api."""
         try:
-            self.logger.info(f"Using legacy API to fetch data for {len(symbols)} symbols")
+            # Determine which feed to use based on configuration
+            feed = 'iex' if "paper" in config.base_url else 'sip'
+            self.logger.info(f"Using legacy API to fetch data for {len(symbols)} symbols with {feed.upper()} feed")
             
             # Convert symbols to list if needed
             symbol_list = symbols if isinstance(symbols, list) else list(symbols)
@@ -456,12 +458,15 @@ class ORBAlertSystem:
                     start_str = start_time.strftime('%Y-%m-%d')
                     end_str = end_time.strftime('%Y-%m-%d')
                     
+                    # Use the feed determined at the beginning of the function
+                    
                     bars = self.historical_client.get_bars(
                         symbol,
                         '1Min',
                         start=start_str,
                         end=end_str,
-                        limit=20  # Extra buffer for 15 minutes
+                        limit=20,  # Extra buffer for 15 minutes
+                        feed=feed  # Use IEX for paper trading, SIP for live trading
                     )
                     
                     if bars:

@@ -82,9 +82,14 @@ class AlpacaStreamClient:
     def _get_websocket_url(self) -> str:
         """Get websocket URL based on base URL."""
         if "paper" in self.base_url:
-            return "wss://stream.data.alpaca.markets/v2/iex"
+            selected_url = "wss://stream.data.alpaca.markets/v2/iex"
+            self.logger.info(f"Using IEX websocket for paper trading. Base URL: {self.base_url}")
         else:
-            return "wss://stream.data.alpaca.markets/v2/sip"
+            selected_url = "wss://stream.data.alpaca.markets/v2/sip"
+            self.logger.info(f"Using SIP websocket for live trading. Base URL: {self.base_url}")
+        
+        self.logger.info(f"Selected websocket URL: {selected_url}")
+        return selected_url
     
     async def connect(self) -> bool:
         """
