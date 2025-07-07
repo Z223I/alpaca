@@ -52,6 +52,13 @@ class ORBAlertConfig:
     # Symbol Configuration
     symbols_file: str = "data/symbols.csv"
     
+    # Data Collection Configuration
+    data_save_interval_minutes: int = 10  # Save historical data every N minutes (configurable)
+    market_open_time: str = "09:30"       # Market open time (ET) - 09:30 for NYSE/NASDAQ
+    start_collection_at_open: bool = True # Wait until market open to start data collection
+                                          # This ensures ORB data is captured from market open
+    fetch_opening_range_data: bool = True # Fetch historical opening range data if started late
+    
     def __post_init__(self):
         """Load API credentials from environment variables."""
         self.api_key = os.getenv("ALPACA_API_KEY", "")
@@ -91,6 +98,9 @@ class ORBAlertConfig:
         
         if self.take_profit_percent <= 0:
             errors.append("take_profit_percent must be positive")
+        
+        if self.data_save_interval_minutes <= 0:
+            errors.append("data_save_interval_minutes must be positive")
         
         return errors
 

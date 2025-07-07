@@ -16,8 +16,9 @@ import logging
 import sys
 import json
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from pathlib import Path
+import pandas as pd
 
 # Add project root to path
 sys.path.append('/home/wilsonb/dl/github.com/Z223I/alpaca')
@@ -25,6 +26,21 @@ sys.path.append('/home/wilsonb/dl/github.com/Z223I/alpaca')
 from atoms.config.alert_config import config
 from molecules.orb_alert_engine import ORBAlertEngine
 from atoms.alerts.alert_formatter import ORBAlert
+# Temporarily disabled due to package version mismatch
+# from atoms.api.get_stock_data import get_stock_data
+
+# Alpaca API imports
+try:
+    from alpaca.data.historical import StockHistoricalDataClient
+    from alpaca.data.timeframe import TimeFrame
+    ALPACA_AVAILABLE = True
+except ImportError:
+    # Fallback to older alpaca-trade-api if available
+    try:
+        from alpaca_trade_api.rest import REST
+        ALPACA_AVAILABLE = "legacy"
+    except ImportError:
+        ALPACA_AVAILABLE = False
 
 
 class ORBAlertSystem:
@@ -45,6 +61,27 @@ class ORBAlertSystem:
         self.alert_engine = ORBAlertEngine(symbols_file) if symbols_file is not None else ORBAlertEngine()
         self.test_mode = test_mode
         
+        # Initialize historical data client
+        self.historical_client = None
+        if ALPACA_AVAILABLE == True:
+            try:
+                self.historical_client = StockHistoricalDataClient(
+                    api_key=config.api_key,
+                    secret_key=config.secret_key
+                )
+            except Exception as e:
+                self.logger.warning(f"Could not initialize historical data client: {e}")
+        elif ALPACA_AVAILABLE == "legacy":
+            try:
+                self.historical_client = REST(
+                    key_id=config.api_key,
+                    secret_key=config.secret_key,
+                    base_url=config.base_url
+                )
+                self.logger.info("Using legacy alpaca-trade-api for historical data")
+            except Exception as e:
+                self.logger.warning(f"Could not initialize legacy historical data client: {e}")
+        
         # Historical data storage setup
         self.historical_data_dir = Path("historical_data")
         self.historical_data_dir.mkdir(exist_ok=True)
@@ -56,10 +93,13 @@ class ORBAlertSystem:
         # Statistics
         self.start_time = None
         self.last_data_save = None
-        self.data_save_interval = timedelta(minutes=1)  # Save every 1 minute
+        self.data_save_interval = timedelta(minutes=config.data_save_interval_minutes)
         
         self.logger.info(f"ORB Alert System initialized in {'TEST' if test_mode else 'LIVE'} mode")
         self.logger.info(f"Historical data will be saved to: {self.historical_data_dir.absolute()}")
+        self.logger.info(f"Data save interval: {config.data_save_interval_minutes} minutes")
+        self.logger.info(f"Start at market open ({config.market_open_time} ET): {config.start_collection_at_open}")
+        self.logger.info(f"Fetch opening range data if started late: {config.fetch_opening_range_data}")
     
     def _setup_logging(self) -> logging.Logger:
         """Setup logging configuration."""
@@ -199,10 +239,274 @@ class ORBAlertSystem:
                 self.logger.error(f"Error in periodic data save: {e}")
                 await asyncio.sleep(60)  # Wait before retrying
     
+    async def _wait_for_market_open(self) -> None:
+        """Wait until market open time if configured to start at market open."""
+        if not config.start_collection_at_open:
+            return
+        
+        now = datetime.now()
+        
+        # Parse market open time
+        market_open_hour, market_open_minute = map(int, config.market_open_time.split(':'))
+        market_open_today = now.replace(hour=market_open_hour, minute=market_open_minute, second=0, microsecond=0)
+        
+        # If market open time has already passed today, start immediately
+        if now >= market_open_today:
+            self.logger.info(f"Market open time ({config.market_open_time} ET) has passed, starting data collection immediately")
+            return
+        
+        # Calculate wait time until market open
+        wait_seconds = (market_open_today - now).total_seconds()
+        wait_minutes = wait_seconds / 60
+        
+        self.logger.info(f"Waiting {wait_minutes:.1f} minutes until market open ({config.market_open_time} ET)")
+        self.logger.info(f"Data collection will start at: {market_open_today.strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        # Wait until market open
+        await asyncio.sleep(wait_seconds)
+    
+    async def _fetch_opening_range_data(self) -> bool:
+        """
+        Fetch historical data for the opening range period if we missed it.
+        
+        Returns:
+            True if data was successfully fetched, False otherwise
+        """
+        if not config.fetch_opening_range_data:
+            self.logger.info("Opening range data fetching disabled in configuration")
+            print("=" * 80)
+            print("⚠️  OPENING RANGE DATA FETCH DISABLED")
+            print("Historical data fetching is disabled in configuration")
+            print("ORB alerts may not function properly if started after market open")
+            print("=" * 80)
+            return True
+            
+        if not self.historical_client:
+            self.logger.warning("Historical data client not available - cannot fetch opening range data")
+            return False
+        
+        try:
+            now = datetime.now()
+            
+            # Parse market open time for today
+            market_open_hour, market_open_minute = map(int, config.market_open_time.split(':'))
+            market_open_today = now.replace(hour=market_open_hour, minute=market_open_minute, second=0, microsecond=0)
+            
+            # Calculate opening range end time (market open + 15 minutes)
+            orb_end_time = market_open_today + timedelta(minutes=config.orb_period_minutes)
+            
+            # Check if we're past the opening range period
+            if now <= orb_end_time:
+                self.logger.info("Still within opening range period - no historical data fetch needed")
+                
+                # Print message to screen that we have opening data
+                if now >= market_open_today:
+                    print("=" * 80)
+                    print("✅ OPENING RANGE DATA AVAILABLE")
+                    print("Started during opening range period - collecting data in real-time")
+                    print(f"ORB period: {market_open_today.strftime('%H:%M')} - {orb_end_time.strftime('%H:%M')} ET")
+                    print("ORB alerts will be operational after opening range completes!")
+                    print("=" * 80)
+                
+                return True
+            
+            self.logger.info(f"Fetching opening range data from {market_open_today.strftime('%H:%M')} to {orb_end_time.strftime('%H:%M')}")
+            
+            # Get symbols to fetch data for
+            symbols = self.alert_engine.get_monitored_symbols()
+            
+            # Fetch 1-minute bars for the opening range period
+            self.logger.info("Fetching historical opening range data...")
+            
+            try:
+                if ALPACA_AVAILABLE == "legacy":
+                    # Use legacy alpaca-trade-api
+                    bars_data = self._fetch_with_legacy_api(symbols, market_open_today, orb_end_time)
+                else:
+                    # Use new alpaca API (currently disabled)
+                    bars_data = None
+                
+                if bars_data and hasattr(bars_data, 'df') and not bars_data.df.empty:
+                    # Process and inject the historical data into the data buffer
+                    data_count = 0
+                    for symbol in symbols:
+                        symbol_bars = bars_data.df[bars_data.df['symbol'] == symbol]
+                        
+                        if not symbol_bars.empty:
+                            # Convert to MarketData format and add to buffer
+                            for _, bar in symbol_bars.iterrows():
+                                from atoms.websocket.alpaca_stream import MarketData
+                                market_data = MarketData(
+                                    symbol=symbol,
+                                    timestamp=bar['timestamp'],
+                                    price=bar['close'],
+                                    volume=bar['volume'],
+                                    high=bar['high'],
+                                    low=bar['low'],
+                                    close=bar['close'],
+                                    trade_count=bar.get('trade_count', 1),
+                                    vwap=bar.get('vwap', bar['close'])
+                                )
+                                
+                                # Add to data buffer
+                                self.alert_engine.data_buffer.add_market_data(market_data)
+                                data_count += 1
+                    
+                    self.logger.info(f"Successfully fetched and loaded {data_count} opening range data points")
+                    
+                    # Save opening range data to tmp directory for each symbol
+                    self._save_opening_range_data_to_tmp(bars_data, market_open_today, orb_end_time)
+                    
+                    # Print success message to screen
+                    print("=" * 80)
+                    print("✅ OPENING RANGE DATA COMPLETE")
+                    print(f"Successfully fetched opening range data for {len(symbols)} symbols")
+                    print(f"Time period: {market_open_today.strftime('%H:%M')} - {orb_end_time.strftime('%H:%M')} ET")
+                    print(f"Total data points loaded: {data_count}")
+                    print("ORB alerts are now fully operational!")
+                    print("=" * 80)
+                    
+                    return True
+                else:
+                    self.logger.warning("No historical data received for opening range period")
+                    return False
+                    
+            except Exception as fetch_error:
+                self.logger.error(f"Error during historical data fetch: {fetch_error}")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Error fetching opening range data: {e}")
+            import traceback
+            self.logger.debug(traceback.format_exc())
+            
+            # Print error message to screen
+            print("=" * 80)
+            print("❌ OPENING RANGE DATA FETCH FAILED")
+            print(f"Error: {e}")
+            print("ORB alerts may not function properly without opening range data")
+            print("Check API credentials and network connection")
+            print("=" * 80)
+            
+            return False
+    
+    def _save_opening_range_data_to_tmp(self, bars_data, market_open_time: datetime, orb_end_time: datetime) -> None:
+        """
+        Save opening range data for each symbol to tmp directory.
+        
+        Args:
+            bars_data: The fetched historical data
+            market_open_time: Market open datetime
+            orb_end_time: ORB period end datetime
+        """
+        try:
+            # Ensure tmp directory exists
+            from pathlib import Path
+            tmp_dir = Path("tmp")
+            tmp_dir.mkdir(exist_ok=True)
+            
+            if hasattr(bars_data, 'df') and not bars_data.df.empty:
+                # Get unique symbols
+                symbols = bars_data.df['symbol'].unique()
+                
+                for symbol in symbols:
+                    symbol_data = bars_data.df[bars_data.df['symbol'] == symbol].copy()
+                    
+                    if not symbol_data.empty:
+                        # Sort by timestamp
+                        symbol_data = symbol_data.sort_values('timestamp')
+                        
+                        # Create filename
+                        date_str = market_open_time.strftime('%Y%m%d')
+                        filename = f"{symbol}_opening_range_{date_str}.csv"
+                        filepath = tmp_dir / filename
+                        
+                        # Save to CSV
+                        symbol_data.to_csv(filepath, index=False)
+                        
+                        self.logger.info(f"Saved opening range data for {symbol} to {filepath}")
+                        
+                        # Also print summary for each symbol
+                        orb_high = symbol_data['high'].max()
+                        orb_low = symbol_data['low'].min()
+                        orb_range = orb_high - orb_low
+                        data_points = len(symbol_data)
+                        
+                        print(f"📊 {symbol}: {data_points} bars | ORB High: ${orb_high:.3f} | ORB Low: ${orb_low:.3f} | Range: ${orb_range:.3f}")
+                
+                print(f"💾 Opening range data saved to tmp/ directory")
+            
+        except Exception as e:
+            self.logger.error(f"Error saving opening range data to tmp: {e}")
+    
+    def _fetch_with_legacy_api(self, symbols, start_time, end_time):
+        """Fetch historical data using legacy alpaca-trade-api."""
+        try:
+            self.logger.info(f"Using legacy API to fetch data for {len(symbols)} symbols")
+            
+            # Convert symbols to list if needed
+            symbol_list = symbols if isinstance(symbols, list) else list(symbols)
+            
+            # Fetch data for each symbol (legacy API doesn't support multi-symbol requests well)
+            all_bars = []
+            
+            for symbol in symbol_list:
+                try:
+                    # Fetch 1-minute bars (legacy API uses different date format)
+                    start_str = start_time.strftime('%Y-%m-%d')
+                    end_str = end_time.strftime('%Y-%m-%d')
+                    
+                    bars = self.historical_client.get_bars(
+                        symbol,
+                        '1Min',
+                        start=start_str,
+                        end=end_str,
+                        limit=20  # Extra buffer for 15 minutes
+                    )
+                    
+                    if bars:
+                        for bar in bars:
+                            bar_data = {
+                                'timestamp': bar.t,
+                                'symbol': symbol,
+                                'open': float(bar.o),
+                                'high': float(bar.h),
+                                'low': float(bar.l),
+                                'close': float(bar.c),
+                                'volume': int(bar.v),
+                                'trade_count': getattr(bar, 'n', 1),
+                                'vwap': getattr(bar, 'vw', float(bar.c))
+                            }
+                            all_bars.append(bar_data)
+                        
+                        self.logger.info(f"Fetched {len(bars)} bars for {symbol}")
+                    else:
+                        self.logger.warning(f"No data returned for {symbol}")
+                        
+                except Exception as e:
+                    self.logger.error(f"Error fetching data for {symbol}: {e}")
+            
+            if all_bars:
+                # Convert to DataFrame-like structure
+                import pandas as pd
+                df = pd.DataFrame(all_bars)
+                
+                # Create mock bars_data object with df attribute
+                class MockBarsData:
+                    def __init__(self, dataframe):
+                        self.df = dataframe
+                
+                return MockBarsData(df)
+            else:
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"Error in legacy API fetch: {e}")
+            return None
+    
     async def start(self) -> None:
         """Start the ORB Alert System."""
         self.logger.info("Starting ORB Alert System...")
-        self.start_time = datetime.now()
         
         # Start periodic data saving task
         data_save_task = None
@@ -214,6 +518,16 @@ class ORBAlertSystem:
                 self.logger.error(f"Configuration errors: {config_errors}")
                 return
             
+            # Wait for market open if configured
+            await self._wait_for_market_open()
+            
+            # Set start time after market open wait
+            self.start_time = datetime.now()
+            self.logger.info(f"Starting data collection at: {self.start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            # Fetch opening range data if we started after market open
+            await self._fetch_opening_range_data()
+            
             # Start alert engine
             symbols = self.alert_engine.get_monitored_symbols()
             self.logger.info(f"Monitoring {len(symbols)} symbols: {', '.join(symbols[:10])}")
@@ -222,7 +536,7 @@ class ORBAlertSystem:
             
             # Start periodic data saving in background
             data_save_task = asyncio.create_task(self._periodic_data_save())
-            self.logger.info("Started periodic data saving task (every 1 minute)")
+            self.logger.info(f"Started periodic data saving task (every {config.data_save_interval_minutes} minutes)")
             
             # Start the alert engine
             await self.alert_engine.start()
