@@ -46,3 +46,5 @@ The remaining tasks are lower priority documentation and deployment tools:
         claude mcp add --transport http context7 https://mcp.context7.com/mcp
         ```
 
+        https://support.anthropic.com/en/articles/11176164-pre-built-integrations-using-remote-mcp
+
