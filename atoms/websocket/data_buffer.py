@@ -302,3 +302,34 @@ class DataBuffer:
         cutoff_time = datetime.now() - timedelta(minutes=minutes)
         
         return latest_data.timestamp >= cutoff_time
+    
+    def get_average_volume(self, symbol: str, lookback_minutes: int = 20) -> Optional[float]:
+        """
+        Calculate average volume for a symbol over the lookback period.
+        
+        Args:
+            symbol: Symbol to calculate average volume for
+            lookback_minutes: Number of minutes to look back
+            
+        Returns:
+            Average volume over the period or None if not found
+        """
+        if symbol not in self.symbol_buffers:
+            return None
+        
+        buffer = self.symbol_buffers[symbol]
+        if buffer.is_empty():
+            return None
+        
+        cutoff_time = datetime.now() - timedelta(minutes=lookback_minutes)
+        
+        # Get recent data within the lookback period
+        recent_volumes = []
+        for data_point in buffer.data:
+            if data_point.timestamp >= cutoff_time:
+                recent_volumes.append(data_point.volume)
+        
+        if not recent_volumes:
+            return None
+        
+        return sum(recent_volumes) / len(recent_volumes)

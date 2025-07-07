@@ -427,7 +427,6 @@ class PerformanceTracker:
         """Check if system health metrics exceed thresholds."""
         if health.memory_percent > 90:
             self.logger.error(f"Critical memory usage: {health.memory_percent:.1f}%")
-        elif health.memory_percent > 80:
             self.logger.warning(f"High memory usage: {health.memory_percent:.1f}%")
         
         if health.cpu_percent > 90:

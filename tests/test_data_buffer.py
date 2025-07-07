@@ -375,3 +375,42 @@ class TestDataBuffer:
     def test_is_symbol_active_not_found(self):
         """Test checking activity for non-existent symbol."""
         assert not self.buffer.is_symbol_active("MSFT", minutes=5)
+    
+    def test_get_average_volume(self):
+        """Test getting average volume for a symbol."""
+        # Add test data with different volumes
+        volumes = [1000, 1500, 2000, 1200, 1800]
+        current_time = datetime.now()
+        
+        for i, volume in enumerate(volumes):
+            data = MarketData(
+                symbol="AAPL",
+                timestamp=current_time - timedelta(minutes=i),
+                price=150.0,
+                volume=volume,
+                high=150.5,
+                low=149.5,
+                close=150.0,
+                trade_count=10,
+                vwap=150.0
+            )
+            self.buffer.add_market_data(data)
+        
+        # Test average volume calculation
+        avg_volume = self.buffer.get_average_volume("AAPL", lookback_minutes=10)
+        expected_avg = sum(volumes) / len(volumes)
+        assert avg_volume == expected_avg
+        
+        # Test with shorter lookback period (only data from last 2 minutes)
+        avg_volume_short = self.buffer.get_average_volume("AAPL", lookback_minutes=2)
+        # Data at minutes 0, 1 should be included (timestamps: current_time, current_time-1min)
+        expected_avg_short = sum(volumes[:2]) / 2  # Only first 2 data points
+        assert avg_volume_short == expected_avg_short
+    
+    def test_get_average_volume_not_found(self):
+        """Test getting average volume for non-existent symbol."""
+        assert self.buffer.get_average_volume("MSFT", lookback_minutes=10) is None
+    
+    def test_get_average_volume_empty_buffer(self):
+        """Test getting average volume for empty buffer."""
+        assert self.buffer.get_average_volume("AAPL", lookback_minutes=10) is None

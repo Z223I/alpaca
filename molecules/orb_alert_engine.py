@@ -472,7 +472,7 @@ class ORBAlertEngine:
         
         try:
             # Add to data buffer
-            self.data_buffer.add_data(market_data)
+            self.data_buffer.add_market_data(market_data)
             
             # Process potential alert with async task
             asyncio.create_task(self._process_potential_alert_optimized(market_data))
