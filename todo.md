@@ -4,6 +4,7 @@ The remaining tasks are lower priority documentation and deployment tools:
   - Production configuration and deployment tools
   - Comprehensive API documentation
 
+- [ ] Update alpaca.py to take .env as argument.
 - [ ] atoms.monitoring.performance_tracker - WARNING - High memory usage: 82.3%
 - [ ] Update to do trailing stop. Create new method UStrailingStop()
 - [ ] Check the return values of orders.
