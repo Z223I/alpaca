@@ -56,7 +56,7 @@ class ORBAlertSystem:
         # Statistics
         self.start_time = None
         self.last_data_save = None
-        self.data_save_interval = timedelta(minutes=5)  # Save every 5 minutes
+        self.data_save_interval = timedelta(minutes=1)  # Save every 1 minute
         
         self.logger.info(f"ORB Alert System initialized in {'TEST' if test_mode else 'LIVE'} mode")
         self.logger.info(f"Historical data will be saved to: {self.historical_data_dir.absolute()}")
@@ -222,7 +222,7 @@ class ORBAlertSystem:
             
             # Start periodic data saving in background
             data_save_task = asyncio.create_task(self._periodic_data_save())
-            self.logger.info("Started periodic data saving task (every 5 minutes)")
+            self.logger.info("Started periodic data saving task (every 1 minute)")
             
             # Start the alert engine
             await self.alert_engine.start()
