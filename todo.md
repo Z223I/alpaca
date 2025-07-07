@@ -5,6 +5,8 @@ The remaining tasks are lower priority documentation and deployment tools:
   - Comprehensive API documentation
 
 - [ ] atoms.monitoring.performance_tracker - WARNING - High memory usage: 82.3%
+- [ ] Update to do trailing stop. Create new method UStrailingStop()
+- [ ] Check the return values of orders.
 - [X] Focus on creating ORB filter.
 - [X] Finish establishing the PCA data.
 - [ ] Create some more ORB PyTests.
@@ -19,10 +21,8 @@ The remaining tasks are lower priority documentation and deployment tools:
 - [X] ORB Calculate the ORB for each stock in the first 15 minutes.
 - [ ] Add float rotation calculator.
 - [X] Create .envpaper
-- [ ] Create .envlive
+- [X] Create .envlive
 - [X] Create '_future_bracket_order()'
-- [ ] Update to do trailing stop. Create new method UStrailingStop()
-- [ ] Check the return values of orders.
 - [X] Create underscore buy.  New cli argument for this.
 - [ ] Update print_active_orders to do all the prints.
 
