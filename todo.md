@@ -4,6 +4,7 @@ The remaining tasks are lower priority documentation and deployment tools:
   - Production configuration and deployment tools
   - Comprehensive API documentation
 
+- [ ] Accumulate stock data in a single file per stock per day.
 - [ ] Fix Phase 3 startup it is currently bypassed
 - [ ] Update alpaca.py to take .env as argument.
 - [ ] atoms.monitoring.performance_tracker - WARNING - High memory usage: 82.3%

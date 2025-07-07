@@ -1,0 +1,28 @@
+{
+  "timestamp": "2025-07-07T12:34:40.136586",
+  "symbols_count": 19,
+  "symbols": [
+    "ASTI",
+    "BMNR",
+    "BTBT",
+    "BTOG",
+    "CGTX",
+    "COGT",
+    "CURR",
+    "EHGO",
+    "GITS",
+    "LGPS",
+    "MDIA",
+    "MINM",
+    "MULN",
+    "NAK",
+    "RGC",
+    "SONY",
+    "SVRE",
+    "TSLZ",
+    "VOR"
+  ],
+  "save_interval_minutes": 1.0,
+  "format": "CSV",
+  "total_records_saved": 1127
+}
