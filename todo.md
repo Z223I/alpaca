@@ -4,10 +4,11 @@ The remaining tasks are lower priority documentation and deployment tools:
   - Production configuration and deployment tools
   - Comprehensive API documentation
 
-
-- [ ] Focus on creating ORB filter.
-- [ ] Finish establishing the PCA data.
+- [ ] atoms.monitoring.performance_tracker - WARNING - High memory usage: 82.3%
+- [X] Focus on creating ORB filter.
+- [X] Finish establishing the PCA data.
 - [ ] Create some more ORB PyTests.
+- [X] Create some more ORB PyTests.
 - [X] Create some ORB PyTests.
 - [X] ORB Create VWAP atom.
 - [X] ORB Create EMA with 9 as the default parameter atom.
