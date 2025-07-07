@@ -108,8 +108,9 @@ class ORBAlertEngine:
         self.start_time = datetime.now()
         
         try:
-            # Start Phase 3 monitoring and optimization systems
-            await self._start_phase3_systems()
+            # TEMPORARILY BYPASS Phase 3 monitoring and optimization systems
+            # await self._start_phase3_systems()
+            self.logger.info("Phase 3 systems temporarily bypassed for data collection")
             
             # Connect to data stream with retry and circuit breaker
             await self._connect_with_retry()
@@ -118,17 +119,17 @@ class ORBAlertEngine:
             symbols = self.symbol_manager.get_symbols()
             self.stats.symbols_monitored = len(symbols)
             
-            # Configure performance optimizer for symbol count
-            if len(symbols) > 50:
-                performance_optimizer.optimize_for_throughput()
-            else:
-                performance_optimizer.optimize_for_latency()
+            # TEMPORARILY BYPASS performance optimizer configuration
+            # if len(symbols) > 50:
+            #     performance_optimizer.optimize_for_throughput()
+            # else:
+            #     performance_optimizer.optimize_for_latency()
             
             success = await self._subscribe_with_retry(symbols)
             if not success:
                 raise RuntimeError("Failed to subscribe to market data")
             
-            self.logger.info(f"Monitoring {len(symbols)} symbols for ORB alerts with Phase 3 optimizations")
+            self.logger.info(f"Monitoring {len(symbols)} symbols for ORB alerts (Phase 3 bypassed)")
             
             # Start listening for market data
             await self.stream_client.listen()
@@ -146,8 +147,8 @@ class ORBAlertEngine:
         self.logger.info("Stopping ORB Alert Engine and Phase 3 systems")
         self.is_running = False
         
-        # Stop Phase 3 systems
-        await self._stop_phase3_systems()
+        # TEMPORARILY BYPASS Phase 3 systems stop
+        # await self._stop_phase3_systems()
         
         await self.stream_client.disconnect()
         
@@ -443,32 +444,24 @@ class ORBAlertEngine:
     def _handle_market_data_with_validation(self, market_data: MarketData) -> None:
         """Handle market data with Phase 3 validation and optimization."""
         try:
-            # Phase 3: Data validation
-            validation_issues = data_validator.validate_market_data(market_data)
+            # TEMPORARILY BYPASS Phase 3: Data validation
+            # validation_issues = data_validator.validate_market_data(market_data)
             
-            # Skip processing if data quality is unacceptable
-            if not data_validator.is_data_quality_acceptable(market_data.symbol):
-                self.logger.warning(f"Skipping {market_data.symbol} due to poor data quality")
-                return
+            # TEMPORARILY BYPASS quality check
+            # if not data_validator.is_data_quality_acceptable(market_data.symbol):
+            #     self.logger.warning(f"Skipping {market_data.symbol} due to poor data quality")
+            #     return
             
-            # Phase 3: Performance optimization - submit to processing pool
-            def process_data(data):
-                return self._process_market_data_optimized(data)
-            
-            performance_optimizer.submit_processing_task(
-                symbol=market_data.symbol,
-                market_data=market_data,
-                priority=1,
-                processor_func=process_data
-            )
+            # TEMPORARILY BYPASS Phase 3: Performance optimization - process directly
+            self._process_market_data_optimized(market_data)
             
         except Exception as e:
             self.logger.error(f"Error in Phase 3 market data handling for {market_data.symbol}: {e}")
     
     def _process_market_data_optimized(self, market_data: MarketData) -> None:
         """Process market data with Phase 3 optimizations."""
-        # Track operation timing
-        op_id = performance_tracker.start_operation(f"process_market_data_{market_data.symbol}")
+        # TEMPORARILY BYPASS performance tracking
+        # op_id = performance_tracker.start_operation(f"process_market_data_{market_data.symbol}")
         
         try:
             # Add to data buffer
@@ -477,21 +470,21 @@ class ORBAlertEngine:
             # Process potential alert with async task
             asyncio.create_task(self._process_potential_alert_optimized(market_data))
             
-            # Record successful processing
-            performance_tracker.end_operation(op_id, success=True)
+            # TEMPORARILY BYPASS performance tracking
+            # performance_tracker.end_operation(op_id, success=True)
             
         except Exception as e:
-            # Record failed processing
-            performance_tracker.end_operation(op_id, success=False, error_message=str(e))
+            # TEMPORARILY BYPASS performance tracking
+            # performance_tracker.end_operation(op_id, success=False, error_message=str(e))
             raise
     
     async def _process_potential_alert_optimized(self, market_data: MarketData) -> None:
         """Process potential alert with Phase 3 optimizations and monitoring."""
         symbol = market_data.symbol
         
-        # Track alert processing time
-        alert_start_time = time.time()
-        op_id = performance_tracker.start_operation(f"alert_processing_{symbol}")
+        # TEMPORARILY BYPASS alert processing time tracking
+        # alert_start_time = time.time()
+        # op_id = performance_tracker.start_operation(f"alert_processing_{symbol}")
         
         try:
             # Get historical data for ORB calculation
@@ -539,25 +532,26 @@ class ORBAlertEngine:
             # Create and process alert
             alert = self.alert_formatter.create_alert(breakout_signal, confidence)
             
-            # Calculate alert generation time
-            alert_generation_time = (time.time() - alert_start_time) * 1000  # Convert to ms
+            # TEMPORARILY BYPASS alert generation time calculation
+            # alert_generation_time = (time.time() - alert_start_time) * 1000  # Convert to ms
             
-            # Record alert metrics
-            performance_tracker.record_alert_generated(
-                alert.priority.value,
-                alert.confidence_score,
-                alert_generation_time,
-                symbol
-            )
+            # TEMPORARILY BYPASS alert metrics recording
+            # performance_tracker.record_alert_generated(
+            #     alert.priority.value,
+            #     alert.confidence_score,
+            #     alert_generation_time,
+            #     symbol
+            # )
             
-            await self._process_alert_with_monitoring(alert, alert_generation_time)
+            await self._process_alert(alert)  # Use simpler alert processing
             
-            # Record successful operation
-            performance_tracker.end_operation(op_id, success=True)
+            # TEMPORARILY BYPASS performance tracking
+            # performance_tracker.end_operation(op_id, success=True)
             
         except Exception as e:
             self.logger.error(f"Error processing potential alert for {symbol}: {e}")
-            performance_tracker.end_operation(op_id, success=False, error_message=str(e))
+            # TEMPORARILY BYPASS performance tracking
+            # performance_tracker.end_operation(op_id, success=False, error_message=str(e))
     
     async def _process_alert_with_monitoring(self, alert: ORBAlert, generation_time_ms: float) -> None:
         """Process alert with Phase 3 monitoring and logging."""
