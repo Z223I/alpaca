@@ -1,0 +1,18 @@
+{
+  "symbol": "PSTV",
+  "timestamp": "2025-07-08T15:00:00",
+  "current_price": 0.33,
+  "orb_high": 0.3784,
+  "orb_low": 0.3466,
+  "orb_range": 0.031799999999999995,
+  "orb_midpoint": 0.36250000000000004,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 4.789382573571841,
+  "volume_ratio": 5.723107459888626,
+  "confidence_score": 0.8761069651677119,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 0.35475,
+  "recommended_take_profit": 0.3168,
+  "alert_message": "[15:00:00] ORB ALERT: PSTV \u2193 $0.33 (+4.79% vs ORB Low)\nVolume: 5.7x avg | Confidence: 0.88 | Priority: HIGH\nStop: $0.35 | Target: $0.32"
+}

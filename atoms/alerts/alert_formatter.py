@@ -216,15 +216,32 @@ class AlertFormatter:
     
     def format_console_output(self, alert: ORBAlert) -> str:
         """
-        Format alert for console output.
+        Format alert for console output with color coding.
         
         Args:
             alert: ORBAlert to format
             
         Returns:
-            Formatted console string
+            Formatted console string with color codes
         """
-        return alert.alert_message
+        # ANSI color codes
+        RED = "\033[31m"      # Red for bearish
+        GREEN = "\033[32m"    # Green for bullish
+        RESET = "\033[0m"     # Reset color
+        
+        # Choose color based on breakout type
+        if alert.breakout_type == BreakoutType.BULLISH_BREAKOUT:
+            color = GREEN
+        elif alert.breakout_type == BreakoutType.BEARISH_BREAKDOWN:
+            color = RED
+        else:
+            color = ""  # No color for other types
+        
+        # Apply color to the entire alert message
+        if color:
+            return f"{color}{alert.alert_message}{RESET}"
+        else:
+            return alert.alert_message
     
     def format_json_output(self, alert: ORBAlert) -> str:
         """
