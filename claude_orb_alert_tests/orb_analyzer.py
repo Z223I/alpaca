@@ -89,8 +89,12 @@ class ORBAnalyzer:
                 if 'vwap' not in df.columns:
                     df['vwap'] = df['close']
             
-            # Convert timestamps
+            # Convert timestamps and handle timezone
             df['timestamp'] = pd.to_datetime(df['timestamp'])
+            
+            # If timestamps are timezone-naive, assume they are UTC
+            if df['timestamp'].dt.tz is None:
+                df['timestamp'] = df['timestamp'].dt.tz_localize('UTC')
             
             # Filter for the specific symbol if multiple symbols in file
             if 'symbol' in df.columns:
@@ -340,24 +344,40 @@ class ORBAnalyzer:
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description='Analyze historical data for ORB patterns')
-    parser.add_argument('symbol', help='Trading symbol to analyze (e.g., BSLK, AAPL)')
+    parser.add_argument('symbol_or_file', help='Trading symbol (e.g., BSLK) or path to CSV file')
     parser.add_argument('csv_file', nargs='?', help='Path to CSV file (optional, will auto-detect)')
     parser.add_argument('--orb-minutes', type=int, default=15, help='ORB period in minutes (default: 15)')
     
     args = parser.parse_args()
     
     print(f"🔍 ORB ALERT ANALYZER")
-    print(f"Analyzing symbol: {args.symbol.upper()}")
+    
+    # Check if first argument is a file path
+    if args.symbol_or_file.endswith('.csv') or '/' in args.symbol_or_file:
+        # Extract symbol from file path
+        filename = os.path.basename(args.symbol_or_file)
+        if '_' in filename:
+            symbol = filename.split('_')[0]
+        else:
+            symbol = filename.replace('.csv', '')
+        csv_file = args.symbol_or_file
+        print(f"Analyzing file: {csv_file}")
+        print(f"Extracted symbol: {symbol.upper()}")
+    else:
+        # First argument is a symbol
+        symbol = args.symbol_or_file
+        csv_file = args.csv_file
+        print(f"Analyzing symbol: {symbol.upper()}")
     
     try:
-        analyzer = ORBAnalyzer(args.symbol, args.csv_file)
+        analyzer = ORBAnalyzer(symbol, csv_file)
         results = analyzer.analyze()
         
         if 'error' not in results:
             print(f"\n✅ Analysis completed successfully for {results['symbol']}")
         
     except Exception as e:
-        print(f"❌ Failed to analyze {args.symbol}: {e}")
+        print(f"❌ Failed to analyze {symbol}: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":

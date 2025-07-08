@@ -343,14 +343,15 @@ class ORBAlertSystem:
                             for _, bar in symbol_bars.iterrows():
                                 from atoms.websocket.alpaca_stream import MarketData
                                 
-                                # Normalize timestamp to timezone-naive UTC to match websocket data
+                                # Normalize timestamp to timezone-naive Eastern Time to match websocket data
                                 timestamp = bar['timestamp']
+                                et_tz = pytz.timezone('US/Eastern')
                                 if hasattr(timestamp, 'tz') and timestamp.tz is not None:
-                                    # Convert timezone-aware to timezone-naive UTC
-                                    timestamp = timestamp.astimezone(pytz.UTC).replace(tzinfo=None)
+                                    # Convert timezone-aware to timezone-naive Eastern Time
+                                    timestamp = timestamp.astimezone(et_tz).replace(tzinfo=None)
                                 elif hasattr(timestamp, 'tzinfo') and timestamp.tzinfo is not None:
-                                    # Convert timezone-aware to timezone-naive UTC
-                                    timestamp = timestamp.astimezone(pytz.UTC).replace(tzinfo=None)
+                                    # Convert timezone-aware to timezone-naive Eastern Time
+                                    timestamp = timestamp.astimezone(et_tz).replace(tzinfo=None)
                                 
                                 market_data = MarketData(
                                     symbol=symbol,
@@ -514,6 +515,17 @@ class ORBAlertSystem:
                 # Convert to DataFrame-like structure
                 import pandas as pd
                 df = pd.DataFrame(all_bars)
+                
+                # Convert timestamps to timezone-naive Eastern Time for consistency
+                if not df.empty and 'timestamp' in df.columns:
+                    et_tz = pytz.timezone('US/Eastern')
+                    df['timestamp'] = pd.to_datetime(df['timestamp'])
+                    if df['timestamp'].dt.tz is not None:
+                        # Convert timezone-aware to timezone-naive Eastern Time
+                        df['timestamp'] = df['timestamp'].dt.tz_convert(et_tz).dt.tz_localize(None)
+                    else:
+                        # If somehow timezone-naive, assume UTC and convert
+                        df['timestamp'] = df['timestamp'].dt.tz_localize('UTC').dt.tz_convert(et_tz).dt.tz_localize(None)
                 
                 # Create mock bars_data object with df attribute
                 class MockBarsData:

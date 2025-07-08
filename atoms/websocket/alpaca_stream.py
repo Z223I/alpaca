@@ -267,14 +267,15 @@ class AlpacaStreamClient:
             bar_data: Bar data from websocket
         """
         try:
-            # Convert timezone-aware timestamp to timezone-naive UTC for pandas compatibility
+            # Convert timezone-aware timestamp to timezone-naive Eastern Time for consistency
             timestamp_str = bar_data.get("t", "").replace("Z", "+00:00")
             timestamp_aware = datetime.fromisoformat(timestamp_str)
-            timestamp_naive = timestamp_aware.astimezone(pytz.UTC).replace(tzinfo=None)
+            et_tz = pytz.timezone('US/Eastern')
+            timestamp_et_naive = timestamp_aware.astimezone(et_tz).replace(tzinfo=None)
             
             market_data = MarketData(
                 symbol=bar_data.get("S", ""),
-                timestamp=timestamp_naive,
+                timestamp=timestamp_et_naive,
                 price=float(bar_data.get("c", 0)),
                 volume=int(bar_data.get("v", 0)),
                 high=float(bar_data.get("h", 0)),

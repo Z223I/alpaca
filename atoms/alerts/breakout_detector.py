@@ -237,14 +237,15 @@ class BreakoutDetector:
         if timestamp is None:
             timestamp = datetime.now()
         
-        # Convert to Eastern Time for alert window check
-        et_tz = pytz.timezone('US/Eastern')
+        # Handle Eastern Time for alert window check
         if timestamp.tzinfo is None:
-            # Timestamps are timezone-naive UTC (from websocket), localize to UTC first
-            timestamp = timestamp.replace(tzinfo=pytz.UTC)
-        
-        timestamp_et = timestamp.astimezone(et_tz)
-        current_time = timestamp_et.time()
+            # Timestamps are already timezone-naive Eastern Time (from websocket), use directly
+            current_time = timestamp.time()
+        else:
+            # If timezone-aware, convert to Eastern Time
+            et_tz = pytz.timezone('US/Eastern')
+            timestamp_et = timestamp.astimezone(et_tz)
+            current_time = timestamp_et.time()
         
         # Parse alert window times (in Eastern Time)
         start_time = time(*map(int, config.alert_window_start.split(':')))

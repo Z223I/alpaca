@@ -128,13 +128,15 @@ class ORBCalculator:
         import pytz
         price_data = price_data.copy()
         
-        # Convert UTC timestamps to Eastern Time
+        # Handle Eastern Time timestamps (now timezone-naive Eastern Time from websocket)
         if price_data['timestamp'].dt.tz is None:
-            # Timestamps are timezone-naive UTC (from websocket), localize to UTC first
-            price_data['timestamp'] = price_data['timestamp'].dt.tz_localize('UTC')
+            # Timestamps are already timezone-naive Eastern Time (from websocket), use directly
+            price_data['timestamp_et'] = price_data['timestamp']
+        else:
+            # If timezone-aware, convert to Eastern Time
+            et_tz = pytz.timezone('US/Eastern')
+            price_data['timestamp_et'] = price_data['timestamp'].dt.tz_convert(et_tz).dt.tz_localize(None)
         
-        et_tz = pytz.timezone('US/Eastern')
-        price_data['timestamp_et'] = price_data['timestamp'].dt.tz_convert(et_tz)
         price_data['time_et'] = price_data['timestamp_et'].dt.time
         
         # Calculate end time for opening range

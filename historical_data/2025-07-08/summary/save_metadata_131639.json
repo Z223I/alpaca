@@ -1,0 +1,20 @@
+{
+  "timestamp": "2025-07-08T13:16:39.281518",
+  "symbols_count": 11,
+  "symbols": [
+    "ASST",
+    "BSLK",
+    "LSB",
+    "NDRA",
+    "OCC",
+    "PROK",
+    "PSTV",
+    "SOUN",
+    "VOR",
+    "WOLF",
+    "ZVSA"
+  ],
+  "save_interval_minutes": 10.0,
+  "format": "CSV",
+  "total_records_saved": 205
+}
