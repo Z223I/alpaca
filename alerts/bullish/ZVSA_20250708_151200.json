@@ -1,0 +1,18 @@
+{
+  "symbol": "ZVSA",
+  "timestamp": "2025-07-08T15:12:00",
+  "current_price": 0.9267,
+  "orb_high": 0.7795,
+  "orb_low": 0.7131,
+  "orb_range": 0.06640000000000001,
+  "orb_midpoint": 0.7463,
+  "breakout_type": "bullish_breakout",
+  "breakout_percentage": 18.88389993585632,
+  "volume_ratio": 1.6491395793499044,
+  "confidence_score": 0.8789433668123465,
+  "priority": "MEDIUM",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 0.8571975000000001,
+  "recommended_take_profit": 0.963768,
+  "alert_message": "[15:12:00] ORB ALERT: ZVSA \u2191 $0.93 (+18.88% vs ORB High)\nVolume: 1.6x avg | Confidence: 0.88 | Priority: MEDIUM\nStop: $0.86 | Target: $0.96"
+}

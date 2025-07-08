@@ -1,0 +1,18 @@
+{
+  "symbol": "LSB",
+  "timestamp": "2025-07-08T15:09:00",
+  "current_price": 1.4,
+  "orb_high": 1.09,
+  "orb_low": 0.9776,
+  "orb_range": 0.11240000000000006,
+  "orb_midpoint": 1.0338,
+  "breakout_type": "bullish_breakout",
+  "breakout_percentage": 28.44036697247705,
+  "volume_ratio": 1.6062992125984252,
+  "confidence_score": 0.8860478295484664,
+  "priority": "MEDIUM",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 1.295,
+  "recommended_take_profit": 1.456,
+  "alert_message": "[15:09:00] ORB ALERT: LSB \u2191 $1.40 (+28.44% vs ORB High)\nVolume: 1.6x avg | Confidence: 0.89 | Priority: MEDIUM\nStop: $1.29 | Target: $1.46"
+}

@@ -1,0 +1,18 @@
+{
+  "symbol": "VOR",
+  "timestamp": "2025-07-08T15:17:00",
+  "current_price": 2.41,
+  "orb_high": 3.28,
+  "orb_low": 2.765,
+  "orb_range": 0.5149999999999997,
+  "orb_midpoint": 3.0225,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 12.839059674502712,
+  "volume_ratio": 2.3740740740740742,
+  "confidence_score": 0.8576345779537465,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 2.59075,
+  "recommended_take_profit": 2.3136,
+  "alert_message": "[15:17:00] ORB ALERT: VOR \u2193 $2.41 (+12.84% vs ORB Low)\nVolume: 2.4x avg | Confidence: 0.86 | Priority: HIGH\nStop: $2.59 | Target: $2.31"
+}

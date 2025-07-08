@@ -1,0 +1,18 @@
+{
+  "symbol": "NDRA",
+  "timestamp": "2025-07-08T15:50:00",
+  "current_price": 8.255,
+  "orb_high": 11.78,
+  "orb_low": 10.02,
+  "orb_range": 1.7599999999999998,
+  "orb_midpoint": 10.899999999999999,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 17.614770459081825,
+  "volume_ratio": 3.4986565158978955,
+  "confidence_score": 0.8894297375710507,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 8.874125000000001,
+  "recommended_take_profit": 7.9248,
+  "alert_message": "[15:50:00] ORB ALERT: NDRA \u2193 $8.26 (+17.61% vs ORB Low)\nVolume: 3.5x avg | Confidence: 0.89 | Priority: HIGH\nStop: $8.87 | Target: $7.92"
+}

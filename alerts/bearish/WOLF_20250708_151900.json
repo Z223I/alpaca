@@ -1,0 +1,18 @@
+{
+  "symbol": "WOLF",
+  "timestamp": "2025-07-08T15:19:00",
+  "current_price": 2.545,
+  "orb_high": 3.325,
+  "orb_low": 2.875,
+  "orb_range": 0.4500000000000002,
+  "orb_midpoint": 3.1,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 11.47826086956522,
+  "volume_ratio": 2.0042400133393676,
+  "confidence_score": 0.8416491598363254,
+  "priority": "MEDIUM",
+  "confidence_level": "HIGH",
+  "recommended_stop_loss": 2.7358749999999996,
+  "recommended_take_profit": 2.4432,
+  "alert_message": "[15:19:00] ORB ALERT: WOLF \u2193 $2.54 (+11.48% vs ORB Low)\nVolume: 2.0x avg | Confidence: 0.84 | Priority: MEDIUM\nStop: $2.74 | Target: $2.44"
+}
