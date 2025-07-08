@@ -186,7 +186,10 @@ class ORBAlertSystem:
         if self.last_data_save is None:
             return True
         
-        return datetime.now() - self.last_data_save >= self.data_save_interval
+        # Use Eastern Time for consistency with last_data_save
+        et_tz = pytz.timezone('US/Eastern')
+        current_time = datetime.now(et_tz)
+        return current_time - self.last_data_save >= self.data_save_interval
     
     def _handle_alert(self, alert: ORBAlert) -> None:
         """
