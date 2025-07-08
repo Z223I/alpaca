@@ -14,6 +14,7 @@ from datetime import datetime
 import pandas as pd
 from dataclasses import dataclass
 from enum import Enum
+import pytz
 
 from ..config.alert_config import config
 
@@ -266,9 +267,14 @@ class AlpacaStreamClient:
             bar_data: Bar data from websocket
         """
         try:
+            # Convert timezone-aware timestamp to timezone-naive UTC for pandas compatibility
+            timestamp_str = bar_data.get("t", "").replace("Z", "+00:00")
+            timestamp_aware = datetime.fromisoformat(timestamp_str)
+            timestamp_naive = timestamp_aware.astimezone(pytz.UTC).replace(tzinfo=None)
+            
             market_data = MarketData(
                 symbol=bar_data.get("S", ""),
-                timestamp=datetime.fromisoformat(bar_data.get("t", "").replace("Z", "+00:00")),
+                timestamp=timestamp_naive,
                 price=float(bar_data.get("c", 0)),
                 volume=int(bar_data.get("v", 0)),
                 high=float(bar_data.get("h", 0)),

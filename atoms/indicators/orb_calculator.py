@@ -130,7 +130,7 @@ class ORBCalculator:
         
         # Convert UTC timestamps to Eastern Time
         if price_data['timestamp'].dt.tz is None:
-            # Assume UTC if no timezone info
+            # Timestamps are timezone-naive UTC (from websocket), localize to UTC first
             price_data['timestamp'] = price_data['timestamp'].dt.tz_localize('UTC')
         
         et_tz = pytz.timezone('US/Eastern')
