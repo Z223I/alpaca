@@ -470,9 +470,12 @@ class ORBAlertSystem:
             
             for symbol in symbol_list:
                 try:
-                    # Fetch 1-minute bars (legacy API needs datetime format for specific time range)
-                    start_str = start_time.strftime('%Y-%m-%dT%H:%M:%S')
-                    end_str = end_time.strftime('%Y-%m-%dT%H:%M:%S')
+                    # Fetch 1-minute bars (legacy API needs specific format)
+                    # Convert to UTC and format as RFC3339
+                    start_utc = start_time.astimezone(pytz.UTC)
+                    end_utc = end_time.astimezone(pytz.UTC)
+                    start_str = start_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
+                    end_str = end_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
                     
                     # Use the feed determined at the beginning of the function
                     
