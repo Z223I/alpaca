@@ -342,9 +342,19 @@ class ORBAlertSystem:
                             # Convert to MarketData format and add to buffer
                             for _, bar in symbol_bars.iterrows():
                                 from atoms.websocket.alpaca_stream import MarketData
+                                
+                                # Normalize timestamp to timezone-naive UTC to match websocket data
+                                timestamp = bar['timestamp']
+                                if hasattr(timestamp, 'tz') and timestamp.tz is not None:
+                                    # Convert timezone-aware to timezone-naive UTC
+                                    timestamp = timestamp.astimezone(pytz.UTC).replace(tzinfo=None)
+                                elif hasattr(timestamp, 'tzinfo') and timestamp.tzinfo is not None:
+                                    # Convert timezone-aware to timezone-naive UTC
+                                    timestamp = timestamp.astimezone(pytz.UTC).replace(tzinfo=None)
+                                
                                 market_data = MarketData(
                                     symbol=symbol,
-                                    timestamp=bar['timestamp'],
+                                    timestamp=timestamp,
                                     price=bar['close'],
                                     volume=bar['volume'],
                                     high=bar['high'],
