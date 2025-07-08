@@ -103,17 +103,32 @@ class ORBAlertSystem:
         self.logger.info(f"Fetch opening range data if started late: {config.fetch_opening_range_data}")
     
     def _setup_logging(self) -> logging.Logger:
-        """Setup logging configuration."""
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        return logging.getLogger(__name__)
+        """Setup logging configuration with Eastern Time."""
+        # Create custom formatter for Eastern Time
+        class EasternFormatter(logging.Formatter):
+            def formatTime(self, record, datefmt=None):
+                et_tz = pytz.timezone('US/Eastern')
+                et_time = datetime.fromtimestamp(record.created, et_tz)
+                if datefmt:
+                    return et_time.strftime(datefmt)
+                return et_time.strftime('%Y-%m-%d %H:%M:%S,%f')[:-3] + ' ET'
+        
+        # Configure logging with Eastern Time
+        logger = logging.getLogger(__name__)
+        if not logger.handlers:  # Only configure if not already configured
+            handler = logging.StreamHandler()
+            formatter = EasternFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+            logger.setLevel(logging.INFO)
+        
+        return logger
     
     def _setup_data_storage(self) -> None:
         """Setup historical data storage directories."""
         # Create subdirectories for organized storage
-        today = datetime.now().strftime("%Y-%m-%d")
+        et_tz = pytz.timezone('US/Eastern')
+        today = datetime.now(et_tz).strftime("%Y-%m-%d")
         self.daily_data_dir = self.historical_data_dir / today
         self.daily_data_dir.mkdir(parents=True, exist_ok=True)
         
@@ -127,7 +142,8 @@ class ORBAlertSystem:
     def _save_historical_data(self) -> None:
         """Save current market data to historical files."""
         try:
-            current_time = datetime.now()
+            et_tz = pytz.timezone('US/Eastern')
+            current_time = datetime.now(et_tz)
             symbols = self.alert_engine.get_monitored_symbols()
             
             for symbol in symbols:
@@ -558,8 +574,9 @@ class ORBAlertSystem:
             await self._wait_for_market_open()
             
             # Set start time after market open wait
-            self.start_time = datetime.now()
-            self.logger.info(f"Starting data collection at: {self.start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            et_tz = pytz.timezone('US/Eastern')
+            self.start_time = datetime.now(et_tz)
+            self.logger.info(f"Starting data collection at: {self.start_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
             
             # Fetch opening range data if we started after market open
             await self._fetch_opening_range_data()
