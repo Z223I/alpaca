@@ -124,17 +124,26 @@ class ORBCalculator:
         Returns:
             Filtered DataFrame for opening range period
         """
-        # Extract time component
+        # Convert timestamps to Eastern Time for filtering
+        import pytz
         price_data = price_data.copy()
-        price_data['time'] = price_data['timestamp'].dt.time
+        
+        # Convert UTC timestamps to Eastern Time
+        if price_data['timestamp'].dt.tz is None:
+            # Assume UTC if no timezone info
+            price_data['timestamp'] = price_data['timestamp'].dt.tz_localize('UTC')
+        
+        et_tz = pytz.timezone('US/Eastern')
+        price_data['timestamp_et'] = price_data['timestamp'].dt.tz_convert(et_tz)
+        price_data['time_et'] = price_data['timestamp_et'].dt.time
         
         # Calculate end time for opening range
         market_open_minutes = self.market_open.hour * 60 + self.market_open.minute
         orb_end_minutes = market_open_minutes + self.orb_period_minutes
         orb_end_time = time(orb_end_minutes // 60, orb_end_minutes % 60)
         
-        # Filter for opening range period
-        orb_mask = (price_data['time'] >= self.market_open) & (price_data['time'] <= orb_end_time)
+        # Filter for opening range period using Eastern Time
+        orb_mask = (price_data['time_et'] >= self.market_open) & (price_data['time_et'] <= orb_end_time)
         
         return price_data[orb_mask]
     

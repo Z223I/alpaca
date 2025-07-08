@@ -232,12 +232,21 @@ class BreakoutDetector:
         Returns:
             True if within alert window
         """
+        import pytz
+        
         if timestamp is None:
             timestamp = datetime.now()
-            
-        current_time = timestamp.time()
         
-        # Parse alert window times
+        # Convert to Eastern Time for alert window check
+        et_tz = pytz.timezone('US/Eastern')
+        if timestamp.tzinfo is None:
+            # Assume UTC if no timezone info
+            timestamp = timestamp.replace(tzinfo=pytz.UTC)
+        
+        timestamp_et = timestamp.astimezone(et_tz)
+        current_time = timestamp_et.time()
+        
+        # Parse alert window times (in Eastern Time)
         start_time = time(*map(int, config.alert_window_start.split(':')))
         end_time = time(*map(int, config.alert_window_end.split(':')))
         
