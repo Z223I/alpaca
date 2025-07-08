@@ -135,6 +135,8 @@ class ORBAlertSystem:
         # Create subdirectories for different data types
         (self.daily_data_dir / "market_data").mkdir(exist_ok=True)
         (self.daily_data_dir / "alerts").mkdir(exist_ok=True)
+        (self.daily_data_dir / "alerts" / "bullish").mkdir(exist_ok=True)
+        (self.daily_data_dir / "alerts" / "bearish").mkdir(exist_ok=True)
         (self.daily_data_dir / "summary").mkdir(exist_ok=True)
         
         self.logger.info(f"Daily data directory: {self.daily_data_dir}")
@@ -211,9 +213,21 @@ class ORBAlertSystem:
     def _save_alert_data(self, alert: ORBAlert) -> None:
         """Save alert data to historical files."""
         try:
+            # Determine subdirectory based on breakout type
+            if alert.breakout_type.value == "bullish_breakout":
+                subdir = "bullish"
+            elif alert.breakout_type.value == "bearish_breakdown":
+                subdir = "bearish"
+            else:
+                subdir = ""  # Save in root alerts directory for other types
+            
             # Save alert as JSON
             alert_filename = f"alert_{alert.symbol}_{alert.timestamp.strftime('%Y%m%d_%H%M%S')}.json"
-            alert_filepath = self.daily_data_dir / "alerts" / alert_filename
+            
+            if subdir:
+                alert_filepath = self.daily_data_dir / "alerts" / subdir / alert_filename
+            else:
+                alert_filepath = self.daily_data_dir / "alerts" / alert_filename
             
             # Convert alert to dictionary for JSON serialization
             alert_data = {

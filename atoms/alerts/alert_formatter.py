@@ -115,6 +115,10 @@ class AlertFormatter:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
         
+        # Create subdirectories for bullish and bearish alerts
+        (self.output_dir / "bullish").mkdir(exist_ok=True)
+        (self.output_dir / "bearish").mkdir(exist_ok=True)
+        
         # Alert history
         self.alert_history: List[ORBAlert] = []
         self.daily_alert_count = 0
@@ -266,7 +270,7 @@ class AlertFormatter:
     
     def save_alert_to_file(self, alert: ORBAlert, file_format: str = "json") -> str:
         """
-        Save alert to file.
+        Save alert to file in appropriate subdirectory.
         
         Args:
             alert: ORBAlert to save
@@ -275,9 +279,21 @@ class AlertFormatter:
         Returns:
             Path to saved file
         """
+        # Determine subdirectory based on breakout type
+        if alert.breakout_type == BreakoutType.BULLISH_BREAKOUT:
+            subdir = "bullish"
+        elif alert.breakout_type == BreakoutType.BEARISH_BREAKDOWN:
+            subdir = "bearish"
+        else:
+            subdir = ""  # Save in root alerts directory for other types
+        
         timestamp_str = alert.timestamp.strftime("%Y%m%d_%H%M%S")
         filename = f"{alert.symbol}_{timestamp_str}.{file_format}"
-        filepath = self.output_dir / filename
+        
+        if subdir:
+            filepath = self.output_dir / subdir / filename
+        else:
+            filepath = self.output_dir / filename
         
         if file_format == "json":
             with open(filepath, 'w') as f:
