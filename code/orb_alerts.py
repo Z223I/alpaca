@@ -19,6 +19,7 @@ from typing import Optional
 from datetime import datetime, timedelta, time
 from pathlib import Path
 import pandas as pd
+import pytz
 
 # Add project root to path
 sys.path.append('/home/wilsonb/dl/github.com/Z223I/alpaca')
@@ -244,23 +245,26 @@ class ORBAlertSystem:
         if not config.start_collection_at_open:
             return
         
-        now = datetime.now()
+        # Get current time in Eastern Time
+        et_tz = pytz.timezone('US/Eastern')
+        now_et = datetime.now(et_tz)
         
-        # Parse market open time
+        # Parse market open time in Eastern Time
         market_open_hour, market_open_minute = map(int, config.market_open_time.split(':'))
-        market_open_today = now.replace(hour=market_open_hour, minute=market_open_minute, second=0, microsecond=0)
+        market_open_today_et = now_et.replace(hour=market_open_hour, minute=market_open_minute, second=0, microsecond=0)
         
         # If market open time has already passed today, start immediately
-        if now >= market_open_today:
+        if now_et >= market_open_today_et:
             self.logger.info(f"Market open time ({config.market_open_time} ET) has passed, starting data collection immediately")
             return
         
         # Calculate wait time until market open
-        wait_seconds = (market_open_today - now).total_seconds()
+        wait_seconds = (market_open_today_et - now_et).total_seconds()
         wait_minutes = wait_seconds / 60
         
+        self.logger.info(f"Current time: {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         self.logger.info(f"Waiting {wait_minutes:.1f} minutes until market open ({config.market_open_time} ET)")
-        self.logger.info(f"Data collection will start at: {market_open_today.strftime('%Y-%m-%d %H:%M:%S')}")
+        self.logger.info(f"Data collection will start at: {market_open_today_et.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         
         # Wait until market open
         await asyncio.sleep(wait_seconds)
@@ -286,31 +290,33 @@ class ORBAlertSystem:
             return False
         
         try:
-            now = datetime.now()
+            # Get current time in Eastern Time
+            et_tz = pytz.timezone('US/Eastern')
+            now_et = datetime.now(et_tz)
             
-            # Parse market open time for today
+            # Parse market open time for today in Eastern Time
             market_open_hour, market_open_minute = map(int, config.market_open_time.split(':'))
-            market_open_today = now.replace(hour=market_open_hour, minute=market_open_minute, second=0, microsecond=0)
+            market_open_today_et = now_et.replace(hour=market_open_hour, minute=market_open_minute, second=0, microsecond=0)
             
             # Calculate opening range end time (market open + 15 minutes)
-            orb_end_time = market_open_today + timedelta(minutes=config.orb_period_minutes)
+            orb_end_time_et = market_open_today_et + timedelta(minutes=config.orb_period_minutes)
             
             # Check if we're past the opening range period
-            if now <= orb_end_time:
+            if now_et <= orb_end_time_et:
                 self.logger.info("Still within opening range period - no historical data fetch needed")
                 
                 # Print message to screen that we have opening data
-                if now >= market_open_today:
+                if now_et >= market_open_today_et:
                     print("=" * 80)
                     print("✅ OPENING RANGE DATA AVAILABLE")
                     print("Started during opening range period - collecting data in real-time")
-                    print(f"ORB period: {market_open_today.strftime('%H:%M')} - {orb_end_time.strftime('%H:%M')} ET")
+                    print(f"ORB period: {market_open_today_et.strftime('%H:%M')} - {orb_end_time_et.strftime('%H:%M')} ET")
                     print("ORB alerts will be operational after opening range completes!")
                     print("=" * 80)
                 
                 return True
             
-            self.logger.info(f"Fetching opening range data from {market_open_today.strftime('%H:%M')} to {orb_end_time.strftime('%H:%M')}")
+            self.logger.info(f"Fetching opening range data from {market_open_today_et.strftime('%H:%M')} to {orb_end_time_et.strftime('%H:%M')}")
             
             # Get symbols to fetch data for
             symbols = self.alert_engine.get_monitored_symbols()
@@ -321,7 +327,7 @@ class ORBAlertSystem:
             try:
                 if ALPACA_AVAILABLE == "legacy":
                     # Use legacy alpaca-trade-api
-                    bars_data = self._fetch_with_legacy_api(symbols, market_open_today, orb_end_time)
+                    bars_data = self._fetch_with_legacy_api(symbols, market_open_today_et, orb_end_time_et)
                 else:
                     # Use new alpaca API (currently disabled)
                     bars_data = None
@@ -355,13 +361,13 @@ class ORBAlertSystem:
                     self.logger.info(f"Successfully fetched and loaded {data_count} opening range data points")
                     
                     # Save opening range data to tmp directory for each symbol
-                    self._save_opening_range_data_to_tmp(bars_data, market_open_today, orb_end_time)
+                    self._save_opening_range_data_to_tmp(bars_data, market_open_today_et, orb_end_time_et)
                     
                     # Print success message to screen
                     print("=" * 80)
                     print("✅ OPENING RANGE DATA COMPLETE")
                     print(f"Successfully fetched opening range data for {len(symbols)} symbols")
-                    print(f"Time period: {market_open_today.strftime('%H:%M')} - {orb_end_time.strftime('%H:%M')} ET")
+                    print(f"Time period: {market_open_today_et.strftime('%H:%M')} - {orb_end_time_et.strftime('%H:%M')} ET")
                     print(f"Total data points loaded: {data_count}")
                     print("ORB alerts are now fully operational!")
                     print("=" * 80)
