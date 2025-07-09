@@ -1,0 +1,18 @@
+{
+  "symbol": "SOBR",
+  "timestamp": "2025-07-09T13:11:00",
+  "current_price": 4.4,
+  "orb_high": 5.0,
+  "orb_low": 4.54,
+  "orb_range": 0.45999999999999996,
+  "orb_midpoint": 4.77,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 3.0837004405286272,
+  "volume_ratio": 2.8464612607966995,
+  "confidence_score": 0.8625588742466472,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 4.73,
+  "recommended_take_profit": 4.224,
+  "alert_message": "[13:11:00] ORB ALERT: SOBR \u2193 $4.40 (+3.08% vs ORB Low)\nVolume: 2.8x avg | Confidence: 0.86 | Priority: HIGH\nStop: $4.73 | Target: $4.22"
+}

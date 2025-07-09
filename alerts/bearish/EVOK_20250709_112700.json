@@ -1,0 +1,18 @@
+{
+  "symbol": "EVOK",
+  "timestamp": "2025-07-09T11:27:00",
+  "current_price": 6.6,
+  "orb_high": 9.815,
+  "orb_low": 7.52,
+  "orb_range": 2.295,
+  "orb_midpoint": 8.6675,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 12.23404255319149,
+  "volume_ratio": 3.187457909758522,
+  "confidence_score": 0.8983357322219467,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 7.095,
+  "recommended_take_profit": 6.335999999999999,
+  "alert_message": "[11:27:00] ORB ALERT: EVOK \u2193 $6.60 (+12.23% vs ORB Low)\nVolume: 3.2x avg | Confidence: 0.90 | Priority: HIGH\nStop: $7.09 | Target: $6.34"
+}

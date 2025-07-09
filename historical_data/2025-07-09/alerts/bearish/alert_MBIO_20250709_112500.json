@@ -1,0 +1,18 @@
+{
+  "symbol": "MBIO",
+  "timestamp": "2025-07-09T11:25:00",
+  "current_price": 2.755,
+  "orb_high": 3.52,
+  "orb_low": 3.0,
+  "orb_range": 0.52,
+  "orb_midpoint": 3.26,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 8.166666666666671,
+  "volume_ratio": 12.130884666585986,
+  "confidence_score": 0.9051450000000001,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 2.9616249999999997,
+  "recommended_take_profit": 2.6447999999999996,
+  "alert_message": "[11:25:00] ORB ALERT: MBIO \u2193 $2.75 (+8.17% vs ORB Low)\nVolume: 12.1x avg | Confidence: 0.91 | Priority: HIGH\nStop: $2.96 | Target: $2.64"
+}

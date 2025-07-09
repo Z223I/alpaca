@@ -1,0 +1,21 @@
+{
+  "timestamp": "2025-07-09T11:43:19.074541-04:00",
+  "symbols_count": 12,
+  "symbols": [
+    "BMGL",
+    "CLDI",
+    "EVOK",
+    "GAME",
+    "KZIA",
+    "MBIO",
+    "MBRX",
+    "PCSA",
+    "PROK",
+    "SCAG",
+    "SOBR",
+    "SUGP"
+  ],
+  "save_interval_minutes": 10.0,
+  "format": "CSV",
+  "total_records_saved": 839
+}

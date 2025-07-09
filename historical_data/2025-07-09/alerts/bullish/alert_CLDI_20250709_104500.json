@@ -1,0 +1,18 @@
+{
+  "symbol": "CLDI",
+  "timestamp": "2025-07-09T10:45:00",
+  "current_price": 1.035,
+  "orb_high": 0.9357,
+  "orb_low": 0.7528,
+  "orb_range": 0.18289999999999995,
+  "orb_midpoint": 0.84425,
+  "breakout_type": "bullish_breakout",
+  "breakout_percentage": 10.612375761462001,
+  "volume_ratio": 2.6767749963593617,
+  "confidence_score": 0.9002849578874415,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 0.957375,
+  "recommended_take_profit": 1.0764,
+  "alert_message": "[10:45:00] ORB ALERT: CLDI \u2191 $1.03 (+10.61% vs ORB High)\nVolume: 2.7x avg | Confidence: 0.90 | Priority: HIGH\nStop: $0.96 | Target: $1.08"
+}
