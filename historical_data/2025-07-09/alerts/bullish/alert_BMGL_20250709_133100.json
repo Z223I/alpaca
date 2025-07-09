@@ -1,0 +1,18 @@
+{
+  "symbol": "BMGL",
+  "timestamp": "2025-07-09T13:31:00",
+  "current_price": 3.605,
+  "orb_high": 3.325,
+  "orb_low": 2.655,
+  "orb_range": 0.6700000000000004,
+  "orb_midpoint": 2.99,
+  "breakout_type": "bullish_breakout",
+  "breakout_percentage": 8.421052631578942,
+  "volume_ratio": 4.354838709677419,
+  "confidence_score": 0.9463000000000001,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 3.334625,
+  "recommended_take_profit": 3.7492,
+  "alert_message": "[13:31:00] ORB ALERT: BMGL \u2191 $3.60 (+8.42% vs ORB High)\nVolume: 4.4x avg | Confidence: 0.95 | Priority: HIGH\nStop: $3.33 | Target: $3.75"
+}

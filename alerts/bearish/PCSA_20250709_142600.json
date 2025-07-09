@@ -1,0 +1,18 @@
+{
+  "symbol": "PCSA",
+  "timestamp": "2025-07-09T14:26:00",
+  "current_price": 0.2368,
+  "orb_high": 0.265,
+  "orb_low": 0.24,
+  "orb_range": 0.025000000000000022,
+  "orb_midpoint": 0.2525,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 1.3333333333333253,
+  "volume_ratio": 3.8309888078858196,
+  "confidence_score": 0.725218363472007,
+  "priority": "MEDIUM",
+  "confidence_level": "HIGH",
+  "recommended_stop_loss": 0.25456,
+  "recommended_take_profit": 0.227328,
+  "alert_message": "[14:26:00] ORB ALERT: PCSA \u2193 $0.24 (+1.33% vs ORB Low)\nVolume: 3.8x avg | Confidence: 0.73 | Priority: MEDIUM\nStop: $0.25 | Target: $0.23"
+}
