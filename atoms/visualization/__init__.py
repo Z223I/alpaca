@@ -1,0 +1,1 @@
+# Visualization atoms for chart generation and data presentation

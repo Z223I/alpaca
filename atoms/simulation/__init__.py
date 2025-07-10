@@ -1,0 +1,1 @@
+# Simulation atoms for trade execution modeling
