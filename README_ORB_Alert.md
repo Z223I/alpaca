@@ -150,6 +150,7 @@ The technical indicators serve as **momentum confirmation** rather than primary 
 
 ### Prerequisites
 - Python 3.10+
+- Conda (Miniconda or Anaconda)
 - Alpaca API account (paper or live trading)
 - Required Python packages
 
@@ -161,24 +162,39 @@ git clone https://github.com/Z223I/alpaca.git
 cd alpaca
 ```
 
-2. **Install Dependencies**
+2. **Create Conda Environment**
 ```bash
-pip install alpaca-trade-api python-dotenv matplotlib pytest pytest-cov pandas numpy psutil
+# Create new conda environment
+conda create -n alpaca python=3.10
+conda activate alpaca
 ```
 
-3. **Environment Configuration**
+3. **Install Dependencies**
+```bash
+# Install required packages in conda environment
+pip install alpaca-trade-api python-dotenv matplotlib pytest pytest-cov pandas numpy psutil pytz websockets scikit-learn
+```
+
+4. **Environment Configuration**
 ```bash
 # Create .env file
 cp .env.example .env
 ```
 
-4. **Configure API Credentials**
+5. **Configure API Credentials**
 ```env
 # .env file
 ALPACA_API_KEY=your_api_key_here
 ALPACA_SECRET_KEY=your_secret_key_here
 ALPACA_BASE_URL=https://paper-api.alpaca.markets  # For paper trading
 PORTFOLIO_RISK=0.10  # Optional: default is 0.10 (10%)
+```
+
+6. **Verify Installation**
+```bash
+# Activate environment before running
+conda activate alpaca
+python3 code/orb_alerts.py --test
 ```
 
 ## Configuration
