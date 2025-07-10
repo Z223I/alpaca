@@ -9,7 +9,7 @@ The remaining tasks are lower priority documentation and deployment tools:
 
 
 
-
+- [ ] orb_alerts.py is to keep only the latest two historical data files per symbol.  Implement this when saving more data.
 - [ ] Create method to add more stocks to the alerts.
 - [ ] Update orb chart to take optional bullish and bearish data.
 - [ ] Update orb chart to take optional s/r lines.

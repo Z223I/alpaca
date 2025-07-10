@@ -1,0 +1,1 @@
+# Dashboard atoms for real-time visualization and monitoring displays
