@@ -1,0 +1,18 @@
+{
+  "symbol": "SAFX",
+  "timestamp": "2025-07-10T13:12:00",
+  "current_price": 1.975,
+  "orb_high": 3.555,
+  "orb_low": 2.755,
+  "orb_range": 0.8000000000000003,
+  "orb_midpoint": 3.1550000000000002,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 28.312159709618868,
+  "volume_ratio": 3.202263989747971,
+  "confidence_score": 0.8823370509472716,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 2.123125,
+  "recommended_take_profit": 1.896,
+  "alert_message": "[13:12:00] ORB ALERT: SAFX \u2193 $1.98 (+28.31% vs ORB Low)\nVolume: 3.2x avg | Confidence: 0.88 | Priority: HIGH\nStop: $2.12 | Target: $1.90"
+}

@@ -1,0 +1,18 @@
+{
+  "symbol": "MLGO",
+  "timestamp": "2025-07-10T15:18:00",
+  "current_price": 0.6951,
+  "orb_high": 0.8659,
+  "orb_low": 0.8049,
+  "orb_range": 0.061000000000000054,
+  "orb_midpoint": 0.8353999999999999,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 13.641446142377923,
+  "volume_ratio": 6.706396577880574,
+  "confidence_score": 0.8604645330216145,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 0.7472325000000001,
+  "recommended_take_profit": 0.667296,
+  "alert_message": "[15:18:00] ORB ALERT: MLGO \u2193 $0.70 (+13.64% vs ORB Low)\nVolume: 6.7x avg | Confidence: 0.86 | Priority: HIGH\nStop: $0.75 | Target: $0.67"
+}

@@ -1,0 +1,18 @@
+{
+  "symbol": "KLTO",
+  "timestamp": "2025-07-10T11:59:00",
+  "current_price": 1.455,
+  "orb_high": 1.635,
+  "orb_low": 1.5,
+  "orb_range": 0.135,
+  "orb_midpoint": 1.5675,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 2.9999999999999956,
+  "volume_ratio": 2.2949808592088474,
+  "confidence_score": 0.8283997395356975,
+  "priority": "MEDIUM",
+  "confidence_level": "HIGH",
+  "recommended_stop_loss": 1.564125,
+  "recommended_take_profit": 1.3968,
+  "alert_message": "[11:59:00] ORB ALERT: KLTO \u2193 $1.46 (+3.00% vs ORB Low)\nVolume: 2.3x avg | Confidence: 0.83 | Priority: MEDIUM\nStop: $1.56 | Target: $1.40"
+}

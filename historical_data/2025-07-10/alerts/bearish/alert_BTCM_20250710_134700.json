@@ -1,0 +1,18 @@
+{
+  "symbol": "BTCM",
+  "timestamp": "2025-07-10T13:47:00",
+  "current_price": 5.6,
+  "orb_high": 7.98,
+  "orb_low": 6.74,
+  "orb_range": 1.2400000000000002,
+  "orb_midpoint": 7.36,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 16.913946587537097,
+  "volume_ratio": 1.8667741935483873,
+  "confidence_score": 0.852866934556251,
+  "priority": "MEDIUM",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 6.02,
+  "recommended_take_profit": 5.3759999999999994,
+  "alert_message": "[13:47:00] ORB ALERT: BTCM \u2193 $5.60 (+16.91% vs ORB Low)\nVolume: 1.9x avg | Confidence: 0.85 | Priority: MEDIUM\nStop: $6.02 | Target: $5.38"
+}

@@ -1,0 +1,18 @@
+{
+  "symbol": "SUGP",
+  "timestamp": "2025-07-10T13:03:00",
+  "current_price": 1.675,
+  "orb_high": 1.59,
+  "orb_low": 1.39,
+  "orb_range": 0.20000000000000018,
+  "orb_midpoint": 1.49,
+  "breakout_type": "bullish_breakout",
+  "breakout_percentage": 5.345911949685532,
+  "volume_ratio": 5.517946620308825,
+  "confidence_score": 0.9463000000000001,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 1.5493750000000002,
+  "recommended_take_profit": 1.7420000000000002,
+  "alert_message": "[13:03:00] ORB ALERT: SUGP \u2191 $1.68 (+5.35% vs ORB High)\nVolume: 5.5x avg | Confidence: 0.95 | Priority: HIGH\nStop: $1.55 | Target: $1.74"
+}

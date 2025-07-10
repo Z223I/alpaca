@@ -1,0 +1,18 @@
+{
+  "symbol": "PROK",
+  "timestamp": "2025-07-10T11:59:00",
+  "current_price": 5.39,
+  "orb_high": 4.83,
+  "orb_low": 4.52,
+  "orb_range": 0.3100000000000005,
+  "orb_midpoint": 4.675,
+  "breakout_type": "bullish_breakout",
+  "breakout_percentage": 11.594202898550716,
+  "volume_ratio": 3.276648626979355,
+  "confidence_score": 0.8859971822613538,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 4.98575,
+  "recommended_take_profit": 5.6056,
+  "alert_message": "[11:59:00] ORB ALERT: PROK \u2191 $5.39 (+11.59% vs ORB High)\nVolume: 3.3x avg | Confidence: 0.89 | Priority: HIGH\nStop: $4.99 | Target: $5.61"
+}

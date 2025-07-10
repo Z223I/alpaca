@@ -1,0 +1,20 @@
+{
+  "timestamp": "2025-07-10T15:05:23.763931-04:00",
+  "symbols_count": 11,
+  "symbols": [
+    "AIRI",
+    "BTCM",
+    "CGTX",
+    "CPOP",
+    "KLTO",
+    "MLGO",
+    "NTHI",
+    "PROK",
+    "SAFX",
+    "STKH",
+    "SUGP"
+  ],
+  "save_interval_minutes": 10.0,
+  "format": "CSV",
+  "total_records_saved": 368
+}

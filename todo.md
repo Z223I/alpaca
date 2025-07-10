@@ -46,6 +46,8 @@ The remaining tasks are lower priority documentation and deployment tools:
         python code/alpaca.py --get_latest_quote --symbol NINE
         python code/alpaca.py --buy --symbol NINE --take_profit 1.45
         python code/alpaca.py --buy --symbol AAPL --take_profit 210.00 --submit
+        python3 code/alpaca.py --buy --symbol AAPL --stop_price 140.00 --take_profit 200.00 --submit
+        python3 code/alpaca.py --buy --symbol STKH --stop_price 2.50 --take_profit 3.10
 
         # quantity will be automatically calculated.
         python3 code/alpaca.py --future_bracket_order --symbol AAPL --limit_price 145.00 --stop_price 140.00 --take_profit 160.00 --submit
