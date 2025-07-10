@@ -1,7 +1,7 @@
 # Product Requirements Document: Alert Performance Analysis
 
 ## Document Information
-- **Version**: 1.2
+- **Version**: 1.3
 - **Date**: 2025-07-10
 - **Author**: Development Team
 - **Status**: Draft
@@ -85,16 +85,17 @@ Currently, we generate ORB alerts based on technical indicators, but we lack sys
 
 #### 5. Historical Data Integration
 - **FR-5.1**: Parse and align alert timestamps with market data
-- **FR-5.2**: Filter historical data to normal trading hours (9:00 AM to 4:00 PM ET)
+- **FR-5.2**: Filter historical data to normal trading hours (9:30 AM to 4:00 PM ET)
 - **FR-5.3**: Handle market gaps (weekends, holidays, after-hours)
 - **FR-5.4**: Validate data quality and identify missing periods
 - **FR-5.5**: Support multiple timeframes (1min, 5min, 15min, 1hour, daily)
 
 #### 6. Alert Matching
-- **FR-6.1**: Match alerts to corresponding market data timestamps
-- **FR-6.2**: Define alert expiration criteria (e.g., end of trading day)
-- **FR-6.3**: Handle multiple alerts for the same symbol
-- **FR-6.4**: Track alert modifications or cancellations
+- **FR-6.1**: Filter alerts to valid alert hours (9:30 AM to 3:30 PM ET)
+- **FR-6.2**: Match alerts to corresponding market data timestamps
+- **FR-6.3**: Define alert expiration criteria (e.g., end of trading day)
+- **FR-6.4**: Handle multiple alerts for the same symbol
+- **FR-6.5**: Track alert modifications or cancellations
 
 ### Reporting Features
 
@@ -117,9 +118,11 @@ Currently, we generate ORB alerts based on technical indicators, but we lack sys
 - **Market metadata**: Summary files with trading session information
 
 ### Trading Hours Filter
-- **Regular Trading Hours**: 9:00 AM to 4:00 PM Eastern Time (ET)
+- **Regular Trading Hours**: 9:30 AM to 4:00 PM Eastern Time (ET)
+- **Valid Alert Hours**: 9:30 AM to 3:30 PM Eastern Time (ET)
 - **Timezone Handling**: All timestamps must be converted to ET for consistency
-- **Data Exclusion**: Pre-market (before 9:00 AM) and after-hours (after 4:00 PM) data will be filtered out
+- **Data Exclusion**: Pre-market (before 9:30 AM) and after-hours (after 4:00 PM) data will be filtered out
+- **Alert Exclusion**: Alerts generated outside of valid alert hours (9:30 AM - 3:30 PM) will be excluded from analysis
 - **Holiday Handling**: Market holidays will be excluded from analysis
 
 ### Analysis Timeframes
@@ -148,13 +151,14 @@ Maximum Drawdown = Max(Peak - Trough) / Peak
 
 ### Data Pipeline Architecture
 1. **Data Ingestion**: Load historic market data and alerts
-2. **Time Filtering**: Filter market data to regular trading hours (9:00 AM - 4:00 PM ET)
-3. **Timezone Conversion**: Ensure all timestamps are in Eastern Time
-4. **Alignment**: Match alerts to market data timestamps
-5. **Simulation**: Execute virtual trades based on alert parameters
-6. **Calculation**: Compute performance metrics
-7. **Aggregation**: Summarize results across multiple dimensions
-8. **Visualization**: Generate charts and reports
+2. **Time Filtering**: Filter market data to regular trading hours (9:30 AM - 4:00 PM ET)
+3. **Alert Filtering**: Filter alerts to valid alert hours (9:30 AM - 3:30 PM ET)
+4. **Timezone Conversion**: Ensure all timestamps are in Eastern Time
+5. **Alignment**: Match alerts to market data timestamps
+6. **Simulation**: Execute virtual trades based on alert parameters
+7. **Calculation**: Compute performance metrics
+8. **Aggregation**: Summarize results across multiple dimensions
+9. **Visualization**: Generate charts and reports
 
 ## Implementation Specifications
 
@@ -166,7 +170,8 @@ This implementation follows the **atoms-molecules architecture pattern** used th
 Small, focused functions that perform single responsibilities:
 
 - **`atoms/analysis/`** - Core analysis functions
-  - `filter_trading_hours.py` - Trading hours filtering utility
+  - `filter_trading_hours.py` - Trading hours filtering utility (9:30 AM - 4:00 PM ET)
+  - `filter_alert_hours.py` - Valid alert hours filtering utility (9:30 AM - 3:30 PM ET)
   - `calculate_returns.py` - Return calculation functions
   - `align_timestamps.py` - Timestamp alignment utilities
   - `validate_data.py` - Data quality validation functions
@@ -196,6 +201,7 @@ Higher-level components that combine multiple atoms:
 # molecules/alert_analyzer.py
 from atoms.api.get_cash import get_cash
 from atoms.analysis.filter_trading_hours import filter_trading_hours
+from atoms.analysis.filter_alert_hours import filter_alert_hours
 from atoms.analysis.align_timestamps import align_alerts_to_market_data
 from atoms.simulation.trade_executor import simulate_trade
 from atoms.metrics.success_rate import calculate_success_rate
@@ -203,7 +209,8 @@ from atoms.metrics.success_rate import calculate_success_rate
 class AlertAnalyzer:
     def load_alerts(self, date_range)
     def load_market_data(self, date_range)
-    def filter_trading_hours(self, start_time="09:00", end_time="16:00", timezone="US/Eastern")
+    def filter_trading_hours(self, start_time="09:30", end_time="16:00", timezone="US/Eastern")
+    def filter_alert_hours(self, start_time="09:30", end_time="15:30", timezone="US/Eastern")
     def align_data(self)
     def simulate_trades(self)
     def calculate_metrics(self)
@@ -215,8 +222,13 @@ Each atom should be independently testable and reusable:
 
 ```python
 # atoms/analysis/filter_trading_hours.py
-def filter_trading_hours(df, start_time="09:00", end_time="16:00", timezone="US/Eastern"):
+def filter_trading_hours(df, start_time="09:30", end_time="16:00", timezone="US/Eastern"):
     """Reusable function to filter any DataFrame to trading hours"""
+    pass
+
+# atoms/analysis/filter_alert_hours.py
+def filter_alert_hours(df, start_time="09:30", end_time="15:30", timezone="US/Eastern"):
+    """Reusable function to filter alerts to valid alert hours"""
     pass
 
 # atoms/metrics/success_rate.py  
@@ -239,7 +251,7 @@ def simulate_trade(alert, market_data, stop_loss, take_profit):
 
 ### Command Line Interface
 ```bash
-# Analyze specific date range (regular trading hours only)
+# Analyze specific date range (regular trading hours and valid alert hours only)
 python3 alert_analyzer.py --start-date 2025-07-08 --end-date 2025-07-10
 
 # Analyze specific symbols
@@ -422,13 +434,13 @@ timestamp,symbol,open,high,low,close,volume,vwap
 
 #### Trading Hours Filter Implementation
 ```python
-def filter_trading_hours(df, start_time="09:00", end_time="16:00", timezone="US/Eastern"):
+def filter_trading_hours(df, start_time="09:30", end_time="16:00", timezone="US/Eastern"):
     """
-    Filter DataFrame to include only regular trading hours (9:00 AM - 4:00 PM ET)
+    Filter DataFrame to include only regular trading hours (9:30 AM - 4:00 PM ET)
     
     Args:
         df: DataFrame with timestamp column
-        start_time: Trading day start time (default: "09:00")
+        start_time: Trading day start time (default: "09:30")
         end_time: Trading day end time (default: "16:00") 
         timezone: Target timezone (default: "US/Eastern")
     
@@ -439,6 +451,31 @@ def filter_trading_hours(df, start_time="09:00", end_time="16:00", timezone="US/
     df['timestamp'] = pd.to_datetime(df['timestamp']).dt.tz_convert(timezone)
     
     # Filter to trading hours
+    mask = (df['timestamp'].dt.time >= pd.to_datetime(start_time).time()) & \
+           (df['timestamp'].dt.time <= pd.to_datetime(end_time).time())
+    
+    # Exclude weekends
+    mask &= df['timestamp'].dt.dayofweek < 5
+    
+    return df[mask]
+
+def filter_alert_hours(df, start_time="09:30", end_time="15:30", timezone="US/Eastern"):
+    """
+    Filter DataFrame to include only valid alert hours (9:30 AM - 3:30 PM ET)
+    
+    Args:
+        df: DataFrame with timestamp column
+        start_time: Alert hours start time (default: "09:30")
+        end_time: Alert hours end time (default: "15:30") 
+        timezone: Target timezone (default: "US/Eastern")
+    
+    Returns:
+        Filtered DataFrame containing only valid alert hours data
+    """
+    # Convert timestamps to Eastern Time
+    df['timestamp'] = pd.to_datetime(df['timestamp']).dt.tz_convert(timezone)
+    
+    # Filter to alert hours
     mask = (df['timestamp'].dt.time >= pd.to_datetime(start_time).time()) & \
            (df['timestamp'].dt.time <= pd.to_datetime(end_time).time())
     
