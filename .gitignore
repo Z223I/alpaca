@@ -135,3 +135,6 @@ dmypy.json
 
 # Temporary files and directories
 tmp/
+
+# Config file
+.config.json

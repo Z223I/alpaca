@@ -1,0 +1,19 @@
+{
+  "Provider": {
+    "provider_name": "<PROVIDER NAME>",
+    "account_name": {
+      "paper": {
+        "APP Key": "<APP Key>",
+        "APP Secret": "<APP Secret>"
+      },
+      "live": {
+        "APP Key": "<APP Key>",
+        "APP Secret": "<APP Secret>"
+      },
+      "cash": {
+        "APP Key": "<APP Key>",
+        "APP Secret": "<APP Secret>"
+      }
+    }
+  }
+}
