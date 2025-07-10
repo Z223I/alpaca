@@ -33,6 +33,12 @@ ALPACA_BASE_URL=https://paper-api.alpaca.markets  # For paper trading
 PORTFOLIO_RISK=0.10  # Optional: default is 0.10 (10%)
 ```
 
+3. Set the Python path for module imports:
+```bash
+export PYTHONPATH=/home/wilsonb/dl/github.com/z223i/alpaca
+```
+   *Note: This command may be placed in your `.bashrc` file for permanent setup.*
+
 ## Testing
 
 This project includes comprehensive test suites for all components. Two convenient test runners are provided for easy testing.

@@ -190,7 +190,14 @@ ALPACA_BASE_URL=https://paper-api.alpaca.markets  # For paper trading
 PORTFOLIO_RISK=0.10  # Optional: default is 0.10 (10%)
 ```
 
-6. **Verify Installation**
+6. **Set Python Path**
+```bash
+# Set the Python path for module imports
+export PYTHONPATH=/home/wilsonb/dl/github.com/z223i/alpaca
+```
+   *Note: This command may be placed in your `.bashrc` file for permanent setup.*
+
+7. **Verify Installation**
 ```bash
 # Activate environment before running
 conda activate alpaca
