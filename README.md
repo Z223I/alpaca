@@ -138,6 +138,11 @@ Execute a buy order with take profit:
 python3 code/alpaca.py --buy --symbol AAPL --submit --take_profit 200.00
 ```
 
+Execute a buy order with custom stop loss:
+```bash
+python3 code/alpaca.py --buy --symbol AAPL --submit --take_profit 200.00 --stop_price 140.00
+```
+
 Create a bracket order:
 ```bash
 python3 code/alpaca.py --bracket_order --symbol AAPL --quantity 10 --market_price 150.00 --submit
@@ -164,7 +169,7 @@ python3 code/alpaca.py --future_bracket_order --symbol AAPL --limit_price 145.00
 - `--quantity N`: Number of shares for bracket orders (optional for future bracket orders - will auto-calculate if omitted)
 - `--market_price PRICE`: Market price for bracket order calculations
 - `--limit_price PRICE`: Limit price for future bracket order entry
-- `--stop_price PRICE`: Stop loss price for future bracket orders
+- `--stop_price PRICE`: Stop loss price for bracket orders and buy orders (optional for buy orders - will auto-calculate if omitted)
 - `--take_profit PRICE`: Take profit price for bracket orders
 
 ## Risk Management
@@ -172,6 +177,7 @@ python3 code/alpaca.py --future_bracket_order --symbol AAPL --limit_price 145.00
 ### Stop Loss Protection
 - All buy orders automatically include a 7.5% stop-loss order
 - Stop-loss percentage is configurable via the `STOP_LOSS_PERCENT` class constant
+- Custom stop loss prices can be specified using the `--stop_price` parameter for buy orders
 
 ### Position Sizing
 - **First Position**: Uses `PORTFOLIO_RISK` percentage of available cash (default: 10%)

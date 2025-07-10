@@ -95,7 +95,7 @@ class alpaca_private:
 
         return quantity
 
-    def _buy(self, symbol: str, take_profit: float, submit_order: bool = False) -> None:
+    def _buy(self, symbol: str, take_profit: float, submit_order: bool = False, stop_price: Optional[float] = None) -> None:
         """
         Execute a buy order with bracket order protection.
 
@@ -107,13 +107,15 @@ class alpaca_private:
             symbol: The stock symbol to buy
             take_profit: The take profit price for the bracket order
             submit_order: Whether to actually submit the order (default: False for dry run)
+            stop_price: Optional stop loss price. If not provided, calculates automatically
         """
         # Get current market data for the symbol
         latest_quote = get_latest_quote(self.api, symbol)
         market_price = latest_quote.bid_price
 
-        # Calculate stop loss price
-        stop_price = round(market_price * (1 - self.STOP_LOSS_PERCENT), 2)
+        # Use provided stop_price or calculate automatically
+        if stop_price is None:
+            stop_price = round(market_price * (1 - self.STOP_LOSS_PERCENT), 2)
 
         # Calculate quantity using shared logic
         quantity = self._calculateQuantity(market_price, "_buy")
@@ -140,7 +142,7 @@ class alpaca_private:
                 time_in_force='gtc',  # Good till cancelled
                 order_class='bracket',  # Bracket order with stop loss
                 stop_loss={
-                    'stop_price': stop_price,  # Triggers a stop order at 10% loss
+                    'stop_price': stop_price,  # Triggers a stop order at specified price
                 },
                 take_profit={
                     'limit_price': take_profit
@@ -277,7 +279,7 @@ class alpaca_private:
 
         # Handle buy order if requested
         if self.args.buy:
-            self._buy(symbol=self.args.symbol, take_profit=self.args.take_profit, submit_order=self.args.submit)
+            self._buy(symbol=self.args.symbol, take_profit=self.args.take_profit, submit_order=self.args.submit, stop_price=self.args.stop_price)
 
         return 0
 
