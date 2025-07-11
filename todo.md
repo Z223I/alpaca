@@ -12,6 +12,9 @@ The remaining tasks are lower priority documentation and deployment tools:
 - [ ] Manually plot EMA20 and see if this would be an indicator to stop trading.
 
 
+- [ ] Update the analysis software to handle bearish alerts correctly.
+- [ ] Turn Claude loose at improving ORB alert.
+
 - [ ] Update plot candle sticks to accept optional alerts.
 - [ ] Update orb.py: Accept a date arg; accept an optional symbol arg; combine alerts; plot
 - [ ] orb_alerts.py is to keep only the latest two historical data files per symbol.  Implement this when saving more data.
