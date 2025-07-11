@@ -1,0 +1,18 @@
+{
+  "symbol": "ONDS",
+  "timestamp": "2025-07-11T12:36:00",
+  "current_price": 2.06,
+  "orb_high": 2.24,
+  "orb_low": 2.12,
+  "orb_range": 0.1200000000000001,
+  "orb_midpoint": 2.18,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 2.8301886792452855,
+  "volume_ratio": 3.8642061412602966,
+  "confidence_score": 0.8277488059449482,
+  "priority": "MEDIUM",
+  "confidence_level": "HIGH",
+  "recommended_stop_loss": 2.2145,
+  "recommended_take_profit": 1.9776,
+  "alert_message": "[12:36:00] ORB ALERT: ONDS \u2193 $2.06 (+2.83% vs ORB Low)\nVolume: 3.9x avg | Confidence: 0.83 | Priority: MEDIUM\nStop: $2.21 | Target: $1.98"
+}

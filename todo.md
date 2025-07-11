@@ -7,8 +7,13 @@ The remaining tasks are lower priority documentation and deployment tools:
 
 - [ ] Capture Conda environment and rebuild system.
 
+- [ ] No alerts in the last 30 minutes of the day.
+
+- [ ] Manually plot EMA20 and see if this would be an indicator to stop trading.
 
 
+- [ ] Update plot candle sticks to accept optional alerts.
+- [ ] Update orb.py: Accept a date arg; accept an optional symbol arg; combine alerts; plot
 - [ ] orb_alerts.py is to keep only the latest two historical data files per symbol.  Implement this when saving more data.
 - [ ] Create method to add more stocks to the alerts.
 - [ ] Update orb chart to take optional bullish and bearish data.

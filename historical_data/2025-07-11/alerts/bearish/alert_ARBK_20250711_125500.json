@@ -1,0 +1,18 @@
+{
+  "symbol": "ARBK",
+  "timestamp": "2025-07-11T12:55:00",
+  "current_price": 0.309,
+  "orb_high": 0.33,
+  "orb_low": 0.3179,
+  "orb_range": 0.0121,
+  "orb_midpoint": 0.32395,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 2.7996225228059197,
+  "volume_ratio": 1.7276471433360472,
+  "confidence_score": 0.7507951550617756,
+  "priority": "MEDIUM",
+  "confidence_level": "HIGH",
+  "recommended_stop_loss": 0.332175,
+  "recommended_take_profit": 0.29663999999999996,
+  "alert_message": "[12:55:00] ORB ALERT: ARBK \u2193 $0.31 (+2.80% vs ORB Low)\nVolume: 1.7x avg | Confidence: 0.75 | Priority: MEDIUM\nStop: $0.33 | Target: $0.30"
+}

@@ -1,0 +1,18 @@
+{
+  "symbol": "LMFA",
+  "timestamp": "2025-07-11T14:28:00",
+  "current_price": 2.625,
+  "orb_high": 3.12,
+  "orb_low": 2.85,
+  "orb_range": 0.27,
+  "orb_midpoint": 2.9850000000000003,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 7.8947368421052655,
+  "volume_ratio": 3.1187853527835663,
+  "confidence_score": 0.8807859295001138,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 2.821875,
+  "recommended_take_profit": 2.52,
+  "alert_message": "[14:28:00] ORB ALERT: LMFA \u2193 $2.62 (+7.89% vs ORB Low)\nVolume: 3.1x avg | Confidence: 0.88 | Priority: HIGH\nStop: $2.82 | Target: $2.52"
+}

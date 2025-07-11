@@ -1,0 +1,18 @@
+{
+  "symbol": "BTOG",
+  "timestamp": "2025-07-11T11:40:00",
+  "current_price": 0.365,
+  "orb_high": 0.434,
+  "orb_low": 0.4026,
+  "orb_range": 0.031399999999999983,
+  "orb_midpoint": 0.4183,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 9.33929458519623,
+  "volume_ratio": 4.406497647134302,
+  "confidence_score": 0.8543919807426336,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 0.392375,
+  "recommended_take_profit": 0.3504,
+  "alert_message": "[11:40:00] ORB ALERT: BTOG \u2193 $0.36 (+9.34% vs ORB Low)\nVolume: 4.4x avg | Confidence: 0.85 | Priority: HIGH\nStop: $0.39 | Target: $0.35"
+}

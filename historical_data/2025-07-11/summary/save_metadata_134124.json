@@ -1,0 +1,22 @@
+{
+  "timestamp": "2025-07-11T13:41:24.553559-04:00",
+  "symbols_count": 13,
+  "symbols": [
+    "ABVE",
+    "ARBK",
+    "BTCT",
+    "BTOG",
+    "CAN",
+    "FTFT",
+    "GAUZ",
+    "HOLO",
+    "LMFA",
+    "MULN",
+    "ONDS",
+    "SGN",
+    "ZBAI"
+  ],
+  "save_interval_minutes": 10.0,
+  "format": "CSV",
+  "total_records_saved": 1888
+}

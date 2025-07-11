@@ -15,6 +15,7 @@ from ..utils.calculate_orb_levels import calculate_orb_levels
 from ..utils.extract_symbol_data import extract_symbol_data
 from ..utils.calculate_ema import calculate_ema
 from ..utils.calculate_vwap import calculate_vwap_typical
+from ..utils.extract_alert_timestamps import extract_alert_timestamps
 
 
 def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') -> bool:
@@ -115,6 +116,31 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') 
         if vwap_success:
             ax1.plot(symbol_data['timestamp'], vwap_values, 
                     color='purple', linewidth=2, alpha=0.8, label='VWAP')
+        
+        # Add alert timestamps as vertical lines
+        try:
+            # Extract date from the first timestamp for alert lookup
+            chart_date_str = symbol_data['timestamp'].iloc[0].strftime('%Y-%m-%d')
+            
+            # Get alert timestamps for both bullish and bearish signals
+            alert_timestamps = extract_alert_timestamps(chart_date_str, symbol, 'both')
+            
+            if alert_timestamps:
+                for alert_time in alert_timestamps:
+                    # Add vertical line for each alert timestamp
+                    ax1.axvline(x=alert_time, color='red', linestyle=':', 
+                               linewidth=1.5, alpha=0.7, zorder=3)
+                    
+                    # Add small text label above the line
+                    ax1.text(alert_time, ax1.get_ylim()[1] * 0.95, 
+                            alert_time.strftime('%H:%M'), 
+                            rotation=90, ha='center', va='top', 
+                            fontsize=8, color='red', alpha=0.8)
+                
+                print(f"Added {len(alert_timestamps)} alert lines for {symbol}")
+            
+        except Exception as e:
+            print(f"Warning: Could not add alert timestamps for {symbol}: {e}")
         
         # Add legend if any indicators were calculated
         if ema_success or vwap_success:

@@ -1,0 +1,18 @@
+{
+  "symbol": "CAN",
+  "timestamp": "2025-07-11T14:06:00",
+  "current_price": 0.7258,
+  "orb_high": 0.769,
+  "orb_low": 0.7562,
+  "orb_range": 0.012800000000000034,
+  "orb_midpoint": 0.7626,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 4.020100502512561,
+  "volume_ratio": 1.988694572671721,
+  "confidence_score": 0.7221326453214103,
+  "priority": "MEDIUM",
+  "confidence_level": "HIGH",
+  "recommended_stop_loss": 0.780235,
+  "recommended_take_profit": 0.6967679999999999,
+  "alert_message": "[14:06:00] ORB ALERT: CAN \u2193 $0.73 (+4.02% vs ORB Low)\nVolume: 2.0x avg | Confidence: 0.72 | Priority: MEDIUM\nStop: $0.78 | Target: $0.70"
+}

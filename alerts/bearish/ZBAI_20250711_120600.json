@@ -1,0 +1,18 @@
+{
+  "symbol": "ZBAI",
+  "timestamp": "2025-07-11T12:06:00",
+  "current_price": 0.5025,
+  "orb_high": 0.5896,
+  "orb_low": 0.5272,
+  "orb_range": 0.06240000000000001,
+  "orb_midpoint": 0.5584,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 4.685128983308053,
+  "volume_ratio": 2.7141717447761953,
+  "confidence_score": 0.8613995179337914,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 0.5401874999999999,
+  "recommended_take_profit": 0.48239999999999994,
+  "alert_message": "[12:06:00] ORB ALERT: ZBAI \u2193 $0.50 (+4.69% vs ORB Low)\nVolume: 2.7x avg | Confidence: 0.86 | Priority: HIGH\nStop: $0.54 | Target: $0.48"
+}

@@ -1,0 +1,18 @@
+{
+  "symbol": "GAUZ",
+  "timestamp": "2025-07-11T15:45:00",
+  "current_price": 6.67,
+  "orb_high": 6.96,
+  "orb_low": 6.81,
+  "orb_range": 0.15000000000000036,
+  "orb_midpoint": 6.885,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 2.055800293685752,
+  "volume_ratio": 2.125573394495413,
+  "confidence_score": 0.7413818899960005,
+  "priority": "MEDIUM",
+  "confidence_level": "HIGH",
+  "recommended_stop_loss": 7.170249999999999,
+  "recommended_take_profit": 6.4032,
+  "alert_message": "[15:45:00] ORB ALERT: GAUZ \u2193 $6.67 (+2.06% vs ORB Low)\nVolume: 2.1x avg | Confidence: 0.74 | Priority: MEDIUM\nStop: $7.17 | Target: $6.40"
+}
