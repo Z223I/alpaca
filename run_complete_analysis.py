@@ -98,9 +98,10 @@ def load_alert_data(base_dir="/home/wilsonb/dl/github.com/z223i/alpaca"):
         # Sort by timestamp
         alerts_df = alerts_df.sort_values('timestamp')
         
-        # Add synthetic return data based on breakout strength
-        # This would normally come from actual trade execution results
-        alerts_df['return_pct'] = alerts_df.apply(calculate_synthetic_return, axis=1)
+        # Calculate returns based on actual market data
+        print("Calculating real returns based on historical market data...")
+        # We'll pass market_data to the calculation function later
+        alerts_df['return_pct'] = 0.0  # Initialize, will be calculated later with market data
         alerts_df['exit_price'] = alerts_df['entry_price'] * (1 + alerts_df['return_pct'] / 100)
         
         # Update status based on returns
@@ -116,8 +117,124 @@ def load_alert_data(base_dir="/home/wilsonb/dl/github.com/z223i/alpaca"):
         
     return alerts_df
 
-def calculate_synthetic_return(row):
-    """Calculate synthetic return based on alert characteristics."""
+def calculate_real_return(row, market_data_df):
+    """Calculate actual return based on historical market data."""
+    
+    if market_data_df.empty:
+        # Fallback to synthetic if no market data available
+        return calculate_synthetic_return_fallback(row)
+    
+    symbol = row['symbol']
+    alert_timestamp = pd.to_datetime(row['timestamp'])
+    entry_price = row['entry_price']
+    target_price = row['recommended_take_profit']
+    
+    try:
+        # Get market data for this symbol
+        symbol_data = market_data_df.loc[symbol]
+        
+        # Find the closest market data point at or after the alert time
+        future_data = symbol_data[symbol_data.index >= alert_timestamp]
+        
+        if len(future_data) == 0:
+            print(f"No market data found after alert time for {symbol} at {alert_timestamp}")
+            return calculate_synthetic_return_fallback(row)
+        
+        # For short selling (bearish), we want to see if price continued down
+        # For long buying (bullish), we want to see if price continued up
+        
+        if row['alert_type'] == 'bearish':
+            return calculate_real_short_return(row, future_data, entry_price, target_price)
+        else:
+            return calculate_real_long_return(row, future_data, entry_price, target_price)
+            
+    except KeyError:
+        print(f"No market data found for symbol {symbol}")
+        return calculate_synthetic_return_fallback(row)
+    except Exception as e:
+        print(f"Error calculating real return for {symbol}: {e}")
+        return calculate_synthetic_return_fallback(row)
+
+def calculate_real_short_return(row, future_data, entry_price, target_price):
+    """Calculate real return for short sell based on minute-by-minute market data."""
+    
+    stop_loss_price = row.get('recommended_stop_loss', entry_price * 1.075)  # 7.5% stop loss default
+    
+    # Go through each minute after the alert
+    for timestamp, minute_data in future_data.iterrows():
+        minute_high = minute_data['high']
+        minute_low = minute_data['low']
+        
+        # Check if stop loss was hit (price went up against our short)
+        if minute_high >= stop_loss_price:
+            # Stop loss triggered - exit at stop loss price
+            short_return = ((entry_price - stop_loss_price) / entry_price) * 100
+            return max(short_return, -50.0)  # Cap loss at -50%
+        
+        # Check if target was hit (price went down in our favor)
+        if minute_low <= target_price:
+            # Target hit - exit at target price
+            target_return = ((entry_price - target_price) / entry_price) * 100
+            return min(target_return, 90.0)  # Cap gain at 90%
+    
+    # If we get here, neither target nor stop was hit
+    # Exit at the last available price (end of day)
+    if len(future_data) > 0:
+        final_price = future_data.iloc[-1]['close']
+        final_return = ((entry_price - final_price) / entry_price) * 100
+        return max(min(final_return, 90.0), -50.0)
+    
+    # No data available - return 0
+    return 0.0
+
+def calculate_real_long_return(row, future_data, entry_price, target_price):
+    """Calculate real return for stock purchase based on minute-by-minute market data."""
+    
+    stop_loss_price = row.get('recommended_stop_loss', entry_price * 0.925)  # 7.5% stop loss default
+    
+    # Go through each minute after the alert
+    for timestamp, minute_data in future_data.iterrows():
+        minute_high = minute_data['high']
+        minute_low = minute_data['low']
+        
+        # Check if stop loss was hit (price went down against our long)
+        if minute_low <= stop_loss_price:
+            # Stop loss triggered - exit at stop loss price
+            long_return = ((stop_loss_price - entry_price) / entry_price) * 100
+            return max(long_return, -30.0)  # Cap loss at -30%
+        
+        # Check if target was hit (price went up in our favor)
+        if target_price > entry_price and minute_high >= target_price:
+            # Target hit - exit at target price
+            target_return = ((target_price - entry_price) / entry_price) * 100
+            return min(target_return, 50.0)  # Cap gain at 50%
+    
+    # If we get here, neither target nor stop was hit
+    # Exit at the last available price (end of day)
+    if len(future_data) > 0:
+        final_price = future_data.iloc[-1]['close']
+        final_return = ((final_price - entry_price) / entry_price) * 100
+        return max(min(final_return, 50.0), -30.0)
+    
+    # No data available - return 0
+    return 0.0
+
+def calculate_synthetic_return_fallback(row):
+    """Fallback synthetic calculation when no market data available."""
+    
+    # Add some randomness to simulate real market conditions
+    np.random.seed(hash(row['symbol'] + str(row['timestamp'])) % 2**32)
+    noise = np.random.normal(0, 2.0)  # 2% standard deviation
+    
+    if row['alert_type'] == 'bearish':
+        # For bearish alerts, simulate short sell trade
+        return calculate_short_sell_return(row, noise)
+    else:
+        # For bullish alerts, simulate stock purchase
+        return calculate_stock_return(row, noise)
+
+def calculate_stock_return(row, noise):
+    """Calculate return for bullish stock purchase."""
     
     # Base return based on breakout strength
     base_return = row['breakout_percentage'] * 0.5  # 50% of breakout translates to return
@@ -136,17 +253,7 @@ def calculate_synthetic_return(row):
     }.get(row['priority'], 1.0)
     
     # Calculate expected return
-    expected_return = base_return * confidence_multiplier * volume_multiplier * priority_multiplier
-    
-    # Add some randomness to simulate real market conditions
-    np.random.seed(hash(row['symbol'] + str(row['timestamp'])) % 2**32)
-    noise = np.random.normal(0, 2.0)  # 2% standard deviation
-    
-    # Apply directional bias
-    if row['alert_type'] == 'bearish':
-        expected_return = -abs(expected_return)
-    else:
-        expected_return = abs(expected_return)
+    expected_return = abs(base_return * confidence_multiplier * volume_multiplier * priority_multiplier)
     
     final_return = expected_return + noise
     
@@ -155,8 +262,63 @@ def calculate_synthetic_return(row):
     
     return final_return
 
+def calculate_short_sell_return(row, noise):
+    """Calculate return for bearish short sell trade."""
+    
+    # Extract key values
+    entry_price = row['entry_price']  # Current stock price when short selling
+    target_price = row['recommended_take_profit']  # Target price to cover short
+    breakout_percentage = row['breakout_percentage']
+    confidence = row['confidence'] if row['confidence'] > 0 else 0.5
+    volume_ratio = min(row['volume_ratio'], 5.0)
+    
+    # Ensure we have valid target price
+    if target_price <= 0 or target_price >= entry_price:
+        # If target price is invalid, estimate based on breakout
+        target_price = entry_price * (1 - breakout_percentage / 100)
+    
+    # More realistic success probability for short selling
+    # Higher than put options since no time decay or premium
+    base_success_rate = 0.55  # Base 55% success rate
+    confidence_bonus = (confidence - 0.5) * 0.4  # Up to 20% bonus for high confidence
+    volume_bonus = (volume_ratio - 1.0) / 10.0  # Small bonus for high volume
+    success_probability = max(0.30, min(0.75, base_success_rate + confidence_bonus + volume_bonus))
+    
+    # Simulate if the trade was successful
+    np.random.seed(hash(row['symbol'] + str(row['timestamp']) + 'short') % 2**32)
+    is_successful = np.random.random() < success_probability
+    
+    # Simulate stock price movement
+    base_movement = breakout_percentage / 100
+    
+    if is_successful:
+        # Stock continued lower as expected
+        additional_move = np.random.uniform(0.02, 0.12)  # 2-12% additional decline
+        final_stock_price = entry_price * (1 - base_movement - additional_move)
+    else:
+        # Stock didn't decline as expected or moved against us
+        # Could bounce back or just not move much
+        counter_move = np.random.uniform(-0.03, 0.15)  # Could move against us significantly
+        final_stock_price = entry_price * (1 - base_movement * 0.4 + counter_move)
+    
+    # Ensure final price is positive
+    final_stock_price = max(final_stock_price, 0.01)
+    
+    # Calculate short sell return
+    # Short sell profit = (entry_price - exit_price) / entry_price
+    short_return = ((entry_price - final_stock_price) / entry_price) * 100
+    
+    # Add market noise
+    short_return += noise
+    
+    # Cap returns at reasonable levels for short selling
+    # Theoretical max gain is 100% (stock goes to 0), losses can be unlimited but cap for simulation
+    short_return = max(min(short_return, 90.0), -150.0)  # Max 90% gain, 150% loss (margin call scenario)
+    
+    return short_return
+
 def load_market_data(base_dir="/home/wilsonb/dl/github.com/z223i/alpaca"):
-    """Load market data for context."""
+    """Load market data for historical price analysis."""
     
     print("Loading market data for 2025-07-10...")
     
@@ -180,7 +342,11 @@ def load_market_data(base_dir="/home/wilsonb/dl/github.com/z223i/alpaca"):
         market_df = pd.concat(all_market_data, ignore_index=True)
         market_df['timestamp'] = pd.to_datetime(market_df['timestamp'])
         market_df = market_df.sort_values(['symbol', 'timestamp'])
-        print(f"Loaded market data: {len(market_df)} records for {len(market_df['symbol'].unique())} symbols")
+        
+        # Create a lookup index for faster access
+        market_df = market_df.set_index(['symbol', 'timestamp']).sort_index()
+        
+        print(f"Loaded market data: {len(market_df)} records for {len(market_df.index.get_level_values('symbol').unique())} symbols")
         return market_df
     
     return pd.DataFrame()
@@ -456,10 +622,12 @@ def generate_simple_html_report(results, alerts_df, output_path):
         
         <div class="section">
             <h2>Alert Type Analysis</h2>
+            <p><em>Note: Bullish alerts simulate stock purchases, while bearish alerts simulate short sell trades with target cover price.</em></p>
             <table class="symbol-table">
                 <thead>
                     <tr>
                         <th>Alert Type</th>
+                        <th>Strategy</th>
                         <th>Count</th>
                         <th>Percentage</th>
                         <th>Avg Return</th>
@@ -477,10 +645,12 @@ def generate_simple_html_report(results, alerts_df, output_path):
             type_pct = type_count / len(alerts_df) * 100
             type_avg = type_data['return_pct'].mean()
             type_success = len(type_data[type_data['status'] == 'SUCCESS']) / len(type_data) * 100
+            strategy = "Stock Purchase" if alert_type == 'bullish' else "Short Sell"
             
             html_content += f"""
                         <tr>
                             <td><strong>{alert_type.title()}</strong></td>
+                            <td>{strategy}</td>
                             <td>{type_count}</td>
                             <td>{type_pct:.1f}%</td>
                             <td class="{'positive' if type_avg > 0 else 'negative'}">{type_avg:.2f}%</td>
@@ -528,6 +698,18 @@ def run_complete_analysis():
     if alerts_df.empty:
         print("No alert data found! Please check the data directories.")
         return
+    
+    # Calculate real returns using market data
+    print("Calculating real returns for each alert...")
+    alerts_df['return_pct'] = alerts_df.apply(
+        lambda row: calculate_real_return(row, market_df), axis=1
+    )
+    
+    # Update exit prices and status based on real returns
+    alerts_df['exit_price'] = alerts_df['entry_price'] * (1 + alerts_df['return_pct'] / 100)
+    alerts_df['status'] = alerts_df['return_pct'].apply(
+        lambda x: 'SUCCESS' if x > 0 else 'FAILURE'
+    )
     
     # Create output directory
     output_dir = Path("analysis_results_20250710")
