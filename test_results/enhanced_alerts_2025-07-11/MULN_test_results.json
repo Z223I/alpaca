@@ -1,0 +1,65 @@
+{
+  "symbol": "MULN",
+  "pca_passed": true,
+  "alerts": [
+    {
+      "symbol": "MULN",
+      "date": "2025-07-11",
+      "alert_time": "11:05:00 ET",
+      "alert_timestamp": "2025-07-11T11:05:00",
+      "alert_type": "ENHANCED_BULLISH_BREAKOUT",
+      "confidence": 0.9,
+      "entry_price": 0.18036,
+      "stop_loss": 0.16437400000000002,
+      "target": 0.20255999999999996,
+      "volume_ratio": 13.0,
+      "momentum": 0.0003615384615384623,
+      "range_pct": 8.95341802782818,
+      "reasoning": "PCA-Enhanced: Vol Ratio 13.0x, Momentum 0.000, Range 9.0%",
+      "orb_features": {
+        "orb_high": 0.18,
+        "orb_low": 0.1652,
+        "orb_range": 0.01479999999999998,
+        "orb_midpoint": 0.1726
+      }
+    },
+    {
+      "symbol": "MULN",
+      "date": "2025-07-11",
+      "alert_time": "09:54:00 ET",
+      "alert_timestamp": "2025-07-11T09:54:00",
+      "alert_type": "ENHANCED_BEARISH_BREAKDOWN",
+      "confidence": 0.8,
+      "entry_price": 0.1648696,
+      "stop_loss": 0.18089999999999998,
+      "target": 0.14266960000000004,
+      "volume_ratio": 13.0,
+      "momentum": 0.0003615384615384623,
+      "range_pct": 8.95341802782818,
+      "reasoning": "PCA-Enhanced: Vol Ratio 13.0x, Momentum 0.000, Range 9.0%",
+      "orb_features": {
+        "orb_high": 0.18,
+        "orb_low": 0.1652,
+        "orb_range": 0.01479999999999998,
+        "orb_midpoint": 0.1726
+      }
+    }
+  ],
+  "orb_features": {
+    "orb_high": 0.18,
+    "orb_low": 0.1652,
+    "orb_range": 0.01479999999999998,
+    "orb_range_pct": 8.95341802782818,
+    "orb_midpoint": 0.1726,
+    "orb_volume": "85793",
+    "orb_avg_volume": 6599.461538461538,
+    "orb_volume_ratio": 13.0,
+    "orb_price_change": 0.00470000000000001,
+    "orb_duration_minutes": 13,
+    "orb_momentum": 0.0003615384615384623,
+    "orb_open": 0.1653,
+    "orb_close": 0.17,
+    "market_open": "2025-07-11 09:30:00",
+    "orb_end": "2025-07-11 09:45:00"
+  }
+}

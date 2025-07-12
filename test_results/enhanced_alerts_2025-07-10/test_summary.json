@@ -1,0 +1,62 @@
+{
+  "date": "2025-07-10",
+  "symbols_tested": 1,
+  "pca_filters": {
+    "volume_ratio_threshold": 2.5,
+    "duration_threshold": 10,
+    "momentum_threshold": -0.01,
+    "range_pct_min": 5.0,
+    "range_pct_max": 35.0
+  },
+  "results": {
+    "PROK": {
+      "symbol": "PROK",
+      "pca_passed": true,
+      "alerts": [
+        {
+          "symbol": "PROK",
+          "date": "2025-07-10",
+          "alert_time": "13:45:00 ET",
+          "alert_timestamp": "2025-07-10T13:45:00",
+          "alert_type": "ENHANCED_BULLISH_BREAKOUT",
+          "confidence": 0.8,
+          "entry_price": 4.83966,
+          "stop_loss": 4.4974,
+          "target": 5.304660000000001,
+          "volume_ratio": 14.0,
+          "momentum": -0.004642857142857171,
+          "range_pct": 6.659505907626219,
+          "reasoning": "PCA-Enhanced: Vol Ratio 14.0x, Momentum -0.005, Range 6.7%",
+          "orb_features": {
+            "orb_high": 4.83,
+            "orb_low": 4.52,
+            "orb_range": 0.3100000000000005,
+            "orb_midpoint": 4.675
+          }
+        }
+      ],
+      "orb_features": {
+        "orb_high": 4.83,
+        "orb_low": 4.52,
+        "orb_range": 0.3100000000000005,
+        "orb_range_pct": 6.659505907626219,
+        "orb_midpoint": 4.675,
+        "orb_volume": "18167",
+        "orb_avg_volume": 1297.642857142857,
+        "orb_volume_ratio": 14.0,
+        "orb_price_change": -0.06500000000000039,
+        "orb_duration_minutes": 14,
+        "orb_momentum": -0.004642857142857171,
+        "orb_open": 4.655,
+        "orb_close": 4.59,
+        "market_open": "2025-07-10 09:30:00",
+        "orb_end": "2025-07-10 09:45:00"
+      }
+    }
+  },
+  "summary": {
+    "total_alerts": 1,
+    "symbols_with_alerts": 1,
+    "symbols_passed_pca": 1
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "symbol": "ONDS",
+  "pca_passed": true,
+  "alerts": [
+    {
+      "symbol": "ONDS",
+      "date": "2025-07-11",
+      "alert_time": "09:47:00 ET",
+      "alert_timestamp": "2025-07-11T09:47:00",
+      "alert_type": "ENHANCED_BEARISH_BREAKDOWN",
+      "confidence": 0.9500000000000001,
+      "entry_price": 2.0958,
+      "stop_loss": 2.2512,
+      "target": 1.8858,
+      "volume_ratio": 15.0,
+      "momentum": -0.005333333333333338,
+      "range_pct": 6.422018348623859,
+      "reasoning": "PCA-Enhanced: Vol Ratio 15.0x, Momentum -0.005, Range 6.4%",
+      "orb_features": {
+        "orb_high": 2.24,
+        "orb_low": 2.1,
+        "orb_range": 0.14000000000000012,
+        "orb_midpoint": 2.17
+      }
+    }
+  ],
+  "orb_features": {
+    "orb_high": 2.24,
+    "orb_low": 2.1,
+    "orb_range": 0.14000000000000012,
+    "orb_range_pct": 6.422018348623859,
+    "orb_midpoint": 2.17,
+    "orb_volume": "151134",
+    "orb_avg_volume": 10075.6,
+    "orb_volume_ratio": 15.0,
+    "orb_price_change": -0.08000000000000007,
+    "orb_duration_minutes": 15,
+    "orb_momentum": -0.005333333333333338,
+    "orb_open": 2.18,
+    "orb_close": 2.1,
+    "market_open": "2025-07-11 09:30:00",
+    "orb_end": "2025-07-11 09:45:00"
+  }
+}

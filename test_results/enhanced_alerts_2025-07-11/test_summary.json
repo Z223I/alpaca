@@ -1,0 +1,62 @@
+{
+  "date": "2025-07-11",
+  "symbols_tested": 1,
+  "pca_filters": {
+    "volume_ratio_threshold": 2.5,
+    "duration_threshold": 10,
+    "momentum_threshold": -0.01,
+    "range_pct_min": 5.0,
+    "range_pct_max": 35.0
+  },
+  "results": {
+    "FTFT": {
+      "symbol": "FTFT",
+      "pca_passed": true,
+      "alerts": [
+        {
+          "symbol": "FTFT",
+          "date": "2025-07-11",
+          "alert_time": "09:46:00 ET",
+          "alert_timestamp": "2025-07-11T09:46:00",
+          "alert_type": "ENHANCED_BULLISH_BREAKOUT",
+          "confidence": 1.0,
+          "entry_price": 2.76552,
+          "stop_loss": 2.17905,
+          "target": 3.62052,
+          "volume_ratio": 14.0,
+          "momentum": 0.026428571428571437,
+          "range_pct": 24.675324675324667,
+          "reasoning": "PCA-Enhanced: Vol Ratio 14.0x, Momentum 0.026, Range 24.7%",
+          "orb_features": {
+            "orb_high": 2.76,
+            "orb_low": 2.19,
+            "orb_range": 0.5699999999999998,
+            "orb_midpoint": 2.4749999999999996
+          }
+        }
+      ],
+      "orb_features": {
+        "orb_high": 2.76,
+        "orb_low": 2.19,
+        "orb_range": 0.5699999999999998,
+        "orb_range_pct": 24.675324675324667,
+        "orb_midpoint": 2.4749999999999996,
+        "orb_volume": "9844",
+        "orb_avg_volume": 703.1428571428571,
+        "orb_volume_ratio": 14.0,
+        "orb_price_change": 0.3700000000000001,
+        "orb_duration_minutes": 14,
+        "orb_momentum": 0.026428571428571437,
+        "orb_open": 2.31,
+        "orb_close": 2.68,
+        "market_open": "2025-07-11 09:30:00",
+        "orb_end": "2025-07-11 09:45:00"
+      }
+    }
+  },
+  "summary": {
+    "total_alerts": 1,
+    "symbols_with_alerts": 1,
+    "symbols_passed_pca": 1
+  }
+}

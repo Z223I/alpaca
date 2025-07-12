@@ -1,0 +1,14 @@
+{
+  "symbol": "PROK",
+  "date": "2025-07-10",
+  "total_alerts": 1,
+  "alert_types": [
+    "ENHANCED_BULLISH_BREAKOUT"
+  ],
+  "average_confidence": 0.8,
+  "test_results": {
+    "pca_filters_passed": true,
+    "alerts_generated": true,
+    "real_time_simulation": "successful"
+  }
+}

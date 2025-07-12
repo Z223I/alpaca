@@ -1,0 +1,44 @@
+{
+  "symbol": "ZBAI",
+  "pca_passed": true,
+  "alerts": [
+    {
+      "symbol": "ZBAI",
+      "date": "2025-07-11",
+      "alert_time": "10:05:00 ET",
+      "alert_timestamp": "2025-07-11T10:05:00",
+      "alert_type": "ENHANCED_BEARISH_BREAKDOWN",
+      "confidence": 1.0,
+      "entry_price": 0.5261456,
+      "stop_loss": 0.6525464999999999,
+      "target": 0.3429956,
+      "volume_ratio": 16.0,
+      "momentum": 0.004806249999999998,
+      "range_pct": 21.710526315789473,
+      "reasoning": "PCA-Enhanced: Vol Ratio 16.0x, Momentum 0.005, Range 21.7%",
+      "orb_features": {
+        "orb_high": 0.6493,
+        "orb_low": 0.5272,
+        "orb_range": 0.12209999999999999,
+        "orb_midpoint": 0.5882499999999999
+      }
+    }
+  ],
+  "orb_features": {
+    "orb_high": 0.6493,
+    "orb_low": 0.5272,
+    "orb_range": 0.12209999999999999,
+    "orb_range_pct": 21.710526315789473,
+    "orb_midpoint": 0.5882499999999999,
+    "orb_volume": "159228",
+    "orb_avg_volume": 9951.75,
+    "orb_volume_ratio": 16.0,
+    "orb_price_change": 0.07689999999999997,
+    "orb_duration_minutes": 16,
+    "orb_momentum": 0.004806249999999998,
+    "orb_open": 0.5624,
+    "orb_close": 0.6393,
+    "market_open": "2025-07-11 09:30:00",
+    "orb_end": "2025-07-11 09:45:00"
+  }
+}
