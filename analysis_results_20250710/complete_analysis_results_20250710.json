@@ -1,30 +1,30 @@
 {
   "basic_metrics": {
-    "total_alerts": 346,
-    "success_rate": 53.75722543352601,
-    "total_return": -14.28765385829145,
-    "avg_return": -0.04129379727829899,
-    "win_rate": 53.75722543352601,
-    "profit_factor": 0.9768606342589664,
-    "sharpe_ratio": -0.0099421263099347,
+    "total_alerts": 354,
+    "success_rate": 54.23728813559322,
+    "total_return": 27.867746763311004,
+    "avg_return": 0.0787224484839294,
+    "win_rate": 54.23728813559322,
+    "profit_factor": 1.0445555369776829,
+    "sharpe_ratio": 0.018396748968758796,
     "max_drawdown": -140.04546423105973,
-    "best_return": 4.0000000000000115,
+    "best_return": 9.819639278557112,
     "worst_return": -7.5000000000000036,
-    "volatility": 4.153417085139628
+    "volatility": 4.279150007298311
   },
   "advanced_analytics": {
     "risk_metrics": {
-      "var_95": -7.5,
+      "var_95": -7.499999999999999,
       "cvar_95": -7.500000000000002,
       "max_drawdown": -140.04546423105973,
-      "calmar_ratio": -0.00029485994069874857,
-      "sortino_ratio": -0.014736628795816602,
-      "downside_risk": 2.8021196605034504,
+      "calmar_ratio": 0.000562120657860407,
+      "sortino_ratio": 0.02828149034701665,
+      "downside_risk": 2.783532533752545,
       "tail_risk": 7.500000000000003
     },
     "statistical_analysis": {
-      "skewness": -0.6546442464765709,
-      "kurtosis": -0.8927479846820061,
+      "skewness": -0.5005791061627658,
+      "kurtosis": -0.7157693954061144,
       "jarque_bera_pvalue": 0.05,
       "best_distribution": "normal"
     }

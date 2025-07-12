@@ -1,13 +1,13 @@
 {
-  "total_alerts": 346,
-  "success_rate": 53.75722543352601,
-  "total_return": -14.28765385829145,
-  "avg_return": -0.04129379727829899,
-  "win_rate": 53.75722543352601,
-  "profit_factor": 0.9768606342589664,
-  "sharpe_ratio": -0.0099421263099347,
+  "total_alerts": 354,
+  "success_rate": 54.23728813559322,
+  "total_return": 27.867746763311004,
+  "avg_return": 0.0787224484839294,
+  "win_rate": 54.23728813559322,
+  "profit_factor": 1.0445555369776829,
+  "sharpe_ratio": 0.018396748968758796,
   "max_drawdown": -140.04546423105973,
-  "best_return": 4.0000000000000115,
+  "best_return": 9.819639278557112,
   "worst_return": -7.5000000000000036,
-  "volatility": 4.153417085139628
+  "volatility": 4.279150007298311
 }

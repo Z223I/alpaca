@@ -1,0 +1,218 @@
+{
+  "report_metadata": {
+    "generated_at": "2025-07-11T19:51:33.710856",
+    "hours_covered": 24,
+    "monitoring_interval": 60
+  },
+  "system_status": {
+    "monitoring_active": false,
+    "timestamp": "2025-07-11T19:51:33.852715",
+    "performance_summary": {},
+    "alert_performance": {
+      "total_alerts": 0,
+      "high_priority_count": 0,
+      "medium_priority_count": 0,
+      "low_priority_count": 0,
+      "avg_confidence_score": 0.0,
+      "avg_generation_time_ms": 0.0,
+      "success_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "alerts_per_hour": 0,
+      "priority_distribution": {
+        "HIGH": 0,
+        "MEDIUM": 0,
+        "LOW": 0
+      }
+    },
+    "system_health": {
+      "timestamp": "2025-07-11 19:51:33.813049",
+      "cpu_percent": 6.7,
+      "memory_percent": 41.2,
+      "memory_used_mb": 2851.72265625,
+      "memory_available_mb": 4478.640625,
+      "disk_usage_percent": 1.7,
+      "network_bytes_sent": 57978057,
+      "network_bytes_recv": 1325499092,
+      "active_connections": 68,
+      "thread_count": 12,
+      "process_uptime_seconds": 0.3066978454589844
+    },
+    "recent_violations": [],
+    "notification_stats": {
+      "total_notifications": 0,
+      "successful_notifications": 0,
+      "failed_notifications": 0,
+      "notifications_by_channel": {},
+      "notifications_by_severity": {},
+      "success_rate": 0.0
+    },
+    "latest_metrics": {}
+  },
+  "performance_benchmarks": {
+    "status": "success",
+    "benchmark_period_days": 1,
+    "calculation_date": "2025-07-11T19:51:33.852741",
+    "benchmarks": {
+      "success_rate_mean": 65.0,
+      "success_rate_std": 10.0,
+      "total_return_mean": 5.0,
+      "total_return_std": 2.0
+    },
+    "sample_size": 100
+  },
+  "threshold_violations": [],
+  "metrics_summary": {
+    "total_rules": 10,
+    "active_rules": 10,
+    "metrics_monitored": 0,
+    "total_violations_24h": 0,
+    "violations_by_severity": {
+      "critical": 0,
+      "warning": 0,
+      "info": 0,
+      "debug": 0
+    },
+    "rules_by_metric": {
+      "success_rate": 2,
+      "return_volatility": 1,
+      "worst_return": 1,
+      "memory_usage_percent": 1,
+      "cpu_usage_percent": 1,
+      "max_drawdown": 1,
+      "sharpe_ratio": 1,
+      "alerts_per_hour": 2
+    }
+  },
+  "rule_statuses": {
+    "success_rate_critical": {
+      "rule_name": "success_rate_critical",
+      "metric_name": "success_rate",
+      "enabled": true,
+      "threshold_type": "less_than",
+      "threshold_value": 30.0,
+      "severity": "critical",
+      "trigger_count": 0,
+      "last_triggered": null,
+      "recent_violations": 0,
+      "consecutive_violations": 0,
+      "recent_metric_values": []
+    },
+    "success_rate_warning": {
+      "rule_name": "success_rate_warning",
+      "metric_name": "success_rate",
+      "enabled": true,
+      "threshold_type": "less_than",
+      "threshold_value": 50.0,
+      "severity": "warning",
+      "trigger_count": 0,
+      "last_triggered": null,
+      "recent_violations": 0,
+      "consecutive_violations": 0,
+      "recent_metric_values": []
+    },
+    "high_volatility": {
+      "rule_name": "high_volatility",
+      "metric_name": "return_volatility",
+      "enabled": true,
+      "threshold_type": "greater_than",
+      "threshold_value": 15.0,
+      "severity": "warning",
+      "trigger_count": 0,
+      "last_triggered": null,
+      "recent_violations": 0,
+      "consecutive_violations": 0,
+      "recent_metric_values": []
+    },
+    "large_loss": {
+      "rule_name": "large_loss",
+      "metric_name": "worst_return",
+      "enabled": true,
+      "threshold_type": "less_than",
+      "threshold_value": -20.0,
+      "severity": "critical",
+      "trigger_count": 0,
+      "last_triggered": null,
+      "recent_violations": 0,
+      "consecutive_violations": 0,
+      "recent_metric_values": []
+    },
+    "high_memory_usage": {
+      "rule_name": "high_memory_usage",
+      "metric_name": "memory_usage_percent",
+      "enabled": true,
+      "threshold_type": "greater_than",
+      "threshold_value": 85.0,
+      "severity": "warning",
+      "trigger_count": 0,
+      "last_triggered": null,
+      "recent_violations": 0,
+      "consecutive_violations": 0,
+      "recent_metric_values": []
+    },
+    "high_cpu_usage": {
+      "rule_name": "high_cpu_usage",
+      "metric_name": "cpu_usage_percent",
+      "enabled": true,
+      "threshold_type": "greater_than",
+      "threshold_value": 80.0,
+      "severity": "warning",
+      "trigger_count": 0,
+      "last_triggered": null,
+      "recent_violations": 0,
+      "consecutive_violations": 0,
+      "recent_metric_values": []
+    },
+    "max_drawdown_critical": {
+      "rule_name": "max_drawdown_critical",
+      "metric_name": "max_drawdown",
+      "enabled": true,
+      "threshold_type": "greater_than",
+      "threshold_value": 25.0,
+      "severity": "critical",
+      "trigger_count": 0,
+      "last_triggered": null,
+      "recent_violations": 0,
+      "consecutive_violations": 0,
+      "recent_metric_values": []
+    },
+    "low_sharpe_ratio": {
+      "rule_name": "low_sharpe_ratio",
+      "metric_name": "sharpe_ratio",
+      "enabled": true,
+      "threshold_type": "less_than",
+      "threshold_value": 0.5,
+      "severity": "warning",
+      "trigger_count": 0,
+      "last_triggered": null,
+      "recent_violations": 0,
+      "consecutive_violations": 0,
+      "recent_metric_values": []
+    },
+    "no_alerts_generated": {
+      "rule_name": "no_alerts_generated",
+      "metric_name": "alerts_per_hour",
+      "enabled": true,
+      "threshold_type": "less_than",
+      "threshold_value": 0.1,
+      "severity": "warning",
+      "trigger_count": 0,
+      "last_triggered": null,
+      "recent_violations": 0,
+      "consecutive_violations": 0,
+      "recent_metric_values": []
+    },
+    "excessive_alerts": {
+      "rule_name": "excessive_alerts",
+      "metric_name": "alerts_per_hour",
+      "enabled": true,
+      "threshold_type": "greater_than",
+      "threshold_value": 50.0,
+      "severity": "warning",
+      "trigger_count": 0,
+      "last_triggered": null,
+      "recent_violations": 0,
+      "consecutive_violations": 0,
+      "recent_metric_values": []
+    }
+  }
+}
