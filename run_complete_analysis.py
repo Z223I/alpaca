@@ -188,19 +188,27 @@ def calculate_real_short_return(row, future_data, entry_price, target_price):
     return 0.0
 
 def calculate_real_long_return(row, future_data, entry_price, target_price):
-    """Calculate real return for stock purchase based on minute-by-minute market data."""
+    """Calculate real return for stock purchase with 4% trailing stop."""
     
-    stop_loss_price = row.get('recommended_stop_loss', entry_price * 0.925)  # 7.5% stop loss default
+    trailing_stop_percentage = 0.04  # 4% trailing stop
+    highest_price_seen = entry_price
+    current_trailing_stop = entry_price * (1 - trailing_stop_percentage)
     
     # Go through each minute after the alert
     for timestamp, minute_data in future_data.iterrows():
         minute_high = minute_data['high']
         minute_low = minute_data['low']
         
-        # Check if stop loss was hit (price went down against our long)
-        if minute_low <= stop_loss_price:
-            # Stop loss triggered - exit at stop loss price
-            long_return = ((stop_loss_price - entry_price) / entry_price) * 100
+        # Update highest price seen and trailing stop
+        if minute_high > highest_price_seen:
+            highest_price_seen = minute_high
+            # Update trailing stop to 4% below new high
+            current_trailing_stop = highest_price_seen * (1 - trailing_stop_percentage)
+        
+        # Check if trailing stop was hit (price went down and hit trailing stop)
+        if minute_low <= current_trailing_stop:
+            # Trailing stop triggered - exit at trailing stop price
+            long_return = ((current_trailing_stop - entry_price) / entry_price) * 100
             return max(long_return, -30.0)  # Cap loss at -30%
         
         # Check if target was hit (price went up in our favor)
@@ -209,7 +217,7 @@ def calculate_real_long_return(row, future_data, entry_price, target_price):
             target_return = ((target_price - entry_price) / entry_price) * 100
             return min(target_return, 50.0)  # Cap gain at 50%
     
-    # If we get here, neither target nor stop was hit
+    # If we get here, neither target nor trailing stop was hit
     # Exit at the last available price (end of day)
     if len(future_data) > 0:
         final_price = future_data.iloc[-1]['close']
@@ -622,7 +630,7 @@ def generate_simple_html_report(results, alerts_df, output_path):
         
         <div class="section">
             <h2>Alert Type Analysis</h2>
-            <p><em>Note: Bullish alerts simulate stock purchases, while bearish alerts simulate short sell trades with target cover price.</em></p>
+            <p><em>Note: Bullish alerts simulate stock purchases with 4% trailing stop, while bearish alerts simulate short sell trades with 7.5% stop loss.</em></p>
             <table class="symbol-table">
                 <thead>
                     <tr>
@@ -645,7 +653,7 @@ def generate_simple_html_report(results, alerts_df, output_path):
             type_pct = type_count / len(alerts_df) * 100
             type_avg = type_data['return_pct'].mean()
             type_success = len(type_data[type_data['status'] == 'SUCCESS']) / len(type_data) * 100
-            strategy = "Stock Purchase" if alert_type == 'bullish' else "Short Sell"
+            strategy = "Stock + 4% Trailing Stop" if alert_type == 'bullish' else "Short Sell + 7.5% Stop"
             
             html_content += f"""
                         <tr>
