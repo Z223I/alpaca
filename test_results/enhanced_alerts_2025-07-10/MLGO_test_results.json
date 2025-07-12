@@ -1,0 +1,44 @@
+{
+  "symbol": "MLGO",
+  "pca_passed": true,
+  "alerts": [
+    {
+      "symbol": "MLGO",
+      "date": "2025-07-10",
+      "alert_time": "13:48:00 ET",
+      "alert_timestamp": "2025-07-10T13:48:00",
+      "alert_type": "ENHANCED_BEARISH_BREAKDOWN",
+      "confidence": 0.9,
+      "entry_price": 0.8032902,
+      "stop_loss": 0.8702294999999999,
+      "target": 0.7117901999999998,
+      "volume_ratio": 13.000000000000002,
+      "momentum": -0.0018615384615384616,
+      "range_pct": 7.044693382607697,
+      "reasoning": "PCA-Enhanced: Vol Ratio 13.0x, Momentum -0.002, Range 7.0%",
+      "orb_features": {
+        "orb_high": 0.8659,
+        "orb_low": 0.8049,
+        "orb_range": 0.061000000000000054,
+        "orb_midpoint": 0.8353999999999999
+      }
+    }
+  ],
+  "orb_features": {
+    "orb_high": 0.8659,
+    "orb_low": 0.8049,
+    "orb_range": 0.061000000000000054,
+    "orb_range_pct": 7.044693382607697,
+    "orb_midpoint": 0.8353999999999999,
+    "orb_volume": "127755",
+    "orb_avg_volume": 9827.307692307691,
+    "orb_volume_ratio": 13.000000000000002,
+    "orb_price_change": -0.0242,
+    "orb_duration_minutes": 13,
+    "orb_momentum": -0.0018615384615384616,
+    "orb_open": 0.8659,
+    "orb_close": 0.8417,
+    "market_open": "2025-07-10 09:30:00",
+    "orb_end": "2025-07-10 09:45:00"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "symbol": "CPOP",
+  "pca_passed": true,
+  "alerts": [],
+  "orb_features": {
+    "orb_high": 0.9898,
+    "orb_low": 0.8154,
+    "orb_range": 0.1744,
+    "orb_range_pct": 20.27906976744186,
+    "orb_midpoint": 0.9026000000000001,
+    "orb_volume": "51612",
+    "orb_avg_volume": 3686.5714285714284,
+    "orb_volume_ratio": 14.0,
+    "orb_price_change": -0.04459999999999997,
+    "orb_duration_minutes": 14,
+    "orb_momentum": -0.003185714285714284,
+    "orb_open": 0.86,
+    "orb_close": 0.8154,
+    "market_open": "2025-07-10 09:30:00",
+    "orb_end": "2025-07-10 09:45:00"
+  }
+}

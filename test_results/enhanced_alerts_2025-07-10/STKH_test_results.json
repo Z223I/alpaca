@@ -1,0 +1,44 @@
+{
+  "symbol": "STKH",
+  "pca_passed": true,
+  "alerts": [
+    {
+      "symbol": "STKH",
+      "date": "2025-07-10",
+      "alert_time": "13:57:00 ET",
+      "alert_timestamp": "2025-07-10T13:57:00",
+      "alert_type": "ENHANCED_BULLISH_BREAKOUT",
+      "confidence": 0.9,
+      "entry_price": 2.78556,
+      "stop_loss": 2.388,
+      "target": 3.3555599999999997,
+      "volume_ratio": 13.0,
+      "momentum": -0.0038461538461538668,
+      "range_pct": 14.728682170542632,
+      "reasoning": "PCA-Enhanced: Vol Ratio 13.0x, Momentum -0.004, Range 14.7%",
+      "orb_features": {
+        "orb_high": 2.78,
+        "orb_low": 2.4,
+        "orb_range": 0.3799999999999999,
+        "orb_midpoint": 2.59
+      }
+    }
+  ],
+  "orb_features": {
+    "orb_high": 2.78,
+    "orb_low": 2.4,
+    "orb_range": 0.3799999999999999,
+    "orb_range_pct": 14.728682170542632,
+    "orb_midpoint": 2.59,
+    "orb_volume": "5116",
+    "orb_avg_volume": 393.53846153846155,
+    "orb_volume_ratio": 13.0,
+    "orb_price_change": -0.050000000000000266,
+    "orb_duration_minutes": 13,
+    "orb_momentum": -0.0038461538461538668,
+    "orb_open": 2.58,
+    "orb_close": 2.53,
+    "market_open": "2025-07-10 09:30:00",
+    "orb_end": "2025-07-10 09:45:00"
+  }
+}

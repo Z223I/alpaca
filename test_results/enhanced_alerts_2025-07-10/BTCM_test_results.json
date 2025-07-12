@@ -1,0 +1,44 @@
+{
+  "symbol": "BTCM",
+  "pca_passed": true,
+  "alerts": [
+    {
+      "symbol": "BTCM",
+      "date": "2025-07-10",
+      "alert_time": "13:45:00 ET",
+      "alert_timestamp": "2025-07-10T13:45:00",
+      "alert_type": "ENHANCED_BEARISH_BREAKDOWN",
+      "confidence": 1.0,
+      "entry_price": 6.72652,
+      "stop_loss": 8.0199,
+      "target": 4.8665199999999995,
+      "volume_ratio": 16.0,
+      "momentum": 0.0034374999999999822,
+      "range_pct": 17.854571634269263,
+      "reasoning": "PCA-Enhanced: Vol Ratio 16.0x, Momentum 0.003, Range 17.9%",
+      "orb_features": {
+        "orb_high": 7.98,
+        "orb_low": 6.74,
+        "orb_range": 1.2400000000000002,
+        "orb_midpoint": 7.36
+      }
+    }
+  ],
+  "orb_features": {
+    "orb_high": 7.98,
+    "orb_low": 6.74,
+    "orb_range": 1.2400000000000002,
+    "orb_range_pct": 17.854571634269263,
+    "orb_midpoint": 7.36,
+    "orb_volume": "74990",
+    "orb_avg_volume": 4686.875,
+    "orb_volume_ratio": 16.0,
+    "orb_price_change": 0.054999999999999716,
+    "orb_duration_minutes": 16,
+    "orb_momentum": 0.0034374999999999822,
+    "orb_open": 6.945,
+    "orb_close": 7.0,
+    "market_open": "2025-07-10 09:30:00",
+    "orb_end": "2025-07-10 09:45:00"
+  }
+}

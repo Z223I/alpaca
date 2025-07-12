@@ -1,0 +1,44 @@
+{
+  "symbol": "AIRI",
+  "pca_passed": true,
+  "alerts": [
+    {
+      "symbol": "AIRI",
+      "date": "2025-07-10",
+      "alert_time": "15:50:00 ET",
+      "alert_timestamp": "2025-07-10T15:50:00",
+      "alert_type": "ENHANCED_BULLISH_BREAKOUT",
+      "confidence": 0.8,
+      "entry_price": 3.96792,
+      "stop_loss": 3.61185,
+      "target": 4.46292,
+      "volume_ratio": 13.0,
+      "momentum": -0.0030769230769230795,
+      "range_pct": 8.593750000000004,
+      "reasoning": "PCA-Enhanced: Vol Ratio 13.0x, Momentum -0.003, Range 8.6%",
+      "orb_features": {
+        "orb_high": 3.96,
+        "orb_low": 3.63,
+        "orb_range": 0.33000000000000007,
+        "orb_midpoint": 3.795
+      }
+    }
+  ],
+  "orb_features": {
+    "orb_high": 3.96,
+    "orb_low": 3.63,
+    "orb_range": 0.33000000000000007,
+    "orb_range_pct": 8.593750000000004,
+    "orb_midpoint": 3.795,
+    "orb_volume": "6786",
+    "orb_avg_volume": 522.0,
+    "orb_volume_ratio": 13.0,
+    "orb_price_change": -0.040000000000000036,
+    "orb_duration_minutes": 13,
+    "orb_momentum": -0.0030769230769230795,
+    "orb_open": 3.84,
+    "orb_close": 3.8,
+    "market_open": "2025-07-10 09:30:00",
+    "orb_end": "2025-07-10 09:45:00"
+  }
+}

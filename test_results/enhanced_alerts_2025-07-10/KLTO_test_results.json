@@ -1,0 +1,44 @@
+{
+  "symbol": "KLTO",
+  "pca_passed": true,
+  "alerts": [
+    {
+      "symbol": "KLTO",
+      "date": "2025-07-10",
+      "alert_time": "14:41:00 ET",
+      "alert_timestamp": "2025-07-10T14:41:00",
+      "alert_type": "ENHANCED_BEARISH_BREAKDOWN",
+      "confidence": 0.9500000000000001,
+      "entry_price": 1.4969999999999999,
+      "stop_loss": 1.6431749999999998,
+      "target": 1.2944999999999998,
+      "volume_ratio": 15.0,
+      "momentum": -0.007000000000000014,
+      "range_pct": 8.385093167701864,
+      "reasoning": "PCA-Enhanced: Vol Ratio 15.0x, Momentum -0.007, Range 8.4%",
+      "orb_features": {
+        "orb_high": 1.635,
+        "orb_low": 1.5,
+        "orb_range": 0.135,
+        "orb_midpoint": 1.5675
+      }
+    }
+  ],
+  "orb_features": {
+    "orb_high": 1.635,
+    "orb_low": 1.5,
+    "orb_range": 0.135,
+    "orb_range_pct": 8.385093167701864,
+    "orb_midpoint": 1.5675,
+    "orb_volume": "28934",
+    "orb_avg_volume": 1928.9333333333334,
+    "orb_volume_ratio": 15.0,
+    "orb_price_change": -0.1050000000000002,
+    "orb_duration_minutes": 15,
+    "orb_momentum": -0.007000000000000014,
+    "orb_open": 1.61,
+    "orb_close": 1.505,
+    "market_open": "2025-07-10 09:30:00",
+    "orb_end": "2025-07-10 09:45:00"
+  }
+}

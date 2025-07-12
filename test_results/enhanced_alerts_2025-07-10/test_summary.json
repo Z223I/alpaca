@@ -1,6 +1,6 @@
 {
   "date": "2025-07-10",
-  "symbols_tested": 1,
+  "symbols_tested": 11,
   "pca_filters": {
     "volume_ratio_threshold": 2.5,
     "duration_threshold": 10,
@@ -9,6 +9,248 @@
     "range_pct_max": 35.0
   },
   "results": {
+    "AIRI": {
+      "symbol": "AIRI",
+      "pca_passed": true,
+      "alerts": [
+        {
+          "symbol": "AIRI",
+          "date": "2025-07-10",
+          "alert_time": "15:50:00 ET",
+          "alert_timestamp": "2025-07-10T15:50:00",
+          "alert_type": "ENHANCED_BULLISH_BREAKOUT",
+          "confidence": 0.8,
+          "entry_price": 3.96792,
+          "stop_loss": 3.61185,
+          "target": 4.46292,
+          "volume_ratio": 13.0,
+          "momentum": -0.0030769230769230795,
+          "range_pct": 8.593750000000004,
+          "reasoning": "PCA-Enhanced: Vol Ratio 13.0x, Momentum -0.003, Range 8.6%",
+          "orb_features": {
+            "orb_high": 3.96,
+            "orb_low": 3.63,
+            "orb_range": 0.33000000000000007,
+            "orb_midpoint": 3.795
+          }
+        }
+      ],
+      "orb_features": {
+        "orb_high": 3.96,
+        "orb_low": 3.63,
+        "orb_range": 0.33000000000000007,
+        "orb_range_pct": 8.593750000000004,
+        "orb_midpoint": 3.795,
+        "orb_volume": "6786",
+        "orb_avg_volume": 522.0,
+        "orb_volume_ratio": 13.0,
+        "orb_price_change": -0.040000000000000036,
+        "orb_duration_minutes": 13,
+        "orb_momentum": -0.0030769230769230795,
+        "orb_open": 3.84,
+        "orb_close": 3.8,
+        "market_open": "2025-07-10 09:30:00",
+        "orb_end": "2025-07-10 09:45:00"
+      }
+    },
+    "BTCM": {
+      "symbol": "BTCM",
+      "pca_passed": true,
+      "alerts": [
+        {
+          "symbol": "BTCM",
+          "date": "2025-07-10",
+          "alert_time": "13:45:00 ET",
+          "alert_timestamp": "2025-07-10T13:45:00",
+          "alert_type": "ENHANCED_BEARISH_BREAKDOWN",
+          "confidence": 1.0,
+          "entry_price": 6.72652,
+          "stop_loss": 8.0199,
+          "target": 4.8665199999999995,
+          "volume_ratio": 16.0,
+          "momentum": 0.0034374999999999822,
+          "range_pct": 17.854571634269263,
+          "reasoning": "PCA-Enhanced: Vol Ratio 16.0x, Momentum 0.003, Range 17.9%",
+          "orb_features": {
+            "orb_high": 7.98,
+            "orb_low": 6.74,
+            "orb_range": 1.2400000000000002,
+            "orb_midpoint": 7.36
+          }
+        }
+      ],
+      "orb_features": {
+        "orb_high": 7.98,
+        "orb_low": 6.74,
+        "orb_range": 1.2400000000000002,
+        "orb_range_pct": 17.854571634269263,
+        "orb_midpoint": 7.36,
+        "orb_volume": "74990",
+        "orb_avg_volume": 4686.875,
+        "orb_volume_ratio": 16.0,
+        "orb_price_change": 0.054999999999999716,
+        "orb_duration_minutes": 16,
+        "orb_momentum": 0.0034374999999999822,
+        "orb_open": 6.945,
+        "orb_close": 7.0,
+        "market_open": "2025-07-10 09:30:00",
+        "orb_end": "2025-07-10 09:45:00"
+      }
+    },
+    "CGTX": {
+      "symbol": "CGTX",
+      "pca_passed": false,
+      "alerts": [],
+      "orb_features": {
+        "orb_high": 1.04,
+        "orb_low": 0.8021,
+        "orb_range": 0.2379,
+        "orb_range_pct": 22.985507246376812,
+        "orb_midpoint": 0.92105,
+        "orb_volume": "282192",
+        "orb_avg_volume": 17637.0,
+        "orb_volume_ratio": 16.0,
+        "orb_price_change": -0.23289999999999988,
+        "orb_duration_minutes": 16,
+        "orb_momentum": -0.014556249999999993,
+        "orb_open": 1.035,
+        "orb_close": 0.8021,
+        "market_open": "2025-07-10 09:30:00",
+        "orb_end": "2025-07-10 09:45:00"
+      }
+    },
+    "CPOP": {
+      "symbol": "CPOP",
+      "pca_passed": true,
+      "alerts": [],
+      "orb_features": {
+        "orb_high": 0.9898,
+        "orb_low": 0.8154,
+        "orb_range": 0.1744,
+        "orb_range_pct": 20.27906976744186,
+        "orb_midpoint": 0.9026000000000001,
+        "orb_volume": "51612",
+        "orb_avg_volume": 3686.5714285714284,
+        "orb_volume_ratio": 14.0,
+        "orb_price_change": -0.04459999999999997,
+        "orb_duration_minutes": 14,
+        "orb_momentum": -0.003185714285714284,
+        "orb_open": 0.86,
+        "orb_close": 0.8154,
+        "market_open": "2025-07-10 09:30:00",
+        "orb_end": "2025-07-10 09:45:00"
+      }
+    },
+    "KLTO": {
+      "symbol": "KLTO",
+      "pca_passed": true,
+      "alerts": [
+        {
+          "symbol": "KLTO",
+          "date": "2025-07-10",
+          "alert_time": "14:41:00 ET",
+          "alert_timestamp": "2025-07-10T14:41:00",
+          "alert_type": "ENHANCED_BEARISH_BREAKDOWN",
+          "confidence": 0.9500000000000001,
+          "entry_price": 1.4969999999999999,
+          "stop_loss": 1.6431749999999998,
+          "target": 1.2944999999999998,
+          "volume_ratio": 15.0,
+          "momentum": -0.007000000000000014,
+          "range_pct": 8.385093167701864,
+          "reasoning": "PCA-Enhanced: Vol Ratio 15.0x, Momentum -0.007, Range 8.4%",
+          "orb_features": {
+            "orb_high": 1.635,
+            "orb_low": 1.5,
+            "orb_range": 0.135,
+            "orb_midpoint": 1.5675
+          }
+        }
+      ],
+      "orb_features": {
+        "orb_high": 1.635,
+        "orb_low": 1.5,
+        "orb_range": 0.135,
+        "orb_range_pct": 8.385093167701864,
+        "orb_midpoint": 1.5675,
+        "orb_volume": "28934",
+        "orb_avg_volume": 1928.9333333333334,
+        "orb_volume_ratio": 15.0,
+        "orb_price_change": -0.1050000000000002,
+        "orb_duration_minutes": 15,
+        "orb_momentum": -0.007000000000000014,
+        "orb_open": 1.61,
+        "orb_close": 1.505,
+        "market_open": "2025-07-10 09:30:00",
+        "orb_end": "2025-07-10 09:45:00"
+      }
+    },
+    "MLGO": {
+      "symbol": "MLGO",
+      "pca_passed": true,
+      "alerts": [
+        {
+          "symbol": "MLGO",
+          "date": "2025-07-10",
+          "alert_time": "13:48:00 ET",
+          "alert_timestamp": "2025-07-10T13:48:00",
+          "alert_type": "ENHANCED_BEARISH_BREAKDOWN",
+          "confidence": 0.9,
+          "entry_price": 0.8032902,
+          "stop_loss": 0.8702294999999999,
+          "target": 0.7117901999999998,
+          "volume_ratio": 13.000000000000002,
+          "momentum": -0.0018615384615384616,
+          "range_pct": 7.044693382607697,
+          "reasoning": "PCA-Enhanced: Vol Ratio 13.0x, Momentum -0.002, Range 7.0%",
+          "orb_features": {
+            "orb_high": 0.8659,
+            "orb_low": 0.8049,
+            "orb_range": 0.061000000000000054,
+            "orb_midpoint": 0.8353999999999999
+          }
+        }
+      ],
+      "orb_features": {
+        "orb_high": 0.8659,
+        "orb_low": 0.8049,
+        "orb_range": 0.061000000000000054,
+        "orb_range_pct": 7.044693382607697,
+        "orb_midpoint": 0.8353999999999999,
+        "orb_volume": "127755",
+        "orb_avg_volume": 9827.307692307691,
+        "orb_volume_ratio": 13.000000000000002,
+        "orb_price_change": -0.0242,
+        "orb_duration_minutes": 13,
+        "orb_momentum": -0.0018615384615384616,
+        "orb_open": 0.8659,
+        "orb_close": 0.8417,
+        "market_open": "2025-07-10 09:30:00",
+        "orb_end": "2025-07-10 09:45:00"
+      }
+    },
+    "NTHI": {
+      "symbol": "NTHI",
+      "pca_passed": false,
+      "alerts": [],
+      "orb_features": {
+        "orb_high": 6.935,
+        "orb_low": 5.8,
+        "orb_range": 1.1349999999999998,
+        "orb_range_pct": 16.366258111031,
+        "orb_midpoint": 6.3675,
+        "orb_volume": "3177",
+        "orb_avg_volume": 453.85714285714283,
+        "orb_volume_ratio": 7.0,
+        "orb_price_change": -0.9849999999999994,
+        "orb_duration_minutes": 7,
+        "orb_momentum": -0.14071428571428563,
+        "orb_open": 6.935,
+        "orb_close": 5.95,
+        "market_open": "2025-07-10 09:30:00",
+        "orb_end": "2025-07-10 09:45:00"
+      }
+    },
     "PROK": {
       "symbol": "PROK",
       "pca_passed": true,
@@ -52,11 +294,99 @@
         "market_open": "2025-07-10 09:30:00",
         "orb_end": "2025-07-10 09:45:00"
       }
+    },
+    "SAFX": {
+      "symbol": "SAFX",
+      "pca_passed": false,
+      "alerts": [],
+      "orb_features": {
+        "orb_high": 3.555,
+        "orb_low": 2.755,
+        "orb_range": 0.8000000000000003,
+        "orb_range_pct": 22.5669957686883,
+        "orb_midpoint": 3.1550000000000002,
+        "orb_volume": "18970",
+        "orb_avg_volume": 1459.2307692307693,
+        "orb_volume_ratio": 13.0,
+        "orb_price_change": -0.79,
+        "orb_duration_minutes": 13,
+        "orb_momentum": -0.06076923076923077,
+        "orb_open": 3.545,
+        "orb_close": 2.755,
+        "market_open": "2025-07-10 09:30:00",
+        "orb_end": "2025-07-10 09:45:00"
+      }
+    },
+    "STKH": {
+      "symbol": "STKH",
+      "pca_passed": true,
+      "alerts": [
+        {
+          "symbol": "STKH",
+          "date": "2025-07-10",
+          "alert_time": "13:57:00 ET",
+          "alert_timestamp": "2025-07-10T13:57:00",
+          "alert_type": "ENHANCED_BULLISH_BREAKOUT",
+          "confidence": 0.9,
+          "entry_price": 2.78556,
+          "stop_loss": 2.388,
+          "target": 3.3555599999999997,
+          "volume_ratio": 13.0,
+          "momentum": -0.0038461538461538668,
+          "range_pct": 14.728682170542632,
+          "reasoning": "PCA-Enhanced: Vol Ratio 13.0x, Momentum -0.004, Range 14.7%",
+          "orb_features": {
+            "orb_high": 2.78,
+            "orb_low": 2.4,
+            "orb_range": 0.3799999999999999,
+            "orb_midpoint": 2.59
+          }
+        }
+      ],
+      "orb_features": {
+        "orb_high": 2.78,
+        "orb_low": 2.4,
+        "orb_range": 0.3799999999999999,
+        "orb_range_pct": 14.728682170542632,
+        "orb_midpoint": 2.59,
+        "orb_volume": "5116",
+        "orb_avg_volume": 393.53846153846155,
+        "orb_volume_ratio": 13.0,
+        "orb_price_change": -0.050000000000000266,
+        "orb_duration_minutes": 13,
+        "orb_momentum": -0.0038461538461538668,
+        "orb_open": 2.58,
+        "orb_close": 2.53,
+        "market_open": "2025-07-10 09:30:00",
+        "orb_end": "2025-07-10 09:45:00"
+      }
+    },
+    "SUGP": {
+      "symbol": "SUGP",
+      "pca_passed": false,
+      "alerts": [],
+      "orb_features": {
+        "orb_high": 1.59,
+        "orb_low": 1.39,
+        "orb_range": 0.20000000000000018,
+        "orb_range_pct": 12.57861635220127,
+        "orb_midpoint": 1.49,
+        "orb_volume": "4097",
+        "orb_avg_volume": 315.15384615384613,
+        "orb_volume_ratio": 13.000000000000002,
+        "orb_price_change": -0.16500000000000004,
+        "orb_duration_minutes": 13,
+        "orb_momentum": -0.012692307692307695,
+        "orb_open": 1.59,
+        "orb_close": 1.425,
+        "market_open": "2025-07-10 09:30:00",
+        "orb_end": "2025-07-10 09:45:00"
+      }
     }
   },
   "summary": {
-    "total_alerts": 1,
-    "symbols_with_alerts": 1,
-    "symbols_passed_pca": 1
+    "total_alerts": 6,
+    "symbols_with_alerts": 6,
+    "symbols_passed_pca": 7
   }
 }
