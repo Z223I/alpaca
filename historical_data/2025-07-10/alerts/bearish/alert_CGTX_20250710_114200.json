@@ -1,0 +1,18 @@
+{
+  "symbol": "CGTX",
+  "timestamp": "2025-07-10T11:42:00",
+  "current_price": 0.7397,
+  "orb_high": 1.04,
+  "orb_low": 0.8021,
+  "orb_range": 0.2379,
+  "orb_midpoint": 0.92105,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 7.779578606158834,
+  "volume_ratio": 1.5811598016970974,
+  "confidence_score": 0.8296008162524728,
+  "priority": "MEDIUM",
+  "confidence_level": "HIGH",
+  "recommended_stop_loss": 0.7951775,
+  "recommended_take_profit": 0.710112,
+  "alert_message": "[11:42:00] ORB ALERT: CGTX \u2193 $0.74 (+7.78% vs ORB Low)\nVolume: 1.6x avg | Confidence: 0.83 | Priority: MEDIUM\nStop: $0.80 | Target: $0.71"
+}

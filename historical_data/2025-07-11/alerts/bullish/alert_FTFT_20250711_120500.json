@@ -1,0 +1,18 @@
+{
+  "symbol": "FTFT",
+  "timestamp": "2025-07-11T12:05:00",
+  "current_price": 2.96,
+  "orb_high": 2.35,
+  "orb_low": 2.25,
+  "orb_range": 0.10000000000000009,
+  "orb_midpoint": 2.3,
+  "breakout_type": "bullish_breakout",
+  "breakout_percentage": 25.957446808510632,
+  "volume_ratio": 3.3812477507038974,
+  "confidence_score": 0.8693688364379011,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 2.738,
+  "recommended_take_profit": 3.0784000000000002,
+  "alert_message": "[12:05:00] ORB ALERT: FTFT \u2191 $2.96 (+25.96% vs ORB High)\nVolume: 3.4x avg | Confidence: 0.87 | Priority: HIGH\nStop: $2.74 | Target: $3.08"
+}

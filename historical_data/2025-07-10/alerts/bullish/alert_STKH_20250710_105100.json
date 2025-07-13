@@ -1,0 +1,18 @@
+{
+  "symbol": "STKH",
+  "timestamp": "2025-07-10T10:51:00",
+  "current_price": 3.5,
+  "orb_high": 2.78,
+  "orb_low": 2.4,
+  "orb_range": 0.3799999999999999,
+  "orb_midpoint": 2.59,
+  "breakout_type": "bullish_breakout",
+  "breakout_percentage": 25.899280575539578,
+  "volume_ratio": 1.6996554752415052,
+  "confidence_score": 0.8890454433465078,
+  "priority": "MEDIUM",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 3.2375000000000003,
+  "recommended_take_profit": 3.64,
+  "alert_message": "[10:51:00] ORB ALERT: STKH \u2191 $3.50 (+25.90% vs ORB High)\nVolume: 1.7x avg | Confidence: 0.89 | Priority: MEDIUM\nStop: $3.24 | Target: $3.64"
+}

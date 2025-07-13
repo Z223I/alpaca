@@ -1,0 +1,18 @@
+{
+  "symbol": "SGN",
+  "timestamp": "2025-07-11T15:58:00",
+  "current_price": 2.37,
+  "orb_high": 3.27,
+  "orb_low": 2.65,
+  "orb_range": 0.6200000000000001,
+  "orb_midpoint": 2.96,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 10.56603773584905,
+  "volume_ratio": 3.748786912519063,
+  "confidence_score": 0.8884466028816616,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 2.54775,
+  "recommended_take_profit": 2.2752,
+  "alert_message": "[15:58:00] ORB ALERT: SGN \u2193 $2.37 (+10.57% vs ORB Low)\nVolume: 3.7x avg | Confidence: 0.89 | Priority: HIGH\nStop: $2.55 | Target: $2.28"
+}
