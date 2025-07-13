@@ -10,6 +10,7 @@ from matplotlib.patches import Rectangle
 from matplotlib.ticker import FuncFormatter
 from typing import Optional, Tuple, List
 from datetime import time
+import pytz
 
 from ..utils.calculate_orb_levels import calculate_orb_levels
 from ..utils.extract_symbol_data import extract_symbol_data
@@ -37,6 +38,18 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
         if symbol_data is None:
             print(f"No data found for symbol: {symbol}")
             return False
+        
+        # Convert timestamps to Eastern Time for display
+        et_tz = pytz.timezone('America/New_York')
+        symbol_data = symbol_data.copy()
+        
+        # Convert timestamps to ET (handles both EDT and EST automatically)
+        if pd.api.types.is_datetime64_any_dtype(symbol_data['timestamp']):
+            # If timezone-aware, convert to ET; if timezone-naive, localize to UTC first then convert
+            if symbol_data['timestamp'].dt.tz is None:
+                # Assume UTC if no timezone info
+                symbol_data['timestamp'] = pd.to_datetime(symbol_data['timestamp'], utc=True)
+            symbol_data['timestamp'] = symbol_data['timestamp'].dt.tz_convert(et_tz)
         
         # Calculate ORB levels
         orb_high, orb_low = calculate_orb_levels(symbol_data)
@@ -131,10 +144,11 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
             chart_start_time = symbol_data['timestamp'].min()
             chart_end_time = symbol_data['timestamp'].max()
             
-            # Make sure chart times are timezone-naive for comparison
-            if hasattr(chart_start_time, 'tz_localize'):
-                chart_start_time = chart_start_time.tz_localize(None) if chart_start_time.tz is None else chart_start_time.tz_convert(None)
-                chart_end_time = chart_end_time.tz_localize(None) if chart_end_time.tz is None else chart_end_time.tz_convert(None)
+            # Convert chart times to timezone-aware for proper comparison
+            # Market data should be timezone-aware, but if not, assume ET
+            if hasattr(chart_start_time, 'tz') and chart_start_time.tz is None:
+                chart_start_time = et_tz.localize(chart_start_time)
+                chart_end_time = et_tz.localize(chart_end_time)
             
             alert_count = 0
             for alert in alerts:
@@ -144,9 +158,9 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
                 if not alert_time:
                     continue
                 
-                # Make alert time timezone-naive for comparison
-                if hasattr(alert_time, 'tz'):
-                    alert_time = alert_time.replace(tzinfo=None)
+                # Ensure alert time is timezone-aware for proper comparison
+                if hasattr(alert_time, 'tz') and alert_time.tz is None:
+                    alert_time = et_tz.localize(alert_time)
                 
                 # Check if alert time is within chart timeframe
                 if chart_start_time <= alert_time <= chart_end_time:
@@ -189,14 +203,19 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
         title = symbol
         
         # Get date from first timestamp and format for US (MM/DD/YYYY)
-        chart_date = symbol_data['timestamp'].iloc[0].strftime('%m/%d/%Y')
+        # Also determine if we're in EDT or EST for the label
+        first_timestamp = symbol_data['timestamp'].iloc[0]
+        chart_date = first_timestamp.strftime('%m/%d/%Y')
+        timezone_name = first_timestamp.strftime('%Z')  # Will be EDT or EST
         
         ax1.set_title(title, fontsize=16, fontweight='bold')
-        ax1.text(0.5, 0.95, chart_date, transform=ax1.transAxes, fontsize=12, 
+        ax1.text(0.5, 0.95, f'{chart_date} ({timezone_name})', transform=ax1.transAxes, fontsize=12, 
                 ha='center', va='top', style='italic')
         ax1.set_ylabel('Price ($)', fontsize=12)
         ax1.grid(True, alpha=0.3)
-        ax1.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+        
+        # Set x-axis formatter to show time in ET timezone
+        ax1.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M', tz=et_tz))
         
         # Format Y-axis to show prices with 2 decimal places
         ax1.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'${x:.2f}'))
@@ -205,9 +224,11 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
         ax2.bar(symbol_data['timestamp'], symbol_data['volume'], 
                color='blue', alpha=0.6, width=0.0008)
         ax2.set_ylabel('Volume', fontsize=12)
-        ax2.set_xlabel('Time', fontsize=12)
+        ax2.set_xlabel(f'Time ({timezone_name})', fontsize=12)
         ax2.grid(True, alpha=0.3)
-        ax2.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+        
+        # Set x-axis formatter to show time in ET timezone for volume chart too
+        ax2.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M', tz=et_tz))
         
         # Rotate x-axis labels
         plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45)
