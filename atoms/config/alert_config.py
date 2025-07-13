@@ -49,8 +49,8 @@ class ORBAlertConfig:
     reconnect_delay: int = 5             # Reconnection delay in seconds
     max_reconnect_attempts: int = 10     # Maximum reconnection attempts
     
-    # Symbol Configuration
-    symbols_file: str = "data/symbols.csv"
+    # Symbol Configuration  
+    symbols_file: str = ""  # Empty string means use current date file (data/YYYYMMDD.csv)
     
     # Data Collection Configuration
     data_save_interval_minutes: int = 10  # Save historical data every N minutes (configurable)

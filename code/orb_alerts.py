@@ -764,7 +764,7 @@ def parse_arguments():
     parser.add_argument(
         "--symbols-file",
         type=str,
-        help="Path to symbols CSV file (default: data/symbols.csv)"
+        help="Path to symbols CSV file (default: data/YYYYMMDD.csv for current date)"
     )
     
     parser.add_argument(

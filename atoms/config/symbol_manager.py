@@ -2,41 +2,68 @@
 Symbol Management for ORB Alerts
 
 This module handles loading and managing the watchlist of symbols for ORB alerts.
-Reads from data/symbols.csv and provides filtering capabilities.
+Reads from date-specific CSV files (YYYYMMDD.csv) and provides filtering capabilities.
 """
 
 import csv
 import os
 from typing import List, Set, Optional
 from pathlib import Path
+from datetime import datetime
+import pytz
 
 
 class SymbolManager:
     """Manages the watchlist of symbols for ORB alerts."""
     
-    def __init__(self, symbols_file: str = "data/symbols.csv"):
+    def __init__(self, symbols_file: Optional[str] = None):
         """
         Initialize symbol manager.
         
         Args:
-            symbols_file: Path to CSV file containing symbols
+            symbols_file: Path to CSV file containing symbols. If None, uses current date file (data/YYYYMMDD.csv)
         """
-        self.symbols_file = symbols_file
+        self.symbols_file = symbols_file or self._get_current_date_file()
         self._symbols: Set[str] = set()
         self._load_symbols()
     
+    def _get_current_date_file(self) -> str:
+        """
+        Get the current date-specific symbols file path.
+        
+        Returns:
+            Path to current date CSV file (data/YYYYMMDD.csv)
+        """
+        # Use Eastern Time for determining the current trading date
+        et_tz = pytz.timezone('US/Eastern')
+        current_date = datetime.now(et_tz).strftime('%Y%m%d')
+        return f"data/{current_date}.csv"
+    
     def _load_symbols(self) -> None:
-        """Load symbols from CSV file."""
+        """Load symbols from CSV file, handling both date-specific and legacy formats."""
         if not os.path.exists(self.symbols_file):
             raise FileNotFoundError(f"Symbols file not found: {self.symbols_file}")
         
         with open(self.symbols_file, 'r') as file:
             reader = csv.reader(file)
+            first_row = True
             for row in reader:
                 if row and row[0].strip():  # Skip empty rows
                     symbol = row[0].strip().upper()
+                    
+                    # Skip header row if it contains "Symbol" (for date-specific files)
+                    if first_row and symbol == "SYMBOL":
+                        first_row = False
+                        continue
+                        
+                    # Skip any other common header patterns
+                    if symbol in ["SYMBOL", "TICKER", "STOCK"]:
+                        continue
+                        
                     if symbol:
                         self._symbols.add(symbol)
+                
+                first_row = False
         
         if not self._symbols:
             raise ValueError(f"No symbols found in {self.symbols_file}")

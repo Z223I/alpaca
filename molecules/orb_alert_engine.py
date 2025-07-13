@@ -56,7 +56,14 @@ class ORBAlertEngine:
             output_dir: Directory for alert output files
         """
         # Initialize components
-        self.symbol_manager = SymbolManager(symbols_file or config.symbols_file)
+        # If symbols_file is provided, use it; otherwise SymbolManager will use current date file
+        if symbols_file:
+            self.symbol_manager = SymbolManager(symbols_file)
+        elif config.symbols_file:
+            self.symbol_manager = SymbolManager(config.symbols_file)
+        else:
+            # Use current date file (data/YYYYMMDD.csv)
+            self.symbol_manager = SymbolManager()
         self.stream_client = AlpacaStreamClient()
         self.data_buffer = DataBuffer()
         self.orb_calculator = ORBCalculator()

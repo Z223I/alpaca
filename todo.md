@@ -8,7 +8,7 @@ The remaining tasks are lower priority documentation and deployment tools:
 - [ ] No alerts in the last 30 minutes of the day.
 - [X] You must source ~/miniconda3/etc/profile.d/conda.sh && conda activate alpaca
 - [ ] Manually plot EMA20 and see if this would be an indicator to stop trading.
-- [ ] Update code/orb.py to plot EMA20.
+- [X] Update code/orb.py to plot EMA20.
 
 
 - [X] Update the analysis software to handle bearish alerts correctly.
