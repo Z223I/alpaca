@@ -124,9 +124,18 @@ class ORB:
                         # Add alert type and parse timestamp
                         alert_data['alert_type'] = alert_type
                         
-                        # Parse timestamp to datetime object
+                        # Parse timestamp to datetime object and handle timezone
                         if 'timestamp' in alert_data:
-                            alert_data['timestamp_dt'] = datetime.fromisoformat(alert_data['timestamp'])
+                            timestamp_str = alert_data['timestamp']
+                            # Parse the timestamp - alerts appear to be in ET timezone
+                            alert_dt = datetime.fromisoformat(timestamp_str)
+                            
+                            # If timezone-naive, assume it's in ET timezone to match market data
+                            if alert_dt.tzinfo is None:
+                                et_tz = pytz.timezone('America/New_York')
+                                alert_dt = et_tz.localize(alert_dt)
+                            
+                            alert_data['timestamp_dt'] = alert_dt
                         
                         alerts.append(alert_data)
                         
