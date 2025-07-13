@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.patches import Rectangle
 from matplotlib.ticker import FuncFormatter
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 from datetime import time
 
 from ..utils.calculate_orb_levels import calculate_orb_levels
@@ -17,7 +17,7 @@ from ..utils.calculate_ema import calculate_ema
 from ..utils.calculate_vwap import calculate_vwap_typical
 
 
-def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') -> bool:
+def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', alerts: Optional[List] = None) -> bool:
     """
     Create a candlestick chart with volume and ORB rectangle for a single stock symbol.
     
@@ -25,6 +25,7 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') 
         df: DataFrame with columns ['timestamp', 'open', 'high', 'low', 'close', 'volume']
         symbol: Stock symbol name
         output_dir: Directory to save the chart
+        alerts: Optional list of alert dictionaries with timestamp_dt and alert_type
         
     Returns:
         True if successful, False otherwise
@@ -42,6 +43,9 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') 
         
         # Calculate EMA (9-period) for close prices
         ema_success, ema_values = calculate_ema(symbol_data, price_column='close', period=9)
+        
+        # Calculate EMA (20-period) for close prices
+        ema20_success, ema20_values = calculate_ema(symbol_data, price_column='close', period=20)
         
         # Calculate VWAP using typical price (HLC/3)
         vwap_success, vwap_values = calculate_vwap_typical(symbol_data)
@@ -111,13 +115,63 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots') 
             ax1.plot(symbol_data['timestamp'], ema_values, 
                     color='blue', linewidth=2, alpha=0.8, label='EMA(9)')
         
+        # Add EMA20 line if calculation was successful
+        if ema20_success:
+            ax1.plot(symbol_data['timestamp'], ema20_values, 
+                    color='orange', linewidth=2, alpha=0.8, label='EMA(20)')
+        
         # Add VWAP line if calculation was successful
         if vwap_success:
             ax1.plot(symbol_data['timestamp'], vwap_values, 
                     color='purple', linewidth=2, alpha=0.8, label='VWAP')
         
+        # Plot alerts as vertical bars if provided
+        if alerts:
+            # Convert symbol_data timestamps to timezone-naive for comparison
+            chart_start_time = symbol_data['timestamp'].min()
+            chart_end_time = symbol_data['timestamp'].max()
+            
+            # Make sure chart times are timezone-naive for comparison
+            if hasattr(chart_start_time, 'tz_localize'):
+                chart_start_time = chart_start_time.tz_localize(None) if chart_start_time.tz is None else chart_start_time.tz_convert(None)
+                chart_end_time = chart_end_time.tz_localize(None) if chart_end_time.tz is None else chart_end_time.tz_convert(None)
+            
+            alert_count = 0
+            for alert in alerts:
+                alert_time = alert.get('timestamp_dt')
+                alert_type = alert.get('alert_type', 'unknown')
+                
+                if not alert_time:
+                    continue
+                
+                # Make alert time timezone-naive for comparison
+                if hasattr(alert_time, 'tz'):
+                    alert_time = alert_time.replace(tzinfo=None)
+                
+                # Check if alert time is within chart timeframe
+                if chart_start_time <= alert_time <= chart_end_time:
+                    # Set color based on alert type
+                    color = 'green' if alert_type == 'bullish' else 'red'
+                    alpha = 0.3
+                    
+                    # Draw vertical line spanning the price chart
+                    y_min, y_max = ax1.get_ylim()
+                    ax1.axvline(x=alert_time, color=color, alpha=alpha, linewidth=2, linestyle='-')
+                    
+                    # Add small label at top of chart
+                    label_y = y_max - (y_max - y_min) * 0.05  # 5% from top
+                    alert_symbol = '↑' if alert_type == 'bullish' else '↓'
+                    ax1.text(alert_time, label_y, alert_symbol, 
+                            color=color, fontsize=12, fontweight='bold', 
+                            ha='center', va='top')
+                    
+                    alert_count += 1
+            
+            if alert_count > 0:
+                print(f"Plotted {alert_count} alerts for {symbol}")
+
         # Add legend if any indicators were calculated
-        if ema_success or vwap_success:
+        if ema_success or ema20_success or vwap_success:
             # Determine legend position based on price trend
             # If closing price is higher than opening price, put legend at bottom right
             # Otherwise, put it at top right to avoid overlapping with rising prices

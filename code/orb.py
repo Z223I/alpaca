@@ -54,52 +54,177 @@ class ORB:
         self.csv_date: Optional[date] = None
         self.pca_data: Optional[pd.DataFrame] = None
 
-    def _get_most_recent_csv(self) -> Optional[str]:
+    def _is_valid_date_csv(self, filename: str) -> bool:
         """
-        Get the most recent CSV file from the data directory.
+        Check if filename matches YYYYMMDD.csv format.
+        
+        Args:
+            filename: The filename to validate
+            
+        Returns:
+            True if filename matches YYYYMMDD.csv format, False otherwise
+        """
+        try:
+            # Remove .csv extension
+            if not filename.lower().endswith('.csv'):
+                return False
+                
+            date_str = filename[:-4]  # Remove .csv
+            
+            # Check if it's exactly 8 digits
+            if len(date_str) != 8 or not date_str.isdigit():
+                return False
+                
+            # Try to parse as date to ensure it's a valid date
+            datetime.strptime(date_str, '%Y%m%d')
+            return True
+            
+        except ValueError:
+            return False
+
+    def _load_alerts_for_symbol(self, symbol: str, target_date: date) -> List[Dict[str, Any]]:
+        """
+        Load alerts for a specific symbol and date from historical_data/alerts.
+        
+        Args:
+            symbol: Stock symbol to load alerts for
+            target_date: Date to load alerts for
+            
+        Returns:
+            List of alert dictionaries containing timestamp, type, and alert data
+        """
+        alerts = []
+        
+        try:
+            # Format date as YYYY-MM-DD for directory structure
+            date_str = target_date.strftime('%Y-%m-%d')
+            alerts_base_dir = os.path.join('historical_data', date_str, 'alerts')
+            
+            if not os.path.exists(alerts_base_dir):
+                if self.isDebugging:
+                    print(f"DEBUG: No alerts directory found for date {date_str}")
+                return alerts
+            
+            # Check both bullish and bearish alert directories
+            for alert_type in ['bullish', 'bearish']:
+                alert_dir = os.path.join(alerts_base_dir, alert_type)
+                
+                if not os.path.exists(alert_dir):
+                    continue
+                    
+                # Look for alert files matching the symbol
+                alert_pattern = f"alert_{symbol}_*.json"
+                alert_files = glob.glob(os.path.join(alert_dir, alert_pattern))
+                
+                for alert_file in alert_files:
+                    try:
+                        with open(alert_file, 'r') as f:
+                            alert_data = json.load(f)
+                            
+                        # Add alert type and parse timestamp
+                        alert_data['alert_type'] = alert_type
+                        
+                        # Parse timestamp to datetime object
+                        if 'timestamp' in alert_data:
+                            alert_data['timestamp_dt'] = datetime.fromisoformat(alert_data['timestamp'])
+                        
+                        alerts.append(alert_data)
+                        
+                        if self.isDebugging:
+                            print(f"DEBUG: Loaded {alert_type} alert for {symbol} at {alert_data.get('timestamp', 'unknown time')}")
+                            
+                    except Exception as e:
+                        print(f"Warning: Error loading alert file {alert_file}: {e}")
+                        continue
+            
+            # Sort alerts by timestamp
+            alerts.sort(key=lambda x: x.get('timestamp_dt', datetime.min))
+            
+            if self.isDebugging:
+                print(f"DEBUG: Loaded {len(alerts)} total alerts for {symbol} on {date_str}")
+            
+            return alerts
+            
+        except Exception as e:
+            print(f"Error loading alerts for {symbol} on {target_date}: {e}")
+            return alerts
+
+    def _select_csv_file(self) -> Optional[str]:
+        """
+        List all CSV files in the data directory and allow user to select one.
+        The most recent file is the default selection.
 
         Returns:
-            Path to the most recent CSV file, or None if no CSV files found
+            Path to selected CSV file, or None if cancelled
         """
         try:
             csv_pattern = os.path.join(self.data_directory, '*.csv')
-            csv_files = glob.glob(csv_pattern)
+            all_csv_files = glob.glob(csv_pattern)
+
+            # Filter to only include files matching YYYYMMDD.csv format
+            csv_files = []
+            for filepath in all_csv_files:
+                filename = os.path.basename(filepath)
+                if self._is_valid_date_csv(filename):
+                    csv_files.append(filepath)
 
             if not csv_files:
+                print("No CSV files with YYYYMMDD.csv format found in the data directory.")
+                if all_csv_files:
+                    print(f"Found {len(all_csv_files)} CSV files, but none match YYYYMMDD.csv format.")
                 return None
 
             # Sort by modification time, most recent first
             csv_files.sort(key=os.path.getmtime, reverse=True)
-            return csv_files[0]
-
+            
+            print("\nAvailable CSV files (YYYYMMDD.csv format):")
+            print("=" * 50)
+            
+            for i, filepath in enumerate(csv_files):
+                filename = os.path.basename(filepath)
+                mod_time = os.path.getmtime(filepath)
+                mod_date = datetime.fromtimestamp(mod_time).strftime('%Y-%m-%d %H:%M:%S')
+                default_marker = " (default)" if i == 0 else ""
+                print(f"{i + 1:2d}. {filename} - {mod_date}{default_marker}")
+            
+            print("=" * 50)
+            
+            while True:
+                try:
+                    response = input(f"Select file (1-{len(csv_files)}) or press Enter for default: ").strip()
+                    
+                    if response == "":
+                        # Use default (most recent)
+                        selected_file = csv_files[0]
+                        print(f"Using default: {os.path.basename(selected_file)}")
+                        return selected_file
+                    
+                    selection = int(response)
+                    if 1 <= selection <= len(csv_files):
+                        selected_file = csv_files[selection - 1]
+                        print(f"Selected: {os.path.basename(selected_file)}")
+                        return selected_file
+                    else:
+                        print(f"Please enter a number between 1 and {len(csv_files)}")
+                        
+                except ValueError:
+                    print("Please enter a valid number or press Enter for default")
+                except (EOFError, KeyboardInterrupt):
+                    print("\nOperation cancelled by user.")
+                    return None
+                    
         except Exception as e:
-            print(f"Error finding CSV files: {e}")
+            print(f"Error selecting CSV file: {e}")
             return None
-
-    def _prompt_user_for_file(self, filename: str) -> bool:
-        """
-        Prompt user to confirm if they want to use the suggested file.
-
-        Args:
-            filename: Name of the file to confirm
-
-        Returns:
-            True if user confirms, False otherwise
-        """
-        try:
-            response = input(f"Use file '{filename}'? (Y/n): ").strip().lower()
-            return response in ['y', 'yes', '']
-        except (EOFError, KeyboardInterrupt):
-            return False
 
     def _load_and_process_csv_data(self) -> bool:
         """
-        Load and process CSV data from the most recent file.
+        Load and process CSV data from user-selected file.
 
         This method:
-        1. Finds the most current CSV file in the data directory
-        2. Prompts user for confirmation to use that file
-        3. Reads the file if confirmed, exits if not
+        1. Lists all CSV files in the data directory
+        2. Allows user to select a file (with most recent as default)
+        3. Reads the selected file
 
         Returns:
             True if successful, False otherwise
@@ -107,28 +232,21 @@ class ORB:
         print("ORB - Open Range Breakout Analysis")
         print("=" * 40)
 
-        # Find the most recent CSV file
-        most_recent_file = self._get_most_recent_csv()
+        # Let user select CSV file
+        selected_file = self._select_csv_file()
 
-        if not most_recent_file:
-            print("No CSV files found in the data directory.")
-            return False
-
-        print(f"Most recent CSV file: {most_recent_file}")
-
-        # Prompt user for confirmation
-        if not self._prompt_user_for_file(most_recent_file):
-            print("Operation cancelled by user.")
+        if not selected_file:
+            print("No file selected or operation cancelled.")
             return False
 
         # Read the CSV file
         try:
-            print(f"Reading file: {most_recent_file}")
-            self.csv_data = read_csv(most_recent_file)
-            self.current_file = most_recent_file
+            print(f"Reading file: {selected_file}")
+            self.csv_data = read_csv(selected_file)
+            self.current_file = selected_file
 
             # Extract date from filename (YYYYMMDD.csv format)
-            filename = os.path.basename(most_recent_file)
+            filename = os.path.basename(selected_file)
             date_str = filename.replace('.csv', '')
             try:
                 self.csv_date = datetime.strptime(date_str, '%Y%m%d').date()
@@ -410,6 +528,23 @@ class ORB:
                         ema_values = ema_values.tolist()
                         print(f"DEBUG: Converted EMA values to list")
 
+            # Calculate EMA (20-period) for close prices
+            if isDebugging:
+                print(f"DEBUG: Calculating EMA (20-period)...")
+                
+            ema20_success, ema20_values = calculate_ema(
+                filtered_data, price_column='close', period=20)
+                
+            if isDebugging:
+                print(f"DEBUG: EMA20 calculation - Success: {ema20_success}")
+                print(f"DEBUG: EMA20 values type: {type(ema20_values)}")
+                if ema20_values is not None:
+                    print(f"DEBUG: EMA20 values count: {len(ema20_values)}")
+                    # Convert to list if it's a pandas Series
+                    if hasattr(ema20_values, 'tolist'):
+                        ema20_values = ema20_values.tolist()
+                        print(f"DEBUG: Converted EMA20 values to list")
+
             # Calculate VWAP using typical price (HLC/3)
             if isDebugging:
                 print(f"DEBUG: Calculating VWAP...")
@@ -510,6 +645,12 @@ class ORB:
                     pca_row['close_vs_ema'] = (row['close'] - ema_values[row_index]) / row['close']
                 else:
                     pca_row['close_vs_ema'] = 0.0
+                
+                if (ema20_success and ema20_values is not None and 
+                        row_index < len(ema20_values) and ema20_values[row_index] is not None):
+                    pca_row['close_vs_ema20'] = (row['close'] - ema20_values[row_index]) / row['close']
+                else:
+                    pca_row['close_vs_ema20'] = 0.0
                 
                 if (vwap_success and vwap_values is not None and
                         row_index < len(vwap_values) and vwap_values[row_index] is not None):
@@ -926,7 +1067,15 @@ class ORB:
             # Generate chart for each symbol
             success_count = 0
             for symbol in symbols:
-                if plot_candle_chart(self.market_df, symbol, plots_dir):
+                # Load alerts for this symbol if csv_date is available
+                alerts = []
+                if self.csv_date:
+                    alerts = self._load_alerts_for_symbol(symbol, self.csv_date)
+                    if alerts:
+                        print(f"Loaded {len(alerts)} alerts for {symbol}")
+                
+                # Generate chart with alerts
+                if plot_candle_chart(self.market_df, symbol, plots_dir, alerts):
                     success_count += 1
 
             print(f"Successfully generated {success_count}/{len(symbols)} "

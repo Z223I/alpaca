@@ -6,16 +6,17 @@ The remaining tasks are lower priority documentation and deployment tools:
 
 
 - [ ] No alerts in the last 30 minutes of the day.
-
+- [X] You must source ~/miniconda3/etc/profile.d/conda.sh && conda activate alpaca
 - [ ] Manually plot EMA20 and see if this would be an indicator to stop trading.
+- [ ] Update code/orb.py to plot EMA20.
 
 
 - [X] Update the analysis software to handle bearish alerts correctly.
 - [X] Turn Claude loose at improving ORB alert.
 
 - [ ] Update plot candle sticks to accept optional alerts.
-- [ ] Update orb.py: Accept a date arg; accept an optional symbol arg; combine alerts; plot
-- [ ] orb_alerts.py is to keep only the latest two historical data files per symbol.  Implement this when saving more data.
+- [ ] Update code/orb.py: Accept a date arg; accept an optional symbol arg; combine alerts; plot
+- [ ] Update code/orb_alerts.py to keep only the latest historical data file per symbol.  Implement this when saving more data.
 - [ ] Create method to add more stocks to the alerts.
 - [ ] Update orb chart to take optional bullish and bearish data.
 - [ ] Update orb chart to take optional s/r lines.
