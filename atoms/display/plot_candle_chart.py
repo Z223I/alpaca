@@ -215,12 +215,17 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
         # Adjust layout
         plt.tight_layout()
         
+        # Extract date from chart data and create date-specific subdirectory
+        chart_date_obj = symbol_data['timestamp'].iloc[0].date()
+        date_subdir = chart_date_obj.strftime('%Y%m%d')
+        date_specific_output_dir = os.path.join(output_dir, date_subdir)
+        
         # Create output directory if it doesn't exist
-        os.makedirs(output_dir, exist_ok=True)
+        os.makedirs(date_specific_output_dir, exist_ok=True)
         
         # Save the chart
         filename = f"{symbol}_candle_chart.png"
-        filepath = os.path.join(output_dir, filename)
+        filepath = os.path.join(date_specific_output_dir, filename)
         plt.savefig(filepath, dpi=300, bbox_inches='tight')
         
         # Close the plot to free memory
