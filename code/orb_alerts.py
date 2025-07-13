@@ -153,6 +153,9 @@ class ORBAlertSystem:
                 symbol_data = self.alert_engine.data_buffer.get_symbol_data(symbol)
                 
                 if symbol_data is not None and not symbol_data.empty:
+                    # Clean up old files for this symbol before saving new one
+                    self._cleanup_old_symbol_files(symbol)
+                    
                     # Save to CSV format for easy analysis
                     filename = f"{symbol}_{current_time.strftime('%Y%m%d_%H%M%S')}.csv"
                     filepath = self.daily_data_dir / "market_data" / filename
@@ -183,6 +186,42 @@ class ORBAlertSystem:
         except Exception as e:
             self.logger.error(f"Error saving historical data: {e}")
     
+    def _cleanup_old_symbol_files(self, symbol: str) -> None:
+        """
+        Remove old historical data files for a symbol, keeping only the latest.
+        
+        Args:
+            symbol: The symbol to clean up files for
+        """
+        try:
+            market_data_dir = self.daily_data_dir / "market_data"
+            
+            # Find all files for this symbol
+            symbol_files = list(market_data_dir.glob(f"{symbol}_*.csv"))
+            
+            if len(symbol_files) <= 1:
+                # No cleanup needed if 1 or fewer files exist
+                return
+            
+            # Sort files by modification time (newest first)
+            symbol_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+            
+            # Keep only the latest file, remove the rest
+            files_to_remove = symbol_files[1:]  # All except the first (newest)
+            
+            for old_file in files_to_remove:
+                try:
+                    old_file.unlink()
+                    self.logger.debug(f"Removed old data file: {old_file.name}")
+                except OSError as e:
+                    self.logger.warning(f"Could not remove old file {old_file.name}: {e}")
+            
+            if files_to_remove:
+                self.logger.info(f"Cleaned up {len(files_to_remove)} old data files for {symbol}")
+                
+        except Exception as e:
+            self.logger.error(f"Error cleaning up old files for {symbol}: {e}")
+    
     def _should_save_data(self) -> bool:
         """Check if it's time to save historical data."""
         if self.last_data_save is None:
@@ -191,7 +230,16 @@ class ORBAlertSystem:
         # Use Eastern Time for consistency with last_data_save
         et_tz = pytz.timezone('US/Eastern')
         current_time = datetime.now(et_tz)
-        return current_time - self.last_data_save >= self.data_save_interval
+        
+        # Ensure both timestamps are timezone-aware for comparison
+        if self.last_data_save.tzinfo is None:
+            # If last_data_save is timezone-naive, assume it's in Eastern Time
+            last_save_aware = et_tz.localize(self.last_data_save)
+        else:
+            # Convert to Eastern Time if it's in a different timezone
+            last_save_aware = self.last_data_save.astimezone(et_tz)
+        
+        return current_time - last_save_aware >= self.data_save_interval
     
     def _handle_alert(self, alert: ORBAlert) -> None:
         """
@@ -225,9 +273,15 @@ class ORBAlertSystem:
             alert_filename = f"alert_{alert.symbol}_{alert.timestamp.strftime('%Y%m%d_%H%M%S')}.json"
             
             if subdir:
-                alert_filepath = self.daily_data_dir / "alerts" / subdir / alert_filename
+                alert_dir = self.daily_data_dir / "alerts" / subdir
+                alert_filepath = alert_dir / alert_filename
+                # Ensure subdirectory exists
+                alert_dir.mkdir(parents=True, exist_ok=True)
             else:
-                alert_filepath = self.daily_data_dir / "alerts" / alert_filename
+                alert_dir = self.daily_data_dir / "alerts"
+                alert_filepath = alert_dir / alert_filename
+                # Ensure alerts directory exists
+                alert_dir.mkdir(parents=True, exist_ok=True)
             
             # Convert alert to dictionary for JSON serialization
             alert_data = {
@@ -463,6 +517,9 @@ class ORBAlertSystem:
                     symbol_data = bars_data.df[bars_data.df['symbol'] == symbol].copy()
                     
                     if not symbol_data.empty:
+                        # Clean up old opening range files for this symbol
+                        self._cleanup_old_opening_range_files(symbol, tmp_dir)
+                        
                         # Sort by timestamp
                         symbol_data = symbol_data.sort_values('timestamp')
                         
@@ -488,6 +545,41 @@ class ORBAlertSystem:
             
         except Exception as e:
             self.logger.error(f"Error saving opening range data to tmp: {e}")
+    
+    def _cleanup_old_opening_range_files(self, symbol: str, tmp_dir: Path) -> None:
+        """
+        Remove old opening range data files for a symbol, keeping only the latest.
+        
+        Args:
+            symbol: The symbol to clean up files for
+            tmp_dir: The tmp directory path
+        """
+        try:
+            # Find all opening range files for this symbol
+            symbol_files = list(tmp_dir.glob(f"{symbol}_opening_range_*.csv"))
+            
+            if len(symbol_files) <= 1:
+                # No cleanup needed if 1 or fewer files exist
+                return
+            
+            # Sort files by modification time (newest first)
+            symbol_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+            
+            # Keep only the latest file, remove the rest
+            files_to_remove = symbol_files[1:]  # All except the first (newest)
+            
+            for old_file in files_to_remove:
+                try:
+                    old_file.unlink()
+                    self.logger.debug(f"Removed old opening range file: {old_file.name}")
+                except OSError as e:
+                    self.logger.warning(f"Could not remove old opening range file {old_file.name}: {e}")
+            
+            if files_to_remove:
+                self.logger.info(f"Cleaned up {len(files_to_remove)} old opening range files for {symbol}")
+                
+        except Exception as e:
+            self.logger.error(f"Error cleaning up old opening range files for {symbol}: {e}")
     
     def _fetch_with_legacy_api(self, symbols, start_time, end_time):
         """Fetch historical data using legacy alpaca-trade-api."""

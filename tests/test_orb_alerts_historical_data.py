@@ -213,9 +213,10 @@ class TestORBAlertsHistoricalData:
         # Save alert data
         orb_alert_system._save_alert_data(sample_orb_alert)
         
-        # Verify JSON file was created
+        # Verify JSON file was created - bullish breakouts go to bullish subdirectory
         alerts_dir = orb_alert_system.daily_data_dir / "alerts"
-        json_files = list(alerts_dir.glob("alert_AAPL_*.json"))
+        bullish_dir = alerts_dir / "bullish"
+        json_files = list(bullish_dir.glob("alert_AAPL_*.json"))
         assert len(json_files) > 0
         
         # Verify JSON content
@@ -277,15 +278,21 @@ class TestORBAlertsHistoricalData:
     
     def test_periodic_data_save_timing(self, orb_alert_system):
         """Test periodic data save timing logic."""
+        import pytz
+        
         # Test initial state - should save data
         assert orb_alert_system._should_save_data() == True
         
-        # Set last save time to recent
-        orb_alert_system.last_data_save = datetime.now() - timedelta(minutes=2)
+        # Use Eastern Time for consistency
+        et_tz = pytz.timezone('US/Eastern')
+        current_time = datetime.now(et_tz)
+        
+        # Set last save time to recent (2 minutes ago)
+        orb_alert_system.last_data_save = current_time - timedelta(minutes=2)
         assert orb_alert_system._should_save_data() == False
         
-        # Set last save time to old enough
-        orb_alert_system.last_data_save = datetime.now() - timedelta(minutes=6)
+        # Set last save time to old enough (6 minutes ago)
+        orb_alert_system.last_data_save = current_time - timedelta(minutes=6)
         assert orb_alert_system._should_save_data() == True
     
     def test_data_save_interval_configuration(self, orb_alert_system):
@@ -438,9 +445,10 @@ class TestORBAlertsHistoricalData:
         # Test the alert callback handler
         orb_alert_system._handle_alert(sample_orb_alert)
         
-        # Verify alert was saved to historical data
+        # Verify alert was saved to historical data - bullish breakouts go to bullish subdirectory
         alerts_dir = orb_alert_system.daily_data_dir / "alerts"
-        json_files = list(alerts_dir.glob("alert_AAPL_*.json"))
+        bullish_dir = alerts_dir / "bullish"
+        json_files = list(bullish_dir.glob("alert_AAPL_*.json"))
         assert len(json_files) > 0
     
     def test_data_storage_file_naming_convention(self, orb_alert_system, sample_market_data, sample_orb_alert):
@@ -481,7 +489,8 @@ class TestORBAlertsHistoricalData:
         orb_alert_system._save_alert_data(sample_orb_alert)
         
         alerts_dir = orb_alert_system.daily_data_dir / "alerts"
-        json_files = list(alerts_dir.glob("alert_AAPL_*.json"))
+        bullish_dir = alerts_dir / "bullish"
+        json_files = list(bullish_dir.glob("alert_AAPL_*.json"))
         
         # Verify alert file name format: alert_SYMBOL_YYYYMMDD_HHMMSS.json
         assert len(json_files) > 0
