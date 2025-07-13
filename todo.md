@@ -5,18 +5,24 @@ The remaining tasks are lower priority documentation and deployment tools:
   - Comprehensive API documentation
 
 
-- [ ] Capture Conda environment and rebuild system.
+- [ ] No alerts in the last 30 minutes of the day.
+
+- [ ] Manually plot EMA20 and see if this would be an indicator to stop trading.
 
 
+- [X] Update the analysis software to handle bearish alerts correctly.
+- [X] Turn Claude loose at improving ORB alert.
 
-
+- [ ] Update plot candle sticks to accept optional alerts.
+- [ ] Update orb.py: Accept a date arg; accept an optional symbol arg; combine alerts; plot
+- [ ] orb_alerts.py is to keep only the latest two historical data files per symbol.  Implement this when saving more data.
 - [ ] Create method to add more stocks to the alerts.
 - [ ] Update orb chart to take optional bullish and bearish data.
 - [ ] Update orb chart to take optional s/r lines.
 - [ ] Accumulate stock data in a single file per stock per day.
 - [ ] Fix Phase 3 startup it is currently bypassed
 - [ ] Update alpaca.py to take .env as argument.
-- [ ] atoms.monitoring.performance_tracker - WARNING - High memory usage: 82.3%
+- [X] atoms.monitoring.performance_tracker - WARNING - High memory usage: 82.3%
 - [ ] Update to do trailing stop. Create new method UStrailingStop()
 - [ ] Check the return values of orders.
 - [X] Focus on creating ORB filter.
@@ -46,6 +52,8 @@ The remaining tasks are lower priority documentation and deployment tools:
         python code/alpaca.py --get_latest_quote --symbol NINE
         python code/alpaca.py --buy --symbol NINE --take_profit 1.45
         python code/alpaca.py --buy --symbol AAPL --take_profit 210.00 --submit
+        python3 code/alpaca.py --buy --symbol AAPL --stop_price 140.00 --take_profit 200.00 --submit
+        python3 code/alpaca.py --buy --symbol STKH --stop_price 2.50 --take_profit 3.10
 
         # quantity will be automatically calculated.
         python3 code/alpaca.py --future_bracket_order --symbol AAPL --limit_price 145.00 --stop_price 140.00 --take_profit 160.00 --submit
