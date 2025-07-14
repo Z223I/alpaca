@@ -11,6 +11,10 @@ The remaining tasks are lower priority documentation and deployment tools:
 - [X] Update code/orb.py to plot EMA20.
 
 
+
+- [ ] Update code/orb.py to do super alerts instead of alerts.
+
+
 - [X] Update the analysis software to handle bearish alerts correctly.
 - [X] Turn Claude loose at improving ORB alert.
 - [ ] Stop printing "INFO - Cleaned up" notifications on deleting historical data.

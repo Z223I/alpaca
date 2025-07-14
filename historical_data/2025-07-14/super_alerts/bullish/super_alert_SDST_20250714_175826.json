@@ -1,0 +1,44 @@
+{
+  "symbol": "SDST",
+  "timestamp": "2025-07-14T17:58:26-0400",
+  "original_alert_timestamp": "2025-07-14T10:58:00",
+  "alert_type": "super_alert",
+  "trigger_condition": "signal_price_reached",
+  "original_alert": {
+    "symbol": "SDST",
+    "timestamp": "2025-07-14T10:58:00",
+    "current_price": 0.6038,
+    "orb_high": 0.5284,
+    "orb_low": 0.4503,
+    "orb_range": 0.0781,
+    "orb_midpoint": 0.48934999999999995,
+    "breakout_type": "bullish_breakout",
+    "breakout_percentage": 14.269492808478429,
+    "volume_ratio": 2.8272239238292114,
+    "confidence_score": 0.9160470899352804,
+    "priority": "HIGH",
+    "confidence_level": "VERY_HIGH",
+    "recommended_stop_loss": 0.558515,
+    "recommended_take_profit": 0.6279520000000001,
+    "alert_message": "[10:58:00] ORB ALERT: SDST \u2191 $0.60 (+14.27% vs ORB High)\nVolume: 2.8x avg | Confidence: 0.92 | Priority: HIGH\nStop: $0.56 | Target: $0.63"
+  },
+  "signal_analysis": {
+    "signal_price": 0.55,
+    "resistance_price": 0.69,
+    "current_price": 0.6038,
+    "penetration_percent": 38.43,
+    "range_percent": 1.25,
+    "signal_reached": true,
+    "resistance_reached": false
+  },
+  "metrics": {
+    "signal_to_resistance_range": 0.1399999999999999,
+    "price_above_signal": 0.05379999999999996,
+    "distance_to_resistance": 0.08619999999999994
+  },
+  "risk_assessment": {
+    "entry_price": 0.55,
+    "target_price": 0.69,
+    "current_risk_reward": 1.6022304832713756
+  }
+}

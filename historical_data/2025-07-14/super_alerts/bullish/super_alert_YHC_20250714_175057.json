@@ -1,0 +1,43 @@
+{
+  "symbol": "YHC",
+  "timestamp": "2025-07-14T15:13:00",
+  "alert_type": "super_alert",
+  "trigger_condition": "signal_price_reached",
+  "original_alert": {
+    "symbol": "YHC",
+    "timestamp": "2025-07-14T15:13:00",
+    "current_price": 4.41,
+    "orb_high": 3.755,
+    "orb_low": 3.42,
+    "orb_range": 0.33499999999999996,
+    "orb_midpoint": 3.5875,
+    "breakout_type": "bullish_breakout",
+    "breakout_percentage": 17.443408788282298,
+    "volume_ratio": 5.632786885245902,
+    "confidence_score": 0.9437729385964913,
+    "priority": "HIGH",
+    "confidence_level": "VERY_HIGH",
+    "recommended_stop_loss": 4.07925,
+    "recommended_take_profit": 4.5864,
+    "alert_message": "[15:13:00] ORB ALERT: YHC \u2191 $4.41 (+17.44% vs ORB High)\nVolume: 5.6x avg | Confidence: 0.94 | Priority: HIGH\nStop: $4.08 | Target: $4.59"
+  },
+  "signal_analysis": {
+    "signal_price": 3.77,
+    "resistance_price": 4.89,
+    "current_price": 4.41,
+    "penetration_percent": 57.14,
+    "range_percent": 1.3,
+    "signal_reached": true,
+    "resistance_reached": false
+  },
+  "metrics": {
+    "signal_to_resistance_range": 1.1199999999999997,
+    "price_above_signal": 0.6400000000000001,
+    "distance_to_resistance": 0.47999999999999954
+  },
+  "risk_assessment": {
+    "entry_price": 3.77,
+    "target_price": 4.89,
+    "current_risk_reward": 0.7499999999999991
+  }
+}
