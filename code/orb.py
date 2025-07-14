@@ -84,36 +84,36 @@ class ORB:
 
     def _load_alerts_for_symbol(self, symbol: str, target_date: date) -> List[Dict[str, Any]]:
         """
-        Load alerts for a specific symbol and date from historical_data/alerts.
+        Load super alerts for a specific symbol and date from historical_data/super_alerts.
         
         Args:
-            symbol: Stock symbol to load alerts for
-            target_date: Date to load alerts for
+            symbol: Stock symbol to load super alerts for
+            target_date: Date to load super alerts for
             
         Returns:
-            List of alert dictionaries containing timestamp, type, and alert data
+            List of super alert dictionaries containing timestamp, type, and alert data
         """
         alerts = []
         
         try:
             # Format date as YYYY-MM-DD for directory structure
             date_str = target_date.strftime('%Y-%m-%d')
-            alerts_base_dir = os.path.join('historical_data', date_str, 'alerts')
+            alerts_base_dir = os.path.join('historical_data', date_str, 'super_alerts')
             
             if not os.path.exists(alerts_base_dir):
                 if self.isDebugging:
-                    print(f"DEBUG: No alerts directory found for date {date_str}")
+                    print(f"DEBUG: No super alerts directory found for date {date_str}")
                 return alerts
             
-            # Check both bullish and bearish alert directories
+            # Check both bullish and bearish super alert directories
             for alert_type in ['bullish', 'bearish']:
                 alert_dir = os.path.join(alerts_base_dir, alert_type)
                 
                 if not os.path.exists(alert_dir):
                     continue
                     
-                # Look for alert files matching the symbol
-                alert_pattern = f"alert_{symbol}_*.json"
+                # Look for super alert files matching the symbol
+                alert_pattern = f"super_alert_{symbol}_*.json"
                 alert_files = glob.glob(os.path.join(alert_dir, alert_pattern))
                 
                 for alert_file in alert_files:
@@ -127,35 +127,58 @@ class ORB:
                         # Parse timestamp to datetime object and handle timezone
                         if 'timestamp' in alert_data:
                             timestamp_str = alert_data['timestamp']
-                            # Parse the timestamp - alerts appear to be in ET timezone
-                            alert_dt = datetime.fromisoformat(timestamp_str)
-                            
-                            # If timezone-naive, assume it's in ET timezone to match market data
-                            if alert_dt.tzinfo is None:
-                                et_tz = pytz.timezone('America/New_York')
-                                alert_dt = et_tz.localize(alert_dt)
+                            try:
+                                # Handle timezone format: convert -0400 to -04:00 for Python compatibility
+                                if timestamp_str.endswith(('-0400', '-0500')):
+                                    # Insert colon in timezone offset for proper ISO format
+                                    timestamp_str = timestamp_str[:-2] + ':' + timestamp_str[-2:]
+                                
+                                # Parse the timestamp - super alerts are in ET timezone with offset
+                                alert_dt = datetime.fromisoformat(timestamp_str)
+                                
+                            except ValueError:
+                                # Fallback: try parsing without timezone, then localize to ET
+                                try:
+                                    if '+' in timestamp_str or timestamp_str.count('-') > 2:
+                                        # Remove timezone if present for fallback parsing
+                                        timestamp_base = timestamp_str.split('+')[0].split('T')[0] + 'T' + timestamp_str.split('T')[1].split('-')[0].split('+')[0]
+                                    else:
+                                        timestamp_base = timestamp_str
+                                    
+                                    alert_dt = datetime.fromisoformat(timestamp_base)
+                                    # If timezone-naive, assume it's in ET timezone
+                                    if alert_dt.tzinfo is None:
+                                        et_tz = pytz.timezone('America/New_York')
+                                        alert_dt = et_tz.localize(alert_dt)
+                                except ValueError:
+                                    # Skip this alert if we can't parse the timestamp
+                                    continue
                             
                             alert_data['timestamp_dt'] = alert_dt
                         
                         alerts.append(alert_data)
                         
                         if self.isDebugging:
-                            print(f"DEBUG: Loaded {alert_type} alert for {symbol} at {alert_data.get('timestamp', 'unknown time')}")
+                            print(f"DEBUG: Loaded {alert_type} super alert for {symbol} at {alert_data.get('timestamp', 'unknown time')}")
                             
                     except Exception as e:
-                        print(f"Warning: Error loading alert file {alert_file}: {e}")
+                        print(f"Warning: Error loading super alert file {alert_file}: {e}")
                         continue
             
-            # Sort alerts by timestamp
-            alerts.sort(key=lambda x: x.get('timestamp_dt', datetime.min))
+            # Sort super alerts by timestamp (use timezone-aware safe min datetime)
+            et_tz = pytz.timezone('America/New_York')
+            # Use a safe minimum date that can be localized (year 1900 is safe)
+            safe_min = datetime(1900, 1, 1)
+            min_dt = et_tz.localize(safe_min)
+            alerts.sort(key=lambda x: x.get('timestamp_dt', min_dt))
             
             if self.isDebugging:
-                print(f"DEBUG: Loaded {len(alerts)} total alerts for {symbol} on {date_str}")
+                print(f"DEBUG: Loaded {len(alerts)} total super alerts for {symbol} on {date_str}")
             
             return alerts
             
         except Exception as e:
-            print(f"Error loading alerts for {symbol} on {target_date}: {e}")
+            print(f"Error loading super alerts for {symbol} on {target_date}: {e}")
             return alerts
 
     def _select_csv_file(self) -> Optional[str]:
@@ -1076,14 +1099,14 @@ class ORB:
             # Generate chart for each symbol
             success_count = 0
             for symbol in symbols:
-                # Load alerts for this symbol if csv_date is available
+                # Load super alerts for this symbol if csv_date is available
                 alerts = []
                 if self.csv_date:
                     alerts = self._load_alerts_for_symbol(symbol, self.csv_date)
                     if alerts:
-                        print(f"Loaded {len(alerts)} alerts for {symbol}")
+                        print(f"Loaded {len(alerts)} super alerts for {symbol}")
                 
-                # Generate chart with alerts
+                # Generate chart with super alerts
                 if plot_candle_chart(self.market_df, symbol, plots_dir, alerts):
                     success_count += 1
 

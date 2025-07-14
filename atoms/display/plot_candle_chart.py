@@ -146,7 +146,7 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
             
             # Convert chart times to timezone-aware for proper comparison
             # Market data should be timezone-aware, but if not, assume ET
-            if hasattr(chart_start_time, 'tz') and chart_start_time.tz is None:
+            if chart_start_time.tzinfo is None:
                 chart_start_time = et_tz.localize(chart_start_time)
                 chart_end_time = et_tz.localize(chart_end_time)
             
@@ -159,7 +159,7 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
                     continue
                 
                 # Ensure alert time is timezone-aware for proper comparison
-                if hasattr(alert_time, 'tz') and alert_time.tz is None:
+                if alert_time.tzinfo is None:
                     alert_time = et_tz.localize(alert_time)
                 
                 # Check if alert time is within chart timeframe
