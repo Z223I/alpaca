@@ -151,6 +151,8 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
                 chart_end_time = et_tz.localize(chart_end_time)
             
             alert_count = 0
+            print(f"DEBUG: Chart timeframe for {symbol}: {chart_start_time} to {chart_end_time}")
+            
             for alert in alerts:
                 alert_time = alert.get('timestamp_dt')
                 alert_type = alert.get('alert_type', 'unknown')
@@ -162,8 +164,12 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
                 if alert_time.tzinfo is None:
                     alert_time = et_tz.localize(alert_time)
                 
+                # Debug: Show each alert time comparison
+                within_range = chart_start_time <= alert_time <= chart_end_time
+                print(f"DEBUG: Alert at {alert_time} ({'in' if within_range else 'out of'} range)")
+                
                 # Check if alert time is within chart timeframe
-                if chart_start_time <= alert_time <= chart_end_time:
+                if within_range:
                     # Set color based on alert type
                     color = 'green' if alert_type == 'bullish' else 'red'
                     alpha = 0.3
@@ -182,7 +188,7 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
                     alert_count += 1
             
             if alert_count > 0:
-                print(f"Plotted {alert_count} alerts for {symbol}")
+                print(f"Plotted {alert_count} super alerts for {symbol}")
 
         # Add legend if any indicators were calculated
         if ema_success or ema20_success or vwap_success:

@@ -136,7 +136,7 @@ class ORB:
                                 # Parse the timestamp - super alerts are in ET timezone with offset
                                 alert_dt = datetime.fromisoformat(timestamp_str)
                                 
-                            except ValueError:
+                            except ValueError as ve1:
                                 # Fallback: try parsing without timezone, then localize to ET
                                 try:
                                     if '+' in timestamp_str or timestamp_str.count('-') > 2:
@@ -150,9 +150,18 @@ class ORB:
                                     if alert_dt.tzinfo is None:
                                         et_tz = pytz.timezone('America/New_York')
                                         alert_dt = et_tz.localize(alert_dt)
-                                except ValueError:
-                                    # Skip this alert if we can't parse the timestamp
+                                except (ValueError, OSError) as ve2:
+                                    # More specific error reporting
+                                    if self.isDebugging:
+                                        print(f"DEBUG: Failed to parse timestamp '{timestamp_str}' from {alert_file}")
+                                        print(f"DEBUG: First error: {ve1}")
+                                        print(f"DEBUG: Second error: {ve2}")
                                     continue
+                            except OSError as oe:
+                                # Handle "date value out of range" errors
+                                if self.isDebugging:
+                                    print(f"DEBUG: Date out of range for timestamp '{timestamp_str}' from {alert_file}: {oe}")
+                                continue
                             
                             alert_data['timestamp_dt'] = alert_dt
                         
@@ -165,12 +174,21 @@ class ORB:
                         print(f"Warning: Error loading super alert file {alert_file}: {e}")
                         continue
             
-            # Sort super alerts by timestamp (use timezone-aware safe min datetime)
-            et_tz = pytz.timezone('America/New_York')
-            # Use a safe minimum date that can be localized (year 1900 is safe)
-            safe_min = datetime(1900, 1, 1)
-            min_dt = et_tz.localize(safe_min)
-            alerts.sort(key=lambda x: x.get('timestamp_dt', min_dt))
+            # Sort super alerts by timestamp 
+            def safe_sort_key(alert):
+                timestamp_dt = alert.get('timestamp_dt')
+                if timestamp_dt is None:
+                    # Return a timezone-aware max datetime for alerts without timestamps
+                    return datetime.max.replace(tzinfo=pytz.UTC)
+                elif timestamp_dt.tzinfo is None:
+                    # If timestamp is timezone-naive, make it timezone-aware (assume ET)
+                    et_tz = pytz.timezone('America/New_York')
+                    return et_tz.localize(timestamp_dt)
+                else:
+                    # Already timezone-aware
+                    return timestamp_dt
+            
+            alerts.sort(key=safe_sort_key)
             
             if self.isDebugging:
                 print(f"DEBUG: Loaded {len(alerts)} total super alerts for {symbol} on {date_str}")
