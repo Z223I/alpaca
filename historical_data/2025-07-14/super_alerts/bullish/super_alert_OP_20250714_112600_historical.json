@@ -1,8 +1,11 @@
 {
   "symbol": "OP",
-  "timestamp": "2025-07-14T11:26:00",
+  "timestamp": "2025-07-14T19:27:00-0400",
+  "original_alert_timestamp": "2025-07-14T11:26:00",
   "alert_type": "super_alert",
   "trigger_condition": "signal_price_reached",
+  "processing_mode": "historical",
+  "source_alert_file": "historical_data/2025-07-14/alerts/bullish/alert_OP_20250714_112600.json",
   "original_alert": {
     "symbol": "OP",
     "timestamp": "2025-07-14T11:26:00",

@@ -140,7 +140,6 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
         
         # Plot alerts as vertical bars if provided
         if alerts:
-            # Convert symbol_data timestamps to timezone-naive for comparison
             chart_start_time = symbol_data['timestamp'].min()
             chart_end_time = symbol_data['timestamp'].max()
             
@@ -168,27 +167,45 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
                 within_range = chart_start_time <= alert_time <= chart_end_time
                 print(f"DEBUG: Alert at {alert_time} ({'in' if within_range else 'out of'} range)")
                 
-                # Check if alert time is within chart timeframe
-                if within_range:
-                    # Set color based on alert type
-                    color = 'green' if alert_type == 'bullish' else 'red'
-                    alpha = 0.3
-                    
-                    # Draw vertical line spanning the price chart
-                    y_min, y_max = ax1.get_ylim()
-                    ax1.axvline(x=alert_time, color=color, alpha=alpha, linewidth=2, linestyle='-')
-                    
-                    # Add small label at top of chart
-                    label_y = y_max - (y_max - y_min) * 0.05  # 5% from top
-                    alert_symbol = '↑' if alert_type == 'bullish' else '↓'
-                    ax1.text(alert_time, label_y, alert_symbol, 
-                            color=color, fontsize=12, fontweight='bold', 
-                            ha='center', va='top')
-                    
-                    alert_count += 1
+                # Show ALL alerts regardless of chart timeframe (removed market hours filtering)
+                # Set color based on alert type
+                color = 'green' if alert_type == 'bullish' else 'red'
+                alpha = 0.3
+                
+                # For alerts outside the chart timeframe, draw them at the chart edges
+                if alert_time < chart_start_time:
+                    # Draw at left edge of chart
+                    plot_time = chart_start_time
+                    alpha = 0.6  # Make edge alerts more visible
+                elif alert_time > chart_end_time:
+                    # Draw at right edge of chart
+                    plot_time = chart_end_time
+                    alpha = 0.6  # Make edge alerts more visible
+                else:
+                    # Draw at actual time within chart
+                    plot_time = alert_time
+                
+                # Draw vertical line spanning the price chart
+                y_min, y_max = ax1.get_ylim()
+                ax1.axvline(x=plot_time, color=color, alpha=alpha, linewidth=2, linestyle='-')
+                
+                # Add small label at top of chart
+                label_y = y_max - (y_max - y_min) * 0.05  # 5% from top
+                alert_symbol = '↑' if alert_type == 'bullish' else '↓'
+                
+                # Add edge indicator for out-of-range alerts
+                if not within_range:
+                    edge_indicator = '◀' if alert_time < chart_start_time else '▶'
+                    alert_symbol = edge_indicator + alert_symbol
+                
+                ax1.text(plot_time, label_y, alert_symbol, 
+                        color=color, fontsize=12, fontweight='bold', 
+                        ha='center', va='top')
+                
+                alert_count += 1
             
             if alert_count > 0:
-                print(f"Plotted {alert_count} super alerts for {symbol}")
+                print(f"Plotted {alert_count} super alerts for {symbol} (including out-of-market-hours alerts)")
 
         # Add legend if any indicators were calculated
         if ema_success or ema20_success or vwap_success:

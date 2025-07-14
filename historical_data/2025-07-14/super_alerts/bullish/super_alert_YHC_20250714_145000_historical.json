@@ -1,9 +1,11 @@
 {
   "symbol": "YHC",
-  "timestamp": "2025-07-14T17:58:28-0400",
+  "timestamp": "2025-07-14T19:27:00-0400",
   "original_alert_timestamp": "2025-07-14T14:50:00",
   "alert_type": "super_alert",
   "trigger_condition": "signal_price_reached",
+  "processing_mode": "historical",
+  "source_alert_file": "historical_data/2025-07-14/alerts/bullish/alert_YHC_20250714_145000.json",
   "original_alert": {
     "symbol": "YHC",
     "timestamp": "2025-07-14T14:50:00",
