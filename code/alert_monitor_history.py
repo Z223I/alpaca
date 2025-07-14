@@ -196,10 +196,8 @@ class AlertMonitorHistory:
             current_price = alert_data['current_price']
             original_timestamp = alert_data['timestamp']
             
-            # Create ET timestamp for when super alert is generated
-            et_tz = pytz.timezone('US/Eastern')
-            super_alert_time = datetime.now(et_tz)
-            et_timestamp = super_alert_time.strftime('%Y-%m-%dT%H:%M:%S%z')
+            # Use original alert timestamp as the super alert timestamp for realism
+            et_timestamp = original_timestamp
             
             # Calculate metrics
             penetration = symbol_info.calculate_penetration(current_price)
@@ -237,8 +235,24 @@ class AlertMonitorHistory:
             }
             
             # Save super alert using the original alert timestamp for filename
-            original_dt = datetime.fromisoformat(original_timestamp.replace('Z', '+00:00'))
-            filename = f"super_alert_{symbol}_{original_dt.strftime('%Y%m%d_%H%M%S')}_historical.json"
+            try:
+                # Handle different timestamp formats
+                if original_timestamp.endswith('Z'):
+                    original_dt = datetime.fromisoformat(original_timestamp.replace('Z', '+00:00'))
+                elif '+' in original_timestamp or original_timestamp.count('-') > 2:
+                    original_dt = datetime.fromisoformat(original_timestamp)
+                else:
+                    # Assume no timezone info, parse as-is and assume ET
+                    original_dt = datetime.fromisoformat(original_timestamp)
+                    if original_dt.tzinfo is None:
+                        et_tz = pytz.timezone('US/Eastern')
+                        original_dt = et_tz.localize(original_dt)
+                
+                filename = f"super_alert_{symbol}_{original_dt.strftime('%Y%m%d_%H%M%S')}_historical.json"
+            except Exception as e:
+                # Fallback to a safe filename if timestamp parsing fails
+                self.logger.warning(f"Could not parse timestamp '{original_timestamp}' for filename: {e}")
+                filename = f"super_alert_{symbol}_unknown_time_historical.json"
             filepath = self.super_alerts_dir / filename
             
             with open(filepath, 'w') as f:

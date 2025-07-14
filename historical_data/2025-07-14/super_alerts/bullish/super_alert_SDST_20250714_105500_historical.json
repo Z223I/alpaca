@@ -1,6 +1,6 @@
 {
   "symbol": "SDST",
-  "timestamp": "2025-07-14T19:27:00-0400",
+  "timestamp": "2025-07-14T10:55:00",
   "original_alert_timestamp": "2025-07-14T10:55:00",
   "alert_type": "super_alert",
   "trigger_condition": "signal_price_reached",
