@@ -1,0 +1,18 @@
+{
+  "symbol": "DVLT",
+  "timestamp": "2025-07-14T15:41:00",
+  "current_price": 0.7178,
+  "orb_high": 0.806,
+  "orb_low": 0.748,
+  "orb_range": 0.05800000000000005,
+  "orb_midpoint": 0.777,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 4.0374331550802145,
+  "volume_ratio": 2.384404007183504,
+  "confidence_score": 0.8205673996727763,
+  "priority": "MEDIUM",
+  "confidence_level": "HIGH",
+  "recommended_stop_loss": 0.771635,
+  "recommended_take_profit": 0.6890879999999999,
+  "alert_message": "[15:41:00] ORB ALERT: DVLT \u2193 $0.72 (+4.04% vs ORB Low)\nVolume: 2.4x avg | Confidence: 0.82 | Priority: MEDIUM\nStop: $0.77 | Target: $0.69"
+}

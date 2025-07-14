@@ -1,0 +1,27 @@
+{
+  "timestamp": "2025-07-14T12:01:02.442228-04:00",
+  "symbols_count": 18,
+  "symbols": [
+    "ABVE",
+    "ALBT",
+    "BTCM",
+    "CLIK",
+    "DARE",
+    "DVLT",
+    "EDHL",
+    "MGRM",
+    "OP",
+    "PHGE",
+    "RANI",
+    "SDST",
+    "SINT",
+    "SNTI",
+    "TER",
+    "VSEE",
+    "WINT",
+    "YHC"
+  ],
+  "save_interval_minutes": 10.0,
+  "format": "CSV",
+  "total_records_saved": 1385
+}

@@ -1,0 +1,18 @@
+{
+  "symbol": "MGRM",
+  "timestamp": "2025-07-14T15:58:00",
+  "current_price": 5.75,
+  "orb_high": 5.61,
+  "orb_low": 5.26,
+  "orb_range": 0.35000000000000053,
+  "orb_midpoint": 5.4350000000000005,
+  "breakout_type": "bullish_breakout",
+  "breakout_percentage": 2.4955436720142545,
+  "volume_ratio": 3.9737991266375547,
+  "confidence_score": 0.872985530190766,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 5.3187500000000005,
+  "recommended_take_profit": 5.98,
+  "alert_message": "[15:58:00] ORB ALERT: MGRM \u2191 $5.75 (+2.50% vs ORB High)\nVolume: 4.0x avg | Confidence: 0.87 | Priority: HIGH\nStop: $5.32 | Target: $5.98"
+}

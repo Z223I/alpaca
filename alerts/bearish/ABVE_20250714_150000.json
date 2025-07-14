@@ -1,0 +1,18 @@
+{
+  "symbol": "ABVE",
+  "timestamp": "2025-07-14T15:00:00",
+  "current_price": 2.255,
+  "orb_high": 2.855,
+  "orb_low": 2.605,
+  "orb_range": 0.25,
+  "orb_midpoint": 2.73,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 13.435700575815742,
+  "volume_ratio": 2.5768667642752563,
+  "confidence_score": 0.8462134035438887,
+  "priority": "MEDIUM",
+  "confidence_level": "HIGH",
+  "recommended_stop_loss": 2.4241249999999996,
+  "recommended_take_profit": 2.1647999999999996,
+  "alert_message": "[15:00:00] ORB ALERT: ABVE \u2193 $2.25 (+13.44% vs ORB Low)\nVolume: 2.6x avg | Confidence: 0.85 | Priority: MEDIUM\nStop: $2.42 | Target: $2.16"
+}

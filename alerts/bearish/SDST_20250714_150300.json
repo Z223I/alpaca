@@ -1,0 +1,18 @@
+{
+  "symbol": "SDST",
+  "timestamp": "2025-07-14T15:03:00",
+  "current_price": 0.4382,
+  "orb_high": 0.5284,
+  "orb_low": 0.4503,
+  "orb_range": 0.0781,
+  "orb_midpoint": 0.48934999999999995,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 2.6870974905618477,
+  "volume_ratio": 1.6005708201637763,
+  "confidence_score": 0.8382388361212799,
+  "priority": "MEDIUM",
+  "confidence_level": "HIGH",
+  "recommended_stop_loss": 0.47106499999999996,
+  "recommended_take_profit": 0.420672,
+  "alert_message": "[15:03:00] ORB ALERT: SDST \u2193 $0.44 (+2.69% vs ORB Low)\nVolume: 1.6x avg | Confidence: 0.84 | Priority: MEDIUM\nStop: $0.47 | Target: $0.42"
+}

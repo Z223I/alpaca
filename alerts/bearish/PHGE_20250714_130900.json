@@ -1,0 +1,18 @@
+{
+  "symbol": "PHGE",
+  "timestamp": "2025-07-14T13:09:00",
+  "current_price": 0.4151,
+  "orb_high": 0.7732,
+  "orb_low": 0.4496,
+  "orb_range": 0.3236,
+  "orb_midpoint": 0.6113999999999999,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 7.673487544483979,
+  "volume_ratio": 1.6821868428957645,
+  "confidence_score": 0.8304897413745234,
+  "priority": "MEDIUM",
+  "confidence_level": "HIGH",
+  "recommended_stop_loss": 0.44623250000000003,
+  "recommended_take_profit": 0.398496,
+  "alert_message": "[13:09:00] ORB ALERT: PHGE \u2193 $0.42 (+7.67% vs ORB Low)\nVolume: 1.7x avg | Confidence: 0.83 | Priority: MEDIUM\nStop: $0.45 | Target: $0.40"
+}

@@ -13,8 +13,8 @@ The remaining tasks are lower priority documentation and deployment tools:
 
 - [X] Update the analysis software to handle bearish alerts correctly.
 - [X] Turn Claude loose at improving ORB alert.
-
-- [ ] Update plot candle sticks to accept optional alerts.
+- [ ] Stop printing "INFO - Cleaned up" notifications on deleting historical data.
+- [?] Update plot candle sticks to accept optional alerts.
 - [ ] Update code/orb.py: Accept a date arg; accept an optional symbol arg; combine alerts; plot
 - [ ] Update code/orb_alerts.py to keep only the latest historical data file per symbol.  Implement this when saving more data.
 - [ ] Create method to add more stocks to the alerts.

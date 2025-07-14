@@ -1,0 +1,18 @@
+{
+  "symbol": "RANI",
+  "timestamp": "2025-07-14T14:58:00",
+  "current_price": 0.6599,
+  "orb_high": 0.8659,
+  "orb_low": 0.77,
+  "orb_range": 0.09589999999999999,
+  "orb_midpoint": 0.81795,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 14.298701298701294,
+  "volume_ratio": 7.554791458927896,
+  "confidence_score": 0.9001142101161679,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 0.7093925,
+  "recommended_take_profit": 0.6335040000000001,
+  "alert_message": "[14:58:00] ORB ALERT: RANI \u2193 $0.66 (+14.30% vs ORB Low)\nVolume: 7.6x avg | Confidence: 0.90 | Priority: HIGH\nStop: $0.71 | Target: $0.63"
+}

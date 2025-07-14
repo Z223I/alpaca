@@ -1,0 +1,18 @@
+{
+  "symbol": "YHC",
+  "timestamp": "2025-07-14T15:01:00",
+  "current_price": 3.93,
+  "orb_high": 3.755,
+  "orb_low": 3.42,
+  "orb_range": 0.33499999999999996,
+  "orb_midpoint": 3.5875,
+  "breakout_type": "bullish_breakout",
+  "breakout_percentage": 4.660452729693749,
+  "volume_ratio": 3.336610410180785,
+  "confidence_score": 0.9243365601314977,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 3.6352500000000005,
+  "recommended_take_profit": 4.0872,
+  "alert_message": "[15:01:00] ORB ALERT: YHC \u2191 $3.93 (+4.66% vs ORB High)\nVolume: 3.3x avg | Confidence: 0.92 | Priority: HIGH\nStop: $3.64 | Target: $4.09"
+}

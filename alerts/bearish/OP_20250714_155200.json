@@ -1,0 +1,18 @@
+{
+  "symbol": "OP",
+  "timestamp": "2025-07-14T15:52:00",
+  "current_price": 1.925,
+  "orb_high": 2.3,
+  "orb_low": 2.02,
+  "orb_range": 0.2799999999999998,
+  "orb_midpoint": 2.16,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 4.702970297029702,
+  "volume_ratio": 2.3051064510965262,
+  "confidence_score": 0.8640585041918822,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 2.069375,
+  "recommended_take_profit": 1.8479999999999999,
+  "alert_message": "[15:52:00] ORB ALERT: OP \u2193 $1.93 (+4.70% vs ORB Low)\nVolume: 2.3x avg | Confidence: 0.86 | Priority: HIGH\nStop: $2.07 | Target: $1.85"
+}

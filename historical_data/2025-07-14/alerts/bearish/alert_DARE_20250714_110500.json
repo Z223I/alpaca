@@ -1,0 +1,18 @@
+{
+  "symbol": "DARE",
+  "timestamp": "2025-07-14T11:05:00",
+  "current_price": 4.73,
+  "orb_high": 9.1,
+  "orb_low": 7.415,
+  "orb_range": 1.6849999999999996,
+  "orb_midpoint": 8.2575,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 36.21038435603506,
+  "volume_ratio": 2.2466342327855675,
+  "confidence_score": 0.8626951472041091,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 5.0847500000000005,
+  "recommended_take_profit": 4.5408,
+  "alert_message": "[11:05:00] ORB ALERT: DARE \u2193 $4.73 (+36.21% vs ORB Low)\nVolume: 2.2x avg | Confidence: 0.86 | Priority: HIGH\nStop: $5.08 | Target: $4.54"
+}

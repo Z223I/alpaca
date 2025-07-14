@@ -1,0 +1,18 @@
+{
+  "symbol": "VSEE",
+  "timestamp": "2025-07-14T14:34:00",
+  "current_price": 1.245,
+  "orb_high": 1.54,
+  "orb_low": 1.44,
+  "orb_range": 0.10000000000000009,
+  "orb_midpoint": 1.49,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 13.541666666666657,
+  "volume_ratio": 2.871205906480722,
+  "confidence_score": 0.8379857825765531,
+  "priority": "MEDIUM",
+  "confidence_level": "HIGH",
+  "recommended_stop_loss": 1.338375,
+  "recommended_take_profit": 1.1952,
+  "alert_message": "[14:34:00] ORB ALERT: VSEE \u2193 $1.25 (+13.54% vs ORB Low)\nVolume: 2.9x avg | Confidence: 0.84 | Priority: MEDIUM\nStop: $1.34 | Target: $1.20"
+}

@@ -1,0 +1,18 @@
+{
+  "symbol": "CLIK",
+  "timestamp": "2025-07-14T15:18:00",
+  "current_price": 0.4269,
+  "orb_high": 0.5101,
+  "orb_low": 0.4693,
+  "orb_range": 0.0408,
+  "orb_midpoint": 0.4897,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 9.03473258043895,
+  "volume_ratio": 1.6,
+  "confidence_score": 0.7983269864471879,
+  "priority": "MEDIUM",
+  "confidence_level": "HIGH",
+  "recommended_stop_loss": 0.4589175,
+  "recommended_take_profit": 0.40982399999999997,
+  "alert_message": "[15:18:00] ORB ALERT: CLIK \u2193 $0.43 (+9.03% vs ORB Low)\nVolume: 1.6x avg | Confidence: 0.80 | Priority: MEDIUM\nStop: $0.46 | Target: $0.41"
+}
