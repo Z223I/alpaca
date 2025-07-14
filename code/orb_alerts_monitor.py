@@ -268,7 +268,12 @@ class ORBAlertMonitor:
         try:
             symbol = alert_data['symbol']
             current_price = alert_data['current_price']
-            timestamp = alert_data['timestamp']
+            original_timestamp = alert_data['timestamp']
+            
+            # Create ET timestamp for when super alert is generated
+            et_tz = pytz.timezone('US/Eastern')
+            super_alert_time = datetime.now(et_tz)
+            et_timestamp = super_alert_time.strftime('%Y-%m-%dT%H:%M:%S%z')
             
             # Calculate metrics
             penetration = symbol_info.calculate_penetration(current_price)
@@ -277,7 +282,8 @@ class ORBAlertMonitor:
             # Create super alert data
             super_alert = {
                 "symbol": symbol,
-                "timestamp": timestamp,
+                "timestamp": et_timestamp,
+                "original_alert_timestamp": original_timestamp,
                 "alert_type": "super_alert",
                 "trigger_condition": "signal_price_reached",
                 "original_alert": alert_data,
@@ -302,10 +308,8 @@ class ORBAlertMonitor:
                 }
             }
             
-            # Save super alert
-            et_tz = pytz.timezone('US/Eastern')
-            current_time = datetime.now(et_tz)
-            filename = f"super_alert_{symbol}_{current_time.strftime('%Y%m%d_%H%M%S')}.json"
+            # Save super alert using the same ET time
+            filename = f"super_alert_{symbol}_{super_alert_time.strftime('%Y%m%d_%H%M%S')}.json"
             filepath = self.super_alerts_dir / filename
             
             with open(filepath, 'w') as f:
