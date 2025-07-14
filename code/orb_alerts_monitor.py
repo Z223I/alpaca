@@ -70,13 +70,18 @@ class SuperAlertData:
 class AlertFileHandler(FileSystemEventHandler):
     """Handles new alert files in the bullish alerts directory."""
     
-    def __init__(self, monitor):
+    def __init__(self, monitor, loop):
         self.monitor = monitor
+        self.loop = loop
         
     def on_created(self, event):
         """Called when a new file is created."""
         if not event.is_directory and event.src_path.endswith('.json'):
-            asyncio.create_task(self.monitor._process_new_alert_file(event.src_path))
+            # Schedule the coroutine in the main event loop from this thread
+            asyncio.run_coroutine_threadsafe(
+                self.monitor._process_new_alert_file(event.src_path), 
+                self.loop
+            )
 
 
 class ORBAlertMonitor:
@@ -131,7 +136,7 @@ class ORBAlertMonitor:
         
         # File system watcher
         self.observer = Observer()
-        self.file_handler = AlertFileHandler(self)
+        self.file_handler = None  # Will be set when event loop is available
         
         # Processed alerts tracking
         self.processed_alerts = set()
@@ -352,6 +357,10 @@ class ORBAlertMonitor:
         self.logger.info("Starting ORB Alert Monitor...")
         
         try:
+            # Initialize file handler with current event loop
+            current_loop = asyncio.get_running_loop()
+            self.file_handler = AlertFileHandler(self, current_loop)
+            
             # Process existing alerts first
             await self._scan_existing_alerts()
             
