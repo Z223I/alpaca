@@ -1,0 +1,18 @@
+{
+  "symbol": "WINT",
+  "timestamp": "2025-07-15T12:24:00",
+  "current_price": 0.7854,
+  "orb_high": 0.8648,
+  "orb_low": 0.8056,
+  "orb_range": 0.05920000000000003,
+  "orb_midpoint": 0.8351999999999999,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 2.507447864945382,
+  "volume_ratio": 1.5086206896551724,
+  "confidence_score": 0.7744587059504228,
+  "priority": "MEDIUM",
+  "confidence_level": "HIGH",
+  "recommended_stop_loss": 0.844305,
+  "recommended_take_profit": 0.753984,
+  "alert_message": "[12:24:00] ORB ALERT: WINT \u2193 $0.79 (+2.51% vs ORB Low)\nVolume: 1.5x avg | Confidence: 0.77 | Priority: MEDIUM\nStop: $0.84 | Target: $0.75"
+}

@@ -1,0 +1,26 @@
+{
+  "timestamp": "2025-07-15T13:21:01.337121-04:00",
+  "symbols_count": 17,
+  "symbols": [
+    "BIAF",
+    "BLMZ",
+    "GRO",
+    "IBG",
+    "IXHL",
+    "KAPA",
+    "MOVE",
+    "MULN",
+    "OPEN",
+    "PLRZ",
+    "PROK",
+    "SKYG",
+    "SMX",
+    "SOXS",
+    "WINT",
+    "WOLF",
+    "XAGE"
+  ],
+  "save_interval_minutes": 10.0,
+  "format": "CSV",
+  "total_records_saved": 2018
+}

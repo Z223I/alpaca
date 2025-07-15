@@ -1,0 +1,18 @@
+{
+  "symbol": "OPEN",
+  "timestamp": "2025-07-15T13:36:00",
+  "current_price": 1.05,
+  "orb_high": 1.02,
+  "orb_low": 0.95,
+  "orb_range": 0.07000000000000006,
+  "orb_midpoint": 0.985,
+  "breakout_type": "bullish_breakout",
+  "breakout_percentage": 2.9411764705882377,
+  "volume_ratio": 2.359974798272315,
+  "confidence_score": 0.8413168731228421,
+  "priority": "MEDIUM",
+  "confidence_level": "HIGH",
+  "recommended_stop_loss": 0.9712500000000001,
+  "recommended_take_profit": 1.092,
+  "alert_message": "[13:36:00] ORB ALERT: OPEN \u2191 $1.05 (+2.94% vs ORB High)\nVolume: 2.4x avg | Confidence: 0.84 | Priority: MEDIUM\nStop: $0.97 | Target: $1.09"
+}

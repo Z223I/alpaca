@@ -1,0 +1,18 @@
+{
+  "symbol": "PLRZ",
+  "timestamp": "2025-07-15T13:35:00",
+  "current_price": 0.9569,
+  "orb_high": 1.17,
+  "orb_low": 0.97,
+  "orb_range": 0.19999999999999996,
+  "orb_midpoint": 1.0699999999999998,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 1.3505154639175259,
+  "volume_ratio": 3.8261329571504143,
+  "confidence_score": 0.734848025710426,
+  "priority": "MEDIUM",
+  "confidence_level": "HIGH",
+  "recommended_stop_loss": 1.0286674999999998,
+  "recommended_take_profit": 0.9186239999999999,
+  "alert_message": "[13:35:00] ORB ALERT: PLRZ \u2193 $0.96 (+1.35% vs ORB Low)\nVolume: 3.8x avg | Confidence: 0.73 | Priority: MEDIUM\nStop: $1.03 | Target: $0.92"
+}

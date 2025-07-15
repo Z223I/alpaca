@@ -1,0 +1,18 @@
+{
+  "symbol": "SOXS",
+  "timestamp": "2025-07-15T13:35:00",
+  "current_price": 7.09,
+  "orb_high": 6.95,
+  "orb_low": 6.855,
+  "orb_range": 0.09499999999999975,
+  "orb_midpoint": 6.9025,
+  "breakout_type": "bullish_breakout",
+  "breakout_percentage": 2.0143884892086286,
+  "volume_ratio": 1.901012982366952,
+  "confidence_score": 0.7547375028712764,
+  "priority": "MEDIUM",
+  "confidence_level": "HIGH",
+  "recommended_stop_loss": 6.55825,
+  "recommended_take_profit": 7.3736,
+  "alert_message": "[13:35:00] ORB ALERT: SOXS \u2191 $7.09 (+2.01% vs ORB High)\nVolume: 1.9x avg | Confidence: 0.75 | Priority: MEDIUM\nStop: $6.56 | Target: $7.37"
+}

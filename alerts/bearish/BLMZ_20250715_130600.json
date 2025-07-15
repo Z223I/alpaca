@@ -1,0 +1,18 @@
+{
+  "symbol": "BLMZ",
+  "timestamp": "2025-07-15T13:06:00",
+  "current_price": 0.218,
+  "orb_high": 0.3017,
+  "orb_low": 0.28,
+  "orb_range": 0.021699999999999997,
+  "orb_midpoint": 0.29085000000000005,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 22.14285714285715,
+  "volume_ratio": 5.276264487170899,
+  "confidence_score": 0.8648156183914182,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 0.23435,
+  "recommended_take_profit": 0.20928,
+  "alert_message": "[13:06:00] ORB ALERT: BLMZ \u2193 $0.22 (+22.14% vs ORB Low)\nVolume: 5.3x avg | Confidence: 0.86 | Priority: HIGH\nStop: $0.23 | Target: $0.21"
+}

@@ -1,0 +1,44 @@
+{
+  "symbol": "OPEN",
+  "timestamp": "2025-07-15T13:46:00-0400",
+  "original_alert_timestamp": "2025-07-15T13:45:00",
+  "alert_type": "super_alert",
+  "trigger_condition": "signal_price_reached",
+  "original_alert": {
+    "symbol": "OPEN",
+    "timestamp": "2025-07-15T13:45:00",
+    "current_price": 1.05,
+    "orb_high": 1.02,
+    "orb_low": 0.95,
+    "orb_range": 0.07000000000000006,
+    "orb_midpoint": 0.985,
+    "breakout_type": "bullish_breakout",
+    "breakout_percentage": 2.9411764705882377,
+    "volume_ratio": 1.6105099487762335,
+    "confidence_score": 0.8207987745345126,
+    "priority": "MEDIUM",
+    "confidence_level": "HIGH",
+    "recommended_stop_loss": 0.9712500000000001,
+    "recommended_take_profit": 1.092,
+    "alert_message": "[13:45:00] ORB ALERT: OPEN \u2191 $1.05 (+2.94% vs ORB High)\nVolume: 1.6x avg | Confidence: 0.82 | Priority: MEDIUM\nStop: $0.97 | Target: $1.09"
+  },
+  "signal_analysis": {
+    "signal_price": 1.05,
+    "resistance_price": 1.11,
+    "current_price": 1.05,
+    "penetration_percent": 0.0,
+    "range_percent": 1.06,
+    "signal_reached": true,
+    "resistance_reached": false
+  },
+  "metrics": {
+    "signal_to_resistance_range": 0.06000000000000005,
+    "price_above_signal": 0.0,
+    "distance_to_resistance": 0.06000000000000005
+  },
+  "risk_assessment": {
+    "entry_price": 1.05,
+    "target_price": 1.11,
+    "current_risk_reward": 0
+  }
+}

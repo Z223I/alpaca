@@ -1,0 +1,18 @@
+{
+  "symbol": "MULN",
+  "timestamp": "2025-07-15T13:11:00",
+  "current_price": 0.109,
+  "orb_high": 0.1328,
+  "orb_low": 0.126,
+  "orb_range": 0.0068000000000000005,
+  "orb_midpoint": 0.12940000000000002,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 13.492063492063494,
+  "volume_ratio": 3.4448179561439805,
+  "confidence_score": 0.8304937973691214,
+  "priority": "MEDIUM",
+  "confidence_level": "HIGH",
+  "recommended_stop_loss": 0.117175,
+  "recommended_take_profit": 0.10464,
+  "alert_message": "[13:11:00] ORB ALERT: MULN \u2193 $0.11 (+13.49% vs ORB Low)\nVolume: 3.4x avg | Confidence: 0.83 | Priority: MEDIUM\nStop: $0.12 | Target: $0.10"
+}

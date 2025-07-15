@@ -1,0 +1,18 @@
+{
+  "symbol": "KAPA",
+  "timestamp": "2025-07-15T13:36:00",
+  "current_price": 1.075,
+  "orb_high": 1.455,
+  "orb_low": 1.32,
+  "orb_range": 0.135,
+  "orb_midpoint": 1.3875000000000002,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 18.56060606060607,
+  "volume_ratio": 1.503941363573503,
+  "confidence_score": 0.8301729427420289,
+  "priority": "MEDIUM",
+  "confidence_level": "HIGH",
+  "recommended_stop_loss": 1.155625,
+  "recommended_take_profit": 1.032,
+  "alert_message": "[13:36:00] ORB ALERT: KAPA \u2193 $1.07 (+18.56% vs ORB Low)\nVolume: 1.5x avg | Confidence: 0.83 | Priority: MEDIUM\nStop: $1.16 | Target: $1.03"
+}

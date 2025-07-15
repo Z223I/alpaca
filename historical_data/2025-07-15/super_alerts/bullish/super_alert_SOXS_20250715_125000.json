@@ -1,0 +1,44 @@
+{
+  "symbol": "SOXS",
+  "timestamp": "2025-07-15T12:50:00-0400",
+  "original_alert_timestamp": "2025-07-15T12:49:00",
+  "alert_type": "super_alert",
+  "trigger_condition": "signal_price_reached",
+  "original_alert": {
+    "symbol": "SOXS",
+    "timestamp": "2025-07-15T12:49:00",
+    "current_price": 7.075,
+    "orb_high": 6.95,
+    "orb_low": 6.855,
+    "orb_range": 0.09499999999999975,
+    "orb_midpoint": 6.9025,
+    "breakout_type": "bullish_breakout",
+    "breakout_percentage": 1.7985611510791366,
+    "volume_ratio": 3.394458506752739,
+    "confidence_score": 0.7524477348777631,
+    "priority": "MEDIUM",
+    "confidence_level": "HIGH",
+    "recommended_stop_loss": 6.5443750000000005,
+    "recommended_take_profit": 7.3580000000000005,
+    "alert_message": "[12:49:00] ORB ALERT: SOXS \u2191 $7.08 (+1.80% vs ORB High)\nVolume: 3.4x avg | Confidence: 0.75 | Priority: MEDIUM\nStop: $6.54 | Target: $7.36"
+  },
+  "signal_analysis": {
+    "signal_price": 6.98,
+    "resistance_price": 7.56,
+    "current_price": 7.075,
+    "penetration_percent": 16.38,
+    "range_percent": 1.08,
+    "signal_reached": true,
+    "resistance_reached": false
+  },
+  "metrics": {
+    "signal_to_resistance_range": 0.5799999999999992,
+    "price_above_signal": 0.09499999999999975,
+    "distance_to_resistance": 0.48499999999999943
+  },
+  "risk_assessment": {
+    "entry_price": 6.98,
+    "target_price": 7.56,
+    "current_risk_reward": 5.105263157894744
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "symbol": "GRO",
+  "timestamp": "2025-07-15T13:32:00",
+  "current_price": 2.055,
+  "orb_high": 2.0,
+  "orb_low": 1.9,
+  "orb_range": 0.10000000000000009,
+  "orb_midpoint": 1.95,
+  "breakout_type": "bullish_breakout",
+  "breakout_percentage": 2.750000000000008,
+  "volume_ratio": 4.042931392931393,
+  "confidence_score": 0.8728539287343084,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 1.9008750000000003,
+  "recommended_take_profit": 2.1372000000000004,
+  "alert_message": "[13:32:00] ORB ALERT: GRO \u2191 $2.06 (+2.75% vs ORB High)\nVolume: 4.0x avg | Confidence: 0.87 | Priority: HIGH\nStop: $1.90 | Target: $2.14"
+}

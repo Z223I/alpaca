@@ -30,7 +30,7 @@ class ORBAlertConfig:
     
     # Risk Management
     min_price: float = 0.01              # Minimum stock price
-    max_price: float = 10.00             # Maximum stock price
+    max_price: float = 50.00             # Maximum stock price
     min_volume: int = 1000000            # Minimum daily volume
     stop_loss_percent: float = 7.5       # Stop loss percentage (7.5%)
     take_profit_percent: float = 4.0     # Take profit percentage (4%)
