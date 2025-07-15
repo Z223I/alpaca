@@ -9,16 +9,16 @@ The remaining tasks are lower priority documentation and deployment tools:
 - [X] You must source ~/miniconda3/etc/profile.d/conda.sh && conda activate alpaca
 - [ ] Manually plot EMA20 and see if this would be an indicator to stop trading.
 - [X] Update code/orb.py to plot EMA20.
+- [ ] Update code/orb_alerts_monitor.py to filter out EMA9 below EMA20 for bullish alerts.
+- [ ] Update code/alert_monitor_history.py to filter out EMA9 below EMA20 for bullish alerts.
 
 
 
-- [ ] Update code/orb.py to do super alerts instead of alerts.
-
-
+- [X] Update code/orb.py to plot super alerts instead of alerts.
 - [X] Update the analysis software to handle bearish alerts correctly.
 - [X] Turn Claude loose at improving ORB alert.
-- [ ] Stop printing "INFO - Cleaned up" notifications on deleting historical data.
-- [?] Update plot candle sticks to accept optional alerts.
+- [X] Stop printing "INFO - Cleaned up" notifications on deleting historical data.
+- [X] Update plot candle sticks to accept optional alerts.
 - [ ] Update code/orb.py: Accept a date arg; accept an optional symbol arg; combine alerts; plot
 - [ ] Update code/orb_alerts.py to keep only the latest historical data file per symbol.  Implement this when saving more data.
 - [ ] Create method to add more stocks to the alerts.

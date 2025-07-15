@@ -217,7 +217,7 @@ class ORBAlertSystem:
                     self.logger.warning(f"Could not remove old file {old_file.name}: {e}")
             
             if files_to_remove:
-                self.logger.info(f"Cleaned up {len(files_to_remove)} old data files for {symbol}")
+                self.logger.debug(f"Cleaned up {len(files_to_remove)} old data files for {symbol}")
                 
         except Exception as e:
             self.logger.error(f"Error cleaning up old files for {symbol}: {e}")
@@ -576,7 +576,7 @@ class ORBAlertSystem:
                     self.logger.warning(f"Could not remove old opening range file {old_file.name}: {e}")
             
             if files_to_remove:
-                self.logger.info(f"Cleaned up {len(files_to_remove)} old opening range files for {symbol}")
+                self.logger.debug(f"Cleaned up {len(files_to_remove)} old opening range files for {symbol}")
                 
         except Exception as e:
             self.logger.error(f"Error cleaning up old opening range files for {symbol}: {e}")
