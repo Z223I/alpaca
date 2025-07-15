@@ -140,6 +140,7 @@ class ORBAlertMonitor:
         
         # Processed alerts tracking
         self.processed_alerts = set()
+        self.filtered_alerts = set()  # Track alerts filtered due to EMA9 below EMA20
         
         self.logger.info(f"ORB Alert Monitor initialized in {'TEST' if test_mode else 'LIVE'} mode")
         self.logger.info(f"Monitoring alerts in: {self.alerts_dir}")
@@ -251,6 +252,30 @@ class ORBAlertMonitor:
             if symbol not in self.symbol_data:
                 self.logger.debug(f"No signal data for {symbol}, skipping")
                 return
+            
+            # Filter out bullish alerts where EMA9 is below EMA20
+            breakout_type = alert_data.get('breakout_type', '').lower()
+            if breakout_type == 'bullish_breakout':
+                ema_9_below_20 = alert_data.get('ema_9_below_20')
+                ema_9 = alert_data.get('ema_9')
+                ema_20 = alert_data.get('ema_20')
+                
+                if ema_9_below_20 is True:
+                    self.filtered_alerts.add(file_path)
+                    ema_info = ""
+                    if ema_9 is not None and ema_20 is not None:
+                        ema_info = f" (EMA9: ${ema_9:.2f} < EMA20: ${ema_20:.2f})"
+                    self.logger.info(f"🚫 Filtered bullish alert for {symbol}: EMA9 below EMA20{ema_info}")
+                    return
+                elif ema_9_below_20 is None:
+                    # Handle case where EMA data is not available
+                    self.logger.warning(f"No EMA9/EMA20 data available for {symbol}, allowing alert")
+                else:
+                    # EMA9 is above EMA20, log this for bullish alerts
+                    ema_info = ""
+                    if ema_9 is not None and ema_20 is not None:
+                        ema_info = f" (EMA9: ${ema_9:.2f} > EMA20: ${ema_20:.2f})"
+                    self.logger.debug(f"✅ Allowing bullish alert for {symbol}: EMA9 above EMA20{ema_info}")
             
             symbol_info = self.symbol_data[symbol]
             
@@ -382,6 +407,7 @@ class ORBAlertMonitor:
             print(f"📁 Monitoring: {self.alerts_dir}")
             print(f"💾 Super alerts: {self.super_alerts_dir}")
             print(f"📊 Symbols loaded: {len(self.symbol_data)}")
+            print("🚫 Filtering: Bullish alerts with EMA9 < EMA20 will be filtered out")
             if self.test_mode:
                 print("🧪 TEST MODE: Super alerts will be marked as [TEST MODE]")
             print("="*80 + "\n")
@@ -417,6 +443,7 @@ class ORBAlertMonitor:
             'symbols_monitored': len(self.symbol_data),
             'super_alerts_generated': super_alerts_count,
             'alerts_processed': len(self.processed_alerts),
+            'alerts_filtered_ema': len(self.filtered_alerts),
             'monitoring_directory': str(self.alerts_dir),
             'super_alerts_directory': str(self.super_alerts_dir)
         }
