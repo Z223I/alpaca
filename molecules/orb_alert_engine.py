@@ -245,7 +245,7 @@ class ORBAlertEngine:
                 return
             
             # Create and process alert
-            alert = self.alert_formatter.create_alert(breakout_signal, confidence)
+            alert = self.alert_formatter.create_alert(breakout_signal, confidence, technical_indicators)
             await self._process_alert(alert)
             
         except Exception as e:
@@ -537,7 +537,7 @@ class ORBAlertEngine:
                 return
             
             # Create and process alert
-            alert = self.alert_formatter.create_alert(breakout_signal, confidence)
+            alert = self.alert_formatter.create_alert(breakout_signal, confidence, technical_indicators)
             
             # TEMPORARILY BYPASS alert generation time calculation
             # alert_generation_time = (time.time() - alert_start_time) * 1000  # Convert to ms

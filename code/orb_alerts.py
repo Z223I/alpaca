@@ -300,7 +300,13 @@ class ORBAlertSystem:
                 "confidence_level": alert.confidence_level,
                 "recommended_stop_loss": alert.recommended_stop_loss,
                 "recommended_take_profit": alert.recommended_take_profit,
-                "alert_message": alert.alert_message
+                "alert_message": alert.alert_message,
+                # EMA Technical Indicators
+                "ema_9": alert.ema_9,
+                "ema_20": alert.ema_20,
+                "ema_9_above_20": alert.ema_9_above_20,
+                "ema_9_below_20": alert.ema_9_below_20,
+                "ema_divergence": alert.ema_divergence
             }
             
             with open(alert_filepath, 'w') as f:

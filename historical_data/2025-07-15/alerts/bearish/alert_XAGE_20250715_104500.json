@@ -1,0 +1,18 @@
+{
+  "symbol": "XAGE",
+  "timestamp": "2025-07-15T10:45:00",
+  "current_price": 5.63,
+  "orb_high": 8.18,
+  "orb_low": 6.9,
+  "orb_range": 1.2799999999999994,
+  "orb_midpoint": 7.54,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 18.40579710144928,
+  "volume_ratio": 2.3696283663486946,
+  "confidence_score": 0.8599882133477579,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 6.05225,
+  "recommended_take_profit": 5.4048,
+  "alert_message": "[10:45:00] ORB ALERT: XAGE \u2193 $5.63 (+18.41% vs ORB Low)\nVolume: 2.4x avg | Confidence: 0.86 | Priority: HIGH\nStop: $6.05 | Target: $5.40"
+}

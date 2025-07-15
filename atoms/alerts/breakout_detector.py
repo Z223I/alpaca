@@ -175,6 +175,22 @@ class BreakoutDetector:
         ema_9 = symbol_data['close'].ewm(span=9).mean().iloc[-1]
         indicators['ema_9'] = ema_9
         
+        # Calculate EMA(20) if we have enough data
+        if len(symbol_data) >= 20:
+            ema_20 = symbol_data['close'].ewm(span=20).mean().iloc[-1]
+            indicators['ema_20'] = ema_20
+            
+            # Calculate EMA9 vs EMA20 relationship
+            indicators['ema_9_above_20'] = ema_9 > ema_20
+            indicators['ema_9_below_20'] = ema_9 < ema_20
+            indicators['ema_divergence'] = (ema_9 - ema_20) / ema_20 if ema_20 > 0 else 0.0
+        else:
+            # Not enough data for EMA20
+            indicators['ema_20'] = None
+            indicators['ema_9_above_20'] = None
+            indicators['ema_9_below_20'] = None
+            indicators['ema_divergence'] = None
+        
         # Calculate VWAP
         typical_price = (symbol_data['high'] + symbol_data['low'] + symbol_data['close']) / 3
         vwap = (typical_price * symbol_data['volume']).sum() / symbol_data['volume'].sum()

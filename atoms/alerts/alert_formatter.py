@@ -45,6 +45,12 @@ class ORBAlert:
     recommended_stop_loss: float
     recommended_take_profit: float
     alert_message: str
+    # EMA Technical Indicators
+    ema_9: Optional[float] = None
+    ema_20: Optional[float] = None
+    ema_9_above_20: Optional[bool] = None
+    ema_9_below_20: Optional[bool] = None
+    ema_divergence: Optional[float] = None
     
     def __post_init__(self):
         """Calculate derived fields after initialization."""
@@ -91,11 +97,23 @@ class ORBAlert:
             direction = "→"
             vs_level = "ORB Range"
             
+        # Build EMA information string
+        ema_info = ""
+        if self.ema_9 is not None:
+            ema_info += f" | EMA9: ${self.ema_9:.2f}"
+        if self.ema_20 is not None:
+            ema_info += f" | EMA20: ${self.ema_20:.2f}"
+        if self.ema_9_above_20 is not None:
+            ema_trend = "↑" if self.ema_9_above_20 else "↓"
+            ema_info += f" | EMA9{ema_trend}EMA20"
+        if self.ema_divergence is not None:
+            ema_info += f" | Div: {self.ema_divergence*100:+.1f}%"
+        
         message = (
             f"[{time_str}] ORB ALERT: {self.symbol} {direction} ${self.current_price:.2f} "
             f"({self.breakout_percentage:+.2f}% vs {vs_level})\n"
             f"Volume: {self.volume_ratio:.1f}x avg | Confidence: {self.confidence_score:.2f} | "
-            f"Priority: {self.priority.value}\n"
+            f"Priority: {self.priority.value}{ema_info}\n"
             f"Stop: ${self.recommended_stop_loss:.2f} | Target: ${self.recommended_take_profit:.2f}"
         )
         
@@ -124,13 +142,15 @@ class AlertFormatter:
         self.daily_alert_count = 0
         
     def create_alert(self, signal: BreakoutSignal, 
-                    confidence: ConfidenceComponents) -> ORBAlert:
+                    confidence: ConfidenceComponents, 
+                    technical_indicators: Optional[Dict[str, Any]] = None) -> ORBAlert:
         """
         Create a formatted alert from breakout signal and confidence data.
         
         Args:
             signal: BreakoutSignal to format
             confidence: ConfidenceComponents for the signal
+            technical_indicators: Dictionary of technical indicators
             
         Returns:
             Formatted ORBAlert
@@ -140,6 +160,20 @@ class AlertFormatter:
         
         # Get confidence level description
         confidence_level = self._get_confidence_level(confidence.total_score)
+        
+        # Extract EMA indicators from technical_indicators if available
+        ema_9 = None
+        ema_20 = None
+        ema_9_above_20 = None
+        ema_9_below_20 = None
+        ema_divergence = None
+        
+        if technical_indicators:
+            ema_9 = technical_indicators.get('ema_9')
+            ema_20 = technical_indicators.get('ema_20')
+            ema_9_above_20 = technical_indicators.get('ema_9_above_20')
+            ema_9_below_20 = technical_indicators.get('ema_9_below_20')
+            ema_divergence = technical_indicators.get('ema_divergence')
         
         alert = ORBAlert(
             symbol=signal.symbol,
@@ -157,7 +191,13 @@ class AlertFormatter:
             confidence_level=confidence_level,
             recommended_stop_loss=0.0,  # Will be calculated in __post_init__
             recommended_take_profit=0.0,  # Will be calculated in __post_init__
-            alert_message=""  # Will be generated in __post_init__
+            alert_message="",  # Will be generated in __post_init__
+            # EMA Technical Indicators
+            ema_9=ema_9,
+            ema_20=ema_20,
+            ema_9_above_20=ema_9_above_20,
+            ema_9_below_20=ema_9_below_20,
+            ema_divergence=ema_divergence
         )
         
         # Add to history
