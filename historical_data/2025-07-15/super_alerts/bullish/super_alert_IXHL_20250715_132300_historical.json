@@ -1,0 +1,46 @@
+{
+  "symbol": "IXHL",
+  "timestamp": "2025-07-15T13:23:00",
+  "original_alert_timestamp": "2025-07-15T13:23:00",
+  "alert_type": "super_alert",
+  "trigger_condition": "signal_price_reached",
+  "processing_mode": "historical",
+  "source_alert_file": "historical_data/2025-07-15/alerts/bullish/alert_IXHL_20250715_132300.json",
+  "original_alert": {
+    "symbol": "IXHL",
+    "timestamp": "2025-07-15T13:23:00",
+    "current_price": 0.3577,
+    "orb_high": 0.2575,
+    "orb_low": 0.25,
+    "orb_range": 0.007500000000000007,
+    "orb_midpoint": 0.25375000000000003,
+    "breakout_type": "bullish_breakout",
+    "breakout_percentage": 38.9126213592233,
+    "volume_ratio": 4.041911737610866,
+    "confidence_score": 0.8567603477516581,
+    "priority": "HIGH",
+    "confidence_level": "VERY_HIGH",
+    "recommended_stop_loss": 0.3308725,
+    "recommended_take_profit": 0.372008,
+    "alert_message": "[13:23:00] ORB ALERT: IXHL \u2191 $0.36 (+38.91% vs ORB High)\nVolume: 4.0x avg | Confidence: 0.86 | Priority: HIGH\nStop: $0.33 | Target: $0.37"
+  },
+  "signal_analysis": {
+    "signal_price": 0.26,
+    "resistance_price": 0.25,
+    "current_price": 0.3577,
+    "penetration_percent": 0.0,
+    "range_percent": 0.96,
+    "signal_reached": true,
+    "resistance_reached": true
+  },
+  "metrics": {
+    "signal_to_resistance_range": -0.010000000000000009,
+    "price_above_signal": 0.09770000000000001,
+    "distance_to_resistance": -0.10770000000000002
+  },
+  "risk_assessment": {
+    "entry_price": 0.26,
+    "target_price": 0.25,
+    "current_risk_reward": -1.1023541453428864
+  }
+}

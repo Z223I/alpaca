@@ -1,0 +1,18 @@
+{
+  "symbol": "IBG",
+  "timestamp": "2025-07-15T15:53:00",
+  "current_price": 1.455,
+  "orb_high": 1.29,
+  "orb_low": 1.215,
+  "orb_range": 0.07499999999999996,
+  "orb_midpoint": 1.2525,
+  "breakout_type": "bullish_breakout",
+  "breakout_percentage": 12.790697674418608,
+  "volume_ratio": 4.834334492570345,
+  "confidence_score": 0.8931617946411972,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 1.3458750000000002,
+  "recommended_take_profit": 1.5132,
+  "alert_message": "[15:53:00] ORB ALERT: IBG \u2191 $1.46 (+12.79% vs ORB High)\nVolume: 4.8x avg | Confidence: 0.89 | Priority: HIGH\nStop: $1.35 | Target: $1.51"
+}

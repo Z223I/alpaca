@@ -1,0 +1,46 @@
+{
+  "symbol": "IBG",
+  "timestamp": "2025-07-15T15:54:00",
+  "original_alert_timestamp": "2025-07-15T15:54:00",
+  "alert_type": "super_alert",
+  "trigger_condition": "signal_price_reached",
+  "processing_mode": "historical",
+  "source_alert_file": "historical_data/2025-07-15/alerts/bullish/alert_IBG_20250715_155400.json",
+  "original_alert": {
+    "symbol": "IBG",
+    "timestamp": "2025-07-15T15:54:00",
+    "current_price": 1.46,
+    "orb_high": 1.29,
+    "orb_low": 1.215,
+    "orb_range": 0.07499999999999996,
+    "orb_midpoint": 1.2525,
+    "breakout_type": "bullish_breakout",
+    "breakout_percentage": 13.178294573643404,
+    "volume_ratio": 9.437710954280455,
+    "confidence_score": 0.8915589904099603,
+    "priority": "HIGH",
+    "confidence_level": "VERY_HIGH",
+    "recommended_stop_loss": 1.3505,
+    "recommended_take_profit": 1.5184,
+    "alert_message": "[15:54:00] ORB ALERT: IBG \u2191 $1.46 (+13.18% vs ORB High)\nVolume: 9.4x avg | Confidence: 0.89 | Priority: HIGH\nStop: $1.35 | Target: $1.52"
+  },
+  "signal_analysis": {
+    "signal_price": 1.26,
+    "resistance_price": 1.32,
+    "current_price": 1.46,
+    "penetration_percent": 100.0,
+    "range_percent": 1.05,
+    "signal_reached": true,
+    "resistance_reached": true
+  },
+  "metrics": {
+    "signal_to_resistance_range": 0.06000000000000005,
+    "price_above_signal": 0.19999999999999996,
+    "distance_to_resistance": -0.1399999999999999
+  },
+  "risk_assessment": {
+    "entry_price": 1.26,
+    "target_price": 1.32,
+    "current_risk_reward": -0.6999999999999996
+  }
+}

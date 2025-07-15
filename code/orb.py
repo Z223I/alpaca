@@ -101,8 +101,6 @@ class ORB:
             alerts_base_dir = os.path.join('historical_data', date_str, 'super_alerts')
             
             if not os.path.exists(alerts_base_dir):
-                if self.isDebugging:
-                    print(f"DEBUG: No super alerts directory found for date {date_str}")
                 return alerts
             
             # Check both bullish and bearish super alert directories
@@ -152,23 +150,14 @@ class ORB:
                                         alert_dt = et_tz.localize(alert_dt)
                                 except (ValueError, OSError) as ve2:
                                     # More specific error reporting
-                                    if self.isDebugging:
-                                        print(f"DEBUG: Failed to parse timestamp '{timestamp_str}' from {alert_file}")
-                                        print(f"DEBUG: First error: {ve1}")
-                                        print(f"DEBUG: Second error: {ve2}")
                                     continue
                             except OSError as oe:
                                 # Handle "date value out of range" errors
-                                if self.isDebugging:
-                                    print(f"DEBUG: Date out of range for timestamp '{timestamp_str}' from {alert_file}: {oe}")
                                 continue
                             
                             alert_data['timestamp_dt'] = alert_dt
                         
                         alerts.append(alert_data)
-                        
-                        if self.isDebugging:
-                            print(f"DEBUG: Loaded {alert_type} super alert for {symbol} at {alert_data.get('timestamp', 'unknown time')}")
                             
                     except Exception as e:
                         print(f"Warning: Error loading super alert file {alert_file}: {e}")
@@ -189,9 +178,6 @@ class ORB:
                     return timestamp_dt
             
             alerts.sort(key=safe_sort_key)
-            
-            if self.isDebugging:
-                print(f"DEBUG: Loaded {len(alerts)} total super alerts for {symbol} on {date_str}")
             
             return alerts
             
@@ -365,6 +351,11 @@ class ORB:
 
             print(f"Fetching 1-minute data from {start_time} to {end_time}")
 
+            # Determine which feed to use based on configuration
+            base_url = os.getenv('ALPACA_BASE_URL', 'https://paper-api.alpaca.markets')
+            feed = 'iex' if "paper" in base_url else 'sip'
+            print(f"Using {feed.upper()} data feed for {'paper' if 'paper' in base_url else 'live'} trading")
+
             # Get stock data using 1-minute timeframe with legacy API
             market_data = {}
             for symbol in symbols:
@@ -373,7 +364,8 @@ class ORB:
                         symbol,
                         tradeapi.TimeFrame.Minute,  # type: ignore
                         start=start_time.isoformat(),
-                        end=end_time.isoformat()
+                        end=end_time.isoformat(),
+                        feed=feed  # Use IEX for paper trading, SIP for live trading
                     )
                     market_data[symbol] = bars
                 except Exception as e:

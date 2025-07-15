@@ -11,8 +11,11 @@ The remaining tasks are lower priority documentation and deployment tools:
 - [X] Update code/orb.py to plot EMA20.
 - [X] Review: does code/orb_alerts.py have EMA9 and EMA20?
 - [X] Update code/orb_alerts.py to include EMA9, EMA20, and the new technical indicators in the alert.
-- [ ] Update code/orb_alerts_monitor.py to filter out EMA9 below EMA20 for bullish alerts.
+- [X] Update code/orb_alerts_monitor.py to filter out EMA9 below EMA20 for bullish alerts.
 - [ ] Update code/alert_monitor_history.py to filter out EMA9 below EMA20 for bullish alerts.
+
+- [ ] Update code/orb_alerts_monitor.py to filter out stocks that the current low is below EMA9 for bullish alerts.
+- [ ] Update code/alert_monitor_history.py to filter out stocks that the current low is below EMA9 for bullish alerts.
 
 
 

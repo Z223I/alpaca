@@ -93,6 +93,7 @@ class AlertMonitorHistory:
         # Processed alerts tracking
         self.processed_alerts = []
         self.super_alerts_created = []
+        self.filtered_alerts = []  # Track alerts filtered due to EMA9 below EMA20
         
         self.logger.info(f"Alert Monitor History initialized in {'TEST' if test_mode else 'LIVE'} mode")
         self.logger.info(f"Processing date: {self.target_date}")
@@ -177,6 +178,30 @@ class AlertMonitorHistory:
             if symbol not in self.symbol_data:
                 self.logger.debug(f"No signal data for {symbol}, skipping")
                 return
+            
+            # Filter out bullish alerts where EMA9 is below EMA20
+            breakout_type = alert_data.get('breakout_type', '').lower()
+            if breakout_type == 'bullish_breakout':
+                ema_9_below_20 = alert_data.get('ema_9_below_20')
+                ema_9 = alert_data.get('ema_9')
+                ema_20 = alert_data.get('ema_20')
+                
+                if ema_9_below_20 is True:
+                    self.filtered_alerts.append(alert_data)
+                    ema_info = ""
+                    if ema_9 is not None and ema_20 is not None:
+                        ema_info = f" (EMA9: ${ema_9:.2f} < EMA20: ${ema_20:.2f})"
+                    self.logger.info(f"🚫 Filtered bullish alert for {symbol}: EMA9 below EMA20{ema_info}")
+                    return
+                elif ema_9_below_20 is None:
+                    # Handle case where EMA data is not available
+                    self.logger.warning(f"No EMA9/EMA20 data available for {symbol}, allowing alert")
+                else:
+                    # EMA9 is above EMA20, log this for bullish alerts
+                    ema_info = ""
+                    if ema_9 is not None and ema_20 is not None:
+                        ema_info = f" (EMA9: ${ema_9:.2f} > EMA20: ${ema_20:.2f})"
+                    self.logger.debug(f"✅ Allowing bullish alert for {symbol}: EMA9 above EMA20{ema_info}")
             
             symbol_info = self.symbol_data[symbol]
             
@@ -307,10 +332,12 @@ class AlertMonitorHistory:
             print(f"📁 Alerts directory: {self.alerts_dir}")
             print(f"💾 Super alerts directory: {self.super_alerts_dir}")
             print(f"📈 Alerts processed: {len(self.processed_alerts)}")
+            print(f"🚫 Alerts filtered (EMA9 < EMA20): {len(self.filtered_alerts)}")
             print(f"🚀 Super alerts created: {len(self.super_alerts_created)}")
             print(f"📊 Symbols monitored: {len(self.symbol_data)}")
             if self.test_mode:
                 print("🧪 TEST MODE: No actual super alert files were created")
+            print("🚫 Filtering: Bullish alerts with EMA9 < EMA20 are filtered out")
             print("="*80 + "\n")
             
             # Print super alert details
@@ -332,6 +359,7 @@ class AlertMonitorHistory:
             'target_date': self.target_date,
             'symbols_monitored': len(self.symbol_data),
             'alerts_processed': len(self.processed_alerts),
+            'alerts_filtered_ema': len(self.filtered_alerts),
             'super_alerts_generated': len(self.super_alerts_created),
             'alerts_directory': str(self.alerts_dir),
             'super_alerts_directory': str(self.super_alerts_dir),
