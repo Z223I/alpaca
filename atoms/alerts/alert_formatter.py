@@ -306,6 +306,12 @@ class AlertFormatter:
         alert_dict['breakout_type'] = alert.breakout_type.value
         alert_dict['priority'] = alert.priority.value
         
+        # Ensure boolean values are properly serializable
+        if 'ema_9_above_20' in alert_dict:
+            alert_dict['ema_9_above_20'] = bool(alert_dict['ema_9_above_20']) if alert_dict['ema_9_above_20'] is not None else None
+        if 'ema_9_below_20' in alert_dict:
+            alert_dict['ema_9_below_20'] = bool(alert_dict['ema_9_below_20']) if alert_dict['ema_9_below_20'] is not None else None
+        
         return json.dumps(alert_dict, indent=2)
     
     def save_alert_to_file(self, alert: ORBAlert, file_format: str = "json") -> str:

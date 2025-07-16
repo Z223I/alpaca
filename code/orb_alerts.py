@@ -287,26 +287,26 @@ class ORBAlertSystem:
             alert_data = {
                 "symbol": alert.symbol,
                 "timestamp": alert.timestamp.isoformat(),
-                "current_price": alert.current_price,
-                "orb_high": alert.orb_high,
-                "orb_low": alert.orb_low,
-                "orb_range": alert.orb_range,
-                "orb_midpoint": alert.orb_midpoint,
+                "current_price": float(alert.current_price),
+                "orb_high": float(alert.orb_high),
+                "orb_low": float(alert.orb_low),
+                "orb_range": float(alert.orb_range),
+                "orb_midpoint": float(alert.orb_midpoint),
                 "breakout_type": alert.breakout_type.value,
-                "breakout_percentage": alert.breakout_percentage,
-                "volume_ratio": alert.volume_ratio,
-                "confidence_score": alert.confidence_score,
+                "breakout_percentage": float(alert.breakout_percentage),
+                "volume_ratio": float(alert.volume_ratio),
+                "confidence_score": float(alert.confidence_score),
                 "priority": alert.priority.value,
                 "confidence_level": alert.confidence_level,
-                "recommended_stop_loss": alert.recommended_stop_loss,
-                "recommended_take_profit": alert.recommended_take_profit,
+                "recommended_stop_loss": float(alert.recommended_stop_loss),
+                "recommended_take_profit": float(alert.recommended_take_profit),
                 "alert_message": alert.alert_message,
-                # EMA Technical Indicators
-                "ema_9": alert.ema_9,
-                "ema_20": alert.ema_20,
-                "ema_9_above_20": alert.ema_9_above_20,
-                "ema_9_below_20": alert.ema_9_below_20,
-                "ema_divergence": alert.ema_divergence
+                # EMA Technical Indicators - ensure proper JSON serialization
+                "ema_9": float(alert.ema_9) if alert.ema_9 is not None else None,
+                "ema_20": float(alert.ema_20) if alert.ema_20 is not None else None,
+                "ema_9_above_20": bool(alert.ema_9_above_20) if alert.ema_9_above_20 is not None else None,
+                "ema_9_below_20": bool(alert.ema_9_below_20) if alert.ema_9_below_20 is not None else None,
+                "ema_divergence": float(alert.ema_divergence) if alert.ema_divergence is not None else None
             }
             
             with open(alert_filepath, 'w') as f:

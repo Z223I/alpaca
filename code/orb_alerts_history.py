@@ -6,10 +6,10 @@ based on historical data from the trading day. It analyzes all alerts from a giv
 and generates super alerts when the current price reached the Signal price from the CSV file.
 
 Usage:
-    python3 code/alert_monitor_history.py                          # Process current date alerts
-    python3 code/alert_monitor_history.py --date 2025-01-15        # Process specific date
-    python3 code/alert_monitor_history.py --symbols-file data/YYYYMMDD.csv  # Use specific symbols file
-    python3 code/alert_monitor_history.py --test                   # Run in test mode
+    python3 code/orb_alerts_history.py                          # Process current date alerts
+    python3 code/orb_alerts_history.py --date 2025-01-15        # Process specific date
+    python3 code/orb_alerts_history.py --symbols-file data/YYYYMMDD.csv  # Use specific symbols file
+    python3 code/orb_alerts_history.py --test                   # Run in test mode
 """
 
 import argparse

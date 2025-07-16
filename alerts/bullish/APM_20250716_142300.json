@@ -1,0 +1,23 @@
+{
+  "symbol": "APM",
+  "timestamp": "2025-07-16T14:23:00",
+  "current_price": 3.37,
+  "orb_high": 1.67,
+  "orb_low": 1.19,
+  "orb_range": 0.48,
+  "orb_midpoint": 1.43,
+  "breakout_type": "bullish_breakout",
+  "breakout_percentage": 101.79640718562877,
+  "volume_ratio": 1.8744142455482662,
+  "confidence_score": 0.8942386555450124,
+  "priority": "MEDIUM",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 3.1172500000000003,
+  "recommended_take_profit": 3.5048000000000004,
+  "alert_message": "[14:23:00] ORB ALERT: APM \u2191 $3.37 (+101.80% vs ORB High)\nVolume: 1.9x avg | Confidence: 0.89 | Priority: MEDIUM | EMA9: $2.84\nStop: $3.12 | Target: $3.50",
+  "ema_9": 2.8384841045825175,
+  "ema_20": null,
+  "ema_9_above_20": null,
+  "ema_9_below_20": null,
+  "ema_divergence": null
+}

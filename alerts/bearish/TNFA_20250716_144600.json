@@ -1,0 +1,23 @@
+{
+  "symbol": "TNFA",
+  "timestamp": "2025-07-16T14:46:00",
+  "current_price": 0.1071,
+  "orb_high": 0.1258,
+  "orb_low": 0.1142,
+  "orb_range": 0.0116,
+  "orb_midpoint": 0.12,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 6.217162872154112,
+  "volume_ratio": 1.837000814995925,
+  "confidence_score": 0.8520138216421838,
+  "priority": "MEDIUM",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 0.1151325,
+  "recommended_take_profit": 0.10281599999999999,
+  "alert_message": "[14:46:00] ORB ALERT: TNFA \u2193 $0.11 (+6.22% vs ORB Low)\nVolume: 1.8x avg | Confidence: 0.85 | Priority: MEDIUM | EMA9: $0.12\nStop: $0.12 | Target: $0.10",
+  "ema_9": 0.11503479239045011,
+  "ema_20": null,
+  "ema_9_above_20": null,
+  "ema_9_below_20": null,
+  "ema_divergence": null
+}
