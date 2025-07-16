@@ -9,7 +9,7 @@ import matplotlib.dates as mdates
 from matplotlib.patches import Rectangle
 from matplotlib.ticker import FuncFormatter
 from typing import Optional, Tuple, List
-from datetime import time
+from datetime import time, datetime
 import pytz
 
 from ..utils.calculate_orb_levels import calculate_orb_levels
@@ -95,26 +95,41 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
         
         # Add ORB rectangle if ORB levels were calculated
         if orb_high is not None and orb_low is not None:
-            # Get time range for ORB rectangle (first 15 candlesticks or all available data)
-            x_min = float(mdates.date2num(symbol_data['timestamp'].min()))
-            
-            # Calculate width to cover first 15 candlesticks (or all if less than 15)
-            orb_candlesticks = min(15, len(symbol_data))
-            if orb_candlesticks > 1:
-                x_max = float(mdates.date2num(symbol_data['timestamp'].iloc[orb_candlesticks - 1]))
-            else:
-                x_max = float(mdates.date2num(symbol_data['timestamp'].iloc[0]))
-            
-            orb_width = x_max - x_min + 0.0012  # Add small padding to cover the last candlestick
-            
-            # Draw ORB rectangle (no fill with thin edge)
-            orb_rect = Rectangle((x_min - 0.0006, orb_low), orb_width, orb_high - orb_low,
-                               facecolor='none', edgecolor='black', alpha=1.0, linewidth=1.5)
-            ax1.add_patch(orb_rect)
-            
-            # Add ORB level lines
-            ax1.axhline(y=orb_high, color='black', linestyle='--', linewidth=1, alpha=0.8, label=f'ORB High: ${orb_high:.2f}')
-            ax1.axhline(y=orb_low, color='black', linestyle='--', linewidth=1, alpha=0.8, label=f'ORB Low: ${orb_low:.2f}')
+            # Filter data to only show ORB rectangle between 9:30 AM and 9:45 AM
+            # Get the trading date from the data
+            if len(symbol_data) > 0:
+                first_timestamp = symbol_data['timestamp'].iloc[0]
+                trading_date = first_timestamp.date()
+                
+                # Define ORB time window: 9:30 AM to 9:45 AM ET
+                orb_start = et_tz.localize(datetime.combine(trading_date, time(9, 30)))
+                orb_end = et_tz.localize(datetime.combine(trading_date, time(9, 45)))
+                
+                # Filter symbol data to only include ORB period
+                orb_mask = (symbol_data['timestamp'] >= orb_start) & (symbol_data['timestamp'] <= orb_end)
+                orb_data = symbol_data[orb_mask]
+                
+                # Only draw ORB rectangle if we have data in the ORB period
+                if len(orb_data) > 0:
+                    # Get time range for ORB rectangle (9:30 AM to 9:45 AM or last available data in that period)
+                    x_min = float(mdates.date2num(orb_data['timestamp'].min()))
+                    x_max = float(mdates.date2num(orb_data['timestamp'].max()))
+                    
+                    # Set rectangle width to cover the actual ORB period
+                    orb_width = x_max - x_min + 0.0012  # Add small padding to cover the last candlestick
+                    
+                    # Draw ORB rectangle (no fill with thin edge)
+                    orb_rect = Rectangle((x_min - 0.0006, orb_low), orb_width, orb_high - orb_low,
+                                       facecolor='none', edgecolor='black', alpha=1.0, linewidth=1.5)
+                    ax1.add_patch(orb_rect)
+                    
+                    # Add ORB level lines
+                    ax1.axhline(y=orb_high, color='black', linestyle='--', linewidth=1, alpha=0.8, label=f'ORB High: ${orb_high:.2f}')
+                    ax1.axhline(y=orb_low, color='black', linestyle='--', linewidth=1, alpha=0.8, label=f'ORB Low: ${orb_low:.2f}')
+                else:
+                    # No data in ORB period, but still show the ORB level lines for reference
+                    ax1.axhline(y=orb_high, color='black', linestyle='--', linewidth=1, alpha=0.8, label=f'ORB High: ${orb_high:.2f}')
+                    ax1.axhline(y=orb_low, color='black', linestyle='--', linewidth=1, alpha=0.8, label=f'ORB Low: ${orb_low:.2f}')
             
             isDebugging = False  # Set to True for debugging output
             if isDebugging:
@@ -237,8 +252,22 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
         ax1.set_ylabel('Price ($)', fontsize=12)
         ax1.grid(True, alpha=0.3)
         
-        # Set x-axis formatter to show time in ET timezone
+        # Set x-axis formatter to show time in ET timezone with more frequent labels
         ax1.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M', tz=et_tz))
+        ax1.xaxis.set_major_locator(mdates.HourLocator(interval=1))  # Show every hour
+        ax1.xaxis.set_minor_locator(mdates.MinuteLocator(interval=30))  # Minor ticks every 30 minutes
+        
+        # Set explicit x-axis limits to show full trading session (9:30 AM to 4:00 PM ET)
+        if len(symbol_data) > 0:
+            # Get the date from the first timestamp
+            first_timestamp = symbol_data['timestamp'].iloc[0]
+            trading_date = first_timestamp.date()
+            
+            # Create full trading session boundaries in ET timezone
+            session_start = et_tz.localize(datetime.combine(trading_date, time(9, 30)))
+            session_end = et_tz.localize(datetime.combine(trading_date, time(16, 0)))
+            
+            ax1.set_xlim(session_start, session_end)
         
         # Format Y-axis to show prices with 2 decimal places
         ax1.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'${x:.2f}'))
@@ -252,6 +281,20 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
         
         # Set x-axis formatter to show time in ET timezone for volume chart too
         ax2.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M', tz=et_tz))
+        ax2.xaxis.set_major_locator(mdates.HourLocator(interval=1))  # Show every hour
+        ax2.xaxis.set_minor_locator(mdates.MinuteLocator(interval=30))  # Minor ticks every 30 minutes
+        
+        # Set same x-axis limits for volume chart to match price chart
+        if len(symbol_data) > 0:
+            # Get the date from the first timestamp
+            first_timestamp = symbol_data['timestamp'].iloc[0]
+            trading_date = first_timestamp.date()
+            
+            # Create full trading session boundaries in ET timezone
+            session_start = et_tz.localize(datetime.combine(trading_date, time(9, 30)))
+            session_end = et_tz.localize(datetime.combine(trading_date, time(16, 0)))
+            
+            ax2.set_xlim(session_start, session_end)
         
         # Rotate x-axis labels
         plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45)

@@ -1260,40 +1260,113 @@ class ORB:
     def _generate_candle_charts(self) -> bool:
         """
         Generate candlestick charts with volume for each stock symbol.
+        Always fetches fresh, complete market data from 9:30 AM to 4:00 PM ET 
+        for accurate charting instead of using potentially incomplete stored data.
 
         Returns:
             True if successful, False otherwise
         """
-        if not hasattr(self, 'market_df') or self.market_df is None:
-            print("No market DataFrame available for charting.")
+        if not self.csv_data:
+            print("No CSV data available for charting.")
             return False
 
         try:
-            # Get unique symbols and sort them
-            symbols = sorted(self.market_df['symbol'].unique())
+            # Extract symbols from CSV data
+            symbols = []
+            for row in self.csv_data:
+                if 'symbol' in row and row['symbol']:
+                    symbols.append(row['symbol'])
+                elif 'Symbol' in row and row['Symbol']:
+                    symbols.append(row['Symbol'])
 
-            print(f"\nGenerating candlestick charts for "
-                  f"{len(symbols)} symbols...")
+            if not symbols:
+                print("No symbols found in CSV data.")
+                return False
+
+            # Remove duplicates and sort
+            symbols = sorted(list(set(symbols)))
+
+            print(f"\nGenerating candlestick charts for {len(symbols)} symbols...")
+            print("Fetching fresh market data from 9:30 AM to 4:00 PM ET for complete charts...")
 
             # Create plots directory if it doesn't exist
             plots_dir = 'plots'
             os.makedirs(plots_dir, exist_ok=True)
+
+            # Set up time range for complete market data (9:30 AM to 4:00 PM ET)
+            et_tz = pytz.timezone('America/New_York')
+            target_date = (self.csv_date if self.csv_date 
+                           else datetime.now(et_tz).date())
+
+            start_time = datetime.combine(target_date, time(9, 30), tzinfo=et_tz)
+            end_time = datetime.combine(target_date, time(16, 0), tzinfo=et_tz)
+
+            # Determine which feed to use based on configuration
+            base_url = os.getenv('ALPACA_BASE_URL', 'https://paper-api.alpaca.markets')
+            feed = 'iex' if "paper" in base_url else 'sip'
+            
+            print(f"Using {feed.upper()} data feed for {'paper' if 'paper' in base_url else 'live'} trading")
+            print(f"Fetching complete market data from {start_time} to {end_time}")
 
             # Generate chart for each symbol
             success_count = 0
             alert_type_name = "super alerts" if self.plot_super_alerts else "regular alerts"
             
             for symbol in symbols:
-                # Load alerts for this symbol if csv_date is available
-                alerts = []
-                if self.csv_date:
-                    alerts = self._load_alerts_for_symbol(symbol, self.csv_date)
-                    if alerts:
-                        print(f"Loaded {len(alerts)} {alert_type_name} for {symbol}")
-                
-                # Generate chart with alerts
-                if plot_candle_chart(self.market_df, symbol, plots_dir, alerts):
-                    success_count += 1
+                try:
+                    # Fetch fresh, complete market data for this symbol
+                    print(f"Fetching fresh market data for {symbol}...")
+                    bars = self.api.get_bars(
+                        symbol,
+                        tradeapi.TimeFrame.Minute,  # type: ignore
+                        start=start_time.isoformat(),
+                        end=end_time.isoformat(),
+                        feed=feed  # Use IEX for paper trading, SIP for live trading
+                    )
+                    
+                    if not bars:
+                        print(f"No market data available for {symbol}")
+                        continue
+                    
+                    # Convert bars to DataFrame format expected by plot_candle_chart
+                    symbol_data = []
+                    for bar in bars:
+                        bar_data = {
+                            'timestamp': bar.t.isoformat(),
+                            'open': float(bar.o),
+                            'high': float(bar.h),
+                            'low': float(bar.l),
+                            'close': float(bar.c),
+                            'volume': int(bar.v),
+                            'symbol': symbol
+                        }
+                        symbol_data.append(bar_data)
+                    
+                    # Create DataFrame for this symbol
+                    symbol_df = pd.DataFrame(symbol_data)
+                    symbol_df['timestamp'] = pd.to_datetime(symbol_df['timestamp'])
+                    
+                    print(f"Retrieved {len(symbol_df)} minutes of data for {symbol}")
+                    if len(symbol_df) > 0:
+                        print(f"Data range: {symbol_df['timestamp'].min()} to {symbol_df['timestamp'].max()}")
+                    
+                    # Load alerts for this symbol if csv_date is available
+                    alerts = []
+                    if self.csv_date:
+                        alerts = self._load_alerts_for_symbol(symbol, self.csv_date)
+                        if alerts:
+                            print(f"Loaded {len(alerts)} {alert_type_name} for {symbol}")
+                    
+                    # Generate chart with fresh data and alerts
+                    if plot_candle_chart(symbol_df, symbol, plots_dir, alerts):
+                        success_count += 1
+                        print(f"✓ Chart generated for {symbol}")
+                    else:
+                        print(f"✗ Failed to generate chart for {symbol}")
+                        
+                except Exception as e:
+                    print(f"Error processing {symbol}: {e}")
+                    continue
 
             print(f"Successfully generated {success_count}/{len(symbols)} "
                   f"charts in '{plots_dir}' directory.")
@@ -1317,25 +1390,26 @@ class ORB:
             print("Failed to load and process CSV data.")
             return False
 
-        # Get market data for ORB analysis
+        # Generate candlestick charts for all symbols
+        # This now fetches fresh, complete market data directly
+        chart_success = self._generate_candle_charts()
+
+        if not chart_success:
+            print("Failed to generate charts.")
+            return False
+
+        # Get market data for ORB analysis (used for PCA analysis)
         market_data_success = self._get_orb_market_data()
 
         if not market_data_success:
             print("Failed to get market data for ORB analysis.")
             return False
 
-        # Process market data from saved JSON file
+        # Process market data from saved JSON file (used for PCA analysis)
         process_success = self._load_market_dataframe()
 
         if not process_success:
             print("Failed to process market data.")
-            return False
-
-        # Generate candlestick charts for all symbols
-        chart_success = self._generate_candle_charts()
-
-        if not chart_success:
-            print("Failed to generate charts.")
             return False
 
         # Perform PCA analysis on all symbols

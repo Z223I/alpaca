@@ -1,0 +1,23 @@
+{
+  "symbol": "DPRO",
+  "timestamp": "2025-07-16T15:24:00",
+  "current_price": 5.21,
+  "orb_high": 4.71,
+  "orb_low": 4.145,
+  "orb_range": 0.5650000000000004,
+  "orb_midpoint": 4.4275,
+  "breakout_type": "bullish_breakout",
+  "breakout_percentage": 10.615711252653929,
+  "volume_ratio": 5.556510528577568,
+  "confidence_score": 0.9439330807937061,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 4.81925,
+  "recommended_take_profit": 5.4184,
+  "alert_message": "[15:24:00] ORB ALERT: DPRO \u2191 $5.21 (+10.62% vs ORB High)\nVolume: 5.6x avg | Confidence: 0.94 | Priority: HIGH | EMA9: $4.98 | EMA20: $4.90 | EMA9\u2191EMA20 | Div: +1.6%\nStop: $4.82 | Target: $5.42",
+  "ema_9": 4.982123410224316,
+  "ema_20": 4.9026996694483795,
+  "ema_9_above_20": true,
+  "ema_9_below_20": false,
+  "ema_divergence": 0.01620000125050962
+}

@@ -1,0 +1,23 @@
+{
+  "symbol": "SLNH",
+  "timestamp": "2025-07-16T15:35:00",
+  "current_price": 0.6553,
+  "orb_high": 0.5183,
+  "orb_low": 0.4619,
+  "orb_range": 0.056400000000000006,
+  "orb_midpoint": 0.4901,
+  "breakout_type": "bullish_breakout",
+  "breakout_percentage": 26.43256801080456,
+  "volume_ratio": 2.503250865490163,
+  "confidence_score": 0.8923607982445102,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 0.6061525,
+  "recommended_take_profit": 0.681512,
+  "alert_message": "[15:35:00] ORB ALERT: SLNH \u2191 $0.66 (+26.43% vs ORB High)\nVolume: 2.5x avg | Confidence: 0.89 | Priority: HIGH | EMA9: $0.66 | EMA20: $0.65 | EMA9\u2191EMA20 | Div: +1.7%\nStop: $0.61 | Target: $0.68",
+  "ema_9": 0.6581979206250749,
+  "ema_20": 0.6473966260376782,
+  "ema_9_above_20": true,
+  "ema_9_below_20": false,
+  "ema_divergence": 0.016684199689925502
+}

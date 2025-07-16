@@ -1,0 +1,23 @@
+{
+  "symbol": "GAME",
+  "timestamp": "2025-07-16T14:59:00",
+  "current_price": 2.475,
+  "orb_high": 2.435,
+  "orb_low": 2.06,
+  "orb_range": 0.375,
+  "orb_midpoint": 2.2475,
+  "breakout_type": "bullish_breakout",
+  "breakout_percentage": 1.6427104722792623,
+  "volume_ratio": 2.0846905537459284,
+  "confidence_score": 0.8019712100464345,
+  "priority": "MEDIUM",
+  "confidence_level": "HIGH",
+  "recommended_stop_loss": 2.289375,
+  "recommended_take_profit": 2.5740000000000003,
+  "alert_message": "[14:59:00] ORB ALERT: GAME \u2191 $2.48 (+1.64% vs ORB High)\nVolume: 2.1x avg | Confidence: 0.80 | Priority: MEDIUM | EMA9: $2.41\nStop: $2.29 | Target: $2.57",
+  "ema_9": 2.414655300165758,
+  "ema_20": null,
+  "ema_9_above_20": null,
+  "ema_9_below_20": null,
+  "ema_divergence": null
+}

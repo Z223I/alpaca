@@ -1,0 +1,23 @@
+{
+  "symbol": "BTBT",
+  "timestamp": "2025-07-16T15:22:00",
+  "current_price": 3.87,
+  "orb_high": 3.76,
+  "orb_low": 3.475,
+  "orb_range": 0.2849999999999997,
+  "orb_midpoint": 3.6174999999999997,
+  "breakout_type": "bullish_breakout",
+  "breakout_percentage": 2.9255319148936256,
+  "volume_ratio": 2.8576300979916307,
+  "confidence_score": 0.877797598943107,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 3.57975,
+  "recommended_take_profit": 4.0248,
+  "alert_message": "[15:22:00] ORB ALERT: BTBT \u2191 $3.87 (+2.93% vs ORB High)\nVolume: 2.9x avg | Confidence: 0.88 | Priority: HIGH | EMA9: $3.85 | EMA20: $3.84 | EMA9\u2191EMA20 | Div: +0.1%\nStop: $3.58 | Target: $4.02",
+  "ema_9": 3.8465668334029193,
+  "ema_20": 3.843174079625759,
+  "ema_9_above_20": true,
+  "ema_9_below_20": false,
+  "ema_divergence": 0.000882799921852737
+}

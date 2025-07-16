@@ -1,0 +1,23 @@
+{
+  "symbol": "IXHL",
+  "timestamp": "2025-07-16T15:04:00",
+  "current_price": 0.3636,
+  "orb_high": 0.4156,
+  "orb_low": 0.38,
+  "orb_range": 0.03560000000000002,
+  "orb_midpoint": 0.39780000000000004,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 4.315789473684218,
+  "volume_ratio": 2.8660888792371626,
+  "confidence_score": 0.8525434379081511,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 0.39086999999999994,
+  "recommended_take_profit": 0.349056,
+  "alert_message": "[15:04:00] ORB ALERT: IXHL \u2193 $0.36 (+4.32% vs ORB Low)\nVolume: 2.9x avg | Confidence: 0.85 | Priority: HIGH | EMA9: $0.37 | EMA20: $0.37 | EMA9\u2193EMA20 | Div: -0.8%\nStop: $0.39 | Target: $0.35",
+  "ema_9": 0.3670865959375989,
+  "ema_20": 0.36986953853066157,
+  "ema_9_above_20": false,
+  "ema_9_below_20": true,
+  "ema_divergence": -0.0075241194614678
+}

@@ -1,0 +1,49 @@
+{
+  "symbol": "DPRO",
+  "timestamp": "2025-07-16T15:27:00-0400",
+  "original_alert_timestamp": "2025-07-16T15:26:00",
+  "alert_type": "super_alert",
+  "trigger_condition": "signal_price_reached",
+  "original_alert": {
+    "symbol": "DPRO",
+    "timestamp": "2025-07-16T15:26:00",
+    "current_price": 5.16,
+    "orb_high": 4.71,
+    "orb_low": 4.145,
+    "orb_range": 0.5650000000000004,
+    "orb_midpoint": 4.4275,
+    "breakout_type": "bullish_breakout",
+    "breakout_percentage": 9.55414012738854,
+    "volume_ratio": 3.2984089370345293,
+    "confidence_score": 0.9302763218333164,
+    "priority": "HIGH",
+    "confidence_level": "VERY_HIGH",
+    "recommended_stop_loss": 4.773000000000001,
+    "recommended_take_profit": 5.3664000000000005,
+    "alert_message": "[15:26:00] ORB ALERT: DPRO \u2191 $5.16 (+9.55% vs ORB High)\nVolume: 3.3x avg | Confidence: 0.93 | Priority: HIGH | EMA9: $5.05 | EMA20: $4.95 | EMA9\u2191EMA20 | Div: +2.0%\nStop: $4.77 | Target: $5.37",
+    "ema_9": 5.052568346281679,
+    "ema_20": 4.953754157494426,
+    "ema_9_above_20": true,
+    "ema_9_below_20": false,
+    "ema_divergence": 0.019947334010864997
+  },
+  "signal_analysis": {
+    "signal_price": 4.76,
+    "resistance_price": 4.73,
+    "current_price": 5.16,
+    "penetration_percent": 0.0,
+    "range_percent": 0.99,
+    "signal_reached": true,
+    "resistance_reached": true
+  },
+  "metrics": {
+    "signal_to_resistance_range": -0.02999999999999936,
+    "price_above_signal": 0.40000000000000036,
+    "distance_to_resistance": -0.4299999999999997
+  },
+  "risk_assessment": {
+    "entry_price": 4.76,
+    "target_price": 4.73,
+    "current_risk_reward": -1.0749999999999984
+  }
+}
