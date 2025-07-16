@@ -202,6 +202,26 @@ class AlertMonitorHistory:
                     if ema_9 is not None and ema_20 is not None:
                         ema_info = f" (EMA9: ${ema_9:.2f} > EMA20: ${ema_20:.2f})"
                     self.logger.debug(f"✅ Allowing bullish alert for {symbol}: EMA9 above EMA20{ema_info}")
+                
+                # Additional filter: Check if current candlestick low is below EMA9 for bullish alerts
+                # Get the current candlestick low from the original alert data
+                original_alert = alert_data.get('original_alert', alert_data)
+                current_low = original_alert.get('low')  # Current candlestick low
+                if current_low is None:
+                    # Fallback to looking for 'current_low' field directly
+                    current_low = alert_data.get('current_low')
+                
+                if ema_9 is not None and current_low is not None:
+                    if current_low < ema_9:
+                        self.filtered_alerts.append(alert_data)
+                        self.logger.info(f"🚫 Filtered bullish alert for {symbol}: Current candlestick low ${current_low:.2f} below EMA9 ${ema_9:.2f}")
+                        return
+                    else:
+                        self.logger.debug(f"✅ Allowing bullish alert for {symbol}: Current candlestick low ${current_low:.2f} above EMA9 ${ema_9:.2f}")
+                elif ema_9 is None:
+                    self.logger.warning(f"No EMA9 data available for {symbol} low filter, allowing alert")
+                elif current_low is None:
+                    self.logger.warning(f"No current candlestick low data available for {symbol} EMA9 filter, allowing alert")
             
             symbol_info = self.symbol_data[symbol]
             
@@ -337,7 +357,7 @@ class AlertMonitorHistory:
             print(f"📊 Symbols monitored: {len(self.symbol_data)}")
             if self.test_mode:
                 print("🧪 TEST MODE: No actual super alert files were created")
-            print("🚫 Filtering: Bullish alerts with EMA9 < EMA20 are filtered out")
+            print("🚫 Filtering: Bullish alerts with EMA9 < EMA20 or candlestick low < EMA9 are filtered out")
             print("="*80 + "\n")
             
             # Print super alert details
