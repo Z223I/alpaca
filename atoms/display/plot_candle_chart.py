@@ -31,6 +31,47 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
     Returns:
         True if successful, False otherwise
     """
+    
+    def check_data_completeness(symbol_data, et_tz):
+        """Check if we have complete trading session data, especially opening range."""
+        
+        if len(symbol_data) == 0:
+            return {'complete': False, 'missing_opening': True, 'message': 'No data available'}
+        
+        # Get the trading date
+        first_timestamp = symbol_data['timestamp'].iloc[0]
+        if hasattr(first_timestamp, 'date'):
+            trading_date = first_timestamp.date()
+        else:
+            trading_date = first_timestamp.to_pydatetime().date()
+        
+        # Define expected opening range: 9:30-9:45 AM ET
+        expected_open = et_tz.localize(datetime.combine(trading_date, time(9, 30)))
+        opening_range_end = et_tz.localize(datetime.combine(trading_date, time(9, 45)))
+        
+        # Check if we have any data in the opening range
+        opening_mask = (symbol_data['timestamp'] >= expected_open) & (symbol_data['timestamp'] <= opening_range_end)
+        opening_data = symbol_data[opening_mask]
+        
+        # Check actual data start time
+        actual_start = symbol_data['timestamp'].min()
+        if actual_start.tzinfo is None:
+            actual_start = et_tz.localize(actual_start)
+        
+        missing_opening = len(opening_data) == 0
+        minutes_late = (actual_start - expected_open).total_seconds() / 60 if actual_start > expected_open else 0
+        
+        completeness = {
+            'complete': not missing_opening and minutes_late < 5,  # Allow 5 minute grace period
+            'missing_opening': missing_opening,
+            'minutes_late': minutes_late,
+            'actual_start': actual_start,
+            'expected_start': expected_open,
+            'opening_data_points': len(opening_data),
+            'message': f'Data starts {minutes_late:.0f} minutes late' if minutes_late > 0 else 'Complete data'
+        }
+        
+        return completeness
     try:
         # Extract symbol data using the dedicated atom
         symbol_data = extract_symbol_data(df, symbol)
@@ -42,6 +83,17 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
         # Convert timestamps to Eastern Time for display
         et_tz = pytz.timezone('America/New_York')
         symbol_data = symbol_data.copy()
+        
+        # Check data completeness before processing
+        completeness = check_data_completeness(symbol_data, et_tz)
+        
+        # Print data completeness warnings
+        if completeness['missing_opening']:
+            print(f"⚠️  WARNING: Missing opening range data for {symbol}")
+            print(f"    Data starts at {completeness['actual_start'].strftime('%H:%M')} instead of 9:30 AM")
+            print(f"    ORB levels may be inaccurate without opening range data")
+        elif completeness['minutes_late'] > 5:
+            print(f"⚠️  WARNING: Data for {symbol} starts {completeness['minutes_late']:.0f} minutes late")
         
         # Convert timestamps to ET (handles both EDT and EST automatically)
         if pd.api.types.is_datetime64_any_dtype(symbol_data['timestamp']):

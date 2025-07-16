@@ -1,0 +1,49 @@
+{
+  "symbol": "APM",
+  "timestamp": "2025-07-16T15:50:00-0400",
+  "original_alert_timestamp": "2025-07-16T15:49:00",
+  "alert_type": "super_alert",
+  "trigger_condition": "signal_price_reached",
+  "original_alert": {
+    "symbol": "APM",
+    "timestamp": "2025-07-16T15:49:00",
+    "current_price": 2.09,
+    "orb_high": 1.67,
+    "orb_low": 1.19,
+    "orb_range": 0.48,
+    "orb_midpoint": 1.43,
+    "breakout_type": "bullish_breakout",
+    "breakout_percentage": 25.149700598802394,
+    "volume_ratio": 1.9543973941368078,
+    "confidence_score": 0.8964558884685188,
+    "priority": "MEDIUM",
+    "confidence_level": "VERY_HIGH",
+    "recommended_stop_loss": 1.93325,
+    "recommended_take_profit": 2.1736,
+    "alert_message": "[15:49:00] ORB ALERT: APM \u2191 $2.09 (+25.15% vs ORB High)\nVolume: 2.0x avg | Confidence: 0.90 | Priority: MEDIUM | EMA9: $1.85\nStop: $1.93 | Target: $2.17",
+    "ema_9": 1.8540182122815558,
+    "ema_20": null,
+    "ema_9_above_20": null,
+    "ema_9_below_20": null,
+    "ema_divergence": null
+  },
+  "signal_analysis": {
+    "signal_price": 1.35,
+    "resistance_price": 1.91,
+    "current_price": 2.09,
+    "penetration_percent": 100.0,
+    "range_percent": 1.41,
+    "signal_reached": true,
+    "resistance_reached": true
+  },
+  "metrics": {
+    "signal_to_resistance_range": 0.5599999999999998,
+    "price_above_signal": 0.7399999999999998,
+    "distance_to_resistance": -0.17999999999999994
+  },
+  "risk_assessment": {
+    "entry_price": 1.35,
+    "target_price": 1.91,
+    "current_risk_reward": -0.24324324324324323
+  }
+}

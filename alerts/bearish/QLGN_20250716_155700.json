@@ -1,0 +1,23 @@
+{
+  "symbol": "QLGN",
+  "timestamp": "2025-07-16T15:57:00",
+  "current_price": 3.95,
+  "orb_high": 6.21,
+  "orb_low": 5.15,
+  "orb_range": 1.0599999999999996,
+  "orb_midpoint": 5.68,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 23.300970873786408,
+  "volume_ratio": 2.822608695652174,
+  "confidence_score": 0.8748053994705394,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 4.24625,
+  "recommended_take_profit": 3.792,
+  "alert_message": "[15:57:00] ORB ALERT: QLGN \u2193 $3.95 (+23.30% vs ORB Low)\nVolume: 2.8x avg | Confidence: 0.87 | Priority: HIGH | EMA9: $4.39\nStop: $4.25 | Target: $3.79",
+  "ema_9": 4.393678210804907,
+  "ema_20": null,
+  "ema_9_above_20": null,
+  "ema_9_below_20": null,
+  "ema_divergence": null
+}

@@ -1,0 +1,49 @@
+{
+  "symbol": "BTBT",
+  "timestamp": "2025-07-16T15:56:00-0400",
+  "original_alert_timestamp": "2025-07-16T15:55:00",
+  "alert_type": "super_alert",
+  "trigger_condition": "signal_price_reached",
+  "original_alert": {
+    "symbol": "BTBT",
+    "timestamp": "2025-07-16T15:55:00",
+    "current_price": 3.9,
+    "orb_high": 3.76,
+    "orb_low": 3.475,
+    "orb_range": 0.2849999999999997,
+    "orb_midpoint": 3.6174999999999997,
+    "breakout_type": "bullish_breakout",
+    "breakout_percentage": 3.7234042553191524,
+    "volume_ratio": 3.0023481235324225,
+    "confidence_score": 0.8946524094483888,
+    "priority": "HIGH",
+    "confidence_level": "VERY_HIGH",
+    "recommended_stop_loss": 3.6075,
+    "recommended_take_profit": 4.056,
+    "alert_message": "[15:55:00] ORB ALERT: BTBT \u2191 $3.90 (+3.72% vs ORB High)\nVolume: 3.0x avg | Confidence: 0.89 | Priority: HIGH | EMA9: $3.89 | EMA20: $3.84 | EMA9\u2191EMA20 | Div: +1.5%\nStop: $3.61 | Target: $4.06",
+    "ema_9": 3.8948489827902018,
+    "ema_20": 3.8384388883485006,
+    "ema_9_above_20": true,
+    "ema_9_below_20": false,
+    "ema_divergence": 0.014696103307241087
+  },
+  "signal_analysis": {
+    "signal_price": 3.7,
+    "resistance_price": 3.76,
+    "current_price": 3.9,
+    "penetration_percent": 100.0,
+    "range_percent": 1.02,
+    "signal_reached": true,
+    "resistance_reached": true
+  },
+  "metrics": {
+    "signal_to_resistance_range": 0.05999999999999961,
+    "price_above_signal": 0.19999999999999973,
+    "distance_to_resistance": -0.14000000000000012
+  },
+  "risk_assessment": {
+    "entry_price": 3.7,
+    "target_price": 3.76,
+    "current_risk_reward": -0.7000000000000015
+  }
+}

@@ -153,6 +153,9 @@ class ORBAlertSystem:
                 symbol_data = self.alert_engine.data_buffer.get_symbol_data(symbol)
                 
                 if symbol_data is not None and not symbol_data.empty:
+                    # Check if we need to prepend opening range data
+                    combined_data = self._combine_with_opening_range_data(symbol, symbol_data, current_time)
+                    
                     # Clean up old files for this symbol before saving new one
                     self._cleanup_old_symbol_files(symbol)
                     
@@ -160,8 +163,8 @@ class ORBAlertSystem:
                     filename = f"{symbol}_{current_time.strftime('%Y%m%d_%H%M%S')}.csv"
                     filepath = self.daily_data_dir / "market_data" / filename
                     
-                    symbol_data.to_csv(filepath, index=False)
-                    self.logger.debug(f"Saved {len(symbol_data)} records for {symbol} to {filename}")
+                    combined_data.to_csv(filepath, index=False)
+                    self.logger.debug(f"Saved {len(combined_data)} records for {symbol} to {filename}")
             
             # Save metadata about the data save
             metadata = {
@@ -221,6 +224,112 @@ class ORBAlertSystem:
                 
         except Exception as e:
             self.logger.error(f"Error cleaning up old files for {symbol}: {e}")
+    
+    def _combine_with_opening_range_data(self, symbol: str, symbol_data: pd.DataFrame, current_time: datetime) -> pd.DataFrame:
+        """
+        Combine opening range data with current symbol data if not already included.
+        
+        Args:
+            symbol: The symbol to combine data for
+            symbol_data: Current symbol data from the data buffer
+            current_time: Current timestamp
+            
+        Returns:
+            Combined DataFrame with opening range data prepended if needed
+        """
+        try:
+            # Get the date for looking up opening range data
+            date_str = current_time.strftime('%Y-%m-%d')
+            market_data_dir = self.daily_data_dir / "market_data"
+            
+            # Look for opening range data files for this symbol
+            opening_range_files = list(market_data_dir.glob(f"{symbol}_opening_range_*.csv"))
+            
+            if not opening_range_files:
+                # No opening range data exists, return original data
+                self.logger.debug(f"No opening range data found for {symbol}")
+                return symbol_data
+            
+            # Get the most recent opening range file
+            opening_range_file = max(opening_range_files, key=lambda f: f.stat().st_mtime)
+            
+            # Load the opening range data
+            opening_range_data = pd.read_csv(opening_range_file)
+            
+            if opening_range_data.empty:
+                self.logger.debug(f"Opening range data file for {symbol} is empty")
+                return symbol_data
+            
+            # Ensure timestamp columns are datetime objects for comparison
+            opening_range_data['timestamp'] = pd.to_datetime(opening_range_data['timestamp'])
+            symbol_data = symbol_data.copy()
+            symbol_data['timestamp'] = pd.to_datetime(symbol_data['timestamp'])
+            
+            # Check if opening range data is already included in symbol_data
+            # We'll check if the earliest timestamp in symbol_data overlaps with opening range period
+            et_tz = pytz.timezone('US/Eastern')
+            market_open_time = current_time.replace(hour=9, minute=30, second=0, microsecond=0)
+            orb_end_time = market_open_time + timedelta(minutes=15)  # 9:30 AM to 9:45 AM
+            
+            # Normalize timestamps to timezone-naive for comparison
+            # Convert orb_end_time to timezone-naive for comparison
+            if orb_end_time.tzinfo is not None:
+                orb_end_time = orb_end_time.replace(tzinfo=None)
+            
+            # Check if symbol_data already contains opening range data
+            earliest_symbol_time = symbol_data['timestamp'].min()
+            
+            # Ensure earliest_symbol_time is timezone-naive for comparison
+            if hasattr(earliest_symbol_time, 'tzinfo') and earliest_symbol_time.tzinfo is not None:
+                earliest_symbol_time = earliest_symbol_time.tz_convert('US/Eastern').tz_localize(None)
+            elif hasattr(earliest_symbol_time, 'tz') and earliest_symbol_time.tz is not None:
+                earliest_symbol_time = earliest_symbol_time.tz_convert('US/Eastern').tz_localize(None)
+            
+            # If symbol data starts before or at 9:45 AM, assume opening range is already included
+            if earliest_symbol_time <= orb_end_time:
+                self.logger.debug(f"Opening range data already included in symbol data for {symbol}")
+                return symbol_data
+            
+            # Opening range data is not included, prepend it
+            # Normalize all timestamps to timezone-naive Eastern Time for consistency
+            def normalize_timestamp_column(df, column_name):
+                """Normalize timestamp column to timezone-naive Eastern Time."""
+                df = df.copy()
+                timestamps = df[column_name]
+                
+                # Convert to timezone-naive Eastern Time
+                if hasattr(timestamps.iloc[0], 'tzinfo') and timestamps.iloc[0].tzinfo is not None:
+                    # Already timezone-aware, convert to ET then remove timezone
+                    df[column_name] = timestamps.dt.tz_convert('US/Eastern').dt.tz_localize(None)
+                elif hasattr(timestamps.iloc[0], 'tz') and timestamps.iloc[0].tz is not None:
+                    # Handle pandas timezone-aware
+                    df[column_name] = timestamps.dt.tz_convert('US/Eastern').dt.tz_localize(None)
+                # If already timezone-naive, assume it's already in Eastern Time
+                
+                return df
+            
+            # Normalize both DataFrames
+            opening_range_data = normalize_timestamp_column(opening_range_data, 'timestamp')
+            symbol_data = normalize_timestamp_column(symbol_data, 'timestamp')
+            
+            # Remove any duplicate timestamps to avoid conflicts
+            opening_range_timestamps = set(opening_range_data['timestamp'])
+            symbol_data_filtered = symbol_data[~symbol_data['timestamp'].isin(opening_range_timestamps)]
+            
+            # Combine the data - opening range first, then regular data
+            combined_data = pd.concat([opening_range_data, symbol_data_filtered], ignore_index=True)
+            
+            # Sort by timestamp to ensure chronological order
+            combined_data = combined_data.sort_values('timestamp').reset_index(drop=True)
+            
+            self.logger.info(f"Prepended {len(opening_range_data)} opening range records to {len(symbol_data_filtered)} regular records for {symbol}")
+            
+            return combined_data
+            
+        except Exception as e:
+            self.logger.error(f"Error combining opening range data for {symbol}: {e}")
+            # Return original data if there's an error
+            return symbol_data
     
     def _should_save_data(self) -> bool:
         """Check if it's time to save historical data."""
@@ -464,8 +573,8 @@ class ORBAlertSystem:
                     
                     self.logger.info(f"Successfully fetched and loaded {data_count} opening range data points")
                     
-                    # Save opening range data to tmp directory for each symbol
-                    self._save_opening_range_data_to_tmp(bars_data, market_open_today_et, orb_end_time_et)
+                    # Save opening range data to historical_data directory for each symbol
+                    self._save_opening_range_data_to_historical(bars_data, market_open_today_et, orb_end_time_et)
                     
                     # Print success message to screen
                     print("=" * 80)
@@ -500,9 +609,9 @@ class ORBAlertSystem:
             
             return False
     
-    def _save_opening_range_data_to_tmp(self, bars_data, market_open_time: datetime, orb_end_time: datetime) -> None:
+    def _save_opening_range_data_to_historical(self, bars_data, market_open_time: datetime, orb_end_time: datetime) -> None:
         """
-        Save opening range data for each symbol to tmp directory.
+        Save opening range data for each symbol to historical_data directory.
         
         Args:
             bars_data: The fetched historical data
@@ -510,10 +619,10 @@ class ORBAlertSystem:
             orb_end_time: ORB period end datetime
         """
         try:
-            # Ensure tmp directory exists
-            from pathlib import Path
-            tmp_dir = Path("tmp")
-            tmp_dir.mkdir(exist_ok=True)
+            # Use the same directory structure as the main historical data storage
+            date_str = market_open_time.strftime('%Y-%m-%d')
+            historical_market_dir = self.historical_data_dir / date_str / "market_data"
+            historical_market_dir.mkdir(parents=True, exist_ok=True)
             
             if hasattr(bars_data, 'df') and not bars_data.df.empty:
                 # Get unique symbols
@@ -524,17 +633,25 @@ class ORBAlertSystem:
                     
                     if not symbol_data.empty:
                         # Clean up old opening range files for this symbol
-                        self._cleanup_old_opening_range_files(symbol, tmp_dir)
+                        self._cleanup_old_opening_range_files(symbol, historical_market_dir)
                         
                         # Sort by timestamp
                         symbol_data = symbol_data.sort_values('timestamp')
                         
-                        # Create filename
-                        date_str = market_open_time.strftime('%Y%m%d')
-                        filename = f"{symbol}_opening_range_{date_str}.csv"
-                        filepath = tmp_dir / filename
+                        # Create filename with opening range timestamp
+                        time_str = market_open_time.strftime('%Y%m%d_%H%M%S')
+                        filename = f"{symbol}_opening_range_{time_str}.csv"
+                        filepath = historical_market_dir / filename
                         
-                        # Save to CSV
+                        # Save to CSV with proper column order for consistency
+                        # Reorder columns to match the standard format
+                        if 'symbol' in symbol_data.columns:
+                            symbol_data = symbol_data[['timestamp', 'symbol', 'high', 'low', 'close', 'volume', 'trade_count', 'vwap']]
+                        else:
+                            # Add symbol column if missing
+                            symbol_data['symbol'] = symbol
+                            symbol_data = symbol_data[['timestamp', 'symbol', 'high', 'low', 'close', 'volume', 'trade_count', 'vwap']]
+                        
                         symbol_data.to_csv(filepath, index=False)
                         
                         self.logger.info(f"Saved opening range data for {symbol} to {filepath}")
@@ -547,22 +664,22 @@ class ORBAlertSystem:
                         
                         print(f"📊 {symbol}: {data_points} bars | ORB High: ${orb_high:.3f} | ORB Low: ${orb_low:.3f} | Range: ${orb_range:.3f}")
                 
-                print(f"💾 Opening range data saved to tmp/ directory")
+                print(f"💾 Opening range data saved to historical_data/{date_str}/market_data/ directory")
             
         except Exception as e:
-            self.logger.error(f"Error saving opening range data to tmp: {e}")
+            self.logger.error(f"Error saving opening range data to historical_data: {e}")
     
-    def _cleanup_old_opening_range_files(self, symbol: str, tmp_dir: Path) -> None:
+    def _cleanup_old_opening_range_files(self, symbol: str, market_data_dir: Path) -> None:
         """
         Remove old opening range data files for a symbol, keeping only the latest.
         
         Args:
             symbol: The symbol to clean up files for
-            tmp_dir: The tmp directory path
+            market_data_dir: The historical market data directory path
         """
         try:
             # Find all opening range files for this symbol
-            symbol_files = list(tmp_dir.glob(f"{symbol}_opening_range_*.csv"))
+            symbol_files = list(market_data_dir.glob(f"{symbol}_opening_range_*.csv"))
             
             if len(symbol_files) <= 1:
                 # No cleanup needed if 1 or fewer files exist

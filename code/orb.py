@@ -512,17 +512,18 @@ class ORB:
                   f"{symbols[:5]}{'...' if len(symbols) > 5 else ''}")
 
             # Use date from CSV filename with normal market hours
-            # (9:30 AM to 4:00 PM ET)
+            # (9:30 AM to 4:00 PM ET) - start from premarket to get opening range data
             et_tz = pytz.timezone('America/New_York')
             target_date = (self.csv_date if self.csv_date
                            else datetime.now(et_tz).date())
 
-            start_time = datetime.combine(target_date, time(9, 30),
-                                          tzinfo=et_tz)
+            start_time = datetime.combine(target_date, time(4, 0),
+                                          tzinfo=et_tz)  # Start from premarket
             end_time = datetime.combine(target_date, time(16, 0),
                                         tzinfo=et_tz)
 
             print(f"Fetching 1-minute data from {start_time} to {end_time}")
+            print(f"  (Starting from premarket to ensure opening range data is included)")
 
             # Determine which feed to use based on configuration
             base_url = os.getenv('ALPACA_BASE_URL', 'https://paper-api.alpaca.markets')
@@ -1294,11 +1295,12 @@ class ORB:
             os.makedirs(plots_dir, exist_ok=True)
 
             # Set up time range for complete market data (9:30 AM to 4:00 PM ET)
+            # Start from premarket (4:00 AM) to ensure we get opening range data
             et_tz = pytz.timezone('America/New_York')
             target_date = (self.csv_date if self.csv_date 
                            else datetime.now(et_tz).date())
 
-            start_time = datetime.combine(target_date, time(9, 30), tzinfo=et_tz)
+            start_time = datetime.combine(target_date, time(4, 0), tzinfo=et_tz)  # Start from premarket
             end_time = datetime.combine(target_date, time(16, 0), tzinfo=et_tz)
 
             # Determine which feed to use based on configuration
@@ -1307,6 +1309,7 @@ class ORB:
             
             print(f"Using {feed.upper()} data feed for {'paper' if 'paper' in base_url else 'live'} trading")
             print(f"Fetching complete market data from {start_time} to {end_time}")
+            print(f"  (Starting from premarket to ensure opening range data is included)")
 
             # Generate chart for each symbol
             success_count = 0
@@ -1316,11 +1319,13 @@ class ORB:
                 try:
                     # Fetch fresh, complete market data for this symbol
                     print(f"Fetching fresh market data for {symbol}...")
+                    print(f"  Time range: {start_time.strftime('%Y-%m-%d %H:%M:%S %Z')} to {end_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
                     bars = self.api.get_bars(
                         symbol,
                         tradeapi.TimeFrame.Minute,  # type: ignore
                         start=start_time.isoformat(),
                         end=end_time.isoformat(),
+                        limit=10000,  # Ensure we get all data (6.5 hours * 60 minutes = 390 minutes max)
                         feed=feed  # Use IEX for paper trading, SIP for live trading
                     )
                     
@@ -1348,7 +1353,24 @@ class ORB:
                     
                     print(f"Retrieved {len(symbol_df)} minutes of data for {symbol}")
                     if len(symbol_df) > 0:
-                        print(f"Data range: {symbol_df['timestamp'].min()} to {symbol_df['timestamp'].max()}")
+                        min_time = symbol_df['timestamp'].min()
+                        max_time = symbol_df['timestamp'].max()
+                        print(f"Data range: {min_time} to {max_time}")
+                        
+                        # Check if we got the full trading session
+                        expected_start = start_time.replace(tzinfo=None)
+                        expected_end = end_time.replace(tzinfo=None)
+                        
+                        if min_time.replace(tzinfo=None) > expected_start:
+                            print(f"⚠️  Data starts later than expected market open (9:30 AM)")
+                        if max_time.replace(tzinfo=None) < expected_end:
+                            print(f"⚠️  Data ends earlier than expected market close (4:00 PM)")
+                        
+                        # Calculate coverage
+                        session_duration = (expected_end - expected_start).total_seconds() / 60  # minutes
+                        actual_duration = (max_time - min_time).total_seconds() / 60  # minutes
+                        coverage = (actual_duration / session_duration) * 100 if session_duration > 0 else 0
+                        print(f"Session coverage: {coverage:.1f}% ({len(symbol_df)} of ~{session_duration:.0f} possible minutes)")
                     
                     # Load alerts for this symbol if csv_date is available
                     alerts = []

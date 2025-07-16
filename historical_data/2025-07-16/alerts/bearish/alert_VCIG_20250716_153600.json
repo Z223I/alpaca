@@ -1,0 +1,23 @@
+{
+  "symbol": "VCIG",
+  "timestamp": "2025-07-16T15:36:00",
+  "current_price": 1.04,
+  "orb_high": 1.335,
+  "orb_low": 1.185,
+  "orb_range": 0.1499999999999999,
+  "orb_midpoint": 1.26,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 12.236286919831224,
+  "volume_ratio": 4.617297105309891,
+  "confidence_score": 0.8909790839710021,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 1.1179999999999999,
+  "recommended_take_profit": 0.9984,
+  "alert_message": "[15:36:00] ORB ALERT: VCIG \u2193 $1.04 (+12.24% vs ORB Low)\nVolume: 4.6x avg | Confidence: 0.89 | Priority: HIGH | EMA9: $1.05 | EMA20: $1.08 | EMA9\u2193EMA20 | Div: -2.2%\nStop: $1.12 | Target: $1.00",
+  "ema_9": 1.05302499293609,
+  "ema_20": 1.0767348234740082,
+  "ema_9_above_20": false,
+  "ema_9_below_20": true,
+  "ema_divergence": -0.022020120480008364
+}

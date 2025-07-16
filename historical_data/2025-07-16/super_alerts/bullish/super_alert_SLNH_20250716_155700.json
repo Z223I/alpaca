@@ -1,0 +1,49 @@
+{
+  "symbol": "SLNH",
+  "timestamp": "2025-07-16T15:57:00-0400",
+  "original_alert_timestamp": "2025-07-16T15:56:00",
+  "alert_type": "super_alert",
+  "trigger_condition": "signal_price_reached",
+  "original_alert": {
+    "symbol": "SLNH",
+    "timestamp": "2025-07-16T15:56:00",
+    "current_price": 0.6375,
+    "orb_high": 0.5183,
+    "orb_low": 0.4619,
+    "orb_range": 0.056400000000000006,
+    "orb_midpoint": 0.4901,
+    "breakout_type": "bullish_breakout",
+    "breakout_percentage": 22.998263553926293,
+    "volume_ratio": 1.576613565445886,
+    "confidence_score": 0.8850580282595437,
+    "priority": "MEDIUM",
+    "confidence_level": "VERY_HIGH",
+    "recommended_stop_loss": 0.5896875,
+    "recommended_take_profit": 0.6629999999999999,
+    "alert_message": "[15:56:00] ORB ALERT: SLNH \u2191 $0.64 (+23.00% vs ORB High)\nVolume: 1.6x avg | Confidence: 0.89 | Priority: MEDIUM | EMA9: $0.60 | EMA20: $0.56 | EMA9\u2191EMA20 | Div: +5.8%\nStop: $0.59 | Target: $0.66",
+    "ema_9": 0.5969460373765881,
+    "ema_20": 0.5642311585713876,
+    "ema_9_above_20": true,
+    "ema_9_below_20": false,
+    "ema_divergence": 0.05798134028619295
+  },
+  "signal_analysis": {
+    "signal_price": 0.51,
+    "resistance_price": 0.97,
+    "current_price": 0.6375,
+    "penetration_percent": 27.72,
+    "range_percent": 1.9,
+    "signal_reached": true,
+    "resistance_reached": false
+  },
+  "metrics": {
+    "signal_to_resistance_range": 0.45999999999999996,
+    "price_above_signal": 0.12749999999999995,
+    "distance_to_resistance": 0.3325
+  },
+  "risk_assessment": {
+    "entry_price": 0.51,
+    "target_price": 0.97,
+    "current_risk_reward": 2.6078431372549034
+  }
+}
