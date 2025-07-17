@@ -159,8 +159,8 @@ class ORBAlertSystem:
                 symbol_data = self.alert_engine.data_buffer.get_symbol_data(symbol)
                 
                 if symbol_data is not None and not symbol_data.empty:
-                    # Check if we need to prepend opening range data
-                    combined_data = self._combine_with_opening_range_data(symbol, symbol_data, current_time)
+                    # Data buffer already contains all data since 9:30 AM, no need to combine
+                    combined_data = symbol_data
                     
                     # Clean up old files for this symbol before saving new one
                     self._cleanup_old_symbol_files(symbol)
@@ -170,7 +170,7 @@ class ORBAlertSystem:
                     filepath = self.daily_data_dir / "market_data" / filename
                     
                     combined_data.to_csv(filepath, index=False)
-                    self.logger.debug(f"Saved {len(combined_data)} records for {symbol} to {filename}")
+                    self.logger.debug(f"Saved {len(combined_data)} records (all data since 9:30 AM) for {symbol} to {filename}")
             
             # Save metadata about the data save
             metadata = {
@@ -231,111 +231,6 @@ class ORBAlertSystem:
         except Exception as e:
             self.logger.error(f"Error cleaning up old files for {symbol}: {e}")
     
-    def _combine_with_opening_range_data(self, symbol: str, symbol_data: pd.DataFrame, current_time: datetime) -> pd.DataFrame:
-        """
-        Combine opening range data with current symbol data if not already included.
-        
-        Args:
-            symbol: The symbol to combine data for
-            symbol_data: Current symbol data from the data buffer
-            current_time: Current timestamp
-            
-        Returns:
-            Combined DataFrame with opening range data prepended if needed
-        """
-        try:
-            # Get the date for looking up opening range data
-            date_str = current_time.strftime('%Y-%m-%d')
-            market_data_dir = self.daily_data_dir / "market_data"
-            
-            # Look for opening range data files for this symbol
-            opening_range_files = list(market_data_dir.glob(f"{symbol}_opening_range_*.csv"))
-            
-            if not opening_range_files:
-                # No opening range data exists, return original data
-                self.logger.debug(f"No opening range data found for {symbol}")
-                return symbol_data
-            
-            # Get the most recent opening range file
-            opening_range_file = max(opening_range_files, key=lambda f: f.stat().st_mtime)
-            
-            # Load the opening range data
-            opening_range_data = pd.read_csv(opening_range_file)
-            
-            if opening_range_data.empty:
-                self.logger.debug(f"Opening range data file for {symbol} is empty")
-                return symbol_data
-            
-            # Ensure timestamp columns are datetime objects for comparison
-            opening_range_data['timestamp'] = pd.to_datetime(opening_range_data['timestamp'])
-            symbol_data = symbol_data.copy()
-            symbol_data['timestamp'] = pd.to_datetime(symbol_data['timestamp'])
-            
-            # Check if opening range data is already included in symbol_data
-            # We'll check if the earliest timestamp in symbol_data overlaps with opening range period
-            et_tz = pytz.timezone('US/Eastern')
-            market_open_time = current_time.replace(hour=9, minute=30, second=0, microsecond=0)
-            orb_end_time = market_open_time + timedelta(minutes=15)  # 9:30 AM to 9:45 AM
-            
-            # Normalize timestamps to timezone-naive for comparison
-            # Convert orb_end_time to timezone-naive for comparison
-            if orb_end_time.tzinfo is not None:
-                orb_end_time = orb_end_time.replace(tzinfo=None)
-            
-            # Check if symbol_data already contains opening range data
-            earliest_symbol_time = symbol_data['timestamp'].min()
-            
-            # Ensure earliest_symbol_time is timezone-naive for comparison
-            if hasattr(earliest_symbol_time, 'tzinfo') and earliest_symbol_time.tzinfo is not None:
-                earliest_symbol_time = earliest_symbol_time.tz_convert('US/Eastern').tz_localize(None)
-            elif hasattr(earliest_symbol_time, 'tz') and earliest_symbol_time.tz is not None:
-                earliest_symbol_time = earliest_symbol_time.tz_convert('US/Eastern').tz_localize(None)
-            
-            # If symbol data starts before or at 9:45 AM, assume opening range is already included
-            if earliest_symbol_time <= orb_end_time:
-                self.logger.debug(f"Opening range data already included in symbol data for {symbol}")
-                return symbol_data
-            
-            # Opening range data is not included, prepend it
-            # Normalize all timestamps to timezone-naive Eastern Time for consistency
-            def normalize_timestamp_column(df, column_name):
-                """Normalize timestamp column to timezone-naive Eastern Time."""
-                df = df.copy()
-                timestamps = df[column_name]
-                
-                # Convert to timezone-naive Eastern Time
-                if hasattr(timestamps.iloc[0], 'tzinfo') and timestamps.iloc[0].tzinfo is not None:
-                    # Already timezone-aware, convert to ET then remove timezone
-                    df[column_name] = timestamps.dt.tz_convert('US/Eastern').dt.tz_localize(None)
-                elif hasattr(timestamps.iloc[0], 'tz') and timestamps.iloc[0].tz is not None:
-                    # Handle pandas timezone-aware
-                    df[column_name] = timestamps.dt.tz_convert('US/Eastern').dt.tz_localize(None)
-                # If already timezone-naive, assume it's already in Eastern Time
-                
-                return df
-            
-            # Normalize both DataFrames
-            opening_range_data = normalize_timestamp_column(opening_range_data, 'timestamp')
-            symbol_data = normalize_timestamp_column(symbol_data, 'timestamp')
-            
-            # Remove any duplicate timestamps to avoid conflicts
-            opening_range_timestamps = set(opening_range_data['timestamp'])
-            symbol_data_filtered = symbol_data[~symbol_data['timestamp'].isin(opening_range_timestamps)]
-            
-            # Combine the data - opening range first, then regular data
-            combined_data = pd.concat([opening_range_data, symbol_data_filtered], ignore_index=True)
-            
-            # Sort by timestamp to ensure chronological order
-            combined_data = combined_data.sort_values('timestamp').reset_index(drop=True)
-            
-            self.logger.info(f"Prepended {len(opening_range_data)} opening range records to {len(symbol_data_filtered)} regular records for {symbol}")
-            
-            return combined_data
-            
-        except Exception as e:
-            self.logger.error(f"Error combining opening range data for {symbol}: {e}")
-            # Return original data if there's an error
-            return symbol_data
     
     def _should_save_data(self) -> bool:
         """Check if it's time to save historical data."""
