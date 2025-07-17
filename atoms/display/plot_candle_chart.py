@@ -12,7 +12,7 @@ from typing import Optional, Tuple, List
 from datetime import time, datetime
 import pytz
 
-from ..utils.calculate_orb_levels import calculate_orb_levels
+from ..indicators.orb_calculator import ORBCalculator
 from ..utils.extract_symbol_data import extract_symbol_data
 from ..utils.calculate_ema import calculate_ema
 from ..utils.calculate_vwap import calculate_vwap_typical
@@ -103,8 +103,16 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
                 symbol_data['timestamp'] = pd.to_datetime(symbol_data['timestamp'], utc=True)
             symbol_data['timestamp'] = symbol_data['timestamp'].dt.tz_convert(et_tz)
         
-        # Calculate ORB levels
-        orb_high, orb_low = calculate_orb_levels(symbol_data)
+        # Calculate ORB levels using the proper ORBCalculator atom
+        orb_calculator = ORBCalculator()
+        orb_result = orb_calculator.calculate_orb_levels(symbol, symbol_data)
+        
+        if orb_result is not None:
+            orb_high = orb_result.orb_high
+            orb_low = orb_result.orb_low
+        else:
+            orb_high = None
+            orb_low = None
         
         # Calculate EMA (9-period) for close prices
         ema_success, ema_values = calculate_ema(symbol_data, price_column='close', period=9)

@@ -1,0 +1,8 @@
+{
+  "commands": {
+    "hey": {
+      "description": "Remind to source conda.sh and activate alpaca environment",
+      "run": "echo '🐍 Remember to run:' && echo 'source /home/wilsonb/miniconda3/etc/profile.d/conda.sh' && echo 'conda activate alpaca'"
+    }
+  }
+}

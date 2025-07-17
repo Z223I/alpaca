@@ -79,11 +79,24 @@ class ORBCalculator:
         Returns:
             ORBLevel object or None if insufficient data
         """
+        debug = False  # Enable debug for ORB calculation
+        
+        if debug:
+            print(f"\n=== ORB Calculator Debug for {symbol} ===")
+            print(f"Input data shape: {price_data.shape}")
+            print(f"Input data columns: {list(price_data.columns)}")
+            if not price_data.empty:
+                print(f"Data range: {price_data['timestamp'].min()} to {price_data['timestamp'].max()}")
+        
         if price_data.empty:
+            if debug:
+                print("DEBUG: No data available")
             return None
         
         # Ensure timestamp column is datetime
         if 'timestamp' not in price_data.columns:
+            if debug:
+                print("DEBUG: No timestamp column found")
             return None
         
         price_data = price_data.copy()
@@ -93,12 +106,27 @@ class ORBCalculator:
         # Filter for opening range period
         orb_data = self._filter_opening_range(price_data)
         
+        if debug:
+            print(f"ORB data shape after filtering: {orb_data.shape}")
+            if not orb_data.empty:
+                print(f"ORB data range: {orb_data['timestamp'].min()} to {orb_data['timestamp'].max()}")
+                print(f"ORB data high values: {orb_data['high'].tolist()}")
+                print(f"ORB data low values: {orb_data['low'].tolist()}")
+        
         if orb_data.empty or len(orb_data) < 5:  # Need minimum data points
+            if debug:
+                print(f"DEBUG: Insufficient ORB data - got {len(orb_data)} points, need at least 5")
             return None
         
         # Calculate ORB levels
         orb_high = orb_data['high'].max()
         orb_low = orb_data['low'].min()
+        
+        if debug:
+            print(f"Calculated ORB High: {orb_high}")
+            print(f"Calculated ORB Low: {orb_low}")
+            print(f"ORB Range: {orb_high - orb_low}")
+            print("=== End ORB Calculator Debug ===\n")
         
         orb_level = ORBLevel(
             symbol=symbol,

@@ -21,7 +21,7 @@ from atoms.utils.read_csv import read_csv  # noqa: E402
 from atoms.api.init_alpaca_client import init_alpaca_client  # noqa: E402
 from atoms.display.plot_candle_chart import plot_candle_chart  # noqa: E402
 from atoms.utils.extract_symbol_data import extract_symbol_data  # noqa: E402
-from atoms.utils.calculate_orb_levels import calculate_orb_levels  # noqa: E402
+from atoms.indicators.orb_calculator import ORBCalculator  # noqa: E402
 from atoms.utils.calculate_ema import calculate_ema  # noqa: E402
 from atoms.utils.calculate_vwap import calculate_vwap_typical  # noqa: E402
 from atoms.utils.calculate_vector_angle import (  # noqa: E402
@@ -700,11 +700,30 @@ class ORB:
                 print(f"DEBUG: Extracted symbol data shape: {symbol_data.shape}")
                 print(f"DEBUG: Date range in symbol data: {symbol_data['timestamp'].min()} to {symbol_data['timestamp'].max()}")
 
-            # Take the first N lines of data instead of time filtering
+            # Filter for market hours (9:30 AM to 4:00 PM ET) and take first N lines
             if isDebugging:
-                print(f"DEBUG: Taking first {data_samples} lines of data")
+                print(f"DEBUG: Filtering for market hours (9:30 AM to 4:00 PM ET)")
                 
-            filtered_data = symbol_data.head(data_samples).copy()
+            # Filter for market hours first
+            market_hours_data = self._filter_stock_data_by_time(
+                symbol_data, 
+                time(9, 30),  # 9:30 AM ET
+                time(16, 0)   # 4:00 PM ET
+            )
+            
+            if market_hours_data is None or market_hours_data.empty:
+                print(f"No market hours data available for symbol: {symbol}")
+                return False
+                
+            if isDebugging:
+                print(f"DEBUG: Market hours data shape: {market_hours_data.shape}")
+                print(f"DEBUG: Market hours range: {market_hours_data['timestamp'].min()} to {market_hours_data['timestamp'].max()}")
+                
+            # Take the first N lines of market hours data
+            if isDebugging:
+                print(f"DEBUG: Taking first {data_samples} lines of market hours data")
+                
+            filtered_data = market_hours_data.head(data_samples).copy()
 
             if filtered_data is None or filtered_data.empty:
                 print(f"No data available for symbol: {symbol}")
@@ -725,11 +744,19 @@ class ORB:
             if isDebugging:
                 print(f"DEBUG: Data length validation passed - found {data_samples} rows")
 
-            # Calculate ORB levels
+            # Calculate ORB levels using the proper ORBCalculator atom
             if isDebugging:
-                print(f"DEBUG: Calculating ORB levels...")
+                print(f"DEBUG: Calculating ORB levels using ORBCalculator...")
                 
-            orb_high, orb_low = calculate_orb_levels(filtered_data)
+            orb_calculator = ORBCalculator()
+            orb_result = orb_calculator.calculate_orb_levels(symbol, filtered_data)
+            
+            if orb_result is not None:
+                orb_high = orb_result.orb_high
+                orb_low = orb_result.orb_low
+            else:
+                orb_high = None
+                orb_low = None
             
             if isDebugging:
                 print(f"DEBUG: ORB levels calculated - High: {orb_high}, Low: {orb_low}")
