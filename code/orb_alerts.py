@@ -589,9 +589,25 @@ class ORBAlertSystem:
             
             # Start alert engine
             symbols = self.alert_engine.get_monitored_symbols()
-            self.logger.info(f"Monitoring {len(symbols)} symbols: {', '.join(symbols[:10])}")
-            if len(symbols) > 10:
-                self.logger.info(f"... and {len(symbols) - 10} more symbols")
+            
+            # Display up to 25 symbols, five per line
+            if len(symbols) <= 25:
+                # Display all symbols, five per line
+                for i in range(0, len(symbols), 5):
+                    line_symbols = symbols[i:i+5]
+                    if i == 0:
+                        self.logger.info(f"Monitoring {len(symbols)} symbols: {', '.join(line_symbols)}")
+                    else:
+                        self.logger.info(f"                           {', '.join(line_symbols)}")
+            else:
+                # Display first 25 symbols, five per line, then show count of remaining
+                for i in range(0, 25, 5):
+                    line_symbols = symbols[i:i+5]
+                    if i == 0:
+                        self.logger.info(f"Monitoring {len(symbols)} symbols: {', '.join(line_symbols)}")
+                    else:
+                        self.logger.info(f"                           {', '.join(line_symbols)}")
+                self.logger.info(f"... and {len(symbols) - 25} more symbols")
             
             # Start periodic data saving in background
             data_save_task = asyncio.create_task(self._periodic_data_save())
