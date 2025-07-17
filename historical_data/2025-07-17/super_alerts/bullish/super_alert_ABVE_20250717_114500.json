@@ -1,0 +1,49 @@
+{
+  "symbol": "ABVE",
+  "timestamp": "2025-07-17T11:45:00-0400",
+  "original_alert_timestamp": "2025-07-17T11:44:00",
+  "alert_type": "super_alert",
+  "trigger_condition": "signal_price_reached",
+  "original_alert": {
+    "symbol": "ABVE",
+    "timestamp": "2025-07-17T11:44:00",
+    "current_price": 3.445,
+    "orb_high": 2.5861,
+    "orb_low": 2.36,
+    "orb_range": 0.2261000000000002,
+    "orb_midpoint": 2.4730499999999997,
+    "breakout_type": "bullish_breakout",
+    "breakout_percentage": 33.21217276980781,
+    "volume_ratio": 1.5597350560143919,
+    "confidence_score": 0.8793076558482955,
+    "priority": "MEDIUM",
+    "confidence_level": "VERY_HIGH",
+    "recommended_stop_loss": 3.186625,
+    "recommended_take_profit": 3.5827999999999998,
+    "alert_message": "[11:44:00] ORB ALERT: ABVE \u2191 $3.44 (+33.21% vs ORB High)\nVolume: 1.6x avg | Confidence: 0.88 | Priority: MEDIUM | EMA9: $3.19 | EMA20: $2.96 | EMA9\u2191EMA20 | Div: +7.9%\nStop: $3.19 | Target: $3.58",
+    "ema_9": 3.1917345386886646,
+    "ema_20": 2.9583948780166756,
+    "ema_9_above_20": true,
+    "ema_9_below_20": false,
+    "ema_divergence": 0.07887373737897399
+  },
+  "signal_analysis": {
+    "signal_price": 2.6,
+    "resistance_price": 3.13,
+    "current_price": 3.445,
+    "penetration_percent": 100.0,
+    "range_percent": 1.2,
+    "signal_reached": true,
+    "resistance_reached": true
+  },
+  "metrics": {
+    "signal_to_resistance_range": 0.5299999999999998,
+    "price_above_signal": 0.8449999999999998,
+    "distance_to_resistance": -0.31499999999999995
+  },
+  "risk_assessment": {
+    "entry_price": 2.6,
+    "target_price": 3.13,
+    "current_risk_reward": -0.37278106508875747
+  }
+}

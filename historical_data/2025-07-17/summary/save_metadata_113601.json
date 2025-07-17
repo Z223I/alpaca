@@ -1,0 +1,24 @@
+{
+  "timestamp": "2025-07-17T11:36:01.141919-04:00",
+  "symbols_count": 15,
+  "symbols": [
+    "ABVE",
+    "AIRE",
+    "BSLK",
+    "BTCS",
+    "BTOG",
+    "DGXX",
+    "GAME",
+    "IXHL",
+    "OPEN",
+    "RCKT",
+    "TDTH",
+    "UPXI",
+    "WINT",
+    "XXII",
+    "ZBAI"
+  ],
+  "save_interval_minutes": 10.0,
+  "format": "CSV",
+  "total_records_saved": 240
+}
