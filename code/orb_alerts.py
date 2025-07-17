@@ -5,9 +5,10 @@ This is the main entry point for the ORB (Opening Range Breakout) trading alerts
 Based on PCA analysis showing 82.31% variance explained by ORB patterns.
 
 Usage:
-    python3 code/orb_alerts.py                    # Start monitoring all symbols
+    python3 code/orb_alerts.py                    # Start monitoring all symbols (SIP feed)
     python3 code/orb_alerts.py --symbols AAPL,TSLA # Monitor specific symbols
     python3 code/orb_alerts.py --test             # Run in test mode
+    python3 code/orb_alerts.py --use-iex          # Use IEX data feed instead of SIP
 """
 
 import asyncio
@@ -47,13 +48,14 @@ except ImportError:
 class ORBAlertSystem:
     """Main ORB Alert System orchestrator."""
     
-    def __init__(self, symbols_file: Optional[str] = None, test_mode: bool = False):
+    def __init__(self, symbols_file: Optional[str] = None, test_mode: bool = False, use_iex: bool = False):
         """
         Initialize ORB Alert System.
         
         Args:
             symbols_file: Path to symbols CSV file
             test_mode: Run in test mode (no actual alerts)
+            use_iex: Use IEX data feed instead of SIP (default: False, uses SIP)
         """
         # Setup logging
         self.logger = self._setup_logging()
@@ -61,6 +63,7 @@ class ORBAlertSystem:
         # Initialize alert engine
         self.alert_engine = ORBAlertEngine(symbols_file) if symbols_file is not None else ORBAlertEngine()
         self.test_mode = test_mode
+        self.use_iex = use_iex
         
         # Initialize historical data client
         self.historical_client = None
@@ -96,7 +99,10 @@ class ORBAlertSystem:
         self.last_data_save = None
         self.data_save_interval = timedelta(minutes=config.data_save_interval_minutes)
         
+        # Log data feed selection
+        feed_type = "IEX" if self.use_iex else "SIP"
         self.logger.info(f"ORB Alert System initialized in {'TEST' if test_mode else 'LIVE'} mode")
+        self.logger.info(f"Using {feed_type} data feed")
         self.logger.info(f"Historical data will be saved to: {self.historical_data_dir.absolute()}")
         self.logger.info(f"Data save interval: {config.data_save_interval_minutes} minutes")
         self.logger.info(f"Start at market open ({config.market_open_time} ET): {config.start_collection_at_open}")
@@ -707,8 +713,12 @@ class ORBAlertSystem:
     def _fetch_with_legacy_api(self, symbols, start_time, end_time):
         """Fetch historical data using legacy alpaca-trade-api."""
         try:
-            # Determine which feed to use based on configuration
-            feed = 'iex' if "paper" in config.base_url else 'sip'
+            # Determine which feed to use based on configuration and CLI argument
+            if self.use_iex:
+                feed = 'iex'
+            else:
+                feed = 'sip'  # Default to SIP
+            
             self.logger.info(f"Using legacy API to fetch data for {len(symbols)} symbols with {feed.upper()} feed")
             
             # Convert symbols to list if needed
@@ -734,7 +744,7 @@ class ORBAlertSystem:
                         start=start_str,
                         end=end_str,
                         limit=20,  # Extra buffer for 15 minutes
-                        feed=feed  # Use IEX for paper trading, SIP for live trading
+                        feed=feed  # Use SIP by default, IEX if --use-iex flag is specified
                     )
                     
                     if bars:
@@ -908,6 +918,12 @@ def parse_arguments():
         help="Show daily summary and exit"
     )
     
+    parser.add_argument(
+        "--use-iex",
+        action="store_true",
+        help="Use IEX data feed instead of SIP (default: SIP)"
+    )
+    
     return parser.parse_args()
 
 
@@ -923,7 +939,8 @@ async def main():
     try:
         system = ORBAlertSystem(
             symbols_file=args.symbols_file,
-            test_mode=args.test
+            test_mode=args.test,
+            use_iex=args.use_iex
         )
         
         if args.summary:
@@ -933,6 +950,10 @@ async def main():
         
         if args.test:
             print("Running in test mode - alerts will be marked as [TEST MODE]")
+        
+        # Show data feed selection
+        feed_type = "IEX" if args.use_iex else "SIP"
+        print(f"Using {feed_type} data feed for market data")
         
         await system.start()
         
