@@ -34,11 +34,12 @@ class ORB:
     based on breakout patterns from opening range data.
     """
 
-    def __init__(self, plot_super_alerts: bool = True):
+    def __init__(self, plot_super_alerts: bool = True, use_iex: bool = False):
         """Initialize the ORB class.
         
         Args:
             plot_super_alerts: If True, plot super alerts. If False, plot regular alerts.
+            use_iex: If True, use IEX data feed. If False, use SIP data feed (default).
         """
 
         # Get api key and secret from environment variables
@@ -59,6 +60,7 @@ class ORB:
         self.csv_date: Optional[date] = None
         self.pca_data: Optional[pd.DataFrame] = None
         self.plot_super_alerts = plot_super_alerts
+        self.use_iex = use_iex
 
     def _is_valid_date_csv(self, filename: str) -> bool:
         """
@@ -525,10 +527,15 @@ class ORB:
             print(f"Fetching 1-minute data from {start_time} to {end_time}")
             print(f"  (Starting from premarket to ensure opening range data is included)")
 
-            # Determine which feed to use based on configuration
+            # Determine which feed to use based on CLI argument
+            if self.use_iex:
+                feed = 'iex'
+            else:
+                feed = 'sip'  # Default to SIP
+            
             base_url = os.getenv('ALPACA_BASE_URL', 'https://paper-api.alpaca.markets')
-            feed = 'iex' if "paper" in base_url else 'sip'
-            print(f"Using {feed.upper()} data feed for {'paper' if 'paper' in base_url else 'live'} trading")
+            trading_mode = 'paper' if 'paper' in base_url else 'live'
+            print(f"Using {feed.upper()} data feed for {trading_mode} trading")
 
             # Get stock data using 1-minute timeframe with legacy API
             market_data = {}
@@ -1303,11 +1310,15 @@ class ORB:
             start_time = datetime.combine(target_date, time(4, 0), tzinfo=et_tz)  # Start from premarket
             end_time = datetime.combine(target_date, time(16, 0), tzinfo=et_tz)
 
-            # Determine which feed to use based on configuration
-            base_url = os.getenv('ALPACA_BASE_URL', 'https://paper-api.alpaca.markets')
-            feed = 'iex' if "paper" in base_url else 'sip'
+            # Determine which feed to use based on CLI argument
+            if self.use_iex:
+                feed = 'iex'
+            else:
+                feed = 'sip'  # Default to SIP
             
-            print(f"Using {feed.upper()} data feed for {'paper' if 'paper' in base_url else 'live'} trading")
+            base_url = os.getenv('ALPACA_BASE_URL', 'https://paper-api.alpaca.markets')
+            trading_mode = 'paper' if 'paper' in base_url else 'live'
+            print(f"Using {feed.upper()} data feed for {trading_mode} trading")
             print(f"Fetching complete market data from {start_time} to {end_time}")
             print(f"  (Starting from premarket to ensure opening range data is included)")
 
@@ -1454,6 +1465,12 @@ def parse_arguments():
         help="Plot regular alerts instead of super alerts (default: plot super alerts)"
     )
     
+    parser.add_argument(
+        "--use-iex",
+        action="store_true",
+        help="Use IEX data feed instead of SIP (default: SIP)"
+    )
+    
     return parser.parse_args()
 
 
@@ -1470,10 +1487,12 @@ def main():
         plot_super_alerts = not args.plot_alerts  # Default is True (super alerts)
         
         # Create and run ORB analysis
-        orb = ORB(plot_super_alerts=plot_super_alerts)
+        orb = ORB(plot_super_alerts=plot_super_alerts, use_iex=args.use_iex)
         
         alert_type = "super alerts" if plot_super_alerts else "regular alerts"
+        feed_type = "IEX" if args.use_iex else "SIP"
         print(f"ORB analysis will plot {alert_type}")
+        print(f"Using {feed_type} data feed")
         
         success = orb.Exec()
 
