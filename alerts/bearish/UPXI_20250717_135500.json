@@ -1,0 +1,23 @@
+{
+  "symbol": "UPXI",
+  "timestamp": "2025-07-17T13:55:00",
+  "current_price": 6.445,
+  "orb_high": 8.36,
+  "orb_low": 7.11,
+  "orb_range": 1.2499999999999991,
+  "orb_midpoint": 7.734999999999999,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 9.353023909985936,
+  "volume_ratio": 1.5326172386691117,
+  "confidence_score": 0.8239776088294571,
+  "priority": "MEDIUM",
+  "confidence_level": "HIGH",
+  "recommended_stop_loss": 6.928375,
+  "recommended_take_profit": 6.1872,
+  "alert_message": "[13:55:00] ORB ALERT: UPXI \u2193 $6.45 (+9.35% vs ORB Low)\nVolume: 1.5x avg | Confidence: 0.82 | Priority: MEDIUM | EMA9: $6.44 | EMA20: $6.43 | EMA9\u2191EMA20 | Div: +0.0%\nStop: $6.93 | Target: $6.19",
+  "ema_9": 6.436877939911095,
+  "ema_20": 6.434310351829973,
+  "ema_9_above_20": true,
+  "ema_9_below_20": false,
+  "ema_divergence": 0.0003990463531792991
+}

@@ -51,6 +51,12 @@ class ORBAlert:
     ema_9_above_20: Optional[bool] = None
     ema_9_below_20: Optional[bool] = None
     ema_divergence: Optional[float] = None
+    # Current candlestick OHLC data
+    open: Optional[float] = None
+    high: Optional[float] = None
+    low: Optional[float] = None
+    close: Optional[float] = None
+    volume: Optional[int] = None
     
     def __post_init__(self):
         """Calculate derived fields after initialization."""
@@ -168,12 +174,26 @@ class AlertFormatter:
         ema_9_below_20 = None
         ema_divergence = None
         
+        # Extract candlestick OHLC data from technical_indicators if available
+        open_price = None
+        high_price = None
+        low_price = None
+        close_price = None
+        volume = None
+        
         if technical_indicators:
             ema_9 = technical_indicators.get('ema_9')
             ema_20 = technical_indicators.get('ema_20')
             ema_9_above_20 = technical_indicators.get('ema_9_above_20')
             ema_9_below_20 = technical_indicators.get('ema_9_below_20')
             ema_divergence = technical_indicators.get('ema_divergence')
+            
+            # Extract candlestick data
+            open_price = technical_indicators.get('open')
+            high_price = technical_indicators.get('high')
+            low_price = technical_indicators.get('low')
+            close_price = technical_indicators.get('close')
+            volume = technical_indicators.get('volume')
         
         alert = ORBAlert(
             symbol=signal.symbol,
@@ -197,7 +217,13 @@ class AlertFormatter:
             ema_20=ema_20,
             ema_9_above_20=ema_9_above_20,
             ema_9_below_20=ema_9_below_20,
-            ema_divergence=ema_divergence
+            ema_divergence=ema_divergence,
+            # Current candlestick OHLC data
+            open=open_price,
+            high=high_price,
+            low=low_price,
+            close=close_price,
+            volume=volume
         )
         
         # Add to history

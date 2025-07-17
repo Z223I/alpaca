@@ -1,0 +1,23 @@
+{
+  "symbol": "BTOG",
+  "timestamp": "2025-07-17T13:52:00",
+  "current_price": 0.5718,
+  "orb_high": 0.463,
+  "orb_low": 0.37,
+  "orb_range": 0.09300000000000003,
+  "orb_midpoint": 0.4165,
+  "breakout_type": "bullish_breakout",
+  "breakout_percentage": 23.498920086393078,
+  "volume_ratio": 2.7720117775230753,
+  "confidence_score": 0.8963685849592082,
+  "priority": "HIGH",
+  "confidence_level": "VERY_HIGH",
+  "recommended_stop_loss": 0.528915,
+  "recommended_take_profit": 0.594672,
+  "alert_message": "[13:52:00] ORB ALERT: BTOG \u2191 $0.57 (+23.50% vs ORB High)\nVolume: 2.8x avg | Confidence: 0.90 | Priority: HIGH | EMA9: $0.57 | EMA20: $0.57 | EMA9\u2193EMA20 | Div: -0.3%\nStop: $0.53 | Target: $0.59",
+  "ema_9": 0.571394624899307,
+  "ema_20": 0.5731237201677772,
+  "ema_9_above_20": false,
+  "ema_9_below_20": true,
+  "ema_divergence": -0.0030169668565873105
+}

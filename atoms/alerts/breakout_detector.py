@@ -201,6 +201,14 @@ class BreakoutDetector:
         indicators['ema_deviation'] = abs(current_price - ema_9) / current_price
         indicators['vwap_deviation'] = abs(current_price - vwap) / current_price
         
+        # Add current candlestick OHLC data from the latest row
+        latest_row = symbol_data.iloc[-1]
+        indicators['open'] = float(latest_row['open'])
+        indicators['high'] = float(latest_row['high'])
+        indicators['low'] = float(latest_row['low'])
+        indicators['close'] = float(latest_row['close'])
+        indicators['volume'] = int(latest_row['volume'])
+        
         return indicators
     
     def get_recent_signal(self, symbol: str) -> Optional[BreakoutSignal]:
