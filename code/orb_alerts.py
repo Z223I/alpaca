@@ -509,22 +509,48 @@ class ORBAlertSystem:
             # Calculate opening range end time (market open + 15 minutes)
             orb_end_time_et = market_open_today_et + timedelta(minutes=config.orb_period_minutes)
             
-            # Check if we're past the opening range period
-            if now_et <= orb_end_time_et:
-                self.logger.info("Still within opening range period - no historical data fetch needed")
+            # Check if we're before, during, or after the opening range period
+            if now_et < market_open_today_et:
+                # Before market open - no fetch needed
+                self.logger.info("Before market open - no historical data fetch needed")
+                return True
+            elif now_et <= orb_end_time_et:
+                # Within opening range - fetch missing data from market open to now
+                minutes_missed = (now_et - market_open_today_et).total_seconds() / 60
                 
-                # Print message to screen that we have opening data
-                if now_et >= market_open_today_et:
+                if minutes_missed < 1:
+                    # Started within 1 minute of market open - no significant data missed
+                    self.logger.info("Started close to market open - collecting data in real-time")
                     print("=" * 80)
-                    print("✅ OPENING RANGE DATA AVAILABLE")
-                    print("Started during opening range period - collecting data in real-time")
+                    print("✅ OPENING RANGE DATA COLLECTION")
+                    print("Started at market open - collecting opening range data in real-time")
                     print(f"ORB period: {market_open_today_et.strftime('%H:%M')} - {orb_end_time_et.strftime('%H:%M')} ET")
                     print("ORB alerts will be operational after opening range completes!")
                     print("=" * 80)
+                    return True
+                else:
+                    # Started during opening range - fetch missing historical data
+                    self.logger.info(f"Started {minutes_missed:.1f} minutes into opening range - fetching missing data from {market_open_today_et.strftime('%H:%M')} to {now_et.strftime('%H:%M')}")
+                    
+                    print("=" * 80)
+                    print("⚠️  PARTIAL OPENING RANGE - FETCHING MISSING DATA")
+                    print(f"Started at {now_et.strftime('%H:%M')} ET - missing {minutes_missed:.1f} minutes of opening range data")
+                    print(f"Fetching historical data from {market_open_today_et.strftime('%H:%M')} to {now_et.strftime('%H:%M')} ET")
+                    print("This ensures complete ORB calculations!")
+                    print("=" * 80)
+                    
+                    # Fetch the missing portion of opening range data
+                    return await self._fetch_partial_opening_range_data(market_open_today_et, now_et)
+            else:
+                # After opening range - fetch complete opening range data
+                self.logger.info(f"Started after opening range - fetching complete data from {market_open_today_et.strftime('%H:%M')} to {orb_end_time_et.strftime('%H:%M')}")
                 
-                return True
-            
-            self.logger.info(f"Fetching opening range data from {market_open_today_et.strftime('%H:%M')} to {orb_end_time_et.strftime('%H:%M')}")
+                print("=" * 80)
+                print("⚠️  MISSED OPENING RANGE - FETCHING COMPLETE DATA")
+                print(f"Started at {now_et.strftime('%H:%M')} ET - after opening range period")
+                print(f"Fetching complete opening range data from {market_open_today_et.strftime('%H:%M')} to {orb_end_time_et.strftime('%H:%M')} ET")
+                print("ORB alerts will be operational immediately after data fetch!")
+                print("=" * 80)
             
             # Get symbols to fetch data for
             symbols = self.alert_engine.get_monitored_symbols()
@@ -709,6 +735,110 @@ class ORBAlertSystem:
                 
         except Exception as e:
             self.logger.error(f"Error cleaning up old opening range files for {symbol}: {e}")
+    
+    async def _fetch_partial_opening_range_data(self, start_time: datetime, end_time: datetime) -> bool:
+        """
+        Fetch partial opening range data when started during the opening range period.
+        
+        Args:
+            start_time: Market open time (e.g., 9:30 AM)
+            end_time: Current time (e.g., 9:38 AM)
+            
+        Returns:
+            True if data was successfully fetched, False otherwise
+        """
+        try:
+            # Get symbols to fetch data for
+            symbols = self.alert_engine.get_monitored_symbols()
+            
+            self.logger.info(f"Fetching partial opening range data from {start_time.strftime('%H:%M')} to {end_time.strftime('%H:%M')}")
+            
+            # Fetch the missing portion of opening range data
+            if ALPACA_AVAILABLE == "legacy":
+                # Use legacy alpaca-trade-api
+                bars_data = self._fetch_with_legacy_api(symbols, start_time, end_time)
+            else:
+                # Use new alpaca API (currently disabled)
+                bars_data = None
+            
+            if bars_data and hasattr(bars_data, 'df') and not bars_data.df.empty:
+                # Process and inject the historical data into the data buffer
+                data_count = 0
+                for symbol in symbols:
+                    symbol_bars = bars_data.df[bars_data.df['symbol'] == symbol]
+                    
+                    if not symbol_bars.empty:
+                        # Convert to MarketData format and add to buffer
+                        for _, bar in symbol_bars.iterrows():
+                            from atoms.websocket.alpaca_stream import MarketData
+                            
+                            # Normalize timestamp to timezone-naive Eastern Time to match websocket data
+                            timestamp = bar['timestamp']
+                            if hasattr(timestamp, 'tz_localize'):
+                                # Handle pandas timestamp
+                                et_tz = pytz.timezone('US/Eastern')
+                                if timestamp.tz is None:
+                                    timestamp = timestamp.tz_localize('UTC').tz_convert(et_tz).tz_localize(None)
+                                else:
+                                    timestamp = timestamp.tz_convert(et_tz).tz_localize(None)
+                            elif hasattr(timestamp, 'tzinfo'):
+                                # Handle datetime object
+                                et_tz = pytz.timezone('US/Eastern')
+                                if hasattr(timestamp, 'tz') and timestamp.tz is not None:
+                                    # Convert timezone-aware to timezone-naive Eastern Time
+                                    timestamp = timestamp.astimezone(et_tz).replace(tzinfo=None)
+                                elif hasattr(timestamp, 'tzinfo') and timestamp.tzinfo is not None:
+                                    # Convert timezone-aware to timezone-naive Eastern Time
+                                    timestamp = timestamp.astimezone(et_tz).replace(tzinfo=None)
+                            
+                            market_data = MarketData(
+                                symbol=symbol,
+                                timestamp=timestamp,
+                                price=bar['close'],
+                                volume=bar['volume'],
+                                high=bar['high'],
+                                low=bar['low'],
+                                close=bar['close'],
+                                trade_count=bar.get('trade_count', 1),
+                                vwap=bar.get('vwap', bar['close'])
+                            )
+                            
+                            # Add to data buffer
+                            self.alert_engine.data_buffer.add_market_data(market_data)
+                            data_count += 1
+                
+                self.logger.info(f"Successfully fetched and loaded {data_count} partial opening range data points")
+                
+                # Save partial opening range data to historical_data directory
+                self._save_opening_range_data_to_historical(bars_data, start_time, end_time)
+                
+                # Print success message to screen
+                print("=" * 80)
+                print("✅ PARTIAL OPENING RANGE DATA COMPLETE")
+                print(f"Successfully fetched missing opening range data for {len(symbols)} symbols")
+                print(f"Time period: {start_time.strftime('%H:%M')} - {end_time.strftime('%H:%M')} ET")
+                print(f"Total data points loaded: {data_count}")
+                print("ORB data is now complete! Continuing with real-time collection...")
+                print("=" * 80)
+                
+                return True
+            else:
+                self.logger.warning("No historical data received for partial opening range period")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Error fetching partial opening range data: {e}")
+            import traceback
+            self.logger.debug(traceback.format_exc())
+            
+            # Print error message to screen
+            print("=" * 80)
+            print("❌ PARTIAL OPENING RANGE DATA FETCH FAILED")
+            print(f"Error: {e}")
+            print("ORB alerts may not function properly without complete opening range data")
+            print("=" * 80)
+            
+            return False
     
     def _fetch_with_legacy_api(self, symbols, start_time, end_time):
         """Fetch historical data using legacy alpaca-trade-api."""

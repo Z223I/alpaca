@@ -5,6 +5,7 @@ The remaining tasks are lower priority documentation and deployment tools:
   - Comprehensive API documentation
 
 
+- [ ] Update code/orb_alerts.py to accept new symbols during the day.
 - [X] No alerts in the last 15 minutes of the day.
 - [X] You must source ~/miniconda3/etc/profile.d/conda.sh && conda activate alpaca
 - [X] Manually plot EMA20 and see if this would be an indicator to stop trading.
@@ -13,12 +14,8 @@ The remaining tasks are lower priority documentation and deployment tools:
 - [X] Update code/orb_alerts.py to include EMA9, EMA20, and the new technical indicators in the alert.
 - [X] Update code/orb_alerts_monitor.py to filter out EMA9 below EMA20 for bullish alerts.
 - [X] Update code/orb_alerts_history.py to filter out EMA9 below EMA20 for bullish alerts.
-
 - [X] Update code/orb_alerts_monitor.py to filter out stocks that the current low is below EMA9 for bullish alerts.
 - [X] Update code/orb_alerts_history.py to filter out stocks that the current low is below EMA9 for bullish alerts.
-
-
-
 - [X] Update code/orb.py to plot super alerts instead of alerts.
 - [X] Update the analysis software to handle bearish alerts correctly.
 - [X] Turn Claude loose at improving ORB alert.
