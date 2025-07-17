@@ -1,0 +1,23 @@
+{
+  "symbol": "BSLK",
+  "timestamp": "2025-07-17T14:02:00",
+  "current_price": 3.21,
+  "orb_high": 4.34,
+  "orb_low": 3.27,
+  "orb_range": 1.0699999999999998,
+  "orb_midpoint": 3.8049999999999997,
+  "breakout_type": "bearish_breakdown",
+  "breakout_percentage": 1.8348623853211024,
+  "volume_ratio": 2.1782654310194087,
+  "confidence_score": 0.8048835864125051,
+  "priority": "MEDIUM",
+  "confidence_level": "HIGH",
+  "recommended_stop_loss": 3.4507499999999998,
+  "recommended_take_profit": 3.0816,
+  "alert_message": "[14:02:00] ORB ALERT: BSLK \u2193 $3.21 (+1.83% vs ORB Low)\nVolume: 2.2x avg | Confidence: 0.80 | Priority: MEDIUM | EMA9: $3.18 | EMA20: $3.19 | EMA9\u2193EMA20 | Div: -0.2%\nStop: $3.45 | Target: $3.08",
+  "ema_9": 3.1802292440416466,
+  "ema_20": 3.1858707568390314,
+  "ema_9_above_20": false,
+  "ema_9_below_20": true,
+  "ema_divergence": -0.0017707914815044792
+}
