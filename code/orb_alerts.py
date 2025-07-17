@@ -609,12 +609,13 @@ class ORBAlertSystem:
                     self._save_opening_range_data_to_historical(bars_data, market_open_today_et, orb_end_time_et)
                     
                     # Print success message to screen
+                    minutes_fetched = (orb_end_time_et - market_open_today_et).total_seconds() / 60
                     print("=" * 80)
-                    print("✅ OPENING RANGE DATA COMPLETE")
-                    print(f"Successfully fetched opening range data for {len(symbols)} symbols")
-                    print(f"Time period: {market_open_today_et.strftime('%H:%M')} - {orb_end_time_et.strftime('%H:%M')} ET")
+                    print("✅ HISTORICAL DATA COMPLETE")
+                    print(f"Successfully fetched data for {len(symbols)} symbols")
+                    print(f"Time period: {market_open_today_et.strftime('%H:%M')} - {orb_end_time_et.strftime('%H:%M')} ET ({minutes_fetched:.1f} minutes)")
                     print(f"Total data points loaded: {data_count}")
-                    print("ORB alerts are now fully operational!")
+                    print("ORB and EMA calculations are now fully operational!")
                     print("=" * 80)
                     
                     return True
@@ -643,12 +644,12 @@ class ORBAlertSystem:
     
     def _save_opening_range_data_to_historical(self, bars_data, market_open_time: datetime, orb_end_time: datetime) -> None:
         """
-        Save opening range data for each symbol to historical_data directory.
+        Save historical data for each symbol to historical_data directory.
         
         Args:
             bars_data: The fetched historical data
             market_open_time: Market open datetime
-            orb_end_time: ORB period end datetime
+            orb_end_time: End time of fetched data period
         """
         try:
             # Use the same directory structure as the main historical data storage
@@ -735,110 +736,6 @@ class ORBAlertSystem:
                 
         except Exception as e:
             self.logger.error(f"Error cleaning up old opening range files for {symbol}: {e}")
-    
-    async def _fetch_partial_opening_range_data(self, start_time: datetime, end_time: datetime) -> bool:
-        """
-        Fetch partial opening range data when started during the opening range period.
-        
-        Args:
-            start_time: Market open time (e.g., 9:30 AM)
-            end_time: Current time (e.g., 9:38 AM)
-            
-        Returns:
-            True if data was successfully fetched, False otherwise
-        """
-        try:
-            # Get symbols to fetch data for
-            symbols = self.alert_engine.get_monitored_symbols()
-            
-            self.logger.info(f"Fetching partial opening range data from {start_time.strftime('%H:%M')} to {end_time.strftime('%H:%M')}")
-            
-            # Fetch the missing portion of opening range data
-            if ALPACA_AVAILABLE == "legacy":
-                # Use legacy alpaca-trade-api
-                bars_data = self._fetch_with_legacy_api(symbols, start_time, end_time)
-            else:
-                # Use new alpaca API (currently disabled)
-                bars_data = None
-            
-            if bars_data and hasattr(bars_data, 'df') and not bars_data.df.empty:
-                # Process and inject the historical data into the data buffer
-                data_count = 0
-                for symbol in symbols:
-                    symbol_bars = bars_data.df[bars_data.df['symbol'] == symbol]
-                    
-                    if not symbol_bars.empty:
-                        # Convert to MarketData format and add to buffer
-                        for _, bar in symbol_bars.iterrows():
-                            from atoms.websocket.alpaca_stream import MarketData
-                            
-                            # Normalize timestamp to timezone-naive Eastern Time to match websocket data
-                            timestamp = bar['timestamp']
-                            if hasattr(timestamp, 'tz_localize'):
-                                # Handle pandas timestamp
-                                et_tz = pytz.timezone('US/Eastern')
-                                if timestamp.tz is None:
-                                    timestamp = timestamp.tz_localize('UTC').tz_convert(et_tz).tz_localize(None)
-                                else:
-                                    timestamp = timestamp.tz_convert(et_tz).tz_localize(None)
-                            elif hasattr(timestamp, 'tzinfo'):
-                                # Handle datetime object
-                                et_tz = pytz.timezone('US/Eastern')
-                                if hasattr(timestamp, 'tz') and timestamp.tz is not None:
-                                    # Convert timezone-aware to timezone-naive Eastern Time
-                                    timestamp = timestamp.astimezone(et_tz).replace(tzinfo=None)
-                                elif hasattr(timestamp, 'tzinfo') and timestamp.tzinfo is not None:
-                                    # Convert timezone-aware to timezone-naive Eastern Time
-                                    timestamp = timestamp.astimezone(et_tz).replace(tzinfo=None)
-                            
-                            market_data = MarketData(
-                                symbol=symbol,
-                                timestamp=timestamp,
-                                price=bar['close'],
-                                volume=bar['volume'],
-                                high=bar['high'],
-                                low=bar['low'],
-                                close=bar['close'],
-                                trade_count=bar.get('trade_count', 1),
-                                vwap=bar.get('vwap', bar['close'])
-                            )
-                            
-                            # Add to data buffer
-                            self.alert_engine.data_buffer.add_market_data(market_data)
-                            data_count += 1
-                
-                self.logger.info(f"Successfully fetched and loaded {data_count} partial opening range data points")
-                
-                # Save partial opening range data to historical_data directory
-                self._save_opening_range_data_to_historical(bars_data, start_time, end_time)
-                
-                # Print success message to screen
-                print("=" * 80)
-                print("✅ PARTIAL OPENING RANGE DATA COMPLETE")
-                print(f"Successfully fetched missing opening range data for {len(symbols)} symbols")
-                print(f"Time period: {start_time.strftime('%H:%M')} - {end_time.strftime('%H:%M')} ET")
-                print(f"Total data points loaded: {data_count}")
-                print("ORB data is now complete! Continuing with real-time collection...")
-                print("=" * 80)
-                
-                return True
-            else:
-                self.logger.warning("No historical data received for partial opening range period")
-                return False
-                
-        except Exception as e:
-            self.logger.error(f"Error fetching partial opening range data: {e}")
-            import traceback
-            self.logger.debug(traceback.format_exc())
-            
-            # Print error message to screen
-            print("=" * 80)
-            print("❌ PARTIAL OPENING RANGE DATA FETCH FAILED")
-            print(f"Error: {e}")
-            print("ORB alerts may not function properly without complete opening range data")
-            print("=" * 80)
-            
-            return False
     
     def _fetch_with_legacy_api(self, symbols, start_time, end_time):
         """Fetch historical data using legacy alpaca-trade-api."""
