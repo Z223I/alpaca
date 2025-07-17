@@ -498,10 +498,7 @@ class ORBAlertSystem:
                                 self.alert_engine.data_buffer.add_market_data(market_data)
                                 data_count += 1
                     
-                    self.logger.info(f"Successfully fetched and loaded {data_count} opening range data points")
-                    
-                    # Save opening range data to historical_data directory for each symbol
-                    self._save_opening_range_data_to_historical(bars_data, market_open_today_et, orb_end_time_et)
+                    self.logger.info(f"Successfully fetched and loaded {data_count} historical data points")
                     
                     # Print success message to screen
                     minutes_fetched = (orb_end_time_et - market_open_today_et).total_seconds() / 60
@@ -536,101 +533,6 @@ class ORBAlertSystem:
             print("=" * 80)
             
             return False
-    
-    def _save_opening_range_data_to_historical(self, bars_data, market_open_time: datetime, orb_end_time: datetime) -> None:
-        """
-        Save historical data for each symbol to historical_data directory.
-        
-        Args:
-            bars_data: The fetched historical data
-            market_open_time: Market open datetime
-            orb_end_time: End time of fetched data period
-        """
-        try:
-            # Use the same directory structure as the main historical data storage
-            date_str = market_open_time.strftime('%Y-%m-%d')
-            historical_market_dir = self.historical_data_dir / date_str / "market_data"
-            historical_market_dir.mkdir(parents=True, exist_ok=True)
-            
-            if hasattr(bars_data, 'df') and not bars_data.df.empty:
-                # Get unique symbols
-                symbols = bars_data.df['symbol'].unique()
-                
-                for symbol in symbols:
-                    symbol_data = bars_data.df[bars_data.df['symbol'] == symbol].copy()
-                    
-                    if not symbol_data.empty:
-                        # Clean up old opening range files for this symbol
-                        self._cleanup_old_opening_range_files(symbol, historical_market_dir)
-                        
-                        # Sort by timestamp
-                        symbol_data = symbol_data.sort_values('timestamp')
-                        
-                        # Create filename with opening range timestamp
-                        time_str = market_open_time.strftime('%Y%m%d_%H%M%S')
-                        filename = f"{symbol}_opening_range_{time_str}.csv"
-                        filepath = historical_market_dir / filename
-                        
-                        # Save to CSV with proper column order for consistency
-                        # Reorder columns to match the standard format
-                        if 'symbol' in symbol_data.columns:
-                            symbol_data = symbol_data[['timestamp', 'symbol', 'high', 'low', 'close', 'volume', 'trade_count', 'vwap']]
-                        else:
-                            # Add symbol column if missing
-                            symbol_data['symbol'] = symbol
-                            symbol_data = symbol_data[['timestamp', 'symbol', 'high', 'low', 'close', 'volume', 'trade_count', 'vwap']]
-                        
-                        symbol_data.to_csv(filepath, index=False)
-                        
-                        self.logger.info(f"Saved opening range data for {symbol} to {filepath}")
-                        
-                        # Also print summary for each symbol
-                        orb_high = symbol_data['high'].max()
-                        orb_low = symbol_data['low'].min()
-                        orb_range = orb_high - orb_low
-                        data_points = len(symbol_data)
-                        
-                        print(f"📊 {symbol}: {data_points} bars | ORB High: ${orb_high:.3f} | ORB Low: ${orb_low:.3f} | Range: ${orb_range:.3f}")
-                
-                print(f"💾 Opening range data saved to historical_data/{date_str}/market_data/ directory")
-            
-        except Exception as e:
-            self.logger.error(f"Error saving opening range data to historical_data: {e}")
-    
-    def _cleanup_old_opening_range_files(self, symbol: str, market_data_dir: Path) -> None:
-        """
-        Remove old opening range data files for a symbol, keeping only the latest.
-        
-        Args:
-            symbol: The symbol to clean up files for
-            market_data_dir: The historical market data directory path
-        """
-        try:
-            # Find all opening range files for this symbol
-            symbol_files = list(market_data_dir.glob(f"{symbol}_opening_range_*.csv"))
-            
-            if len(symbol_files) <= 1:
-                # No cleanup needed if 1 or fewer files exist
-                return
-            
-            # Sort files by modification time (newest first)
-            symbol_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
-            
-            # Keep only the latest file, remove the rest
-            files_to_remove = symbol_files[1:]  # All except the first (newest)
-            
-            for old_file in files_to_remove:
-                try:
-                    old_file.unlink()
-                    self.logger.debug(f"Removed old opening range file: {old_file.name}")
-                except OSError as e:
-                    self.logger.warning(f"Could not remove old opening range file {old_file.name}: {e}")
-            
-            if files_to_remove:
-                self.logger.debug(f"Cleaned up {len(files_to_remove)} old opening range files for {symbol}")
-                
-        except Exception as e:
-            self.logger.error(f"Error cleaning up old opening range files for {symbol}: {e}")
     
     def _fetch_with_legacy_api(self, symbols, start_time, end_time):
         """Fetch historical data using legacy alpaca-trade-api."""
