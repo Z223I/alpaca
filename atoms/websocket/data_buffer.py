@@ -40,6 +40,7 @@ class SymbolBuffer:
             records.append({
                 'timestamp': data_point.timestamp,
                 'symbol': data_point.symbol,
+                'open': data_point.open,
                 'high': data_point.high,
                 'low': data_point.low,
                 'close': data_point.close,

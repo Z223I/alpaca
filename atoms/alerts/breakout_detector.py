@@ -203,10 +203,10 @@ class BreakoutDetector:
         
         # Add current candlestick OHLC data from the latest row
         latest_row = symbol_data.iloc[-1]
-        indicators['open'] = float(latest_row['open'])
-        indicators['high'] = float(latest_row['high'])
-        indicators['low'] = float(latest_row['low'])
-        indicators['close'] = float(latest_row['close'])
+        indicators['open_price'] = float(latest_row['open']) if latest_row['open'] is not None else None
+        indicators['high_price'] = float(latest_row['high'])
+        indicators['low_price'] = float(latest_row['low'])
+        indicators['close_price'] = float(latest_row['close'])
         indicators['volume'] = int(latest_row['volume'])
         
         return indicators

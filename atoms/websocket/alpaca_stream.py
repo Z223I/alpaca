@@ -41,6 +41,7 @@ class MarketData:
     close: float
     trade_count: int
     vwap: float
+    open: Optional[float] = None
 
 
 class AlpacaStreamClient:
