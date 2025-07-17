@@ -52,10 +52,10 @@ class ORBAlert:
     ema_9_below_20: Optional[bool] = None
     ema_divergence: Optional[float] = None
     # Current candlestick OHLC data
-    open: Optional[float] = None
-    high: Optional[float] = None
-    low: Optional[float] = None
-    close: Optional[float] = None
+    open_price: Optional[float] = None
+    high_price: Optional[float] = None
+    low_price: Optional[float] = None
+    close_price: Optional[float] = None
     volume: Optional[int] = None
     
     def __post_init__(self):
@@ -219,10 +219,10 @@ class AlertFormatter:
             ema_9_below_20=ema_9_below_20,
             ema_divergence=ema_divergence,
             # Current candlestick OHLC data
-            open=open_price,
-            high=high_price,
-            low=low_price,
-            close=close_price,
+            open_price=open_price,
+            high_price=high_price,
+            low_price=low_price,
+            close_price=close_price,
             volume=volume
         )
         

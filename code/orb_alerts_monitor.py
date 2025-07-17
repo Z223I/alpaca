@@ -280,10 +280,12 @@ class ORBAlertMonitor:
                 # Additional filter: Check if current candlestick low is below EMA9 for bullish alerts
                 # Get the current candlestick low from the original alert data
                 original_alert = alert_data.get('original_alert', alert_data)
-                current_low = original_alert.get('low')  # Current candlestick low
+                current_low = original_alert.get('low_price')  # Current candlestick low
                 if current_low is None:
-                    # Fallback to looking for 'current_low' field directly
-                    current_low = alert_data.get('current_low')
+                    # Fallback to looking for 'low' field (legacy) or 'current_low' field directly
+                    current_low = original_alert.get('low')
+                    if current_low is None:
+                        current_low = alert_data.get('current_low')
                 
                 if ema_9 is not None and current_low is not None:
                     if current_low < ema_9:
