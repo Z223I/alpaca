@@ -30,6 +30,9 @@ sys.path.append('/home/wilsonb/dl/github.com/z223i/alpaca')
 
 from atoms.config.alert_config import config
 from atoms.config.symbol_manager import SymbolManager
+from atoms.config.symbol_data_loader import SymbolDataLoader
+from atoms.alerts.super_alert_filter import SuperAlertFilter
+from atoms.alerts.super_alert_generator import SuperAlertGenerator
 
 # Alpaca API imports for real-time price checking
 try:
@@ -44,27 +47,7 @@ except ImportError:
         ALPACA_AVAILABLE = False
 
 
-class SuperAlertData:
-    """Data structure for super alert information."""
-    
-    def __init__(self, symbol: str, signal_price: float, resistance_price: float):
-        self.symbol = symbol
-        self.signal_price = signal_price
-        self.resistance_price = resistance_price
-        self.range_percent = (resistance_price / signal_price) if signal_price > 0 else 0
-        self.alerts_triggered = []
-        
-    def calculate_penetration(self, current_price: float) -> float:
-        """Calculate penetration percentage into Signal-to-Resistance range."""
-        if current_price < self.signal_price:
-            return 0.0
-        
-        range_size = self.resistance_price - self.signal_price
-        if range_size <= 0:
-            return 0.0
-            
-        penetration = (current_price - self.signal_price) / range_size
-        return min(penetration * 100, 100.0)  # Cap at 100%
+# SuperAlertData is now imported from atoms.alerts.super_alert_filter
 
 
 class AlertFileHandler(FileSystemEventHandler):
@@ -98,9 +81,13 @@ class ORBAlertMonitor:
         # Setup logging
         self.logger = self._setup_logging()
         
-        # Load symbol data with Signal and Resistance prices
-        self.symbol_manager = SymbolManager(symbols_file) if symbols_file else SymbolManager()
-        self.symbol_data = self._load_symbol_data()
+        # Load symbol data with Signal and Resistance prices using atom
+        self.symbol_loader = SymbolDataLoader(symbols_file)
+        self.symbol_data = self.symbol_loader.load_symbol_data()
+        
+        # Initialize filtering and generation atoms
+        self.super_alert_filter = SuperAlertFilter(self.symbol_data)
+        self.super_alert_generator = None  # Will be initialized when directories are set up
         self.test_mode = test_mode
         
         # Alert monitoring setup
@@ -112,6 +99,9 @@ class ORBAlertMonitor:
         # Ensure directories exist
         self.alerts_dir.mkdir(parents=True, exist_ok=True)
         self.super_alerts_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize super alert generator now that directory is set up
+        self.super_alert_generator = SuperAlertGenerator(self.super_alerts_dir, test_mode)
         
         # Initialize price client
         self.price_client = None
@@ -140,7 +130,7 @@ class ORBAlertMonitor:
         
         # Processed alerts tracking
         self.processed_alerts = set()
-        self.filtered_alerts = set()  # Track alerts filtered due to EMA9 below EMA20
+        self.filtered_alerts = set()  # Track filtered alerts
         
         self.logger.info(f"ORB Alert Monitor initialized in {'TEST' if test_mode else 'LIVE'} mode")
         self.logger.info(f"Monitoring alerts in: {self.alerts_dir}")
@@ -167,43 +157,7 @@ class ORBAlertMonitor:
         
         return logger
     
-    def _load_symbol_data(self) -> Dict[str, SuperAlertData]:
-        """Load symbol data from CSV file with Signal and Resistance prices."""
-        symbol_data = {}
-        
-        try:
-            with open(self.symbol_manager.symbols_file, 'r') as file:
-                reader = csv.DictReader(file)
-                
-                for row in reader:
-                    symbol = row.get('Symbol', '').strip().upper()
-                    if not symbol or symbol in ['SYMBOL', 'TICKER', 'STOCK']:
-                        continue
-                    
-                    # Parse Signal and Resistance prices
-                    try:
-                        signal_str = row.get('Signal', '0').strip()
-                        resistance_str = row.get('Resistance', '0').strip()
-                        
-                        # Handle empty values
-                        if not signal_str or not resistance_str:
-                            continue
-                            
-                        signal_price = float(signal_str)
-                        resistance_price = float(resistance_str)
-                        
-                        if signal_price > 0 and resistance_price > 0:
-                            symbol_data[symbol] = SuperAlertData(symbol, signal_price, resistance_price)
-                            self.logger.debug(f"Loaded {symbol}: Signal=${signal_price:.2f}, Resistance=${resistance_price:.2f}")
-                        
-                    except (ValueError, TypeError) as e:
-                        self.logger.warning(f"Could not parse prices for {symbol}: {e}")
-                        continue
-                        
-        except Exception as e:
-            self.logger.error(f"Error loading symbol data: {e}")
-            
-        return symbol_data
+    # Symbol data loading is now handled by SymbolDataLoader atom
     
     async def _get_current_price(self, symbol: str) -> Optional[float]:
         """Get current price for a symbol."""
@@ -241,147 +195,32 @@ class ORBAlertMonitor:
             with open(file_path, 'r') as f:
                 alert_data = json.load(f)
             
-            symbol = alert_data.get('symbol')
-            current_price = alert_data.get('current_price')
+            # Use SuperAlertFilter to determine if we should create a super alert
+            should_create, filter_reason = self.super_alert_filter.should_create_super_alert(alert_data)
             
-            if not symbol or current_price is None:
-                self.logger.warning(f"Invalid alert data in {file_path}")
-                return
-            
-            # Check if we have signal data for this symbol
-            if symbol not in self.symbol_data:
-                self.logger.debug(f"No signal data for {symbol}, skipping")
-                return
-            
-            # Filter out bullish alerts where EMA9 is below EMA20
-            breakout_type = alert_data.get('breakout_type', '').lower()
-            if breakout_type == 'bullish_breakout':
-                ema_9_below_20 = alert_data.get('ema_9_below_20')
-                ema_9 = alert_data.get('ema_9')
-                ema_20 = alert_data.get('ema_20')
-                
-                if ema_9_below_20 is True:
-                    self.filtered_alerts.add(file_path)
-                    ema_info = ""
-                    if ema_9 is not None and ema_20 is not None:
-                        ema_info = f" (EMA9: ${ema_9:.2f} < EMA20: ${ema_20:.2f})"
-                    self.logger.info(f"🚫 Filtered bullish alert for {symbol}: EMA9 below EMA20{ema_info}")
-                    return
-                elif ema_9_below_20 is None:
-                    # Handle case where EMA data is not available
-                    self.logger.warning(f"No EMA9/EMA20 data available for {symbol}, allowing alert")
+            if not should_create:
+                if filter_reason.startswith("Price") or filter_reason.startswith("No signal"):
+                    # Log at debug level for price/signal issues
+                    self.logger.debug(f"Skipping alert: {filter_reason}")
                 else:
-                    # EMA9 is above EMA20, log this for bullish alerts
-                    ema_info = ""
-                    if ema_9 is not None and ema_20 is not None:
-                        ema_info = f" (EMA9: ${ema_9:.2f} > EMA20: ${ema_20:.2f})"
-                    self.logger.debug(f"✅ Allowing bullish alert for {symbol}: EMA9 above EMA20{ema_info}")
-                
-                # Additional filter: Check if current candlestick low is below EMA9 for bullish alerts
-                # Get the current candlestick low from the original alert data
-                original_alert = alert_data.get('original_alert', alert_data)
-                current_low = original_alert.get('low_price')  # Current candlestick low
-                if current_low is None:
-                    # Fallback to looking for 'low' field (legacy) or 'current_low' field directly
-                    current_low = original_alert.get('low')
-                    if current_low is None:
-                        current_low = alert_data.get('current_low')
-                
-                if ema_9 is not None and current_low is not None:
-                    if current_low < ema_9:
-                        self.filtered_alerts.add(file_path)
-                        self.logger.info(f"🚫 Filtered bullish alert for {symbol}: Current candlestick low ${current_low:.2f} below EMA9 ${ema_9:.2f}")
-                        return
-                    else:
-                        self.logger.debug(f"✅ Allowing bullish alert for {symbol}: Current candlestick low ${current_low:.2f} above EMA9 ${ema_9:.2f}")
-                elif ema_9 is None:
-                    self.logger.warning(f"No EMA9 data available for {symbol} low filter, allowing alert")
-                elif current_low is None:
-                    self.logger.warning(f"No current candlestick low data available for {symbol} EMA9 filter, allowing alert")
+                    # Log filtered alerts
+                    self.filtered_alerts.add(file_path)
+                    self.logger.info(f"🚫 Filtered alert: {filter_reason}")
+                return
             
-            symbol_info = self.symbol_data[symbol]
+            # Get symbol info and create super alert
+            symbol = alert_data.get('symbol')
+            symbol_info = self.super_alert_filter.get_symbol_info(symbol)
             
-            # Check if current price has reached signal price
-            if current_price >= symbol_info.signal_price:
-                await self._create_super_alert(alert_data, symbol_info)
-            else:
-                self.logger.debug(f"{symbol}: Price ${current_price:.2f} below Signal ${symbol_info.signal_price:.2f}")
-                
+            if symbol_info:
+                filename = self.super_alert_generator.create_and_save_super_alert(alert_data, symbol_info)
+                if filename:
+                    self.logger.info(f"Super alert created: {filename}")
+            
         except Exception as e:
             self.logger.error(f"Error processing alert file {file_path}: {e}")
     
-    async def _create_super_alert(self, alert_data: dict, symbol_info: SuperAlertData) -> None:
-        """Create a super alert when signal price is reached."""
-        try:
-            symbol = alert_data['symbol']
-            current_price = alert_data['current_price']
-            original_timestamp = alert_data['timestamp']
-            
-            # Create ET timestamp for when super alert is generated
-            et_tz = pytz.timezone('US/Eastern')
-            super_alert_time = datetime.now(et_tz)
-            et_timestamp = super_alert_time.strftime('%Y-%m-%dT%H:%M:%S%z')
-            
-            # Calculate metrics
-            penetration = symbol_info.calculate_penetration(current_price)
-            range_percent = symbol_info.range_percent
-            
-            # Create super alert data
-            super_alert = {
-                "symbol": symbol,
-                "timestamp": et_timestamp,
-                "original_alert_timestamp": original_timestamp,
-                "alert_type": "super_alert",
-                "trigger_condition": "signal_price_reached",
-                "original_alert": alert_data,
-                "signal_analysis": {
-                    "signal_price": symbol_info.signal_price,
-                    "resistance_price": symbol_info.resistance_price,
-                    "current_price": current_price,
-                    "penetration_percent": round(penetration, 2),
-                    "range_percent": round(range_percent, 2),
-                    "signal_reached": True,
-                    "resistance_reached": current_price >= symbol_info.resistance_price
-                },
-                "metrics": {
-                    "signal_to_resistance_range": symbol_info.resistance_price - symbol_info.signal_price,
-                    "price_above_signal": current_price - symbol_info.signal_price,
-                    "distance_to_resistance": symbol_info.resistance_price - current_price
-                },
-                "risk_assessment": {
-                    "entry_price": symbol_info.signal_price,
-                    "target_price": symbol_info.resistance_price,
-                    "current_risk_reward": (symbol_info.resistance_price - current_price) / (current_price - symbol_info.signal_price) if current_price > symbol_info.signal_price else 0
-                }
-            }
-            
-            # Save super alert using the same ET time
-            filename = f"super_alert_{symbol}_{super_alert_time.strftime('%Y%m%d_%H%M%S')}.json"
-            filepath = self.super_alerts_dir / filename
-            
-            with open(filepath, 'w') as f:
-                json.dump(super_alert, f, indent=2)
-            
-            # Log and display super alert
-            message = (f"🚀 SUPER ALERT: {symbol} @ ${current_price:.2f}\n"
-                      f"   Signal: ${symbol_info.signal_price:.2f} ✅ | "
-                      f"Resistance: ${symbol_info.resistance_price:.2f}\n"
-                      f"   Penetration: {penetration:.1f}% | "
-                      f"Range %: {range_percent:.1f}%\n"
-                      f"   Saved: {filename}")
-            
-            if self.test_mode:
-                print(f"[TEST MODE] {message}")
-            else:
-                print(message)
-                
-            self.logger.info(f"Super alert created for {symbol} at ${current_price:.2f}")
-            
-            # Track this alert
-            symbol_info.alerts_triggered.append(super_alert)
-            
-        except Exception as e:
-            self.logger.error(f"Error creating super alert: {e}")
+    # _create_super_alert method is now handled by SuperAlertGenerator atom
     
     async def _scan_existing_alerts(self) -> None:
         """Scan existing alert files on startup."""
@@ -429,7 +268,7 @@ class ORBAlertMonitor:
             print(f"📁 Monitoring: {self.alerts_dir}")
             print(f"💾 Super alerts: {self.super_alerts_dir}")
             print(f"📊 Symbols loaded: {len(self.symbol_data)}")
-            print("🚫 Filtering: Bullish alerts with EMA9 < EMA20 or candlestick low < EMA9 will be filtered out")
+            print("✅ Filtering: Only bullish alerts with candlestick low >= EMA9 will be allowed")
             if self.test_mode:
                 print("🧪 TEST MODE: Super alerts will be marked as [TEST MODE]")
             print("="*80 + "\n")
@@ -465,7 +304,7 @@ class ORBAlertMonitor:
             'symbols_monitored': len(self.symbol_data),
             'super_alerts_generated': super_alerts_count,
             'alerts_processed': len(self.processed_alerts),
-            'alerts_filtered_ema': len(self.filtered_alerts),
+            'alerts_filtered': len(self.filtered_alerts),
             'monitoring_directory': str(self.alerts_dir),
             'super_alerts_directory': str(self.super_alerts_dir)
         }
