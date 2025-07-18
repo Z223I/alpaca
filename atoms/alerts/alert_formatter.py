@@ -189,10 +189,10 @@ class AlertFormatter:
             ema_divergence = technical_indicators.get('ema_divergence')
             
             # Extract candlestick data
-            open_price = technical_indicators.get('open')
-            high_price = technical_indicators.get('high')
-            low_price = technical_indicators.get('low')
-            close_price = technical_indicators.get('close')
+            open_price = technical_indicators.get('open_price')
+            high_price = technical_indicators.get('high_price')
+            low_price = technical_indicators.get('low_price')
+            close_price = technical_indicators.get('close_price')
             volume = technical_indicators.get('volume')
         
         alert = ORBAlert(

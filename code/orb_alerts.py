@@ -310,6 +310,12 @@ class ORBAlertSystem:
                 "recommended_stop_loss": float(alert.recommended_stop_loss),
                 "recommended_take_profit": float(alert.recommended_take_profit),
                 "alert_message": alert.alert_message,
+                # Candlestick data for super alert filtering
+                "low_price": float(alert.low_price) if alert.low_price is not None else None,
+                "high_price": float(alert.high_price) if alert.high_price is not None else None,
+                "open_price": float(alert.open_price) if alert.open_price is not None else None,
+                "close_price": float(alert.close_price) if alert.close_price is not None else None,
+                "volume": int(alert.volume) if alert.volume is not None else None,
                 # EMA Technical Indicators - ensure proper JSON serialization
                 "ema_9": float(alert.ema_9) if alert.ema_9 is not None else None,
                 "ema_20": float(alert.ema_20) if alert.ema_20 is not None else None,
@@ -449,7 +455,8 @@ class ORBAlertSystem:
                                     low=bar['low'],
                                     close=bar['close'],
                                     trade_count=bar.get('trade_count', 1),
-                                    vwap=bar.get('vwap', bar['close'])
+                                    vwap=bar.get('vwap', bar['close']),
+                                    open=bar.get('open', bar['close'])
                                 )
                                 
                                 # Add to data buffer

@@ -283,7 +283,8 @@ class AlpacaStreamClient:
                 low=float(bar_data.get("l", 0)),
                 close=float(bar_data.get("c", 0)),
                 trade_count=int(bar_data.get("n", 0)),
-                vwap=float(bar_data.get("vw", 0))
+                vwap=float(bar_data.get("vw", 0)),
+                open=float(bar_data.get("o", 0))
             )
             
             # Call all registered data handlers

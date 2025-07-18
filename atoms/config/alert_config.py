@@ -37,7 +37,7 @@ class ORBAlertConfig:
     
     # Alert Timing
     alert_window_start: str = "09:45"    # Post-ORB period
-    alert_window_end: str = "15:45"      # Before close
+    alert_window_end: str = "20:00"      # Extended for testing
     
     # Alpaca API Configuration
     api_key: str = ""
