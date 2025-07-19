@@ -138,3 +138,6 @@ tmp/
 
 # Historical data directory
 historical_data/
+
+# Telegram user database
+.telegram_users.csv

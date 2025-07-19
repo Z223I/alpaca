@@ -1,0 +1,11 @@
+# Telegram Users Sample CSV
+# Copy this file to .telegram_users.csv and add your actual chat IDs
+# To get your chat ID: message @userinfobot on Telegram
+# Group chat IDs are negative numbers starting with -100
+
+chat_id,username,enabled,created_date,notes
+# Example entries (replace with actual data):
+# 123456789,john_trader,true,2024-01-15,Main portfolio notifications
+# 987654321,jane_admin,true,2024-01-15,All system alerts
+# -1001234567890,trading_group,true,2024-01-16,Group trading signals
+# 555666777,test_user,false,2024-01-17,Disabled for testing
