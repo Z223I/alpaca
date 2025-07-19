@@ -128,6 +128,9 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
                                        gridspec_kw={'height_ratios': [3, 1]},
                                        sharex=True)
         
+        # Create secondary Y axis for price/ORB high ratio
+        ax1_secondary = ax1.twinx()
+        
         # Plot candlesticks on top subplot
         for idx, row in symbol_data.iterrows():
             timestamp = row['timestamp']
@@ -212,6 +215,27 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
         if vwap_success:
             ax1.plot(symbol_data['timestamp'], vwap_values, 
                     color='purple', linewidth=2, alpha=0.8, label='VWAP')
+        
+        # Setup secondary Y axis for price/ORB high ratio if ORB high is available
+        if orb_high is not None and orb_high > 0:
+            # Calculate price/ORB high ratio range for axis scaling
+            price_orb_ratio = symbol_data['close'] / orb_high
+            
+            # Set secondary Y axis properties
+            ax1_secondary.set_ylabel('Price / ORB High Ratio', fontsize=12, color='gray')
+            ax1_secondary.tick_params(axis='y', labelcolor='gray')
+            
+            # Set the Y axis limits to match the ratio range
+            ratio_min = price_orb_ratio.min()
+            ratio_max = price_orb_ratio.max()
+            padding = (ratio_max - ratio_min) * 0.05  # 5% padding
+            ax1_secondary.set_ylim(ratio_min - padding, ratio_max + padding)
+            
+            # Add horizontal line at ratio = 1.0 (breakout level)
+            ax1_secondary.axhline(y=1.0, color='gray', linestyle='-', linewidth=1, alpha=0.5)
+            
+            # Format secondary Y axis to show ratio with 3 decimal places
+            ax1_secondary.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'{x:.3f}'))
         
         # Plot alerts as vertical bars if provided
         if alerts:

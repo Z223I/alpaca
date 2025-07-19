@@ -388,21 +388,47 @@ class ORB:
             # Sort by modification time, most recent first
             csv_files.sort(key=os.path.getmtime, reverse=True)
             
-            print("\nAvailable CSV files (YYYYMMDD.csv format):")
-            print("=" * 50)
+            # Pagination variables
+            files_per_page = 5  # Show 5 files initially
+            more_files_per_page = 10  # Show 10 more when requested
+            current_display_count = min(files_per_page, len(csv_files))
             
-            for i, filepath in enumerate(csv_files):
-                filename = os.path.basename(filepath)
-                mod_time = os.path.getmtime(filepath)
-                mod_date = datetime.fromtimestamp(mod_time).strftime('%Y-%m-%d %H:%M:%S')
-                default_marker = " (default)" if i == 0 else ""
-                print(f"{i + 1:2d}. {filename} - {mod_date}{default_marker}")
+            def display_files(display_count):
+                """Display the specified number of files."""
+                print("\nAvailable CSV files (YYYYMMDD.csv format):")
+                print("=" * 50)
+                
+                for i in range(display_count):
+                    filepath = csv_files[i]
+                    filename = os.path.basename(filepath)
+                    mod_time = os.path.getmtime(filepath)
+                    mod_date = datetime.fromtimestamp(mod_time).strftime('%Y-%m-%d %H:%M:%S')
+                    default_marker = " (default)" if i == 0 else ""
+                    print(f"{i + 1:2d}. {filename} - {mod_date}{default_marker}")
+                
+                remaining_files = len(csv_files) - display_count
+                if remaining_files > 0:
+                    print(f"... {remaining_files} more files available")
+                
+                print("=" * 50)
             
-            print("=" * 50)
+            # Display initial files
+            display_files(current_display_count)
             
             while True:
                 try:
-                    response = input(f"Select file (1-{len(csv_files)}) or press Enter for default: ").strip()
+                    # Build prompt based on available options
+                    prompt_parts = [f"Select file (1-{current_display_count})"]
+                    
+                    if current_display_count < len(csv_files):
+                        remaining = len(csv_files) - current_display_count
+                        show_count = min(more_files_per_page, remaining)
+                        prompt_parts.append(f"'m' to show {show_count} more")
+                    
+                    prompt_parts.append("Enter for default")
+                    prompt = f"{', '.join(prompt_parts)}: "
+                    
+                    response = input(prompt).strip().lower()
                     
                     if response == "":
                         # Use default (most recent)
@@ -410,16 +436,29 @@ class ORB:
                         print(f"Using default: {os.path.basename(selected_file)}")
                         return selected_file
                     
+                    if response == "m" or response == "more":
+                        if current_display_count < len(csv_files):
+                            # Show more files
+                            remaining = len(csv_files) - current_display_count
+                            additional_files = min(more_files_per_page, remaining)
+                            current_display_count += additional_files
+                            display_files(current_display_count)
+                            continue
+                        else:
+                            print("All files are already displayed.")
+                            continue
+                    
+                    # Try to parse as number
                     selection = int(response)
-                    if 1 <= selection <= len(csv_files):
+                    if 1 <= selection <= current_display_count:
                         selected_file = csv_files[selection - 1]
                         print(f"Selected: {os.path.basename(selected_file)}")
                         return selected_file
                     else:
-                        print(f"Please enter a number between 1 and {len(csv_files)}")
+                        print(f"Please enter a number between 1 and {current_display_count}")
                         
                 except ValueError:
-                    print("Please enter a valid number or press Enter for default")
+                    print("Please enter a valid number, 'm' for more files, or press Enter for default")
                 except (EOFError, KeyboardInterrupt):
                     print("\nOperation cancelled by user.")
                     return None
@@ -1400,7 +1439,9 @@ class ORB:
                         expected_end = end_time.replace(tzinfo=None)
                         
                         if min_time.replace(tzinfo=None) > expected_start:
-                            print(f"⚠️  Data starts later than expected market open (9:30 AM)")
+                            actual_start_et = min_time.astimezone(et_tz)
+                            expected_premarket_start = start_time
+                            print(f"⚠️  Data starts later than expected premarket start ({expected_premarket_start.strftime('%H:%M %Z')}) - actual start: {actual_start_et.strftime('%H:%M:%S %Z')}")
                         if max_time.replace(tzinfo=None) < expected_end:
                             print(f"⚠️  Data ends earlier than expected market close (4:00 PM)")
                         
