@@ -5,9 +5,10 @@ The remaining tasks are lower priority documentation and deployment tools:
   - Comprehensive API documentation
 
 
+- [ ] Think hard. Create a PRD, specs/telegram_post_prd.md, to ceate Telegram atom to post messages to Telegram API. The atom needs to accept a message as a string and post it to Telegram. Use dotenv to retrieve Telegram keys or whatever.  Have a separate CSV containing users to which to post; the file name is to start with ".", be in the root dir, and added to .gitignore.
 - [ ] Update code/orb_alerts.py to accept new symbols during the day.
 
-- [ ] Update atoms/display/plot_candle_chart.py: Add a second Y axis; it is to be price / orb high.
+- [X] Update atoms/display/plot_candle_chart.py: Add a second Y axis; it is to be price / orb high.
 - [X] Update code/alpaca.py: The return values of orders placed are not being checked.  Process all order return values and handle gracefully.
 - [X] Git switch -c premarket_data
 - [X] Update code/orb_alerts.py to collect data starting at 9:00 so EMA20 can be calculated at market open.  ORB is still 9:30 to 9:45.
