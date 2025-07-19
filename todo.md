@@ -7,11 +7,10 @@ The remaining tasks are lower priority documentation and deployment tools:
 
 - [ ] Update code/orb_alerts.py to accept new symbols during the day.
 
-- [ ] Update code/alpaca.py: The return values of orders placed are not being checked.  Process all order return values and handle gracefully.
-
-- [ ] Git switch -c premarket_data.
-- [ ] Update code/orb_alerts.py to collect data starting at 9:00 so EMA20 can be calculated at market open.  ORB is still 9:30 to 9:45.
-
+- [ ] Update atoms/display/plot_candle_chart.py: Add a second Y axis; it is to be price / orb high.
+- [X] Update code/alpaca.py: The return values of orders placed are not being checked.  Process all order return values and handle gracefully.
+- [X] Git switch -c premarket_data
+- [X] Update code/orb_alerts.py to collect data starting at 9:00 so EMA20 can be calculated at market open.  ORB is still 9:30 to 9:45.
 - [X] No alerts in the last 15 minutes of the day.
 - [X] You must source ~/miniconda3/etc/profile.d/conda.sh && conda activate alpaca
 - [X] Manually plot EMA20 and see if this would be an indicator to stop trading.

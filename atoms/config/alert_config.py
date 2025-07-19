@@ -36,6 +36,7 @@ class ORBAlertConfig:
     take_profit_percent: float = 4.0     # Take profit percentage (4%)
     
     # Alert Timing
+    orb_start_time: str = "09:30"        # ORB period start time (NYSE/NASDAQ market open)
     alert_window_start: str = "09:45"    # Post-ORB period
     alert_window_end: str = "20:00"      # Extended for testing
     
@@ -54,9 +55,9 @@ class ORBAlertConfig:
     
     # Data Collection Configuration
     data_save_interval_minutes: int = 10  # Save historical data every N minutes (configurable)
-    market_open_time: str = "09:30"       # Market open time (ET) - 09:30 for NYSE/NASDAQ
-    start_collection_at_open: bool = True # Wait until market open to start data collection
-                                          # This ensures ORB data is captured from market open
+    market_open_time: str = "09:00"       # Data collection start time (ET) - 09:00 to allow EMA20 calculation by 09:30
+    start_collection_at_open: bool = True # Wait until data collection start time to begin data collection
+                                          # This ensures EMA20 can be calculated by market open (09:30)
     
     def __post_init__(self):
         """Load API credentials from environment variables."""

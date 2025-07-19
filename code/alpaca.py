@@ -95,7 +95,7 @@ class alpaca_private:
 
         return quantity
 
-    def _buy(self, symbol: str, take_profit: float, submit_order: bool = False) -> None:
+    def _buy(self, symbol: str, take_profit: float, submit_order: bool = False) -> Optional[Any]:
         """
         Execute a buy order with bracket order protection.
 
@@ -129,26 +129,41 @@ class alpaca_private:
                 f"    stop_loss={{'stop_price': {stop_price}}},\n"
                 f"    take_profit={{'limit_price': {take_profit}}}\n"
                 f")")
+        
+        if not submit_order:
+            print("[DRY RUN] Order not submitted (use --submit to execute)")
+            return None
 
         # Submit the actual order if requested
         if submit_order:
-            self.api.submit_order(
-                symbol=symbol,
-                qty=quantity,
-                side='buy',
-                type='market',  # Market order for immediate execution
-                time_in_force='gtc',  # Good till cancelled
-                order_class='bracket',  # Bracket order with stop loss
-                stop_loss={
-                    'stop_price': stop_price,  # Triggers a stop order at 10% loss
-                },
-                take_profit={
-                    'limit_price': take_profit
-                }
-            )
+            try:
+                order_response = self.api.submit_order(
+                    symbol=symbol,
+                    qty=quantity,
+                    side='buy',
+                    type='market',  # Market order for immediate execution
+                    time_in_force='gtc',  # Good till cancelled
+                    order_class='bracket',  # Bracket order with stop loss
+                    stop_loss={
+                        'stop_price': stop_price,  # Triggers a stop order at 10% loss
+                    },
+                    take_profit={
+                        'limit_price': take_profit
+                    }
+                )
+                print(f"✓ Order submitted successfully: {order_response.id}")
+                print(f"  Status: {order_response.status}")
+                print(f"  Symbol: {order_response.symbol}")
+                print(f"  Quantity: {order_response.qty}")
+                print(f"  Order Class: {order_response.order_class}")
+                return order_response
+            except Exception as e:
+                print(f"✗ Order submission failed: {str(e)}")
+                print(f"  Symbol: {symbol}, Quantity: {quantity}")
+                return None
 
 
-    def _bracketOrder(self, symbol: str, quantity: int, market_price: float, take_profit: float, submit_order: bool = False) -> None:
+    def _bracketOrder(self, symbol: str, quantity: int, market_price: float, take_profit: float, submit_order: bool = False) -> Optional[Any]:
         """
         Create a bracket order with stop loss protection.
 
@@ -171,26 +186,41 @@ class alpaca_private:
               f"    stop_loss={{'stop_price': {stop_price}}},\n"
               f"    take_profit={{'limit_price': {take_profit}}}\n"
               f")")
+        
+        if not submit_order:
+            print("[DRY RUN] Bracket order not submitted (use --submit to execute)")
+            return None
 
         if submit_order:
-            self.api.submit_order(
-                symbol=symbol,
-                qty=quantity,
-                side='buy',
-                type='market',  # or 'limit'
-                time_in_force='gtc',
-                order_class='bracket',
-                stop_loss={
-                    'stop_price': stop_price,  # Triggers a stop order
-                },
-                take_profit={
-                    'limit_price': take_profit  # Required for take-profit
-                }
-            )
+            try:
+                order_response = self.api.submit_order(
+                    symbol=symbol,
+                    qty=quantity,
+                    side='buy',
+                    type='market',  # or 'limit'
+                    time_in_force='gtc',
+                    order_class='bracket',
+                    stop_loss={
+                        'stop_price': stop_price,  # Triggers a stop order
+                    },
+                    take_profit={
+                        'limit_price': take_profit  # Required for take-profit
+                    }
+                )
+                print(f"✓ Bracket order submitted successfully: {order_response.id}")
+                print(f"  Status: {order_response.status}")
+                print(f"  Symbol: {order_response.symbol}")
+                print(f"  Quantity: {order_response.qty}")
+                print(f"  Order Class: {order_response.order_class}")
+                return order_response
+            except Exception as e:
+                print(f"✗ Bracket order submission failed: {str(e)}")
+                print(f"  Symbol: {symbol}, Quantity: {quantity}")
+                return None
 
 
 
-    def _futureBracketOrder(self, symbol: str, quantity: int, limit_price: float, stop_price: float, take_profit: float, submit_order: bool = False) -> None:
+    def _futureBracketOrder(self, symbol: str, quantity: int, limit_price: float, stop_price: float, take_profit: float, submit_order: bool = False) -> Optional[Any]:
         """
         Create a future bracket order with limit entry and stop loss protection.
 
@@ -217,23 +247,39 @@ class alpaca_private:
               f"    stop_loss={{'stop_price': {stop_price}}},\n"
               f"    take_profit={{'limit_price': {take_profit}}}\n"
               f")")
+        
+        if not submit_order:
+            print("[DRY RUN] Future bracket order not submitted (use --submit to execute)")
+            return None
 
         if submit_order:
-            self.api.submit_order(
-                symbol=symbol,
-                qty=quantity,
-                side='buy',
-                type='limit',
-                time_in_force='day',
-                limit_price=str(limit_price),
-                order_class='bracket',
-                stop_loss={
-                    'stop_price': stop_price,
-                },
-                take_profit={
-                    'limit_price': take_profit
-                }
-            )
+            try:
+                order_response = self.api.submit_order(
+                    symbol=symbol,
+                    qty=quantity,
+                    side='buy',
+                    type='limit',
+                    time_in_force='day',
+                    limit_price=str(limit_price),
+                    order_class='bracket',
+                    stop_loss={
+                        'stop_price': stop_price,
+                    },
+                    take_profit={
+                        'limit_price': take_profit
+                    }
+                )
+                print(f"✓ Future bracket order submitted successfully: {order_response.id}")
+                print(f"  Status: {order_response.status}")
+                print(f"  Symbol: {order_response.symbol}")
+                print(f"  Quantity: {order_response.qty}")
+                print(f"  Limit Price: {limit_price}")
+                print(f"  Order Class: {order_response.order_class}")
+                return order_response
+            except Exception as e:
+                print(f"✗ Future bracket order submission failed: {str(e)}")
+                print(f"  Symbol: {symbol}, Quantity: {quantity}, Limit Price: {limit_price}")
+                return None
 
     def Exec(self) -> int:
         """
@@ -252,17 +298,20 @@ class alpaca_private:
 
         # Handle bracket order if requested
         if self.args.bracket_order:
-            self._bracketOrder(
+            order_result = self._bracketOrder(
                 symbol=self.args.symbol,
                 quantity=self.args.quantity,
                 market_price=self.args.market_price,
                 take_profit=self.args.take_profit,
                 submit_order=self.args.submit
             )
+            if order_result is None and self.args.submit:
+                print("Failed to submit bracket order")
+                return 1
 
         # Handle future bracket order if requested
         if self.args.future_bracket_order:
-            self._futureBracketOrder(
+            order_result = self._futureBracketOrder(
                 symbol=self.args.symbol,
                 quantity=self.args.quantity,
                 limit_price=self.args.limit_price,
@@ -270,6 +319,9 @@ class alpaca_private:
                 take_profit=self.args.take_profit,
                 submit_order=self.args.submit
             )
+            if order_result is None and self.args.submit:
+                print("Failed to submit future bracket order")
+                return 1
 
         # Handle quote request if requested
         if self.args.get_latest_quote:
@@ -277,7 +329,14 @@ class alpaca_private:
 
         # Handle buy order if requested
         if self.args.buy:
-            self._buy(symbol=self.args.symbol, take_profit=self.args.take_profit, submit_order=self.args.submit)
+            order_result = self._buy(
+                symbol=self.args.symbol, 
+                take_profit=self.args.take_profit, 
+                submit_order=self.args.submit
+            )
+            if order_result is None and self.args.submit:
+                print("Failed to submit buy order")
+                return 1
 
         return 0
 

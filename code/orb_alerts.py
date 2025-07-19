@@ -105,7 +105,7 @@ class ORBAlertSystem:
         self.logger.info(f"Using {feed_type} data feed")
         self.logger.info(f"Historical data will be saved to: {self.historical_data_dir.absolute()}")
         self.logger.info(f"Data save interval: {config.data_save_interval_minutes} minutes")
-        self.logger.info(f"Start at market open ({config.market_open_time} ET): {config.start_collection_at_open}")
+        self.logger.info(f"Data collection starts at {config.market_open_time} ET, ORB period: {config.orb_start_time}-{config.alert_window_start} ET")
     
     def _setup_logging(self) -> logging.Logger:
         """Setup logging configuration with Eastern Time."""
@@ -158,7 +158,7 @@ class ORBAlertSystem:
                 symbol_data = self.alert_engine.data_buffer.get_symbol_data(symbol)
                 
                 if symbol_data is not None and not symbol_data.empty:
-                    # Data buffer contains historical data from 9:30 AM plus real-time websocket data
+                    # Data buffer contains historical data from 9:00 AM plus real-time websocket data
                     combined_data = symbol_data
                     
                     # Clean up old files for this symbol before saving new one
@@ -169,7 +169,7 @@ class ORBAlertSystem:
                     filepath = self.daily_data_dir / "market_data" / filename
                     
                     combined_data.to_csv(filepath, index=False)
-                    self.logger.debug(f"Saved {len(combined_data)} records (historical + real-time data from 9:30 AM) for {symbol} to {filename}")
+                    self.logger.debug(f"Saved {len(combined_data)} records (historical + real-time data from 9:00 AM) for {symbol} to {filename}")
             
             # Save metadata about the data save
             metadata = {
@@ -361,26 +361,28 @@ class ORBAlertSystem:
         market_open_hour, market_open_minute = map(int, config.market_open_time.split(':'))
         market_open_today_et = now_et.replace(hour=market_open_hour, minute=market_open_minute, second=0, microsecond=0)
         
-        # If market open time has already passed today, start immediately
+        # If data collection start time has already passed today, start immediately
         if now_et >= market_open_today_et:
-            self.logger.info(f"Market open time ({config.market_open_time} ET) has passed, starting data collection immediately")
+            self.logger.info(f"Data collection start time ({config.market_open_time} ET) has passed, starting data collection immediately")
             return
         
-        # Calculate wait time until market open
+        # Calculate wait time until data collection start
         wait_seconds = (market_open_today_et - now_et).total_seconds()
         wait_minutes = wait_seconds / 60
         
         self.logger.info(f"Current time: {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')}")
-        self.logger.info(f"Waiting {wait_minutes:.1f} minutes until market open ({config.market_open_time} ET)")
+        self.logger.info(f"Waiting {wait_minutes:.1f} minutes until data collection starts ({config.market_open_time} ET)")
         self.logger.info(f"Data collection will start at: {market_open_today_et.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+        self.logger.info(f"ORB period will be: {config.orb_start_time}-{config.alert_window_start} ET")
         
-        # Wait until market open
+        # Wait until data collection start time
         await asyncio.sleep(wait_seconds)
     
-    async def _fetch_historical_data_from_market_open(self) -> bool:
+    async def _fetch_historical_data_from_data_start(self) -> bool:
         """
-        Fetch historical data from market open (9:30 AM) to current time.
-        This ensures complete data coverage regardless of when the system starts.
+        Fetch historical data from data collection start time (9:00 AM) to current time.
+        This ensures EMA20 can be calculated by market open (9:30 AM) and complete data coverage 
+        regardless of when the system starts.
         
         Returns:
             True if data was successfully fetched, False otherwise
@@ -394,33 +396,33 @@ class ORBAlertSystem:
             et_tz = pytz.timezone('US/Eastern')
             now_et = datetime.now(et_tz)
             
-            # Parse market open time for today in Eastern Time
-            market_open_hour, market_open_minute = map(int, config.market_open_time.split(':'))
-            market_open_today_et = now_et.replace(hour=market_open_hour, minute=market_open_minute, second=0, microsecond=0)
+            # Parse data collection start time for today in Eastern Time
+            data_start_hour, data_start_minute = map(int, config.market_open_time.split(':'))
+            data_start_today_et = now_et.replace(hour=data_start_hour, minute=data_start_minute, second=0, microsecond=0)
             
-            # Check if we're before market open
-            if now_et < market_open_today_et:
-                self.logger.info("Before market open - no historical data fetch needed")
+            # Check if we're before data collection start time
+            if now_et < data_start_today_et:
+                self.logger.info("Before data collection start time - no historical data fetch needed")
                 return True
             
             # Calculate how much data we need to fetch
-            minutes_since_open = (now_et - market_open_today_et).total_seconds() / 60
+            minutes_since_data_start = (now_et - data_start_today_et).total_seconds() / 60
             
-            if minutes_since_open < 1:
-                self.logger.info("Started within 1 minute of market open - minimal historical data needed")
+            if minutes_since_data_start < 1:
+                self.logger.info("Started within 1 minute of data collection start - minimal historical data needed")
                 return True
             
             # Get symbols to fetch data for
             symbols = self.alert_engine.get_monitored_symbols()
             
-            # Fetch 1-minute bars from market open to current time
-            self.logger.info(f"Fetching historical data from {market_open_today_et.strftime('%H:%M')} to {now_et.strftime('%H:%M')} ET ({minutes_since_open:.1f} minutes)...")
-            print(f"📊 Fetching historical data from 9:30 AM to {now_et.strftime('%H:%M')} ET for {len(symbols)} symbols...")
+            # Fetch 1-minute bars from data collection start to current time
+            self.logger.info(f"Fetching historical data from {data_start_today_et.strftime('%H:%M')} to {now_et.strftime('%H:%M')} ET ({minutes_since_data_start:.1f} minutes)...")
+            print(f"📊 Fetching historical data from 9:00 AM to {now_et.strftime('%H:%M')} ET for {len(symbols)} symbols...")
             
             try:
                 if ALPACA_AVAILABLE == "legacy":
                     # Use legacy alpaca-trade-api
-                    bars_data = self._fetch_with_legacy_api(symbols, market_open_today_et, now_et)
+                    bars_data = self._fetch_with_legacy_api(symbols, data_start_today_et, now_et)
                 else:
                     # Use new alpaca API (currently disabled)
                     bars_data = None
@@ -464,11 +466,11 @@ class ORBAlertSystem:
                                 data_count += 1
                     
                     self.logger.info(f"Successfully fetched and loaded {data_count} historical data points")
-                    print(f"✅ Successfully loaded {data_count} historical data points from 9:30 AM")
+                    print(f"✅ Successfully loaded {data_count} historical data points from 9:00 AM")
                     
                     return True
                 else:
-                    self.logger.warning("No historical data received from market open")
+                    self.logger.warning("No historical data received from data collection start")
                     return False
                     
             except Exception as fetch_error:
@@ -476,7 +478,7 @@ class ORBAlertSystem:
                 return False
                 
         except Exception as e:
-            self.logger.error(f"Error fetching historical data from market open: {e}")
+            self.logger.error(f"Error fetching historical data from data collection start: {e}")
             import traceback
             self.logger.debug(traceback.format_exc())
             return False
@@ -591,8 +593,8 @@ class ORBAlertSystem:
             self.start_time = datetime.now(et_tz)
             self.logger.info(f"Starting data collection at: {self.start_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
             
-            # Fetch historical data from 9:30 AM to current time (ALWAYS)
-            await self._fetch_historical_data_from_market_open()
+            # Fetch historical data from 9:00 AM to current time (ALWAYS)
+            await self._fetch_historical_data_from_data_start()
             
             # Start alert engine
             symbols = self.alert_engine.get_monitored_symbols()
