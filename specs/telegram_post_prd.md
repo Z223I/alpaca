@@ -96,11 +96,11 @@ chat_id,username,enabled,created_date,notes
 def send_message(message: str, urgent: bool = False) -> dict:
     """
     Send message to all enabled users in CSV file.
-    
+
     Args:
         message (str): Message content to send
         urgent (bool): If True, ignore user notification preferences
-        
+
     Returns:
         dict: {
             'success': bool,
@@ -181,16 +181,16 @@ DEFAULT_CSV_CONTENT = """chat_id,username,enabled,created_date,notes
 class TestTelegramPost(unittest.TestCase):
     def test_send_message_success(self):
         """Test successful message sending to valid users."""
-        
+
     def test_send_message_with_failures(self):
         """Test handling of partial failures."""
-        
+
     def test_csv_file_creation(self):
         """Test automatic CSV creation when missing."""
-        
+
     def test_user_management(self):
         """Test add/disable/enable user functions."""
-        
+
     def test_invalid_credentials(self):
         """Test handling of invalid bot token."""
 ```
@@ -292,7 +292,7 @@ if submit and order_filled:
 
 ### 15.2 Documentation Complete
 - [ ] Code comments and docstrings
-- [ ] Usage examples in README
+- [ ] Usage examples in README_telegram
 - [ ] Configuration guide
 - [ ] Troubleshooting guide
 
