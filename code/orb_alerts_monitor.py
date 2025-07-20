@@ -33,6 +33,7 @@ from atoms.config.symbol_manager import SymbolManager
 from atoms.config.symbol_data_loader import SymbolDataLoader
 from atoms.alerts.super_alert_filter import SuperAlertFilter
 from atoms.alerts.super_alert_generator import SuperAlertGenerator
+from atoms.telegram.orb_alerts import send_orb_alert
 
 # Alpaca API imports for real-time price checking
 try:
@@ -136,6 +137,7 @@ class ORBAlertMonitor:
         self.logger.info(f"Monitoring alerts in: {self.alerts_dir}")
         self.logger.info(f"Super alerts will be saved to: {self.super_alerts_dir}")
         self.logger.info(f"Loaded {len(self.symbol_data)} symbols with Signal/Resistance data")
+        self.logger.info("📱 Telegram notifications enabled for super alerts")
     
     def _setup_logging(self) -> logging.Logger:
         """Setup logging configuration with Eastern Time."""
@@ -216,6 +218,19 @@ class ORBAlertMonitor:
                 filename = self.super_alert_generator.create_and_save_super_alert(alert_data, symbol_info)
                 if filename:
                     self.logger.info(f"Super alert created: {filename}")
+                    
+                    # Send Telegram notification immediately after file creation
+                    try:
+                        file_path = self.super_alerts_dir / filename
+                        result = send_orb_alert(str(file_path), urgent=True)
+                        
+                        if result['success']:
+                            self.logger.info(f"📤 Telegram alert sent: {result['sent_count']} users notified")
+                        else:
+                            self.logger.warning(f"❌ Telegram alert failed: {result.get('error', 'Unknown error')}")
+                            
+                    except Exception as e:
+                        self.logger.error(f"❌ Error sending Telegram alert: {e}")
             
         except Exception as e:
             self.logger.error(f"Error processing alert file {file_path}: {e}")
@@ -269,6 +284,7 @@ class ORBAlertMonitor:
             print(f"💾 Super alerts: {self.super_alerts_dir}")
             print(f"📊 Symbols loaded: {len(self.symbol_data)}")
             print("✅ Filtering: Only bullish alerts with candlestick low >= EMA9 will be allowed")
+            print("📱 Telegram: Instant notifications enabled for super alerts")
             if self.test_mode:
                 print("🧪 TEST MODE: Super alerts will be marked as [TEST MODE]")
             print("="*80 + "\n")
