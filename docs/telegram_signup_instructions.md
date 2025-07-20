@@ -1,5 +1,13 @@
 # 📈 Trading Alerts Signup Instructions
 
+## About the Alerts
+
+- Every alert will be at or above the Oracle signal;
+- There will not necessarily be an alert the first time the Oracle signal is reached;
+- Many factors go into an alert including volume;
+- Repeated in a short timeframe should be a good indicator that a stock is bullish (check to see if the price is rising); and
+- Always do your own research.
+
 ## How to Receive Trading Alerts
 
 To receive automated trading alerts and signals, follow these simple steps:
