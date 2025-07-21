@@ -77,6 +77,9 @@ The remaining tasks are lower priority documentation and deployment tools:
         python3 code/alpaca.py --buy --symbol AAPL --stop_loss 145.00 --calc_take_profit
         python3 code/alpaca.py --buy --symbol OPEN --stop_loss 4.75 --calc_take_profit --submit
 
+
+        
+
         python code/orb_alerts.py --test --verbose
         ```
 
