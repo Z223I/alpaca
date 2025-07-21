@@ -17,6 +17,7 @@ from atoms.api.get_cash import get_cash
 # from atoms.api.get_active_orders import get_active_orders
 from atoms.api.get_positions import get_positions
 from atoms.api.get_latest_quote import get_latest_quote
+from atoms.api.get_latest_quote_avg import get_latest_quote_avg
 from atoms.api.init_alpaca_client import init_alpaca_client
 from atoms.display.print_cash import print_cash
 from atoms.display.print_orders import print_active_orders
@@ -95,7 +96,7 @@ class alpaca_private:
 
         return quantity
 
-    def _buy(self, symbol: str, take_profit: float, submit_order: bool = False) -> Optional[Any]:
+    def _buy(self, symbol: str, take_profit: Optional[float] = None, stop_loss: Optional[float] = None, submit_order: bool = False) -> Optional[Any]:
         """
         Execute a buy order with bracket order protection.
 
@@ -105,15 +106,23 @@ class alpaca_private:
 
         Args:
             symbol: The stock symbol to buy
-            take_profit: The take profit price for the bracket order
+            take_profit: The take profit price for the bracket order (optional if calc_take_profit is used)
+            stop_loss: Custom stop loss price (optional, uses default percentage if not provided)
             submit_order: Whether to actually submit the order (default: False for dry run)
         """
-        # Get current market data for the symbol
-        latest_quote = get_latest_quote(self.api, symbol)
-        market_price = latest_quote.bid_price
+        # Get current market data for the symbol (using average of bid/ask)
+        market_price = get_latest_quote_avg(self.api, symbol)
 
-        # Calculate stop loss price
-        stop_price = round(market_price * (1 - self.STOP_LOSS_PERCENT), 2)
+        # Use custom stop loss or calculate default
+        if stop_loss is not None:
+            stop_price = stop_loss
+        else:
+            stop_price = round(market_price * (1 - self.STOP_LOSS_PERCENT), 2)
+
+        # Calculate take profit if using calc_take_profit
+        if take_profit is None:
+            # This means calc_take_profit is being used (validation ensures this)
+            take_profit = round(market_price + (market_price - stop_price) * 1.5, 2)
 
         # Calculate quantity using shared logic
         quantity = self._calculateQuantity(market_price, "_buy")
@@ -332,6 +341,7 @@ class alpaca_private:
             order_result = self._buy(
                 symbol=self.args.symbol, 
                 take_profit=self.args.take_profit, 
+                stop_loss=self.args.stop_loss,
                 submit_order=self.args.submit
             )
             if order_result is None and self.args.submit:

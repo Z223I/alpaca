@@ -8,6 +8,8 @@ The remaining tasks are lower priority documentation and deployment tools:
 - [ ] Think hard. Create a PRD, specs/telegram_post_prd.md, to ceate Telegram atom to post messages to Telegram API. The atom needs to accept a message as a string and post it to Telegram. Use dotenv to retrieve Telegram keys or whatever.  Have a separate CSV containing users to which to post; the file name is to start with ".", be in the root dir, and added to .gitignore.
 - [ ] Update code/orb_alerts.py to accept new symbols during the day.
 
+- [X] Update code/alpaca.py: for --buy, add optional --stop_loss and use it when provided; add optional --calc_take_profit.  If --calc_take_profit, calculate it as (latest_quote - stop loss) * 1.5.  --calc_take_profit is only valid when used with --stop_loss so print a warning if used without --stop_loss.  Print warning if --calc_take_profit is used with --take_profit.
+- [X] Review code/alpaca.py: What CLI args can be combined with --buy
 - [X] Update atoms/display/plot_candle_chart.py: Add a second Y axis; it is to be price / orb high.
 - [X] Update code/alpaca.py: The return values of orders placed are not being checked.  Process all order return values and handle gracefully.
 - [X] Git switch -c premarket_data
@@ -71,6 +73,9 @@ The remaining tasks are lower priority documentation and deployment tools:
         # quantity will be automatically calculated.
         python3 code/alpaca.py --future_bracket_order --symbol AAPL --limit_price 145.00 --stop_price 140.00 --take_profit 160.00 --submit
 
+        # Auto-calculate take profit based on risk/reward ratio
+        python3 code/alpaca.py --buy --symbol AAPL --stop_loss 145.00 --calc_take_profit
+        python3 code/alpaca.py --buy --symbol OPEN --stop_loss 4.75 --calc_take_profit --submit
 
         python code/orb_alerts.py --test --verbose
         ```
