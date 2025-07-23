@@ -7,7 +7,8 @@ The remaining tasks are lower priority documentation and deployment tools:
 
 - [X] Think hard. Create a PRD, specs/telegram_post_prd.md, to ceate Telegram atom to post messages to Telegram API. The atom needs to accept a message as a string and post it to Telegram. Use dotenv to retrieve Telegram keys or whatever.  Have a separate CSV containing users to which to post; the file name is to start with ".", be in the root dir, and added to .gitignore.
 
-
+- [ ] Create specs/webull.md.
+- [ ] Follow instructions in specs/webull.md to create a PRD specs/webull_prd.md. Think Hard.
 - [X] Update code/orb_alerts.py to accept new symbols during the day. Due to other updates, just restart the script.  Have Claude add to exiting table.
 - [X] Update code/alpaca.py: for --buy, add optional --amount; use amount to calculate number of shares; round shares to 0 decimal places.
 - [X] Update code/alpaca.py: for --buy, add optional --stop_loss and use it when provided; add optional --calc_take_profit.  If --calc_take_profit, calculate it as (latest_quote - stop loss) * 1.5.  --calc_take_profit is only valid when used with --stop_loss so print a warning if used without --stop_loss.  Print warning if --calc_take_profit is used with --take_profit.
