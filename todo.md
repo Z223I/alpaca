@@ -5,12 +5,16 @@ The remaining tasks are lower priority documentation and deployment tools:
   - Comprehensive API documentation
 
 
-- [ ] Think hard. Create a PRD, specs/telegram_post_prd.md, to ceate Telegram atom to post messages to Telegram API. The atom needs to accept a message as a string and post it to Telegram. Use dotenv to retrieve Telegram keys or whatever.  Have a separate CSV containing users to which to post; the file name is to start with ".", be in the root dir, and added to .gitignore.
-- [ ] Update code/orb_alerts.py to accept new symbols during the day.
+- [X] Think hard. Create a PRD, specs/telegram_post_prd.md, to ceate Telegram atom to post messages to Telegram API. The atom needs to accept a message as a string and post it to Telegram. Use dotenv to retrieve Telegram keys or whatever.  Have a separate CSV containing users to which to post; the file name is to start with ".", be in the root dir, and added to .gitignore.
 
+
+- [X] Update code/orb_alerts.py to accept new symbols during the day. Due to other updates, just restart the script.  Have Claude add to exiting table.
+- [X] Update code/alpaca.py: for --buy, add optional --amount; use amount to calculate number of shares; round shares to 0 decimal places.
+- [X] Update code/alpaca.py: for --buy, add optional --stop_loss and use it when provided; add optional --calc_take_profit.  If --calc_take_profit, calculate it as (latest_quote - stop loss) * 1.5.  --calc_take_profit is only valid when used with --stop_loss so print a warning if used without --stop_loss.  Print warning if --calc_take_profit is used with --take_profit.
 - [X] Update code/alpaca.py: for --buy, add optional --stop_loss and use it when provided; add optional --calc_take_profit.  If --calc_take_profit, calculate it as (latest_quote - stop loss) * 1.5.  --calc_take_profit is only valid when used with --stop_loss so print a warning if used without --stop_loss.  Print warning if --calc_take_profit is used with --take_profit.
 - [X] Review code/alpaca.py: What CLI args can be combined with --buy
 - [X] Update atoms/display/plot_candle_chart.py: Add a second Y axis; it is to be price / orb high.
+
 - [X] Update code/alpaca.py: The return values of orders placed are not being checked.  Process all order return values and handle gracefully.
 - [X] Git switch -c premarket_data
 - [X] Update code/orb_alerts.py to collect data starting at 9:00 so EMA20 can be calculated at market open.  ORB is still 9:30 to 9:45.
@@ -77,8 +81,10 @@ The remaining tasks are lower priority documentation and deployment tools:
         python3 code/alpaca.py --buy --symbol AAPL --stop_loss 145.00 --calc_take_profit
         python3 code/alpaca.py --buy --symbol OPEN --stop_loss 4.75 --calc_take_profit --submit
 
+        # Buy $1000 worth with custom stop-loss and auto take-profit
+        python3 code/alpaca.py --buy --symbol AAPL --amount 1000.00 --stop_loss 145.00 --calc_take_profit --submit
 
-        
+
 
         python code/orb_alerts.py --test --verbose
         ```

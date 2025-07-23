@@ -223,19 +223,39 @@ class AlertsSummaryGenerator:
         bullish_alerts = self._load_alert_files("bullish")
         bearish_alerts = self._load_alert_files("bearish")
         
-        # Check for super alerts
-        super_alerts = []
-        super_alerts_dir = self.target_dir / "super_alerts" / "bullish"
-        if super_alerts_dir.exists():
-            for json_file in super_alerts_dir.glob("*.json"):
+        # Check for super alerts (bullish and bearish)
+        bullish_super_alerts = []
+        bearish_super_alerts = []
+        
+        # Load bullish super alerts
+        bullish_super_dir = self.target_dir / "super_alerts" / "bullish"
+        if bullish_super_dir.exists():
+            for json_file in bullish_super_dir.glob("*.json"):
                 try:
                     with open(json_file, 'r') as f:
                         super_alert = json.load(f)
                         super_alert['_source_file'] = json_file.name
-                        super_alerts.append(super_alert)
+                        super_alert['alert_direction'] = 'bullish'
+                        bullish_super_alerts.append(super_alert)
                 except Exception as e:
                     if self.verbose:
-                        print(f"Error loading super alert {json_file}: {e}")
+                        print(f"Error loading bullish super alert {json_file}: {e}")
+        
+        # Load bearish super alerts (for future support)
+        bearish_super_dir = self.target_dir / "super_alerts" / "bearish"
+        if bearish_super_dir.exists():
+            for json_file in bearish_super_dir.glob("*.json"):
+                try:
+                    with open(json_file, 'r') as f:
+                        super_alert = json.load(f)
+                        super_alert['_source_file'] = json_file.name
+                        super_alert['alert_direction'] = 'bearish'
+                        bearish_super_alerts.append(super_alert)
+                except Exception as e:
+                    if self.verbose:
+                        print(f"Error loading bearish super alert {json_file}: {e}")
+        
+        super_alerts = bullish_super_alerts + bearish_super_alerts
         
         # Generate statistics
         all_alerts = bullish_alerts + bearish_alerts
@@ -262,7 +282,11 @@ class AlertsSummaryGenerator:
             },
             'super_alerts': {
                 'total_count': len(super_alerts),
-                'alerts': super_alerts
+                'bullish_count': len(bullish_super_alerts),
+                'bearish_count': len(bearish_super_alerts),
+                'alerts': super_alerts,
+                'bullish_alerts': bullish_super_alerts,
+                'bearish_alerts': bearish_super_alerts
             },
             'overall_statistics': {
                 'most_active_symbols': self._get_most_active_symbols(all_alerts),
@@ -310,11 +334,14 @@ class AlertsSummaryGenerator:
         # Save to CSV format
         self._save_summary_csv(summary, csv_filepath)
         
-        # Generate pie charts and bar chart
-        chart_files = self._generate_pie_charts(summary, summary_dir, date_str)
-        bar_chart = self._generate_bar_chart(summary, summary_dir, date_str)
-        if bar_chart:
-            chart_files.append(bar_chart)
+        # Generate regular alerts charts
+        regular_chart_files = self._generate_regular_alerts_charts(summary, summary_dir, date_str)
+        
+        # Generate super alerts charts
+        super_chart_files = self._generate_super_alerts_charts(summary, summary_dir, date_str)
+        
+        # Combine all chart files
+        chart_files = regular_chart_files + super_chart_files
         
         print(f"💾 JSON summary saved to: {json_filepath}")
         print(f"📊 CSV summary saved to: {csv_filepath}")
@@ -424,8 +451,8 @@ class AlertsSummaryGenerator:
             'range_percent': signal_analysis.get('range_percent', '')
         }
     
-    def _generate_pie_charts(self, summary: Dict, summary_dir: Path, date_str: str) -> List[str]:
-        """Generate pie charts for bullish and bearish alerts by symbol count."""
+    def _generate_regular_alerts_charts(self, summary: Dict, summary_dir: Path, date_str: str) -> List[str]:
+        """Generate pie charts and bar chart for regular alerts by symbol count."""
         chart_files = []
         
         # Set matplotlib style for better looking charts
@@ -435,7 +462,7 @@ class AlertsSummaryGenerator:
         bullish_chart = self._create_alert_pie_chart(
             summary['bullish_analysis']['symbol_statistics'],
             'Bullish Alerts by Symbol',
-            'bullish',
+            'bullish_alerts',
             summary_dir,
             date_str
         )
@@ -446,14 +473,164 @@ class AlertsSummaryGenerator:
         bearish_chart = self._create_alert_pie_chart(
             summary['bearish_analysis']['symbol_statistics'],
             'Bearish Alerts by Symbol',
-            'bearish',
+            'bearish_alerts',
             summary_dir,
             date_str
         )
         if bearish_chart:
             chart_files.append(bearish_chart)
         
+        # Generate bar chart for regular alerts
+        bar_chart = self._generate_bar_chart(summary, summary_dir, date_str)
+        if bar_chart:
+            chart_files.append(bar_chart)
+        
         return chart_files
+    
+    def _generate_super_alerts_charts(self, summary: Dict, summary_dir: Path, date_str: str) -> List[str]:
+        """Generate pie charts for super alerts by symbol count."""
+        chart_files = []
+        
+        # Set matplotlib style for better looking charts
+        plt.style.use('default')
+        
+        # Calculate super alert symbol statistics
+        bullish_super_stats = self._calculate_super_alert_symbol_statistics(
+            summary['super_alerts']['bullish_alerts']
+        )
+        bearish_super_stats = self._calculate_super_alert_symbol_statistics(
+            summary['super_alerts']['bearish_alerts']
+        )
+        
+        # Generate bullish super alerts pie chart
+        if bullish_super_stats:
+            bullish_super_chart = self._create_alert_pie_chart(
+                bullish_super_stats,
+                'Bullish Super Alerts by Symbol',
+                'bullish_super_alerts',
+                summary_dir,
+                date_str
+            )
+            if bullish_super_chart:
+                chart_files.append(bullish_super_chart)
+        
+        # Generate bearish super alerts pie chart (for future support)
+        if bearish_super_stats:
+            bearish_super_chart = self._create_alert_pie_chart(
+                bearish_super_stats,
+                'Bearish Super Alerts by Symbol',
+                'bearish_super_alerts',
+                summary_dir,
+                date_str
+            )
+            if bearish_super_chart:
+                chart_files.append(bearish_super_chart)
+        
+        # Generate combined super alerts bar chart
+        super_bar_chart = self._generate_super_alerts_bar_chart(summary, summary_dir, date_str)
+        if super_bar_chart:
+            chart_files.append(super_bar_chart)
+        
+        return chart_files
+    
+    def _calculate_super_alert_symbol_statistics(self, super_alerts: List[Dict]) -> Dict:
+        """Calculate symbol statistics for super alerts."""
+        symbol_stats = defaultdict(lambda: {
+            'total_alerts': 0,
+            'alerts': []
+        })
+        
+        for alert in super_alerts:
+            symbol = alert.get('symbol', 'UNKNOWN')
+            stats = symbol_stats[symbol]
+            stats['total_alerts'] += 1
+            stats['alerts'].append(alert)
+        
+        return dict(symbol_stats)
+    
+    def _generate_super_alerts_bar_chart(self, summary: Dict, summary_dir: Path, date_str: str) -> Optional[str]:
+        """Generate a bar chart showing bullish (positive) and bearish (negative) super alerts by symbol."""
+        bullish_stats = self._calculate_super_alert_symbol_statistics(
+            summary['super_alerts']['bullish_alerts']
+        )
+        bearish_stats = self._calculate_super_alert_symbol_statistics(
+            summary['super_alerts']['bearish_alerts']
+        )
+        
+        # Combine all symbols from both bullish and bearish super alerts
+        all_symbols = set()
+        if bullish_stats:
+            all_symbols.update(bullish_stats.keys())
+        if bearish_stats:
+            all_symbols.update(bearish_stats.keys())
+        
+        if not all_symbols:
+            if self.verbose:
+                print("No symbols found for super alerts bar chart")
+            return None
+        
+        # Sort symbols alphabetically (ascending)
+        sorted_symbols = sorted(all_symbols)
+        
+        # Prepare data for bar chart
+        bullish_counts = []
+        bearish_counts = []
+        
+        for symbol in sorted_symbols:
+            # Get bullish count (positive)
+            bullish_count = bullish_stats.get(symbol, {}).get('total_alerts', 0)
+            bullish_counts.append(bullish_count)
+            
+            # Get bearish count (negative for chart display)
+            bearish_count = bearish_stats.get(symbol, {}).get('total_alerts', 0)
+            bearish_counts.append(-bearish_count)  # Negative for bearish
+        
+        # Create figure and axis
+        fig, ax = plt.subplots(figsize=(12, 8))
+        
+        # Create bar chart
+        x_pos = range(len(sorted_symbols))
+        
+        # Plot bullish bars (positive, green)
+        bullish_bars = ax.bar(x_pos, bullish_counts, color='green', alpha=0.7, label='Bullish Super Alerts')
+        
+        # Plot bearish bars (negative, red)
+        bearish_bars = ax.bar(x_pos, bearish_counts, color='red', alpha=0.7, label='Bearish Super Alerts')
+        
+        # Customize the chart
+        ax.set_xlabel('Symbols', fontsize=12, fontweight='bold')
+        ax.set_ylabel('Number of Super Alerts', fontsize=12, fontweight='bold')
+        ax.set_title(f'Super Alert Distribution by Symbol\n{self.target_date}', fontsize=14, fontweight='bold', pad=20)
+        ax.set_xticks(x_pos)
+        ax.set_xticklabels(sorted_symbols, rotation=45, ha='right')
+        
+        # Add horizontal line at y=0
+        ax.axhline(y=0, color='black', linestyle='-', linewidth=0.8)
+        
+        # Add legend
+        ax.legend(loc='upper right')
+        
+        # Add grid for better readability
+        ax.grid(True, alpha=0.3, axis='y')
+        
+        # Add value labels on bars
+        for i, (bull_count, bear_count) in enumerate(zip(bullish_counts, bearish_counts)):
+            if bull_count > 0:
+                ax.text(i, bull_count + 0.5, str(bull_count), ha='center', va='bottom', fontweight='bold', fontsize=9)
+            if bear_count < 0:
+                ax.text(i, bear_count - 0.5, str(-bear_count), ha='center', va='top', fontweight='bold', fontsize=9)
+        
+        # Adjust layout to prevent label cutoff
+        plt.tight_layout()
+        
+        # Save chart
+        chart_filename = f"bar_chart_super_alerts_{date_str}.png"
+        chart_filepath = summary_dir / chart_filename
+        
+        plt.savefig(chart_filepath, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        return str(chart_filepath)
     
     def _create_alert_pie_chart(self, symbol_stats: Dict, title: str, alert_type: str, 
                                summary_dir: Path, date_str: str) -> Optional[str]:

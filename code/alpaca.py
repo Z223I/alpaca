@@ -96,7 +96,7 @@ class alpaca_private:
 
         return quantity
 
-    def _buy(self, symbol: str, take_profit: Optional[float] = None, stop_loss: Optional[float] = None, submit_order: bool = False) -> Optional[Any]:
+    def _buy(self, symbol: str, take_profit: Optional[float] = None, stop_loss: Optional[float] = None, amount: Optional[float] = None, submit_order: bool = False) -> Optional[Any]:
         """
         Execute a buy order with bracket order protection.
 
@@ -108,6 +108,7 @@ class alpaca_private:
             symbol: The stock symbol to buy
             take_profit: The take profit price for the bracket order (optional if calc_take_profit is used)
             stop_loss: Custom stop loss price (optional, uses default percentage if not provided)
+            amount: Dollar amount to invest (optional, uses portfolio risk if not provided)
             submit_order: Whether to actually submit the order (default: False for dry run)
         """
         # Get current market data for the symbol (using average of bid/ask)
@@ -124,8 +125,13 @@ class alpaca_private:
             # This means calc_take_profit is being used (validation ensures this)
             take_profit = round(market_price + (market_price - stop_price) * 1.5, 2)
 
-        # Calculate quantity using shared logic
-        quantity = self._calculateQuantity(market_price, "_buy")
+        # Calculate quantity based on amount or use portfolio risk logic
+        if amount is not None:
+            # Use specified dollar amount to calculate shares
+            quantity = round(amount / market_price)
+        else:
+            # Use existing portfolio risk calculation
+            quantity = self._calculateQuantity(market_price, "_buy")
 
         # Display the order details that would be submitted
         print(f"submit_order(\n"
@@ -342,6 +348,7 @@ class alpaca_private:
                 symbol=self.args.symbol, 
                 take_profit=self.args.take_profit, 
                 stop_loss=self.args.stop_loss,
+                amount=self.args.amount,
                 submit_order=self.args.submit
             )
             if order_result is None and self.args.submit:

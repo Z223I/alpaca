@@ -42,6 +42,8 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
                       help='Custom stop loss price for buy orders')
     parser.add_argument('--calc_take_profit', action='store_true',
                       help='Calculate take profit as (latest_quote - stop_loss) * 1.5')
+    parser.add_argument('--amount', type=float, required=False,
+                      help='Dollar amount to invest (will calculate quantity automatically)')
 
     args = parser.parse_args(userArgs)
 
