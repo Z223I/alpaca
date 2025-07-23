@@ -177,6 +177,76 @@ class alpaca_private:
                 print(f"  Symbol: {symbol}, Quantity: {quantity}")
                 return None
 
+    def _buy_after_hours(self, symbol: str, amount: Optional[float] = None, limit_price: Optional[float] = None, submit_order: bool = False) -> Optional[Any]:
+        """
+        Execute a buy order for after-hours trading (extended hours).
+
+        After-hours trading has restrictions:
+        - Only limit orders are allowed (no market orders)
+        - Bracket orders are not supported
+        - Must use time_in_force='ext' for extended hours
+
+        Args:
+            symbol: The stock symbol to buy
+            amount: Dollar amount to invest (optional, uses portfolio risk if not provided)
+            limit_price: Custom limit price (optional, calculates slightly above market if not provided)
+            submit_order: Whether to actually submit the order (default: False for dry run)
+        """
+        # Get current market data for the symbol (using average of bid/ask)
+        market_price = get_latest_quote_avg(self.api, symbol)
+
+        # Calculate limit price if not provided (slightly above market for better fill probability)
+        if limit_price is None:
+            limit_price = round(market_price * 1.002, 2)  # 0.2% above market price
+
+        # Calculate quantity based on amount or use portfolio risk logic
+        if amount is not None:
+            # Use specified dollar amount to calculate shares
+            quantity = round(amount / limit_price)
+        else:
+            # Use existing portfolio risk calculation
+            quantity = self._calculateQuantity(limit_price, "_buy_after_hours")
+
+        # Display the order details that would be submitted
+        print(f"submit_order(\n"
+                f"    symbol={symbol},\n"
+                f"    qty={quantity},\n"
+                f"    side='buy',\n"
+                f"    type='limit',\n"
+                f"    limit_price={limit_price},\n"
+                f"    time_in_force='ext'\n"
+                f")")
+        print(f"  NOTE: After-hours order - no bracket/stop-loss protection available")
+        
+        if not submit_order:
+            print("[DRY RUN] After-hours order not submitted (use --submit to execute)")
+            return None
+
+        # Submit the actual order if requested
+        if submit_order:
+            try:
+                order_response = self.api.submit_order(
+                    symbol=symbol,
+                    qty=quantity,
+                    side='buy',
+                    type='limit',  # Only limit orders allowed after-hours
+                    limit_price=limit_price,
+                    time_in_force='ext'  # Extended hours trading
+                )
+                print(f"✓ After-hours order submitted successfully: {order_response.id}")
+                print(f"  Status: {order_response.status}")
+                print(f"  Symbol: {order_response.symbol}")
+                print(f"  Quantity: {order_response.qty}")
+                print(f"  Limit Price: ${limit_price:.2f}")
+                print(f"  Market Price: ~${market_price:.2f}")
+                print(f"  ⚠️  No automatic stop-loss protection - monitor manually")
+                return order_response
+            except Exception as e:
+                print(f"✗ After-hours order submission failed: {str(e)}")
+                print(f"  Symbol: {symbol}, Quantity: {quantity}, Limit Price: {limit_price}")
+                print(f"  Note: Extended hours trading may not be enabled on your account")
+                return None
+
     def _sell_short(self, symbol: str, take_profit: Optional[float] = None, stop_loss: Optional[float] = None, amount: Optional[float] = None, submit_order: bool = False) -> Optional[Any]:
         """
         Execute a short sell order with bracket order protection for bearish predictions.
@@ -261,6 +331,306 @@ class alpaca_private:
                 print(f"✗ Short order submission failed: {str(e)}")
                 print(f"  Symbol: {symbol}, Quantity: {quantity}")
                 return None
+
+    def _sell_short_after_hours(self, symbol: str, amount: Optional[float] = None, limit_price: Optional[float] = None, submit_order: bool = False) -> Optional[Any]:
+        """
+        Execute a short sell order for after-hours trading (extended hours).
+
+        After-hours trading has restrictions:
+        - Only limit orders are allowed (no market orders)
+        - Bracket orders are not supported
+        - Must use time_in_force='ext' for extended hours
+
+        Args:
+            symbol: The stock symbol to short sell
+            amount: Dollar amount to invest (optional, uses portfolio risk if not provided)
+            limit_price: Custom limit price (optional, calculates slightly below market if not provided)
+            submit_order: Whether to actually submit the order (default: False for dry run)
+        """
+        # Get current market data for the symbol (using average of bid/ask)
+        market_price = get_latest_quote_avg(self.api, symbol)
+
+        # Calculate limit price if not provided (slightly below market for better fill probability)
+        if limit_price is None:
+            limit_price = round(market_price * 0.998, 2)  # 0.2% below market price
+
+        # Calculate quantity based on amount or use portfolio risk logic
+        if amount is not None:
+            # Use specified dollar amount to calculate shares
+            quantity = round(amount / limit_price)
+        else:
+            # Use existing portfolio risk calculation
+            quantity = self._calculateQuantity(limit_price, "_sell_short_after_hours")
+
+        # Display the order details that would be submitted
+        print(f"submit_order(\n"
+                f"    symbol={symbol},\n"
+                f"    qty={quantity},\n"
+                f"    side='sell',\n"
+                f"    type='limit',\n"
+                f"    limit_price={limit_price},\n"
+                f"    time_in_force='ext'\n"
+                f")")
+        print(f"  NOTE: After-hours short order - no bracket/stop-loss protection available")
+        
+        if not submit_order:
+            print("[DRY RUN] After-hours short order not submitted (use --submit to execute)")
+            return None
+
+        # Submit the actual order if requested
+        if submit_order:
+            try:
+                order_response = self.api.submit_order(
+                    symbol=symbol,
+                    qty=quantity,
+                    side='sell',  # Short sell
+                    type='limit',  # Only limit orders allowed after-hours
+                    limit_price=limit_price,
+                    time_in_force='ext'  # Extended hours trading
+                )
+                print(f"✓ After-hours short order submitted successfully: {order_response.id}")
+                print(f"  Status: {order_response.status}")
+                print(f"  Symbol: {order_response.symbol}")
+                print(f"  Quantity: -{order_response.qty}")  # Negative to indicate short
+                print(f"  Limit Price: ${limit_price:.2f}")
+                print(f"  Market Price: ~${market_price:.2f}")
+                print(f"  ⚠️  No automatic stop-loss protection - monitor manually")
+                return order_response
+            except Exception as e:
+                print(f"✗ After-hours short order submission failed: {str(e)}")
+                print(f"  Symbol: {symbol}, Quantity: {quantity}, Limit Price: {limit_price}")
+                print(f"  Note: Extended hours trading may not be enabled on your account")
+                return None
+
+    def _submit_after_hours_stop_loss(self, symbol: str, quantity: int, stop_price: float, side: str) -> Optional[Any]:
+        """
+        Submit a stop-loss order for after-hours trading.
+        
+        Args:
+            symbol: Stock symbol
+            quantity: Number of shares
+            stop_price: Stop loss trigger price
+            side: 'buy' for covering shorts, 'sell' for closing longs
+        """
+        try:
+            stop_order = self.api.submit_order(
+                symbol=symbol,
+                qty=quantity,
+                side=side,
+                type='stop',
+                stop_price=stop_price,
+                time_in_force='ext'
+            )
+            print(f"  ✓ Stop-loss order submitted: {stop_order.id}")
+            print(f"    Stop Price: ${stop_price:.2f}")
+            return stop_order
+        except Exception as e:
+            print(f"  ✗ Stop-loss order failed: {str(e)}")
+            return None
+
+    def _submit_after_hours_take_profit(self, symbol: str, quantity: int, limit_price: float, side: str) -> Optional[Any]:
+        """
+        Submit a take-profit order for after-hours trading.
+        
+        Args:
+            symbol: Stock symbol
+            quantity: Number of shares
+            limit_price: Take profit limit price
+            side: 'sell' for closing longs, 'buy' for covering shorts
+        """
+        try:
+            profit_order = self.api.submit_order(
+                symbol=symbol,
+                qty=quantity,
+                side=side,
+                type='limit',
+                limit_price=limit_price,
+                time_in_force='ext'
+            )
+            print(f"  ✓ Take-profit order submitted: {profit_order.id}")
+            print(f"    Limit Price: ${limit_price:.2f}")
+            return profit_order
+        except Exception as e:
+            print(f"  ✗ Take-profit order failed: {str(e)}")
+            return None
+
+    def _buy_after_hours_protected(self, symbol: str, take_profit: Optional[float] = None, stop_loss: Optional[float] = None, amount: Optional[float] = None, limit_price: Optional[float] = None, submit_order: bool = False) -> Optional[Dict]:
+        """
+        Execute a protected buy order for after-hours trading with separate stop-loss and take-profit orders.
+
+        Since bracket orders aren't allowed after-hours, this method:
+        1. Submits the main buy order
+        2. If filled, submits separate stop-loss and take-profit orders
+
+        Args:
+            symbol: The stock symbol to buy
+            take_profit: The take profit price (optional if calc_take_profit is used)
+            stop_loss: Custom stop loss price (optional, uses default percentage if not provided)
+            amount: Dollar amount to invest (optional, uses portfolio risk if not provided)
+            limit_price: Custom limit price (optional, calculates slightly above market if not provided)
+            submit_order: Whether to actually submit the order (default: False for dry run)
+        """
+        # Get current market data for the symbol (using average of bid/ask)
+        market_price = get_latest_quote_avg(self.api, symbol)
+
+        # Calculate limit price if not provided (slightly above market for better fill probability)
+        if limit_price is None:
+            limit_price = round(market_price * 1.002, 2)  # 0.2% above market price
+
+        # Use custom stop loss or calculate default (BELOW entry price for longs)
+        if stop_loss is not None:
+            stop_price = stop_loss
+        else:
+            stop_price = round(limit_price * (1 - self.STOP_LOSS_PERCENT), 2)
+
+        # Calculate take profit if using calc_take_profit (ABOVE entry price for longs)
+        if take_profit is None:
+            # This means calc_take_profit is being used (validation ensures this)
+            take_profit = round(limit_price + (limit_price - stop_price) * 1.5, 2)
+
+        # Calculate quantity based on amount or use portfolio risk logic
+        if amount is not None:
+            # Use specified dollar amount to calculate shares
+            quantity = round(amount / limit_price)
+        else:
+            # Use existing portfolio risk calculation
+            quantity = self._calculateQuantity(limit_price, "_buy_after_hours_protected")
+
+        # Display the order details that would be submitted
+        print(f"submit_order(\n"
+                f"    symbol={symbol},\n"
+                f"    qty={quantity},\n"
+                f"    side='buy',\n"
+                f"    type='limit',\n"
+                f"    limit_price={limit_price},\n"
+                f"    time_in_force='ext'\n"
+                f")")
+        print(f"  Protected after-hours order with stop-loss: ${stop_price:.2f}, take-profit: ${take_profit:.2f}")
+        
+        if not submit_order:
+            print("[DRY RUN] Protected after-hours order not submitted (use --submit to execute)")
+            return None
+
+        # Submit the main buy order
+        try:
+            main_order = self.api.submit_order(
+                symbol=symbol,
+                qty=quantity,
+                side='buy',
+                type='limit',
+                limit_price=limit_price,
+                time_in_force='ext'
+            )
+            print(f"✓ Main buy order submitted: {main_order.id}")
+            print(f"  Status: {main_order.status}")
+            print(f"  Limit Price: ${limit_price:.2f}")
+            
+            # Submit protection orders
+            stop_order = self._submit_after_hours_stop_loss(symbol, quantity, stop_price, 'sell')
+            profit_order = self._submit_after_hours_take_profit(symbol, quantity, take_profit, 'sell')
+            
+            return {
+                'main_order': main_order,
+                'stop_loss_order': stop_order,
+                'take_profit_order': profit_order,
+                'entry_price': limit_price,
+                'stop_price': stop_price,
+                'take_profit_price': take_profit
+            }
+            
+        except Exception as e:
+            print(f"✗ Protected after-hours buy order failed: {str(e)}")
+            print(f"  Symbol: {symbol}, Quantity: {quantity}, Limit Price: {limit_price}")
+            return None
+
+    def _sell_short_after_hours_protected(self, symbol: str, take_profit: Optional[float] = None, stop_loss: Optional[float] = None, amount: Optional[float] = None, limit_price: Optional[float] = None, submit_order: bool = False) -> Optional[Dict]:
+        """
+        Execute a protected short sell order for after-hours trading with separate stop-loss and take-profit orders.
+
+        Since bracket orders aren't allowed after-hours, this method:
+        1. Submits the main short sell order
+        2. If filled, submits separate stop-loss and take-profit orders
+
+        Args:
+            symbol: The stock symbol to short sell
+            take_profit: The take profit price (optional if calc_take_profit is used)
+            stop_loss: Custom stop loss price (optional, uses default percentage if not provided)
+            amount: Dollar amount to invest (optional, uses portfolio risk if not provided)
+            limit_price: Custom limit price (optional, calculates slightly below market if not provided)
+            submit_order: Whether to actually submit the order (default: False for dry run)
+        """
+        # Get current market data for the symbol (using average of bid/ask)
+        market_price = get_latest_quote_avg(self.api, symbol)
+
+        # Calculate limit price if not provided (slightly below market for better fill probability)
+        if limit_price is None:
+            limit_price = round(market_price * 0.998, 2)  # 0.2% below market price
+
+        # Use custom stop loss or calculate default (ABOVE entry price for shorts)
+        if stop_loss is not None:
+            stop_price = stop_loss
+        else:
+            stop_price = round(limit_price * (1 + self.STOP_LOSS_PERCENT), 2)
+
+        # Calculate take profit if using calc_take_profit (BELOW entry price for shorts)
+        if take_profit is None:
+            # This means calc_take_profit is being used (validation ensures this)
+            take_profit = round(limit_price - (stop_price - limit_price) * 1.5, 2)
+
+        # Calculate quantity based on amount or use portfolio risk logic
+        if amount is not None:
+            # Use specified dollar amount to calculate shares
+            quantity = round(amount / limit_price)
+        else:
+            # Use existing portfolio risk calculation
+            quantity = self._calculateQuantity(limit_price, "_sell_short_after_hours_protected")
+
+        # Display the order details that would be submitted
+        print(f"submit_order(\n"
+                f"    symbol={symbol},\n"
+                f"    qty={quantity},\n"
+                f"    side='sell',\n"
+                f"    type='limit',\n"
+                f"    limit_price={limit_price},\n"
+                f"    time_in_force='ext'\n"
+                f")")
+        print(f"  Protected after-hours short with stop-loss: ${stop_price:.2f}, take-profit: ${take_profit:.2f}")
+        
+        if not submit_order:
+            print("[DRY RUN] Protected after-hours short order not submitted (use --submit to execute)")
+            return None
+
+        # Submit the main short sell order
+        try:
+            main_order = self.api.submit_order(
+                symbol=symbol,
+                qty=quantity,
+                side='sell',
+                type='limit',
+                limit_price=limit_price,
+                time_in_force='ext'
+            )
+            print(f"✓ Main short order submitted: {main_order.id}")
+            print(f"  Status: {main_order.status}")
+            print(f"  Limit Price: ${limit_price:.2f}")
+            
+            # Submit protection orders (note: sides are reversed for short positions)
+            stop_order = self._submit_after_hours_stop_loss(symbol, quantity, stop_price, 'buy')  # Buy to cover
+            profit_order = self._submit_after_hours_take_profit(symbol, quantity, take_profit, 'buy')  # Buy to cover
+            
+            return {
+                'main_order': main_order,
+                'stop_loss_order': stop_order,
+                'take_profit_order': profit_order,
+                'entry_price': limit_price,
+                'stop_price': stop_price,
+                'take_profit_price': take_profit
+            }
+            
+        except Exception as e:
+            print(f"✗ Protected after-hours short order failed: {str(e)}")
+            print(f"  Symbol: {symbol}, Quantity: {quantity}, Limit Price: {limit_price}")
+            return None
 
 
     def _bracketOrder(self, symbol: str, quantity: int, market_price: float, take_profit: float, submit_order: bool = False) -> Optional[Any]:
@@ -429,29 +799,79 @@ class alpaca_private:
 
         # Handle buy order if requested
         if self.args.buy:
-            order_result = self._buy(
-                symbol=self.args.symbol, 
-                take_profit=self.args.take_profit, 
-                stop_loss=self.args.stop_loss,
-                amount=self.args.amount,
-                submit_order=self.args.submit
-            )
-            if order_result is None and self.args.submit:
-                print("Failed to submit buy order")
-                return 1
+            if self.args.after_hours:
+                # Check if protection is requested
+                if self.args.stop_loss or self.args.take_profit or self.args.calc_take_profit:
+                    # Use protected after-hours method
+                    order_result = self._buy_after_hours_protected(
+                        symbol=self.args.symbol,
+                        take_profit=self.args.take_profit,
+                        stop_loss=self.args.stop_loss,
+                        amount=self.args.amount,
+                        limit_price=self.args.limit_price,
+                        submit_order=self.args.submit
+                    )
+                else:
+                    # Use simple after-hours method
+                    order_result = self._buy_after_hours(
+                        symbol=self.args.symbol,
+                        amount=self.args.amount,
+                        limit_price=self.args.limit_price,
+                        submit_order=self.args.submit
+                    )
+                if order_result is None and self.args.submit:
+                    print("Failed to submit after-hours buy order")
+                    return 1
+            else:
+                # Use regular buy method with bracket order protection
+                order_result = self._buy(
+                    symbol=self.args.symbol, 
+                    take_profit=self.args.take_profit, 
+                    stop_loss=self.args.stop_loss,
+                    amount=self.args.amount,
+                    submit_order=self.args.submit
+                )
+                if order_result is None and self.args.submit:
+                    print("Failed to submit buy order")
+                    return 1
 
         # Handle sell-short order if requested
         if self.args.sell_short:
-            order_result = self._sell_short(
-                symbol=self.args.symbol, 
-                take_profit=self.args.take_profit, 
-                stop_loss=self.args.stop_loss,
-                amount=self.args.amount,
-                submit_order=self.args.submit
-            )
-            if order_result is None and self.args.submit:
-                print("Failed to submit short order")
-                return 1
+            if self.args.after_hours:
+                # Check if protection is requested
+                if self.args.stop_loss or self.args.take_profit or self.args.calc_take_profit:
+                    # Use protected after-hours method
+                    order_result = self._sell_short_after_hours_protected(
+                        symbol=self.args.symbol,
+                        take_profit=self.args.take_profit,
+                        stop_loss=self.args.stop_loss,
+                        amount=self.args.amount,
+                        limit_price=self.args.limit_price,
+                        submit_order=self.args.submit
+                    )
+                else:
+                    # Use simple after-hours method
+                    order_result = self._sell_short_after_hours(
+                        symbol=self.args.symbol,
+                        amount=self.args.amount,
+                        limit_price=self.args.limit_price,
+                        submit_order=self.args.submit
+                    )
+                if order_result is None and self.args.submit:
+                    print("Failed to submit after-hours short order")
+                    return 1
+            else:
+                # Use regular short method with bracket order protection
+                order_result = self._sell_short(
+                    symbol=self.args.symbol, 
+                    take_profit=self.args.take_profit, 
+                    stop_loss=self.args.stop_loss,
+                    amount=self.args.amount,
+                    submit_order=self.args.submit
+                )
+                if order_result is None and self.args.submit:
+                    print("Failed to submit short order")
+                    return 1
 
         return 0
 

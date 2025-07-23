@@ -40,6 +40,10 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
                       help='Execute a buy order for the specified symbol')
     parser.add_argument('--sell_short', action='store_true',
                       help='Execute a short sell order for bearish predictions')
+    parser.add_argument('--after_hours', action='store_true',
+                      help='Execute order for after-hours/extended hours trading (limit orders only)')
+    parser.add_argument('--limit_price', type=float, required=False,
+                      help='Custom limit price for after-hours orders')
     parser.add_argument('--stop_loss', type=float, required=False,
                       help='Custom stop loss price for buy/short orders')
     parser.add_argument('--calc_take_profit', action='store_true',
@@ -98,5 +102,12 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
     # Ensure buy and sell_short are mutually exclusive
     if args.buy and args.sell_short:
         parser.error("--buy and --sell_short cannot be used together")
+    
+    # Validate after_hours arguments
+    if args.after_hours:
+        if not (args.buy or args.sell_short):
+            parser.error("--after_hours requires either --buy or --sell_short")
+        if not args.symbol:
+            parser.error("--after_hours requires --symbol")
 
     return args
