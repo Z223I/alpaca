@@ -38,8 +38,10 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
                       help='Get latest quote for a symbol')
     parser.add_argument('--buy', action='store_true',
                       help='Execute a buy order for the specified symbol')
+    parser.add_argument('--sell_short', action='store_true',
+                      help='Execute a short sell order for bearish predictions')
     parser.add_argument('--stop_loss', type=float, required=False,
-                      help='Custom stop loss price for buy orders')
+                      help='Custom stop loss price for buy/short orders')
     parser.add_argument('--calc_take_profit', action='store_true',
                       help='Calculate take profit as (latest_quote - stop_loss) * 1.5')
     parser.add_argument('--amount', type=float, required=False,
@@ -78,5 +80,23 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
             parser.error("--buy requires --symbol")
         if not args.take_profit and not args.calc_take_profit:
             parser.error("--buy requires either --take_profit or --calc_take_profit")
+    
+    # Validate sell_short arguments
+    if args.sell_short:
+        # Check for calc_take_profit usage warnings
+        if args.calc_take_profit and not args.stop_loss:
+            parser.error("--calc_take_profit requires --stop_loss")
+        if args.calc_take_profit and args.take_profit:
+            print("Warning: --calc_take_profit used with --take_profit. --take_profit will be ignored.")
+        
+        # Require symbol and either take_profit or calc_take_profit
+        if not args.symbol:
+            parser.error("--sell_short requires --symbol")
+        if not args.take_profit and not args.calc_take_profit:
+            parser.error("--sell_short requires either --take_profit or --calc_take_profit")
+    
+    # Ensure buy and sell_short are mutually exclusive
+    if args.buy and args.sell_short:
+        parser.error("--buy and --sell_short cannot be used together")
 
     return args

@@ -177,6 +177,91 @@ class alpaca_private:
                 print(f"  Symbol: {symbol}, Quantity: {quantity}")
                 return None
 
+    def _sell_short(self, symbol: str, take_profit: Optional[float] = None, stop_loss: Optional[float] = None, amount: Optional[float] = None, submit_order: bool = False) -> Optional[Any]:
+        """
+        Execute a short sell order with bracket order protection for bearish predictions.
+
+        This method retrieves the latest quote, calculates position size based on
+        available cash and existing positions, and submits a short bracket order with
+        stop loss protection above the entry price.
+
+        Args:
+            symbol: The stock symbol to short sell
+            take_profit: The take profit price for the bracket order (optional if calc_take_profit is used)
+            stop_loss: Custom stop loss price (optional, uses default percentage if not provided)
+            amount: Dollar amount to invest (optional, uses portfolio risk if not provided)
+            submit_order: Whether to actually submit the order (default: False for dry run)
+        """
+        # Get current market data for the symbol (using average of bid/ask)
+        market_price = get_latest_quote_avg(self.api, symbol)
+
+        # Use custom stop loss or calculate default (ABOVE entry price for shorts)
+        if stop_loss is not None:
+            stop_price = stop_loss
+        else:
+            stop_price = round(market_price * (1 + self.STOP_LOSS_PERCENT), 2)
+
+        # Calculate take profit if using calc_take_profit (BELOW entry price for shorts)
+        if take_profit is None:
+            # This means calc_take_profit is being used (validation ensures this)
+            # For shorts: profit when price falls, so take_profit = entry - (stop_loss - entry) * 1.5
+            take_profit = round(market_price - (stop_price - market_price) * 1.5, 2)
+
+        # Calculate quantity based on amount or use portfolio risk logic
+        if amount is not None:
+            # Use specified dollar amount to calculate shares
+            quantity = round(amount / market_price)
+        else:
+            # Use existing portfolio risk calculation
+            quantity = self._calculateQuantity(market_price, "_sell_short")
+
+        # Display the order details that would be submitted
+        print(f"submit_order(\n"
+                f"    symbol={symbol},\n"
+                f"    qty={quantity},\n"
+                f"    side='sell',\n"
+                f"    type='market',\n"
+                f"    time_in_force='gtc',\n"
+                f"    order_class='bracket',\n"
+                f"    stop_loss={{'stop_price': {stop_price}}},\n"
+                f"    take_profit={{'limit_price': {take_profit}}}\n"
+                f")")
+        
+        if not submit_order:
+            print("[DRY RUN] Short order not submitted (use --submit to execute)")
+            return None
+
+        # Submit the actual order if requested
+        if submit_order:
+            try:
+                order_response = self.api.submit_order(
+                    symbol=symbol,
+                    qty=quantity,
+                    side='sell',  # Short sell
+                    type='market',  # Market order for immediate execution
+                    time_in_force='gtc',  # Good till cancelled
+                    order_class='bracket',  # Bracket order with stop loss
+                    stop_loss={
+                        'stop_price': stop_price,  # Triggers stop order ABOVE entry price
+                    },
+                    take_profit={
+                        'limit_price': take_profit  # Take profit BELOW entry price
+                    }
+                )
+                print(f"✓ Short order submitted successfully: {order_response.id}")
+                print(f"  Status: {order_response.status}")
+                print(f"  Symbol: {order_response.symbol}")
+                print(f"  Quantity: -{order_response.qty}")  # Negative to indicate short
+                print(f"  Order Class: {order_response.order_class}")
+                print(f"  Entry Price: ~${market_price:.2f}")
+                print(f"  Stop Loss: ${stop_price:.2f} (above entry)")
+                print(f"  Take Profit: ${take_profit:.2f} (below entry)")
+                return order_response
+            except Exception as e:
+                print(f"✗ Short order submission failed: {str(e)}")
+                print(f"  Symbol: {symbol}, Quantity: {quantity}")
+                return None
+
 
     def _bracketOrder(self, symbol: str, quantity: int, market_price: float, take_profit: float, submit_order: bool = False) -> Optional[Any]:
         """
@@ -353,6 +438,19 @@ class alpaca_private:
             )
             if order_result is None and self.args.submit:
                 print("Failed to submit buy order")
+                return 1
+
+        # Handle sell-short order if requested
+        if self.args.sell_short:
+            order_result = self._sell_short(
+                symbol=self.args.symbol, 
+                take_profit=self.args.take_profit, 
+                stop_loss=self.args.stop_loss,
+                amount=self.args.amount,
+                submit_order=self.args.submit
+            )
+            if order_result is None and self.args.submit:
+                print("Failed to submit short order")
                 return 1
 
         return 0

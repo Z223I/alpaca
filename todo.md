@@ -84,6 +84,14 @@ The remaining tasks are lower priority documentation and deployment tools:
         # Buy $1000 worth with custom stop-loss and auto take-profit
         python3 code/alpaca.py --buy --symbol AAPL --amount 1000.00 --stop_loss 145.00 --calc_take_profit --submit
 
+        # Short sell with manual take profit
+        python3 code/alpaca.py --sell_short --symbol AAPL --stop_loss 105.00 --take_profit 95.00
+
+        # Short sell with auto-calculated take profit
+        python3 code/alpaca.py --sell_short --symbol AAPL --stop_loss 105.00 --calc_take_profit
+
+        # Short sell $1000 worth with auto take profit
+        python3 code/alpaca.py --sell_short --symbol AAPL --amount 1000.00 --stop_loss 105.00 --calc_take_profit --submit
 
 
         python code/orb_alerts.py --test --verbose
