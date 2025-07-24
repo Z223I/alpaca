@@ -30,11 +30,11 @@ class TestParseArgs:
     def test_parse_args_bracket_order_valid(self):
         """Test parsing valid bracket order arguments."""
         args = parse_args([
-            '--bracket_order',
+            '--bracket-order',
             '--symbol', 'AAPL',
             '--quantity', '100',
-            '--market_price', '150.50',
-            '--take_profit', '160.00'
+            '--market-price', '150.50',
+            '--take-profit', '160.00'
         ])
         
         assert args.bracket_order is True
@@ -47,11 +47,11 @@ class TestParseArgs:
     def test_parse_args_bracket_order_with_submit(self):
         """Test parsing bracket order with submit flag."""
         args = parse_args([
-            '--bracket_order',
+            '--bracket-order',
             '--symbol', 'AAPL',
             '--quantity', '100',
-            '--market_price', '150.50',
-            '--take_profit', '160.00',
+            '--market-price', '150.50',
+            '--take-profit', '160.00',
             '--submit'
         ])
         
@@ -62,50 +62,50 @@ class TestParseArgs:
         """Test bracket order validation with missing symbol."""
         with pytest.raises(SystemExit):
             parse_args([
-                '--bracket_order',
+                '--bracket-order',
                 '--quantity', '100',
-                '--market_price', '150.50',
-                '--take_profit', '160.00'
+                '--market-price', '150.50',
+                '--take-profit', '160.00'
             ])
     
     def test_parse_args_bracket_order_missing_quantity(self):
         """Test bracket order validation with missing quantity."""
         with pytest.raises(SystemExit):
             parse_args([
-                '--bracket_order',
+                '--bracket-order',
                 '--symbol', 'AAPL',
-                '--market_price', '150.50',
-                '--take_profit', '160.00'
+                '--market-price', '150.50',
+                '--take-profit', '160.00'
             ])
     
     def test_parse_args_bracket_order_missing_market_price(self):
         """Test bracket order validation with missing market price."""
         with pytest.raises(SystemExit):
             parse_args([
-                '--bracket_order',
+                '--bracket-order',
                 '--symbol', 'AAPL',
                 '--quantity', '100',
-                '--take_profit', '160.00'
+                '--take-profit', '160.00'
             ])
     
     def test_parse_args_bracket_order_missing_take_profit(self):
         """Test bracket order validation with missing take profit."""
         with pytest.raises(SystemExit):
             parse_args([
-                '--bracket_order',
+                '--bracket-order',
                 '--symbol', 'AAPL',
                 '--quantity', '100',
-                '--market_price', '150.50'
+                '--market-price', '150.50'
             ])
     
     def test_parse_args_future_bracket_order_valid(self):
         """Test parsing valid future bracket order arguments."""
         args = parse_args([
-            '--future_bracket_order',
+            '--future-bracket-order',
             '--symbol', 'TSLA',
-            '--limit_price', '200.00',
-            '--stop_price', '190.00',
-            '--take_profit', '220.00'
+            '--limit-price', '200.00',
+            '--stop-price', '190.00',
+            '--take-profit', '220.00'
         ])
         
         assert args.future_bracket_order is True
@@ -118,12 +118,12 @@ class TestParseArgs:
     def test_parse_args_future_bracket_order_with_quantity(self):
         """Test future bracket order with explicit quantity."""
         args = parse_args([
-            '--future_bracket_order',
+            '--future-bracket-order',
             '--symbol', 'TSLA',
             '--quantity', '50',
-            '--limit_price', '200.00',
-            '--stop_price', '190.00',
-            '--take_profit', '220.00'
+            '--limit-price', '200.00',
+            '--stop-price', '190.00',
+            '--take-profit', '220.00'
         ])
         
         assert args.quantity == 50
@@ -132,46 +132,46 @@ class TestParseArgs:
         """Test future bracket order validation with missing symbol."""
         with pytest.raises(SystemExit):
             parse_args([
-                '--future_bracket_order',
-                '--limit_price', '200.00',
-                '--stop_price', '190.00',
-                '--take_profit', '220.00'
+                '--future-bracket-order',
+                '--limit-price', '200.00',
+                '--stop-price', '190.00',
+                '--take-profit', '220.00'
             ])
     
     def test_parse_args_future_bracket_order_missing_limit_price(self):
         """Test future bracket order validation with missing limit price."""
         with pytest.raises(SystemExit):
             parse_args([
-                '--future_bracket_order',
+                '--future-bracket-order',
                 '--symbol', 'TSLA',
-                '--stop_price', '190.00',
-                '--take_profit', '220.00'
+                '--stop-price', '190.00',
+                '--take-profit', '220.00'
             ])
     
     def test_parse_args_future_bracket_order_missing_stop_price(self):
         """Test future bracket order validation with missing stop price."""
         with pytest.raises(SystemExit):
             parse_args([
-                '--future_bracket_order',
+                '--future-bracket-order',
                 '--symbol', 'TSLA',
-                '--limit_price', '200.00',
-                '--take_profit', '220.00'
+                '--limit-price', '200.00',
+                '--take-profit', '220.00'
             ])
     
     def test_parse_args_future_bracket_order_missing_take_profit(self):
         """Test future bracket order validation with missing take profit."""
         with pytest.raises(SystemExit):
             parse_args([
-                '--future_bracket_order',
+                '--future-bracket-order',
                 '--symbol', 'TSLA',
-                '--limit_price', '200.00',
-                '--stop_price', '190.00'
+                '--limit-price', '200.00',
+                '--stop-price', '190.00'
             ])
     
     def test_parse_args_get_latest_quote_valid(self):
         """Test parsing valid get latest quote arguments."""
         args = parse_args([
-            '--get_latest_quote',
+            '--get-latest-quote',
             '--symbol', 'MSFT'
         ])
         
@@ -181,14 +181,14 @@ class TestParseArgs:
     def test_parse_args_get_latest_quote_missing_symbol(self):
         """Test get latest quote validation with missing symbol."""
         with pytest.raises(SystemExit):
-            parse_args(['--get_latest_quote'])
+            parse_args(['--get-latest-quote'])
     
     def test_parse_args_buy_order_valid(self):
         """Test parsing valid buy order arguments."""
         args = parse_args([
             '--buy',
             '--symbol', 'AMZN',
-            '--take_profit', '140.00'
+            '--take-profit', '140.00'
         ])
         
         assert args.buy is True
@@ -200,7 +200,7 @@ class TestParseArgs:
         with pytest.raises(SystemExit):
             parse_args([
                 '--buy',
-                '--take_profit', '140.00'
+                '--take-profit', '140.00'
             ])
     
     def test_parse_args_buy_order_missing_take_profit(self):
@@ -214,27 +214,27 @@ class TestParseArgs:
     def test_parse_args_short_flags(self):
         """Test parsing with short flags."""
         args = parse_args([
-            '-b',  # --bracket_order
+            '-b',  # --bracket-order
             '--symbol', 'AAPL',
             '--quantity', '100',
-            '--market_price', '150.50',
-            '--take_profit', '160.00'
+            '--market-price', '150.50',
+            '--take-profit', '160.00'
         ])
         
         assert args.bracket_order is True
         
         args2 = parse_args([
-            '-f',  # --future_bracket_order
+            '-f',  # --future-bracket-order
             '--symbol', 'TSLA',
-            '--limit_price', '200.00',
-            '--stop_price', '190.00',
-            '--take_profit', '220.00'
+            '--limit-price', '200.00',
+            '--stop-price', '190.00',
+            '--take-profit', '220.00'
         ])
         
         assert args2.future_bracket_order is True
         
         args3 = parse_args([
-            '-q',  # --get_latest_quote
+            '-q',  # --get-latest-quote
             '--symbol', 'MSFT'
         ])
         
@@ -243,11 +243,11 @@ class TestParseArgs:
     def test_parse_args_data_type_conversion(self):
         """Test that arguments are converted to correct data types."""
         args = parse_args([
-            '--bracket_order',
+            '--bracket-order',
             '--symbol', 'AAPL',
             '--quantity', '100',
-            '--market_price', '150.50',
-            '--take_profit', '160.75'
+            '--market-price', '150.50',
+            '--take-profit', '160.75'
         ])
         
         assert isinstance(args.quantity, int)
@@ -260,32 +260,32 @@ class TestParseArgs:
         # Invalid quantity (should be int)
         with pytest.raises(SystemExit):
             parse_args([
-                '--bracket_order',
+                '--bracket-order',
                 '--symbol', 'AAPL',
                 '--quantity', 'not_a_number',
-                '--market_price', '150.50',
-                '--take_profit', '160.00'
+                '--market-price', '150.50',
+                '--take-profit', '160.00'
             ])
         
         # Invalid price (should be float)
         with pytest.raises(SystemExit):
             parse_args([
-                '--bracket_order',
+                '--bracket-order',
                 '--symbol', 'AAPL',
                 '--quantity', '100',
-                '--market_price', 'not_a_price',
-                '--take_profit', '160.00'
+                '--market-price', 'not_a_price',
+                '--take-profit', '160.00'
             ])
     
     def test_parse_args_multiple_conflicting_actions(self):
         """Test parsing with multiple action flags (should be allowed)."""
         args = parse_args([
-            '--bracket_order',
-            '--get_latest_quote',
+            '--bracket-order',
+            '--get-latest-quote',
             '--symbol', 'AAPL',
             '--quantity', '100',
-            '--market_price', '150.50',
-            '--take_profit', '160.00'
+            '--market-price', '150.50',
+            '--take-profit', '160.00'
         ])
         
         # Both flags should be set
@@ -295,11 +295,11 @@ class TestParseArgs:
     def test_parse_args_negative_values(self):
         """Test parsing with negative numeric values."""
         args = parse_args([
-            '--bracket_order',
+            '--bracket-order',
             '--symbol', 'AAPL',
             '--quantity', '-100',  # Negative quantity
-            '--market_price', '150.50',
-            '--take_profit', '160.00'
+            '--market-price', '150.50',
+            '--take-profit', '160.00'
         ])
         
         assert args.quantity == -100
@@ -309,18 +309,18 @@ class TestParseArgs:
         # Zero values should still be valid for bracket orders
         with pytest.raises(SystemExit):  # Validation may fail with 0 market price
             parse_args([
-                '--bracket_order',
+                '--bracket-order',
                 '--symbol', 'AAPL',
                 '--quantity', '0',
-                '--market_price', '0.0',
-                '--take_profit', '160.00'
+                '--market-price', '0.0',
+                '--take-profit', '160.00'
             ])
         
         # Test zero values in a context that should work
         args = parse_args([
             '--symbol', 'AAPL',
             '--quantity', '0',
-            '--market_price', '0.0'
+            '--market-price', '0.0'
         ])
         
         assert args.quantity == 0
@@ -329,11 +329,11 @@ class TestParseArgs:
     def test_parse_args_very_large_values(self):
         """Test parsing with very large numeric values."""
         args = parse_args([
-            '--bracket_order',
+            '--bracket-order',
             '--symbol', 'AAPL',
             '--quantity', '999999',
-            '--market_price', '999999.99',
-            '--take_profit', '1000000.00'
+            '--market-price', '999999.99',
+            '--take-profit', '1000000.00'
         ])
         
         assert args.quantity == 999999
@@ -344,21 +344,21 @@ class TestParseArgs:
         """Test parsing with special symbol formats."""
         # Symbol with dot
         args1 = parse_args([
-            '--get_latest_quote',
+            '--get-latest-quote',
             '--symbol', 'BRK.A'
         ])
         assert args1.symbol == 'BRK.A'
         
         # Symbol with hyphen
         args2 = parse_args([
-            '--get_latest_quote',
+            '--get-latest-quote',
             '--symbol', 'BRK-B'
         ])
         assert args2.symbol == 'BRK-B'
         
         # Symbol with numbers
         args3 = parse_args([
-            '--get_latest_quote',
+            '--get-latest-quote',
             '--symbol', 'STOCK123'
         ])
         assert args3.symbol == 'STOCK123'
@@ -375,14 +375,14 @@ class TestParseArgs:
         # Empty string symbol should fail validation
         with pytest.raises(SystemExit):
             parse_args([
-                '--get_latest_quote',
+                '--get-latest-quote',
                 '--symbol', ''
             ])
     
     def test_parse_args_whitespace_symbol(self):
         """Test parsing with whitespace in symbol."""
         args = parse_args([
-            '--get_latest_quote',
+            '--get-latest-quote',
             '--symbol', ' AAPL '
         ])
         
@@ -391,11 +391,11 @@ class TestParseArgs:
     def test_parse_args_decimal_precision(self):
         """Test parsing with high decimal precision."""
         args = parse_args([
-            '--bracket_order',
+            '--bracket-order',
             '--symbol', 'AAPL',
             '--quantity', '100',
-            '--market_price', '150.123456789',
-            '--take_profit', '160.987654321'
+            '--market-price', '150.123456789',
+            '--take-profit', '160.987654321'
         ])
         
         assert args.market_price == 150.123456789
@@ -404,11 +404,11 @@ class TestParseArgs:
     def test_parse_args_scientific_notation(self):
         """Test parsing with scientific notation."""
         args = parse_args([
-            '--bracket_order',
+            '--bracket-order',
             '--symbol', 'AAPL',
             '--quantity', '1000',
-            '--market_price', '1.5e2',  # 150.0
-            '--take_profit', '1.6e2'    # 160.0
+            '--market-price', '1.5e2',  # 150.0
+            '--take-profit', '1.6e2'    # 160.0
         ])
         
         assert args.market_price == 150.0
@@ -417,17 +417,17 @@ class TestParseArgs:
     def test_parse_args_all_parameters_present(self):
         """Test parsing with all possible parameters."""
         args = parse_args([
-            '--bracket_order',
-            '--future_bracket_order',
-            '--get_latest_quote',
+            '--bracket-order',
+            '--future-bracket-order',
+            '--get-latest-quote',
             '--buy',
             '--submit',
             '--symbol', 'AAPL',
             '--quantity', '100',
-            '--market_price', '150.50',
-            '--limit_price', '149.00',
-            '--stop_price', '145.00',
-            '--take_profit', '160.00'
+            '--market-price', '150.50',
+            '--limit-price', '149.00',
+            '--stop-price', '145.00',
+            '--take-profit', '160.00'
         ])
         
         assert args.bracket_order is True
@@ -463,8 +463,8 @@ class TestParseArgs:
         # Test that all expected arguments are defined
         try:
             args = parse_args([
-                '--bracket_order', '--symbol', 'TEST', '--quantity', '1', 
-                '--market_price', '1.0', '--take_profit', '2.0'
+                '--bracket-order', '--symbol', 'TEST', '--quantity', '1', 
+                '--market-price', '1.0', '--take-profit', '2.0'
             ])
             assert hasattr(args, 'bracket_order')
             assert hasattr(args, 'future_bracket_order')
