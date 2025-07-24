@@ -340,8 +340,11 @@ class AlertsSummaryGenerator:
         # Generate super alerts charts
         super_chart_files = self._generate_super_alerts_charts(summary, summary_dir, date_str)
         
+        # Generate high-impact super alerts charts (20% above signal price)
+        high_impact_chart_files = self._generate_high_impact_super_alerts_charts(summary, summary_dir, date_str)
+        
         # Combine all chart files
-        chart_files = regular_chart_files + super_chart_files
+        chart_files = regular_chart_files + super_chart_files + high_impact_chart_files
         
         print(f"💾 JSON summary saved to: {json_filepath}")
         print(f"📊 CSV summary saved to: {csv_filepath}")
@@ -532,6 +535,97 @@ class AlertsSummaryGenerator:
             chart_files.append(super_bar_chart)
         
         return chart_files
+    
+    def _generate_high_impact_super_alerts_charts(self, summary: Dict, summary_dir: Path, date_str: str) -> List[str]:
+        """Generate pie charts for high-impact super alerts (20% price movement from signal)."""
+        chart_files = []
+        
+        # Set matplotlib style for better looking charts
+        plt.style.use('default')
+        
+        # Filter bullish super alerts where current_price >= signal_price * 1.20
+        high_impact_bullish_super_stats = self._calculate_high_impact_super_alert_symbol_statistics(
+            summary['super_alerts']['bullish_alerts'], 'bullish'
+        )
+        
+        # Filter bearish super alerts where current_price <= signal_price * 0.80
+        high_impact_bearish_super_stats = self._calculate_high_impact_super_alert_symbol_statistics(
+            summary['super_alerts']['bearish_alerts'], 'bearish'
+        )
+        
+        # Generate bullish high-impact super alerts pie chart
+        if high_impact_bullish_super_stats:
+            bullish_high_impact_chart = self._create_alert_pie_chart(
+                high_impact_bullish_super_stats,
+                'High-Impact Bullish Super Alerts by Symbol (≥20% Above Signal)',
+                'high_impact_bullish_super_alerts',
+                summary_dir,
+                date_str
+            )
+            if bullish_high_impact_chart:
+                chart_files.append(bullish_high_impact_chart)
+        
+        # Generate bearish high-impact super alerts pie chart
+        if high_impact_bearish_super_stats:
+            bearish_high_impact_chart = self._create_alert_pie_chart(
+                high_impact_bearish_super_stats,
+                'High-Impact Bearish Super Alerts by Symbol (≥20% Below Signal)',
+                'high_impact_bearish_super_alerts',
+                summary_dir,
+                date_str
+            )
+            if bearish_high_impact_chart:
+                chart_files.append(bearish_high_impact_chart)
+        
+        if self.verbose:
+            bullish_count = sum(stats['total_alerts'] for stats in high_impact_bullish_super_stats.values()) if high_impact_bullish_super_stats else 0
+            bearish_count = sum(stats['total_alerts'] for stats in high_impact_bearish_super_stats.values()) if high_impact_bearish_super_stats else 0
+            print(f"Generated high-impact super alerts charts: {bullish_count} bullish, {bearish_count} bearish")
+        
+        return chart_files
+    
+    def _calculate_high_impact_super_alert_symbol_statistics(self, super_alerts: List[Dict], alert_direction: str) -> Dict:
+        """Calculate symbol statistics for high-impact super alerts based on price movement."""
+        symbol_stats = defaultdict(lambda: {
+            'total_alerts': 0,
+            'alerts': []
+        })
+        
+        for alert in super_alerts:
+            signal_analysis = alert.get('signal_analysis', {})
+            current_price = signal_analysis.get('current_price')
+            signal_price = signal_analysis.get('signal_price')
+            
+            # Skip alerts without required price data
+            if not current_price or not signal_price:
+                if self.verbose:
+                    print(f"Skipping alert due to missing price data: current={current_price}, signal={signal_price}")
+                continue
+            
+            # Determine if this is a high-impact alert based on direction
+            is_high_impact = False
+            
+            if alert_direction == 'bullish':
+                # Bullish: current_price >= signal_price * 1.20 (20% above signal)
+                is_high_impact = current_price >= signal_price * 1.20
+                if self.verbose and is_high_impact:
+                    ratio = (current_price / signal_price - 1) * 100
+                    print(f"High-impact bullish alert for {alert.get('symbol')}: {ratio:.1f}% above signal")
+            elif alert_direction == 'bearish':
+                # Bearish: current_price <= signal_price * 0.80 (20% below signal)
+                is_high_impact = current_price <= signal_price * 0.80
+                if self.verbose and is_high_impact:
+                    ratio = (1 - current_price / signal_price) * 100
+                    print(f"High-impact bearish alert for {alert.get('symbol')}: {ratio:.1f}% below signal")
+            
+            # Add to statistics if it's a high-impact alert
+            if is_high_impact:
+                symbol = alert.get('symbol', 'UNKNOWN')
+                stats = symbol_stats[symbol]
+                stats['total_alerts'] += 1
+                stats['alerts'].append(alert)
+        
+        return dict(symbol_stats)
     
     def _calculate_super_alert_symbol_statistics(self, super_alerts: List[Dict]) -> Dict:
         """Calculate symbol statistics for super alerts."""
