@@ -144,7 +144,7 @@ class alpaca_private:
                 f"    stop_loss={{'stop_price': {stop_price}}},\n"
                 f"    take_profit={{'limit_price': {take_profit}}}\n"
                 f")")
-        
+
         if not submit_order:
             print("[DRY RUN] Order not submitted (use --submit to execute)")
             return None
@@ -184,7 +184,7 @@ class alpaca_private:
         After-hours trading has restrictions:
         - Only limit orders are allowed (no market orders)
         - Bracket orders are not supported
-        - Must use time_in_force='ext' for extended hours
+        - Must use time_in_force='day' for extended hours
 
         Args:
             symbol: The stock symbol to buy
@@ -197,7 +197,7 @@ class alpaca_private:
 
         # Calculate limit price if not provided (slightly above market for better fill probability)
         if limit_price is None:
-            limit_price = round(market_price * 1.002, 2)  # 0.2% above market price
+            limit_price = round(market_price * 1.01, 2)  # 1% above market price
 
         # Calculate quantity based on amount or use portfolio risk logic
         if amount is not None:
@@ -214,10 +214,10 @@ class alpaca_private:
                 f"    side='buy',\n"
                 f"    type='limit',\n"
                 f"    limit_price={limit_price},\n"
-                f"    time_in_force='ext'\n"
+                f"    time_in_force='day'\n"
                 f")")
         print(f"  NOTE: After-hours order - no bracket/stop-loss protection available")
-        
+
         if not submit_order:
             print("[DRY RUN] After-hours order not submitted (use --submit to execute)")
             return None
@@ -231,7 +231,7 @@ class alpaca_private:
                     side='buy',
                     type='limit',  # Only limit orders allowed after-hours
                     limit_price=limit_price,
-                    time_in_force='ext'  # Extended hours trading
+                    time_in_force='day'  # Good for day including extended hours
                 )
                 print(f"✓ After-hours order submitted successfully: {order_response.id}")
                 print(f"  Status: {order_response.status}")
@@ -296,7 +296,7 @@ class alpaca_private:
                 f"    stop_loss={{'stop_price': {stop_price}}},\n"
                 f"    take_profit={{'limit_price': {take_profit}}}\n"
                 f")")
-        
+
         if not submit_order:
             print("[DRY RUN] Short order not submitted (use --submit to execute)")
             return None
@@ -339,7 +339,7 @@ class alpaca_private:
         After-hours trading has restrictions:
         - Only limit orders are allowed (no market orders)
         - Bracket orders are not supported
-        - Must use time_in_force='ext' for extended hours
+        - Must use time_in_force='day' for extended hours
 
         Args:
             symbol: The stock symbol to short sell
@@ -369,10 +369,10 @@ class alpaca_private:
                 f"    side='sell',\n"
                 f"    type='limit',\n"
                 f"    limit_price={limit_price},\n"
-                f"    time_in_force='ext'\n"
+                f"    time_in_force='day'\n"
                 f")")
         print(f"  NOTE: After-hours short order - no bracket/stop-loss protection available")
-        
+
         if not submit_order:
             print("[DRY RUN] After-hours short order not submitted (use --submit to execute)")
             return None
@@ -386,7 +386,7 @@ class alpaca_private:
                     side='sell',  # Short sell
                     type='limit',  # Only limit orders allowed after-hours
                     limit_price=limit_price,
-                    time_in_force='ext'  # Extended hours trading
+                    time_in_force='day'  # Good for day including extended hours
                 )
                 print(f"✓ After-hours short order submitted successfully: {order_response.id}")
                 print(f"  Status: {order_response.status}")
@@ -405,7 +405,7 @@ class alpaca_private:
     def _submit_after_hours_stop_loss(self, symbol: str, quantity: int, stop_price: float, side: str) -> Optional[Any]:
         """
         Submit a stop-loss order for after-hours trading.
-        
+
         Args:
             symbol: Stock symbol
             quantity: Number of shares
@@ -419,7 +419,7 @@ class alpaca_private:
                 side=side,
                 type='stop',
                 stop_price=stop_price,
-                time_in_force='ext'
+                time_in_force='day'
             )
             print(f"  ✓ Stop-loss order submitted: {stop_order.id}")
             print(f"    Stop Price: ${stop_price:.2f}")
@@ -431,7 +431,7 @@ class alpaca_private:
     def _submit_after_hours_take_profit(self, symbol: str, quantity: int, limit_price: float, side: str) -> Optional[Any]:
         """
         Submit a take-profit order for after-hours trading.
-        
+
         Args:
             symbol: Stock symbol
             quantity: Number of shares
@@ -445,7 +445,7 @@ class alpaca_private:
                 side=side,
                 type='limit',
                 limit_price=limit_price,
-                time_in_force='ext'
+                time_in_force='day'
             )
             print(f"  ✓ Take-profit order submitted: {profit_order.id}")
             print(f"    Limit Price: ${limit_price:.2f}")
@@ -475,7 +475,7 @@ class alpaca_private:
 
         # Calculate limit price if not provided (slightly above market for better fill probability)
         if limit_price is None:
-            limit_price = round(market_price * 1.002, 2)  # 0.2% above market price
+            limit_price = round(market_price * 1.01, 2)  # 1% above market price
 
         # Use custom stop loss or calculate default (BELOW entry price for longs)
         if stop_loss is not None:
@@ -503,10 +503,10 @@ class alpaca_private:
                 f"    side='buy',\n"
                 f"    type='limit',\n"
                 f"    limit_price={limit_price},\n"
-                f"    time_in_force='ext'\n"
+                f"    time_in_force='day'\n"
                 f")")
         print(f"  Protected after-hours order with stop-loss: ${stop_price:.2f}, take-profit: ${take_profit:.2f}")
-        
+
         if not submit_order:
             print("[DRY RUN] Protected after-hours order not submitted (use --submit to execute)")
             return None
@@ -519,16 +519,16 @@ class alpaca_private:
                 side='buy',
                 type='limit',
                 limit_price=limit_price,
-                time_in_force='ext'
+                time_in_force='day'
             )
             print(f"✓ Main buy order submitted: {main_order.id}")
             print(f"  Status: {main_order.status}")
             print(f"  Limit Price: ${limit_price:.2f}")
-            
+
             # Submit protection orders
             stop_order = self._submit_after_hours_stop_loss(symbol, quantity, stop_price, 'sell')
             profit_order = self._submit_after_hours_take_profit(symbol, quantity, take_profit, 'sell')
-            
+
             return {
                 'main_order': main_order,
                 'stop_loss_order': stop_order,
@@ -537,7 +537,7 @@ class alpaca_private:
                 'stop_price': stop_price,
                 'take_profit_price': take_profit
             }
-            
+
         except Exception as e:
             print(f"✗ Protected after-hours buy order failed: {str(e)}")
             print(f"  Symbol: {symbol}, Quantity: {quantity}, Limit Price: {limit_price}")
@@ -592,10 +592,10 @@ class alpaca_private:
                 f"    side='sell',\n"
                 f"    type='limit',\n"
                 f"    limit_price={limit_price},\n"
-                f"    time_in_force='ext'\n"
+                f"    time_in_force='day'\n"
                 f")")
         print(f"  Protected after-hours short with stop-loss: ${stop_price:.2f}, take-profit: ${take_profit:.2f}")
-        
+
         if not submit_order:
             print("[DRY RUN] Protected after-hours short order not submitted (use --submit to execute)")
             return None
@@ -608,16 +608,16 @@ class alpaca_private:
                 side='sell',
                 type='limit',
                 limit_price=limit_price,
-                time_in_force='ext'
+                time_in_force='day'
             )
             print(f"✓ Main short order submitted: {main_order.id}")
             print(f"  Status: {main_order.status}")
             print(f"  Limit Price: ${limit_price:.2f}")
-            
+
             # Submit protection orders (note: sides are reversed for short positions)
             stop_order = self._submit_after_hours_stop_loss(symbol, quantity, stop_price, 'buy')  # Buy to cover
             profit_order = self._submit_after_hours_take_profit(symbol, quantity, take_profit, 'buy')  # Buy to cover
-            
+
             return {
                 'main_order': main_order,
                 'stop_loss_order': stop_order,
@@ -626,7 +626,7 @@ class alpaca_private:
                 'stop_price': stop_price,
                 'take_profit_price': take_profit
             }
-            
+
         except Exception as e:
             print(f"✗ Protected after-hours short order failed: {str(e)}")
             print(f"  Symbol: {symbol}, Quantity: {quantity}, Limit Price: {limit_price}")
@@ -656,7 +656,7 @@ class alpaca_private:
               f"    stop_loss={{'stop_price': {stop_price}}},\n"
               f"    take_profit={{'limit_price': {take_profit}}}\n"
               f")")
-        
+
         if not submit_order:
             print("[DRY RUN] Bracket order not submitted (use --submit to execute)")
             return None
@@ -717,7 +717,7 @@ class alpaca_private:
               f"    stop_loss={{'stop_price': {stop_price}}},\n"
               f"    take_profit={{'limit_price': {take_profit}}}\n"
               f")")
-        
+
         if not submit_order:
             print("[DRY RUN] Future bracket order not submitted (use --submit to execute)")
             return None
@@ -825,8 +825,8 @@ class alpaca_private:
             else:
                 # Use regular buy method with bracket order protection
                 order_result = self._buy(
-                    symbol=self.args.symbol, 
-                    take_profit=self.args.take_profit, 
+                    symbol=self.args.symbol,
+                    take_profit=self.args.take_profit,
                     stop_loss=self.args.stop_loss,
                     amount=self.args.amount,
                     submit_order=self.args.submit
@@ -863,8 +863,8 @@ class alpaca_private:
             else:
                 # Use regular short method with bracket order protection
                 order_result = self._sell_short(
-                    symbol=self.args.symbol, 
-                    take_profit=self.args.take_profit, 
+                    symbol=self.args.symbol,
+                    take_profit=self.args.take_profit,
                     stop_loss=self.args.stop_loss,
                     amount=self.args.amount,
                     submit_order=self.args.submit

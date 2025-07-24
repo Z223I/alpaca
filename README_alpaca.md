@@ -88,6 +88,12 @@ python3 code/alpaca.py --buy --after-hours --symbol AAPL --take-profit 160.00 --
 
 # After-hours with custom limit price
 python3 code/alpaca.py --buy --after-hours --symbol AAPL --custom-limit-price 151.00 --take-profit 160.00 --submit
+
+# After-hours with specific dollar amount
+python3 code/alpaca.py --buy --after-hours --symbol AAPL --amount 1000 --take-profit 160.00 --stop-loss 145.00 --submit
+
+# After-hours amount without protection
+python3 code/alpaca.py --buy --after-hours --symbol AAPL --amount 500 --submit
 ```
 
 ## Project Structure

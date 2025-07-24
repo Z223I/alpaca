@@ -7,9 +7,9 @@ The remaining tasks are lower priority documentation and deployment tools:
 
 - [X] Think hard. Create a PRD, specs/telegram_post_prd.md, to ceate Telegram atom to post messages to Telegram API. The atom needs to accept a message as a string and post it to Telegram. Use dotenv to retrieve Telegram keys or whatever.  Have a separate CSV containing users to which to post; the file name is to start with ".", be in the root dir, and added to .gitignore.
 
-- [ ] see below move parse
-- [ ] Think hard. Review code/alpaca.py: Review _buy: it is a bracket order; however certain types of orders are not allowed in after hours trading; create a new method for after hours trading.
-- [ ] Think hard.  Is atoms/utils/parse_args.py only used by code/alpaca.py?  If so, move it to atoms/api with the other alpaca atoms.
+- [ ] Update atoms/api/parse_args.py to use "-" instead of "_" in argument names.
+- [X] Think hard. Review code/alpaca.py: Review _buy: it is a bracket order; however certain types of orders are not allowed in after hours trading; create a new method for after hours trading.
+- [X] Think hard.  Is atoms/utils/parse_args.py only used by code/alpaca.py?  If so, move it to atoms/api with the other alpaca atoms.
 - [ ] Think hard. Rename atoms/api to atoms/api_alpaca.
 
 
