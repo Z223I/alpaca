@@ -24,7 +24,7 @@ from atoms.display.print_orders import print_active_orders
 from atoms.display.print_positions import print_positions
 from atoms.display.print_quote import print_quote
 from atoms.utils.delay import delay
-from atoms.utils.parse_args import parse_args
+from atoms.api.parse_args import parse_args
 
 # Load environment variables from .env file (optional)
 try:
@@ -808,7 +808,7 @@ class alpaca_private:
                         take_profit=self.args.take_profit,
                         stop_loss=self.args.stop_loss,
                         amount=self.args.amount,
-                        limit_price=self.args.limit_price,
+                        limit_price=self.args.custom_limit_price,
                         submit_order=self.args.submit
                     )
                 else:
@@ -816,7 +816,7 @@ class alpaca_private:
                     order_result = self._buy_after_hours(
                         symbol=self.args.symbol,
                         amount=self.args.amount,
-                        limit_price=self.args.limit_price,
+                        limit_price=self.args.custom_limit_price,
                         submit_order=self.args.submit
                     )
                 if order_result is None and self.args.submit:
@@ -846,7 +846,7 @@ class alpaca_private:
                         take_profit=self.args.take_profit,
                         stop_loss=self.args.stop_loss,
                         amount=self.args.amount,
-                        limit_price=self.args.limit_price,
+                        limit_price=self.args.custom_limit_price,
                         submit_order=self.args.submit
                     )
                 else:
@@ -854,7 +854,7 @@ class alpaca_private:
                     order_result = self._sell_short_after_hours(
                         symbol=self.args.symbol,
                         amount=self.args.amount,
-                        limit_price=self.args.limit_price,
+                        limit_price=self.args.custom_limit_price,
                         submit_order=self.args.submit
                     )
                 if order_result is None and self.args.submit:

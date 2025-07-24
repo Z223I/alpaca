@@ -5,7 +5,7 @@ Comprehensive tests for command line argument parsing utility.
 import pytest
 import argparse
 from unittest.mock import patch
-from atoms.utils.parse_args import parse_args
+from atoms.api.parse_args import parse_args
 
 
 class TestParseArgs:

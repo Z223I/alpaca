@@ -42,7 +42,7 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
                       help='Execute a short sell order for bearish predictions')
     parser.add_argument('--after_hours', action='store_true',
                       help='Execute order for after-hours/extended hours trading (limit orders only)')
-    parser.add_argument('--limit_price', type=float, required=False,
+    parser.add_argument('--custom_limit_price', type=float, required=False,
                       help='Custom limit price for after-hours orders')
     parser.add_argument('--stop_loss', type=float, required=False,
                       help='Custom stop loss price for buy/short orders')
