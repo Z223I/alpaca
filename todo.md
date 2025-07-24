@@ -11,7 +11,7 @@ The remaining tasks are lower priority documentation and deployment tools:
 - [X] Update code/orb_alerts_monitor.py: Send Telegram message as urgent if "original_alert": ("current_price" / "orb_high") >= 1.20; otherwise regular message.
 
 
-- [ ] Update atoms/api/parse_args.py to use "-" instead of "_" in argument names. Update README_alpace.md as appropriate.
+- [X] Update atoms/api/parse_args.py to use "-" instead of "_" in argument names. Update README_alpace.md as appropriate.
 - [X] Think hard. Review code/alpaca.py: Review _buy: it is a bracket order; however certain types of orders are not allowed in after hours trading; create a new method for after hours trading.
 - [X] Think hard.  Is atoms/utils/parse_args.py only used by code/alpaca.py?  If so, move it to atoms/api with the other alpaca atoms.
 - [ ] Think hard. Rename atoms/api to atoms/api_alpaca.
