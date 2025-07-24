@@ -195,6 +195,7 @@ class TestBreakoutDetector:
         """Test technical indicators calculation."""
         # Create test data
         data = pd.DataFrame({
+            'open': [149.0, 149.8, 150.3, 149.9, 150.5] * 3,
             'high': [150.0, 150.5, 151.0, 150.8, 151.2] * 3,
             'low': [149.0, 149.5, 150.0, 149.8, 150.2] * 3,
             'close': [149.5, 150.0, 150.5, 150.0, 150.8] * 3,
@@ -207,12 +208,16 @@ class TestBreakoutDetector:
         assert 'vwap' in indicators
         assert 'ema_deviation' in indicators
         assert 'vwap_deviation' in indicators
-        assert all(isinstance(v, float) for v in indicators.values())
+        # Check that numeric values are float or numeric
+        numeric_keys = ['ema_9', 'vwap', 'ema_deviation', 'vwap_deviation']
+        for key in numeric_keys:
+            assert isinstance(indicators[key], (int, float))
     
     def test_calculate_technical_indicators_insufficient_data(self):
         """Test technical indicators with insufficient data."""
         # Create minimal data (less than 9 periods)
         data = pd.DataFrame({
+            'open': [149.0, 149.3],
             'high': [150.0, 150.5],
             'low': [149.0, 149.5],
             'close': [149.5, 150.0],

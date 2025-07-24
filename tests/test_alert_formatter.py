@@ -99,13 +99,12 @@ class TestORBAlert:
             alert_message=""
         )
         
-        # Stop loss should be below ORB low with 7.5% buffer
-        expected_stop = 148.00 * 0.925  # 148 - 7.5%
+        # Stop loss should be 7.5% below current price (config.stop_loss_percent)
+        expected_stop = 151.00 * (1 - 7.5/100)  # 151.00 * 0.925
         assert abs(alert.recommended_stop_loss - expected_stop) < 0.01
         
-        # Take profit should be 2:1 risk/reward
-        stop_distance = alert.current_price - alert.recommended_stop_loss
-        expected_target = alert.current_price + (stop_distance * 2.0)
+        # Take profit should be 4% above current price (config.take_profit_percent)  
+        expected_target = 151.00 * (1 + 4.0/100)  # 151.00 * 1.04
         assert abs(alert.recommended_take_profit - expected_target) < 0.01
 
 

@@ -360,6 +360,43 @@ class ORB:
             print(f"Error loading regular alerts for {symbol} on {target_date}: {e}")
             return alerts
 
+    def _get_most_recent_csv(self) -> Optional[str]:
+        """
+        Get the most recent CSV file from the data directory.
+        
+        Returns:
+            Path to the most recent CSV file, or None if no files found
+        """
+        import os
+        import glob
+        
+        try:
+            if not os.path.exists(self.data_directory):
+                return None
+                
+            csv_pattern = os.path.join(self.data_directory, '*.csv')
+            all_csv_files = glob.glob(csv_pattern)
+            
+            # Filter to only include files matching YYYYMMDD.csv format
+            csv_files = []
+            for filepath in all_csv_files:
+                filename = os.path.basename(filepath)
+                if self._is_valid_date_csv(filename):
+                    csv_files.append(filepath)
+            
+            if not csv_files:
+                return None
+            
+            # Sort by modification time (most recent first)
+            csv_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+            
+            return csv_files[0]
+            
+        except Exception as e:
+            if self.isDebugging:
+                print(f"Error getting most recent CSV file: {e}")
+            return None
+
     def _select_csv_file(self) -> Optional[str]:
         """
         List all CSV files in the data directory and allow user to select one.

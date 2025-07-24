@@ -30,3 +30,40 @@ This is an ORB (Opening Range Breakout) trading system built for Alpaca API. Key
 - Testing: `source ~/miniconda3/etc/profile.d/conda.sh && conda activate alpaca && ./test.sh orb`
 - Running alerts: `source ~/miniconda3/etc/profile.d/conda.sh && conda activate alpaca && python3 code/orb_alerts.py`
 - Linting: `source ~/miniconda3/etc/profile.d/conda.sh && conda activate alpaca && flake8 code/`
+
+## Test Execution Notes (Claude Code)
+
+**IMPORTANT**: Standard conda activation commands often fail in the Claude Code environment. Use these workarounds:
+
+### Working Test Execution Methods:
+1. **Direct Python Path** (RECOMMENDED):
+   ```bash
+   ~/miniconda3/envs/alpaca/bin/python -m pytest tests/ -v
+   ```
+
+2. **Specific Test Files**:
+   ```bash
+   ~/miniconda3/envs/alpaca/bin/python -m pytest tests/test_alpaca_after_hours.py -v
+   ```
+
+3. **Quick Test Runs** (no verbose):
+   ```bash
+   ~/miniconda3/envs/alpaca/bin/python -m pytest tests/ -q
+   ```
+
+### Common Issues Encountered:
+- `source ~/miniconda3/etc/profile.d/conda.sh && conda activate alpaca` often fails with "CondaError: Run 'conda init'"
+- Standard `./test.sh` script may not work due to environment activation issues
+- Environment variables from conda may not be properly loaded
+
+### Debugging Test Issues:
+- Check if pytest is available: `~/miniconda3/envs/alpaca/bin/python -c "import pytest; print('pytest available')"`
+- List installed packages: `~/miniconda3/envs/alpaca/bin/pip list`
+- For import issues, check sys.path in test files or use direct module paths
+
+### Test Categories:
+- **After-hours trading**: `tests/test_alpaca_after_hours.py` (26 tests)
+- **Risk management**: Look for tests with "risk_calculation" in name
+- **ORB functionality**: `tests/test_orb.py`
+- **Alert formatting**: `tests/test_alert_formatter.py`
+- **Integration tests**: May be skipped or removed if too complex

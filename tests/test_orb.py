@@ -153,7 +153,7 @@ class TestORB:
         assert result is None
 
     @patch.object(orb_module, 'extract_symbol_data')
-    @patch.object(orb_module, 'calculate_orb_levels')
+    @patch('atoms.utils.calculate_orb_levels.calculate_orb_levels')
     @patch.object(orb_module, 'calculate_ema')
     @patch.object(orb_module, 'calculate_vwap_typical')
     @patch.object(orb_module, 'calculate_vector_angle')
@@ -235,7 +235,7 @@ class TestORB:
         """Test that PCA data accumulates across multiple calls."""
         # Mock all dependencies
         with patch.object(orb_module, 'extract_symbol_data') as mock_extract, \
-             patch.object(orb_module, 'calculate_orb_levels') as mock_orb, \
+             patch('atoms.utils.calculate_orb_levels.calculate_orb_levels') as mock_orb, \
              patch.object(orb_module, 'calculate_ema') as mock_ema, \
              patch.object(orb_module, 'calculate_vwap_typical') as mock_vwap, \
              patch.object(orb_module, 'calculate_vector_angle') as mock_vector:
@@ -264,7 +264,7 @@ class TestORB:
         test_symbol = symbols[0] if len(symbols) > 0 else 'BMNR'
 
         # Mock the external dependencies that require API access
-        with patch.object(orb_module, 'calculate_orb_levels') as mock_orb, \
+        with patch('atoms.utils.calculate_orb_levels.calculate_orb_levels') as mock_orb, \
              patch.object(orb_module, 'calculate_ema') as mock_ema, \
              patch.object(orb_module, 'calculate_vwap_typical') as mock_vwap, \
              patch.object(orb_module, 'calculate_vector_angle') as mock_vector:

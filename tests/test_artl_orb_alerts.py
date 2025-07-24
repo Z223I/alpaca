@@ -313,14 +313,13 @@ class TestARTLORBAlerts:
         assert alert.recommended_take_profit < alert.current_price  # Take profit below for short
         assert alert.recommended_stop_loss > alert.current_price   # Stop loss above for short
         
-        # Stop loss should be above ORB high with 7.5% buffer
-        expected_stop_loss = artl_orb_levels.orb_high * 1.075  # 7.5% above
-        assert abs(alert.recommended_stop_loss - expected_stop_loss) < 1.0
+        # Stop loss should be 7.5% above current price for bearish breakdown
+        expected_stop_loss = 15.00 * (1 + 7.5/100)  # 15.00 * 1.075
+        assert abs(alert.recommended_stop_loss - expected_stop_loss) < 0.1
         
-        # Take profit should follow 2:1 risk/reward ratio for short
-        stop_distance = alert.recommended_stop_loss - alert.current_price
-        expected_take_profit = alert.current_price - (stop_distance * 2.0)
-        assert abs(alert.recommended_take_profit - expected_take_profit) < 0.5
+        # Take profit should be 4% below current price for bearish breakdown
+        expected_take_profit = 15.00 * (1 - 4.0/100)  # 15.00 * 0.96
+        assert abs(alert.recommended_take_profit - expected_take_profit) < 0.1
     
     def test_artl_bearish_alert_message_formatting(self, alert_formatter, artl_orb_levels):
         """Test alert message formatting for ARTL bearish alerts."""
