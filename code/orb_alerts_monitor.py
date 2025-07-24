@@ -215,22 +215,38 @@ class ORBAlertMonitor:
             symbol_info = self.super_alert_filter.get_symbol_info(symbol)
             
             if symbol_info:
+                # Create and save super alert (only after all filters have been applied)
                 filename = self.super_alert_generator.create_and_save_super_alert(alert_data, symbol_info)
                 if filename:
-                    self.logger.info(f"Super alert created: {filename}")
+                    self.logger.info(f"✅ Super alert created and saved: {filename}")
                     
-                    # Send Telegram notification immediately after file creation
+                    # Send Telegram notification only after successful super alert creation
                     try:
-                        file_path = self.super_alerts_dir / filename
-                        result = send_orb_alert(str(file_path), urgent=True)
+                        # Determine urgency based on price breakout percentage
+                        current_price = alert_data.get('current_price', 0)
+                        orb_high = alert_data.get('orb_high', 0)
                         
+                        # Calculate breakout ratio and determine urgency
+                        is_urgent = False
+                        if orb_high > 0:
+                            breakout_ratio = current_price / orb_high
+                            is_urgent = breakout_ratio >= 1.20
+                            
+                            self.logger.info(f"📊 Breakout analysis: {current_price:.2f} / {orb_high:.2f} = {breakout_ratio:.3f} {'(URGENT)' if is_urgent else '(REGULAR)'}")
+                        
+                        file_path = self.super_alerts_dir / filename
+                        result = send_orb_alert(str(file_path), urgent=is_urgent)
+                        
+                        urgency_type = "urgent" if is_urgent else "regular"
                         if result['success']:
-                            self.logger.info(f"📤 Telegram alert sent: {result['sent_count']} users notified")
+                            self.logger.info(f"📤 Telegram alert sent ({urgency_type}): {result['sent_count']} users notified")
                         else:
-                            self.logger.warning(f"❌ Telegram alert failed: {result.get('error', 'Unknown error')}")
+                            self.logger.warning(f"❌ Telegram alert failed ({urgency_type}): {result.get('error', 'Unknown error')}")
                             
                     except Exception as e:
                         self.logger.error(f"❌ Error sending Telegram alert: {e}")
+                else:
+                    self.logger.warning(f"⚠️ Failed to create super alert for {symbol} - no Telegram notification sent")
             
         except Exception as e:
             self.logger.error(f"Error processing alert file {file_path}: {e}")
