@@ -4,9 +4,18 @@ The remaining tasks are lower priority documentation and deployment tools:
   - Production configuration and deployment tools
   - Comprehensive API documentation
 
+Be sure to watch stocks minute-by-minute for buying oportunities Jdun Trades style but with 1 min candles.
+
+- [no] Update code/orb_alerts_monitor.py: No alert if red candlestick. Maybe not.  That might be an entry point.
+- [X] Review code/orb_alerts_monitor.py: How often is it polling the directory structure for creating super alerts? Answer: It uses a watchdog for file creation events allowing to respond immediately.
+
+- [ ] Think hard. Read .claude/instructions.md. git switch -c accumulate_symbols.  Create atom/api/build_symbol_list.py: You are in an atoms/molecules architecture. Create an atom to combine all files of the form data/YYYYMMDD.csv; eliminate duplicate symbols; set all fields other fields to zero; Do not zero the fields of the most recent file.  It is important that all the data/columns of the most recent file are preserved.  You might just want to append it and remember to eliminate duplicate symbols. This is going to be ran every trading day.  You might just establish a file with the accumulated data and append to it daily. Create PyTests; copy real data for the tests. Do not integrate the atom.
+- [ ] Integrate atom.
+- [ ] Update code/orb_alerts.py: After calculating the ORB, for each stock: if the "Signal" field is zero, set it to orb high.
 
 - [X] Think hard. Create a PRD, specs/telegram_post_prd.md, to ceate Telegram atom to post messages to Telegram API. The atom needs to accept a message as a string and post it to Telegram. Use dotenv to retrieve Telegram keys or whatever.  Have a separate CSV containing users to which to post; the file name is to start with ".", be in the root dir, and added to .gitignore.
 
+- [X] Update code/orb_alerts_summary.py: Create bullish and bearish bar charts for super alerts and bin ("current_price" / "orb_high") by increments of 10 percent.
 - [X] Update code/orb_alerts_summary.py: Create additional bullish and bearish pie charts for super alerts that the current price is 20% above signal price for bullish alerts and vice versa.
 - [X] Update code/orb_alerts_monitor.py: Only send messages to Telegram users after the filters have been applied.
 - [X] Update code/orb_alerts_monitor.py: Send Telegram message as urgent if "original_alert": ("current_price" / "orb_high") >= 1.20; otherwise regular message.

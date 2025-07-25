@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import pytz
 import matplotlib.pyplot as plt
+import numpy as np
 
 # Add project root to path
 sys.path.append('/home/wilsonb/dl/github.com/z223i/alpaca')
@@ -343,8 +344,11 @@ class AlertsSummaryGenerator:
         # Generate high-impact super alerts charts (20% above signal price)
         high_impact_chart_files = self._generate_high_impact_super_alerts_charts(summary, summary_dir, date_str)
         
+        # Generate super alerts ratio bar charts (current_price / orb_high binned by 10%)
+        ratio_bar_chart_files = self._generate_super_alerts_ratio_bar_charts(summary, summary_dir, date_str)
+        
         # Combine all chart files
-        chart_files = regular_chart_files + super_chart_files + high_impact_chart_files
+        chart_files = regular_chart_files + super_chart_files + high_impact_chart_files + ratio_bar_chart_files
         
         print(f"💾 JSON summary saved to: {json_filepath}")
         print(f"📊 CSV summary saved to: {csv_filepath}")
@@ -626,6 +630,149 @@ class AlertsSummaryGenerator:
                 stats['alerts'].append(alert)
         
         return dict(symbol_stats)
+    
+    def _generate_super_alerts_ratio_bar_charts(self, summary: Dict, summary_dir: Path, date_str: str) -> List[str]:
+        """Generate bar charts for super alerts binned by (current_price / orb_high) ratio in 10% increments."""
+        chart_files = []
+        
+        # Set matplotlib style for better looking charts
+        plt.style.use('default')
+        
+        # Generate bullish super alerts ratio bar chart
+        bullish_ratio_chart = self._create_super_alerts_ratio_bar_chart(
+            summary['super_alerts']['bullish_alerts'], 
+            'bullish', 
+            summary_dir, 
+            date_str
+        )
+        if bullish_ratio_chart:
+            chart_files.append(bullish_ratio_chart)
+        
+        # Generate bearish super alerts ratio bar chart
+        bearish_ratio_chart = self._create_super_alerts_ratio_bar_chart(
+            summary['super_alerts']['bearish_alerts'], 
+            'bearish', 
+            summary_dir, 
+            date_str
+        )
+        if bearish_ratio_chart:
+            chart_files.append(bearish_ratio_chart)
+        
+        if self.verbose and chart_files:
+            print(f"Generated {len(chart_files)} super alerts ratio bar charts")
+        
+        return chart_files
+    
+    def _create_super_alerts_ratio_bar_chart(self, super_alerts: List[Dict], alert_direction: str, 
+                                           summary_dir: Path, date_str: str) -> Optional[str]:
+        """Create a bar chart for super alerts binned by (current_price / orb_high) ratio."""
+        if not super_alerts:
+            if self.verbose:
+                print(f"No {alert_direction} super alerts for ratio bar chart")
+            return None
+        
+        # Calculate ratios and bin them
+        ratios = []
+        valid_alerts = 0
+        
+        for alert in super_alerts:
+            original_alert = alert.get('original_alert', {})
+            current_price = original_alert.get('current_price')
+            orb_high = original_alert.get('orb_high')
+            
+            if current_price and orb_high and orb_high > 0:
+                ratio = current_price / orb_high
+                ratios.append(ratio)
+                valid_alerts += 1
+            elif self.verbose:
+                print(f"Skipping alert due to missing data: current_price={current_price}, orb_high={orb_high}")
+        
+        if not ratios:
+            if self.verbose:
+                print(f"No valid ratio data for {alert_direction} super alerts")
+            return None
+        
+        # Define bins (10% increments)
+        # Start from 0.5 (50%) to 2.5 (250%) in 10% increments
+        bin_edges = [i * 0.1 for i in range(5, 26)]  # 0.5, 0.6, 0.7, ..., 2.4, 2.5
+        bin_labels = [f"{int(edge*100)}%-{int((edge+0.1)*100-1)}%" for edge in bin_edges[:-1]]
+        
+        # Add overflow bins for extreme values
+        if min(ratios) < 0.5:
+            bin_edges.insert(0, 0.0)
+            bin_labels.insert(0, "<50%")
+        if max(ratios) >= 2.5:
+            bin_edges.append(float('inf'))
+            bin_labels.append("≥250%")
+        
+        # Bin the ratios
+        hist, _ = np.histogram(ratios, bins=bin_edges)
+        
+        # Filter out empty bins and their labels
+        non_zero_indices = hist > 0
+        filtered_counts = hist[non_zero_indices]
+        filtered_labels = [bin_labels[i] for i in range(len(bin_labels)) if non_zero_indices[i]]
+        
+        if len(filtered_counts) == 0:
+            if self.verbose:
+                print(f"No data to plot for {alert_direction} super alerts ratio chart")
+            return None
+        
+        # Create figure and axis
+        fig, ax = plt.subplots(figsize=(12, 8))
+        
+        # Create bar chart
+        x_pos = range(len(filtered_labels))
+        color = 'green' if alert_direction == 'bullish' else 'red'
+        alpha = 0.7
+        
+        bars = ax.bar(x_pos, filtered_counts, color=color, alpha=alpha, 
+                     label=f'{alert_direction.title()} Super Alerts')
+        
+        # Customize the chart
+        ax.set_xlabel('Current Price / ORB High Ratio', fontsize=12, fontweight='bold')
+        ax.set_ylabel('Number of Super Alerts', fontsize=12, fontweight='bold')
+        direction_title = alert_direction.title()
+        ax.set_title(f'{direction_title} Super Alerts Distribution by Price/ORB-High Ratio\n{self.target_date}', 
+                    fontsize=14, fontweight='bold', pad=20)
+        ax.set_xticks(x_pos)
+        ax.set_xticklabels(filtered_labels, rotation=45, ha='right')
+        
+        # Add legend
+        ax.legend(loc='upper right')
+        
+        # Add grid for better readability
+        ax.grid(True, alpha=0.3, axis='y')
+        
+        # Add value labels on bars
+        for i, (bar, count) in enumerate(zip(bars, filtered_counts)):
+            if count > 0:
+                ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.5, 
+                       str(count), ha='center', va='bottom', fontweight='bold', fontsize=10)
+        
+        # Add statistics text
+        mean_ratio = np.mean(ratios)
+        median_ratio = np.median(ratios)
+        stats_text = f'Mean: {mean_ratio:.2f}x | Median: {median_ratio:.2f}x | Total: {valid_alerts} alerts'
+        ax.text(0.02, 0.98, stats_text, transform=ax.transAxes, fontsize=10, 
+                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+        
+        # Adjust layout to prevent label cutoff
+        plt.tight_layout()
+        
+        # Save chart
+        chart_filename = f"bar_chart_{alert_direction}_super_alerts_ratio_{date_str}.png"
+        chart_filepath = summary_dir / chart_filename
+        
+        plt.savefig(chart_filepath, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        if self.verbose:
+            print(f"Generated {alert_direction} super alerts ratio bar chart: {chart_filename}")
+            print(f"  Ratios range: {min(ratios):.2f}x to {max(ratios):.2f}x")
+            print(f"  Mean ratio: {mean_ratio:.2f}x, Median: {median_ratio:.2f}x")
+        
+        return str(chart_filepath)
     
     def _calculate_super_alert_symbol_statistics(self, super_alerts: List[Dict]) -> Dict:
         """Calculate symbol statistics for super alerts."""
