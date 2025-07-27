@@ -6,6 +6,16 @@ The remaining tasks are lower priority documentation and deployment tools:
 
 Be sure to watch stocks minute-by-minute for buying oportunities Jdun Trades style but with 1 min candles.
 
+
+- [ ] /read-instruction
+- [ ] git switch -c superduper_alerts
+- [ ] Think hard. code/orb_alerts.py generates alerts. code/orb_alerts_monitor.py filters alerts to generate super alerts. create code/orb_alerts_monitor_superduper.py to filter super alerts to generate superduper alerts; Mirror code/orb_alerts_monitor.py for the architecture such as the watchdog and filter; However, update the filtering. Make the filtering an atom; the atom should be passed the path of the latest super alert which the watchdog will make available; the atom should look at all super alerts from the symbol on that day (the date will be in the path from the watchdog); the you are to design the filter logic for the superduper alert based upon the stock is rising in price or consolidating; pass a timeframe to the atom and have it default to 45 minutes; use the timeframe for the filter logic; you are to create a new message format that is to be sent on Telegram.
+- [X] Update the superduper filter to only look at files prior to the timestamp in the filepath variable.  This will allow back testing.
+- [ ] /commit
+- [ ] Publish the new branch
+- [ ] git switch master and merge new branch
+
+
 - [no] Update code/orb_alerts_monitor.py: No alert if red candlestick. Maybe not.  That might be an entry point.
 - [X] Review code/orb_alerts_monitor.py: How often is it polling the directory structure for creating super alerts? Answer: It uses a watchdog for file creation events allowing to respond immediately.
 
