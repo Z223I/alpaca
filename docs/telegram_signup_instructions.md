@@ -2,6 +2,7 @@
 
 ## About the Alerts
 
+- Every alert will be at or above 20% of the ORB high;
 - Every alert will be at or above the Oracle signal;
 - There will not necessarily be an alert the first time the Oracle signal is reached;
 - Many factors go into an alert including volume;

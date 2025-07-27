@@ -13,13 +13,14 @@ Be sure to watch stocks minute-by-minute for buying oportunities Jdun Trades sty
 - [X] Think hard. Update code/orb.py: The code currently conducts PCA for a single date; Add --start and --end optional args;  do the old processing if the new args aren't there; if and only if both new args are there, do PCA analyis but do not generate charts; also add a new arg --opening-range, have it default to 15 which is probably what is in the current code.  Please do PCA across all dates in a single pass and not day-by-day.
 - [X] Think hard. Create code/orb_analysis.py: This code is to repeatedly call code/orb.py with the date range in ./data and iterate from 10 to 30 by 5's; it is then to compare and contrast the results to determine the impact of the opening range. Put all the results in a single file.  Then I can run them through you separately.
 
+- [X] Think. Update code/orb_alerts_monitor.py: Add the arg --post-only-urgent; update the call to send_orb_alert by adding a bool argument for the new CLI arg; send_orb_alert is to send telegram messages per this new arg; send_orb_alert sends only urgent methods if --post-only-urgent, otherwise send all messages.
 
 
 
 - [X] Think hard. git switch -c accumulate_symbols.  Create atom/api/build_symbol_list.py: You are in an atoms/molecules architecture. Create an atom to combine all files of the form data/YYYYMMDD.csv; eliminate duplicate symbols; set all other fields to zero; Do not zero the fields of the most recent file.  It is important that all the data/columns of the most recent file are preserved.  You might just want to append it and remember to eliminate duplicate symbols. This is going to be ran every trading day.  You might just establish a file with the accumulated data and append to it daily. Create PyTests; copy real data for the tests. Do not integrate the atom.
 - [X] /read-instruction
 - [X] cp code/orb_alerts.py code/orb_alerts_2.py; Integrate the atom atom/api/build_symbol_list.py into code/orb_alerts_2.py.
-- [ ] Update code/orb_alerts_2.py: After calculating the ORB, for each stock: if the "Signal" field is zero, set it to orb high.
+- [X] Update code/orb_alerts_2.py: After calculating the ORB, for each stock: if the "Signal" field is zero, set it to orb high.
 
 
 
