@@ -12,13 +12,14 @@ from datetime import datetime
 
 from .telegram_post import send_message
 
-def send_orb_alert(file_path: str, urgent: bool = True) -> Dict[str, Any]:
+def send_orb_alert(file_path: str, urgent: bool = True, post_only_urgent: bool = False) -> Dict[str, Any]:
     """
     Send ORB alert from super alert JSON file.
     
     Args:
         file_path (str): Path to super alert JSON file
         urgent (bool): Whether to mark the message as urgent (default True)
+        post_only_urgent (bool): If True, only send urgent messages (default False)
         
     Returns:
         dict: Result from send_message with additional metadata
@@ -52,6 +53,20 @@ def send_orb_alert(file_path: str, urgent: bool = True) -> Dict[str, Any]:
         
         # Add ORB alert emoji and formatting
         formatted_message = _format_orb_message(alert_message, alert_data)
+        
+        # Check if we should send based on urgency filter
+        if post_only_urgent and not urgent:
+            return {
+                'success': True,
+                'skipped': True,
+                'reason': 'Non-urgent message filtered by post_only_urgent setting',
+                'file_path': file_path,
+                'symbol': alert_data.get('symbol', 'UNKNOWN'),
+                'timestamp': alert_data.get('timestamp', 'UNKNOWN'),
+                'alert_type': alert_data.get('alert_type', 'UNKNOWN'),
+                'urgent': urgent,
+                'sent_count': 0
+            }
         
         # Send via Telegram
         result = send_message(formatted_message, urgent=urgent)

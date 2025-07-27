@@ -71,13 +71,14 @@ class AlertFileHandler(FileSystemEventHandler):
 class ORBAlertMonitor:
     """Main ORB Alert Monitor that watches for bullish alerts and creates super alerts."""
     
-    def __init__(self, symbols_file: Optional[str] = None, test_mode: bool = False):
+    def __init__(self, symbols_file: Optional[str] = None, test_mode: bool = False, post_only_urgent: bool = False):
         """
         Initialize ORB Alert Monitor.
         
         Args:
             symbols_file: Path to symbols CSV file
             test_mode: Run in test mode (no actual alerts)
+            post_only_urgent: Only send urgent telegram alerts
         """
         # Setup logging
         self.logger = self._setup_logging()
@@ -90,6 +91,7 @@ class ORBAlertMonitor:
         self.super_alert_filter = SuperAlertFilter(self.symbol_data)
         self.super_alert_generator = None  # Will be initialized when directories are set up
         self.test_mode = test_mode
+        self.post_only_urgent = post_only_urgent
         
         # Alert monitoring setup
         et_tz = pytz.timezone('US/Eastern')
@@ -235,11 +237,14 @@ class ORBAlertMonitor:
                             self.logger.info(f"📊 Breakout analysis: {current_price:.2f} / {orb_high:.2f} = {breakout_ratio:.3f} {'(URGENT)' if is_urgent else '(REGULAR)'}")
                         
                         file_path = self.super_alerts_dir / filename
-                        result = send_orb_alert(str(file_path), urgent=is_urgent)
+                        result = send_orb_alert(str(file_path), urgent=is_urgent, post_only_urgent=self.post_only_urgent)
                         
                         urgency_type = "urgent" if is_urgent else "regular"
                         if result['success']:
-                            self.logger.info(f"📤 Telegram alert sent ({urgency_type}): {result['sent_count']} users notified")
+                            if result.get('skipped'):
+                                self.logger.info(f"⏭️ Telegram alert skipped ({urgency_type}): {result.get('reason', 'Non-urgent filtered')}")
+                            else:
+                                self.logger.info(f"📤 Telegram alert sent ({urgency_type}): {result['sent_count']} users notified")
                         else:
                             self.logger.warning(f"❌ Telegram alert failed ({urgency_type}): {result.get('error', 'Unknown error')}")
                             
@@ -364,6 +369,12 @@ def parse_arguments():
         help="Enable verbose logging"
     )
     
+    parser.add_argument(
+        "--post-only-urgent",
+        action="store_true",
+        help="Only send telegram notifications for urgent alerts"
+    )
+    
     return parser.parse_args()
 
 
@@ -379,7 +390,8 @@ async def main():
     try:
         monitor = ORBAlertMonitor(
             symbols_file=args.symbols_file,
-            test_mode=args.test
+            test_mode=args.test,
+            post_only_urgent=args.post_only_urgent
         )
         
         if args.test:
