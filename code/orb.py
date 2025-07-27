@@ -34,12 +34,13 @@ class ORB:
     based on breakout patterns from opening range data.
     """
 
-    def __init__(self, plot_super_alerts: bool = True, use_iex: bool = False):
+    def __init__(self, plot_super_alerts: bool = True, use_iex: bool = False, opening_range_minutes: int = 15):
         """Initialize the ORB class.
         
         Args:
             plot_super_alerts: If True, plot super alerts. If False, plot regular alerts.
             use_iex: If True, use IEX data feed. If False, use SIP data feed (default).
+            opening_range_minutes: Opening range period in minutes (default: 15).
         """
 
         # Get api key and secret from environment variables
@@ -61,6 +62,7 @@ class ORB:
         self.pca_data: Optional[pd.DataFrame] = None
         self.plot_super_alerts = plot_super_alerts
         self.use_iex = use_iex
+        self.opening_range_minutes = opening_range_minutes
 
     def _is_valid_date_csv(self, filename: str) -> bool:
         """
@@ -504,6 +506,45 @@ class ORB:
             print(f"Error selecting CSV file: {e}")
             return None
 
+    def _get_csv_files_for_date_range(self, start_date: date, end_date: date) -> List[str]:
+        """
+        Get CSV files for a date range.
+        
+        Args:
+            start_date: Start date (inclusive)
+            end_date: End date (inclusive)
+            
+        Returns:
+            List of CSV file paths that fall within the date range
+        """
+        try:
+            csv_pattern = os.path.join(self.data_directory, '*.csv')
+            all_csv_files = glob.glob(csv_pattern)
+            
+            # Filter to only include files matching YYYYMMDD.csv format within date range
+            matching_files = []
+            for filepath in all_csv_files:
+                filename = os.path.basename(filepath)
+                if self._is_valid_date_csv(filename):
+                    try:
+                        # Extract date from filename
+                        date_str = filename.replace('.csv', '')
+                        file_date = datetime.strptime(date_str, '%Y%m%d').date()
+                        
+                        # Check if date is within range
+                        if start_date <= file_date <= end_date:
+                            matching_files.append(filepath)
+                    except ValueError:
+                        continue
+            
+            # Sort by date
+            matching_files.sort()
+            return matching_files
+            
+        except Exception as e:
+            print(f"Error getting CSV files for date range: {e}")
+            return []
+
     def _load_and_process_csv_data(self) -> bool:
         """
         Load and process CSV data from user-selected file.
@@ -824,7 +865,7 @@ class ORB:
             if isDebugging:
                 print(f"DEBUG: Calculating ORB levels using ORBCalculator...")
                 
-            orb_calculator = ORBCalculator()
+            orb_calculator = ORBCalculator(orb_period_minutes=self.opening_range_minutes)
             orb_result = orb_calculator.calculate_orb_levels(symbol, filtered_data)
             
             if orb_result is not None:
@@ -1515,13 +1556,208 @@ class ORB:
             print(f"Error generating charts: {e}")
             return False
 
-    def Exec(self) -> bool:
+    def _process_date_range_for_pca(self, start_date: date, end_date: date) -> bool:
+        """
+        Process multiple dates for PCA analysis without chart generation.
+        Collects data from all dates first, then performs PCA in a single pass.
+        
+        Args:
+            start_date: Start date for analysis
+            end_date: End date for analysis
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        print(f"\nProcessing date range for PCA analysis: {start_date} to {end_date}")
+        print("=" * 60)
+        
+        # Get CSV files for the date range
+        csv_files = self._get_csv_files_for_date_range(start_date, end_date)
+        
+        if not csv_files:
+            print(f"No CSV files found for date range {start_date} to {end_date}")
+            return False
+        
+        print(f"Found {len(csv_files)} CSV files to process:")
+        for csv_file in csv_files:
+            filename = os.path.basename(csv_file)
+            print(f"  - {filename}")
+        
+        # Initialize counters and data collection
+        total_files = len(csv_files)
+        successful_files = 0
+        all_market_data = {}  # Collect all market data across dates
+        
+        # Phase 1: Collect market data from all dates
+        print(f"\nPhase 1: Collecting market data from {total_files} dates...")
+        print("-" * 50)
+        
+        for i, csv_file in enumerate(csv_files, 1):
+            filename = os.path.basename(csv_file)
+            print(f"\nCollecting data from file {i}/{total_files}: {filename}")
+            
+            try:
+                # Load CSV data
+                csv_data = read_csv(csv_file)
+                
+                # Extract date from filename
+                date_str = filename.replace('.csv', '')
+                try:
+                    file_date = datetime.strptime(date_str, '%Y%m%d').date()
+                    print(f"Processing date: {file_date}")
+                except ValueError:
+                    print(f"Warning: Could not parse date from filename '{filename}'")
+                    continue
+                
+                if not csv_data:
+                    print(f"Warning: No data in CSV file {filename}")
+                    continue
+                
+                # Extract symbols from CSV data
+                symbols = []
+                for row in csv_data:
+                    if 'symbol' in row and row['symbol']:
+                        symbols.append(row['symbol'])
+                    elif 'Symbol' in row and row['Symbol']:
+                        symbols.append(row['Symbol'])
+                
+                if not symbols:
+                    print(f"No symbols found in {filename}")
+                    continue
+                
+                symbols = list(set(symbols))  # Remove duplicates
+                print(f"Found {len(symbols)} symbols: {symbols[:5]}{'...' if len(symbols) > 5 else ''}")
+                
+                # Get market data for this date
+                et_tz = pytz.timezone('America/New_York')
+                start_time = datetime.combine(file_date, time(4, 0), tzinfo=et_tz)
+                end_time = datetime.combine(file_date, time(16, 0), tzinfo=et_tz)
+                
+                # Determine which feed to use
+                feed = 'iex' if self.use_iex else 'sip'
+                
+                date_market_data = {}
+                for symbol in symbols:
+                    try:
+                        bars = self.api.get_bars(
+                            symbol,
+                            tradeapi.TimeFrame.Minute,
+                            start=start_time.isoformat(),
+                            end=end_time.isoformat(),
+                            feed=feed
+                        )
+                        
+                        if bars:
+                            symbol_data = []
+                            for bar in bars:
+                                bar_data = {
+                                    'timestamp': bar.t.isoformat(),
+                                    'open': float(bar.o),
+                                    'high': float(bar.h),
+                                    'low': float(bar.l),
+                                    'close': float(bar.c),
+                                    'volume': int(bar.v),
+                                    'symbol': symbol,
+                                    'date': file_date.strftime('%Y-%m-%d')
+                                }
+                                symbol_data.append(bar_data)
+                            
+                            date_market_data[symbol] = symbol_data
+                            
+                    except Exception as e:
+                        print(f"Error getting data for {symbol} on {file_date}: {e}")
+                        continue
+                
+                if date_market_data:
+                    # Store market data with date key
+                    all_market_data[file_date.strftime('%Y-%m-%d')] = date_market_data
+                    successful_files += 1
+                    print(f"✓ Collected data for {len(date_market_data)} symbols on {file_date}")
+                else:
+                    print(f"✗ No market data collected for {file_date}")
+                
+            except Exception as e:
+                print(f"Error processing {filename}: {e}")
+                continue
+        
+        if not all_market_data:
+            print("No market data collected from any date")
+            return False
+        
+        # Phase 2: Combine all market data into single DataFrame
+        print(f"\nPhase 2: Combining market data from {len(all_market_data)} successful dates...")
+        print("-" * 50)
+        
+        combined_data = []
+        total_symbols = set()
+        
+        for date_str, date_data in all_market_data.items():
+            for symbol, bars in date_data.items():
+                combined_data.extend(bars)
+                total_symbols.add(symbol)
+        
+        if not combined_data:
+            print("No combined market data available")
+            return False
+        
+        # Create combined DataFrame
+        combined_df = pd.DataFrame(combined_data)
+        combined_df['timestamp'] = pd.to_datetime(combined_df['timestamp'])
+        
+        print(f"Combined DataFrame created:")
+        print(f"  - Total rows: {len(combined_df):,}")
+        print(f"  - Unique symbols: {len(total_symbols)}")
+        print(f"  - Date range: {combined_df['date'].min()} to {combined_df['date'].max()}")
+        print(f"  - Symbols: {sorted(list(total_symbols))[:10]}{'...' if len(total_symbols) > 10 else ''}")
+        
+        # Store combined DataFrame
+        self.market_df = combined_df
+        
+        # Phase 3: Perform single-pass PCA analysis across all dates
+        print(f"\nPhase 3: Performing single-pass PCA analysis across all dates...")
+        print("-" * 50)
+        
+        pca_success = self._perform_pca_analysis()
+        
+        if pca_success:
+            print(f"\n✓ Multi-date PCA analysis completed successfully!")
+            print(f"Data processing summary:")
+            print(f"  - Processed files: {successful_files}/{total_files}")
+            print(f"  - Total symbols: {len(total_symbols)}")
+            print(f"  - Date range: {start_date} to {end_date}")
+            
+            if hasattr(self, 'pca_data') and self.pca_data is not None:
+                print(f"  - PCA data rows: {len(self.pca_data):,}")
+                unique_dates_in_pca = self.pca_data['timestamp'].dt.date.nunique() if 'timestamp' in self.pca_data.columns else len(all_market_data)
+                print(f"  - Dates in PCA: {unique_dates_in_pca}")
+            
+            return True
+        else:
+            print(f"✗ Multi-date PCA analysis failed")
+            return False
+
+    def Exec(self, start_date: Optional[date] = None, end_date: Optional[date] = None) -> bool:
         """
         Execute the ORB analysis process.
+        
+        Args:
+            start_date: Optional start date for multi-date analysis
+            end_date: Optional end date for multi-date analysis
 
         Returns:
             True if successful, False otherwise
         """
+        # Check if both start and end dates are provided for multi-date analysis
+        if start_date is not None and end_date is not None:
+            print("Multi-date PCA analysis mode (no chart generation)")
+            print(f"Date range: {start_date} to {end_date}")
+            print(f"Opening range period: {self.opening_range_minutes} minutes")
+            return self._process_date_range_for_pca(start_date, end_date)
+        
+        # Original single-date processing with chart generation
+        print("Single-date analysis mode (with chart generation)")
+        print(f"Opening range period: {self.opening_range_minutes} minutes")
+        
         success = self._load_and_process_csv_data()
 
         if not success:
@@ -1576,6 +1812,25 @@ def parse_arguments():
         help="Use IEX data feed instead of SIP (default: SIP)"
     )
     
+    parser.add_argument(
+        "--start",
+        type=str,
+        help="Start date for multi-date analysis (YYYY-MM-DD format)"
+    )
+    
+    parser.add_argument(
+        "--end",
+        type=str,
+        help="End date for multi-date analysis (YYYY-MM-DD format)"
+    )
+    
+    parser.add_argument(
+        "--opening-range",
+        type=int,
+        default=15,
+        help="Opening range period in minutes (default: 15)"
+    )
+    
     return parser.parse_args()
 
 
@@ -1588,18 +1843,54 @@ def main():
         # Parse command line arguments
         args = parse_arguments()
         
+        # Validate date arguments
+        start_date = None
+        end_date = None
+        
+        if args.start or args.end:
+            if not (args.start and args.end):
+                print("Error: Both --start and --end must be provided for multi-date analysis")
+                sys.exit(1)
+            
+            try:
+                start_date = datetime.strptime(args.start, '%Y-%m-%d').date()
+                end_date = datetime.strptime(args.end, '%Y-%m-%d').date()
+                
+                if start_date > end_date:
+                    print("Error: Start date must be before or equal to end date")
+                    sys.exit(1)
+                    
+            except ValueError as e:
+                print(f"Error parsing dates: {e}")
+                print("Please use YYYY-MM-DD format")
+                sys.exit(1)
+        
         # Determine whether to plot super alerts or regular alerts
         plot_super_alerts = not args.plot_alerts  # Default is True (super alerts)
         
         # Create and run ORB analysis
-        orb = ORB(plot_super_alerts=plot_super_alerts, use_iex=args.use_iex)
+        orb = ORB(
+            plot_super_alerts=plot_super_alerts, 
+            use_iex=args.use_iex,
+            opening_range_minutes=args.opening_range
+        )
         
         alert_type = "super alerts" if plot_super_alerts else "regular alerts"
         feed_type = "IEX" if args.use_iex else "SIP"
-        print(f"ORB analysis will plot {alert_type}")
-        print(f"Using {feed_type} data feed")
         
-        success = orb.Exec()
+        if start_date and end_date:
+            print(f"Multi-date ORB analysis: {start_date} to {end_date}")
+            print(f"Opening range period: {args.opening_range} minutes")
+            print(f"Analysis will plot {alert_type}")
+            print(f"Using {feed_type} data feed")
+            print("Note: Charts will NOT be generated in multi-date mode")
+        else:
+            print(f"Single-date ORB analysis")
+            print(f"Opening range period: {args.opening_range} minutes")
+            print(f"Analysis will plot {alert_type}")
+            print(f"Using {feed_type} data feed")
+        
+        success = orb.Exec(start_date=start_date, end_date=end_date)
 
         if success:
             print("\nORB analysis completed successfully.")

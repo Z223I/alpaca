@@ -1,0 +1,502 @@
+ORB OPENING RANGE IMPACT ANALYSIS - DETAILED REPORT
+================================================================================
+Generated: 2025-07-27 14:25:35
+Script: /home/wilsonb/dl/github.com/z223i/alpaca/code/orb_analysis.py
+
+================================================================================
+ORB OPENING RANGE IMPACT ANALYSIS
+================================================================================
+Analysis conducted: 2025-07-27 14:25:35
+
+SUMMARY OF RESULTS
+--------------------------------------------------
+Period   Success  Symbols  Rows       PCA Comp  Total Var %  1st Comp %
+--------------------------------------------------
+10       ✓        143      144,179    10        97.1         34.1      
+15       ✓        143      144,179    10        97.2         34.7      
+20       ✓        143      144,179    10        97.3         36.4      
+25       ✓        143      144,179    10        97.2         36.3      
+30       ✓        143      144,179    10        97.2         36.3      
+
+DETAILED COMPARATIVE ANALYSIS
+----------------------------------------
+1. PCA Variance Explained Comparison:
+   1. 20 minutes: 97.27% total variance
+   2. 25 minutes: 97.25% total variance
+   3. 30 minutes: 97.24% total variance
+   4. 15 minutes: 97.19% total variance
+   5. 10 minutes: 97.11% total variance
+   → Best performing period: 20 minutes (97.27%)
+
+2. First Principal Component Strength:
+   1. 20 minutes: 36.37% first component
+   2. 25 minutes: 36.34% first component
+   3. 30 minutes: 36.32% first component
+   4. 15 minutes: 34.67% first component
+   5. 10 minutes: 34.11% first component
+   → Strongest first component: 20 minutes (36.37%)
+
+3. Data Processing Efficiency:
+   10 minutes: 10 components from 143 symbols (7.0% efficiency)
+   15 minutes: 10 components from 143 symbols (7.0% efficiency)
+   20 minutes: 10 components from 143 symbols (7.0% efficiency)
+   25 minutes: 10 components from 143 symbols (7.0% efficiency)
+   30 minutes: 10 components from 143 symbols (7.0% efficiency)
+
+4. Opening Range Period Impact Assessment:
+   Total variance trend with longer periods: mixed
+   Optimal period for maximum variance explained: 20 minutes
+   Above-average periods: 20, 25, 30 minutes
+
+5. RECOMMENDATIONS:
+   → RECOMMENDED OPENING RANGE: 20 minutes
+     - Captures 97.27% of total variance
+     - First component explains 36.37%
+     - Processes 143 symbols effectively
+   → ALTERNATIVE: 25 minutes (97.25% variance)
+
+================================================================================
+
+DETAILED EXECUTION RESULTS
+==================================================
+
+OPENING RANGE PERIOD: 10 MINUTES
+----------------------------------------
+Command: ~/miniconda3/envs/alpaca/bin/python code/orb.py --start 2025-06-25 --end 2025-07-25 --opening-range 10
+Start Time: 2025-07-27T14:25:35.709253
+Duration: 69.7 seconds
+Exit Code: 0
+Success: True
+
+PCA Analysis Metrics:
+  total_symbols: 143
+  total_rows: 144179
+  pca_components: 10
+  total_variance_explained: 97.11
+  first_component_variance: 34.11
+  processing_success: True
+  error_message: None
+  execution_summary: {'processed_files': 16, 'total_files': 16, 'success_rate': 100.0, 'start_date': '2025-06-25', 'end_date': '2025-07-25'}
+
+Execution Output (first 2000 characters):
+------------------------------
+Multi-date ORB analysis: 2025-06-25 to 2025-07-25
+Opening range period: 10 minutes
+Analysis will plot super alerts
+Using SIP data feed
+Note: Charts will NOT be generated in multi-date mode
+Multi-date PCA analysis mode (no chart generation)
+Date range: 2025-06-25 to 2025-07-25
+Opening range period: 10 minutes
+
+Processing date range for PCA analysis: 2025-06-25 to 2025-07-25
+============================================================
+Found 16 CSV files to process:
+  - 20250625.csv
+  - 20250626.csv
+  - 20250630.csv
+  - 20250703.csv
+  - 20250709.csv
+  - 20250711.csv
+  - 20250714.csv
+  - 20250715.csv
+  - 20250716.csv
+  - 20250717.csv
+  - 20250718.csv
+  - 20250721.csv
+  - 20250722.csv
+  - 20250723.csv
+  - 20250724.csv
+  - 20250725.csv
+
+Phase 1: Collecting market data from 16 dates...
+--------------------------------------------------
+
+Collecting data from file 1/16: 20250625.csv
+Processing date: 2025-06-25
+Found 17 symbols: ['QXO', 'ZVSA', 'SONM', 'CNDS', 'NAAS']...
+✓ Collected data for 16 symbols on 2025-06-25
+
+Collecting data from file 2/16: 20250626.csv
+Processing date: 2025-06-26
+Found 9 symbols: ['CYN', 'PSTV', 'BEEM', 'BTAF', 'SRFM']...
+✓ Collected data for 7 symbols on 2025-06-26
+
+Collecting data from file 3/16: 20250630.csv
+Processing date: 2025-06-30
+Found 11 symbols: ['ARTL', 'BMNR', 'BBAI', 'LIDR', 'WBUY']...
+✓ Collected data for 10 symbols on 2025-06-30
+
+Collecting data from file 4/16: 20250703.csv
+Processing date: 2025-07-03
+Found 33 symbols: ['BBAI', 'QXO', 'SONM', 'LIDR', 'WBUY']...
+✓ Collected data for 29 symbols on 2025-07-03
+
+Collecting data from file 5/16: 20250709.csv
+Processing date: 2025-07-09
+Found 12 symbols: ['CLDI', 'GAME', 'KZIA', 'MBRX', 'MBIO']...
+✓ Collected data for 12 symbols on 2025-07-09
+
+Collecting data from file 6/16: 20250711.csv
+Processing date: 2025-07-11
+Found 5 symbols: ['ABVE', 'BTOG', 'FTFT', 'MULN', 'ARBK']
+✓ Collected data for 5 symbols on 2025-07-11
+
+Collecting data from file 7/16: 20250714.csv
+Processing date: 2025-07-14
+Fou
+... (truncated, full output was 11026383 characters)
+
+
+OPENING RANGE PERIOD: 15 MINUTES
+----------------------------------------
+Command: ~/miniconda3/envs/alpaca/bin/python code/orb.py --start 2025-06-25 --end 2025-07-25 --opening-range 15
+Start Time: 2025-07-27T14:26:45.462396
+Duration: 68.9 seconds
+Exit Code: 0
+Success: True
+
+PCA Analysis Metrics:
+  total_symbols: 143
+  total_rows: 144179
+  pca_components: 10
+  total_variance_explained: 97.19
+  first_component_variance: 34.67
+  processing_success: True
+  error_message: None
+  execution_summary: {'processed_files': 16, 'total_files': 16, 'success_rate': 100.0, 'start_date': '2025-06-25', 'end_date': '2025-07-25'}
+
+Execution Output (first 2000 characters):
+------------------------------
+Multi-date ORB analysis: 2025-06-25 to 2025-07-25
+Opening range period: 15 minutes
+Analysis will plot super alerts
+Using SIP data feed
+Note: Charts will NOT be generated in multi-date mode
+Multi-date PCA analysis mode (no chart generation)
+Date range: 2025-06-25 to 2025-07-25
+Opening range period: 15 minutes
+
+Processing date range for PCA analysis: 2025-06-25 to 2025-07-25
+============================================================
+Found 16 CSV files to process:
+  - 20250625.csv
+  - 20250626.csv
+  - 20250630.csv
+  - 20250703.csv
+  - 20250709.csv
+  - 20250711.csv
+  - 20250714.csv
+  - 20250715.csv
+  - 20250716.csv
+  - 20250717.csv
+  - 20250718.csv
+  - 20250721.csv
+  - 20250722.csv
+  - 20250723.csv
+  - 20250724.csv
+  - 20250725.csv
+
+Phase 1: Collecting market data from 16 dates...
+--------------------------------------------------
+
+Collecting data from file 1/16: 20250625.csv
+Processing date: 2025-06-25
+Found 17 symbols: ['QS', 'HIMS', 'SONM', 'SRFM', 'VOR']...
+✓ Collected data for 16 symbols on 2025-06-25
+
+Collecting data from file 2/16: 20250626.csv
+Processing date: 2025-06-26
+Found 9 symbols: ['BEEM', 'CYN', 'VOR', 'BTAF', 'ASTI']...
+✓ Collected data for 7 symbols on 2025-06-26
+
+Collecting data from file 3/16: 20250630.csv
+Processing date: 2025-06-30
+Found 11 symbols: ['KLTO', 'VOR', 'BBAI', 'VERO', 'JPON']...
+✓ Collected data for 10 symbols on 2025-06-30
+
+Collecting data from file 4/16: 20250703.csv
+Processing date: 2025-07-03
+Found 33 symbols: ['BEEM', 'CYN', 'BBAI', 'VERO', 'ONDS']...
+✓ Collected data for 29 symbols on 2025-07-03
+
+Collecting data from file 5/16: 20250709.csv
+Processing date: 2025-07-09
+Found 12 symbols: ['PROK', 'EVOK', 'SUGP', 'GAME', 'KZIA']...
+✓ Collected data for 12 symbols on 2025-07-09
+
+Collecting data from file 6/16: 20250711.csv
+Processing date: 2025-07-11
+Found 5 symbols: ['MULN', 'ABVE', 'ARBK', 'BTOG', 'FTFT']
+✓ Collected data for 5 symbols on 2025-07-11
+
+Collecting data from file 7/16: 20250714.csv
+Processing date: 2025-07-14
+Found 1
+... (truncated, full output was 11026384 characters)
+
+
+OPENING RANGE PERIOD: 20 MINUTES
+----------------------------------------
+Command: ~/miniconda3/envs/alpaca/bin/python code/orb.py --start 2025-06-25 --end 2025-07-25 --opening-range 20
+Start Time: 2025-07-27T14:27:54.435262
+Duration: 69.6 seconds
+Exit Code: 0
+Success: True
+
+PCA Analysis Metrics:
+  total_symbols: 143
+  total_rows: 144179
+  pca_components: 10
+  total_variance_explained: 97.27
+  first_component_variance: 36.37
+  processing_success: True
+  error_message: None
+  execution_summary: {'processed_files': 16, 'total_files': 16, 'success_rate': 100.0, 'start_date': '2025-06-25', 'end_date': '2025-07-25'}
+
+Execution Output (first 2000 characters):
+------------------------------
+Multi-date ORB analysis: 2025-06-25 to 2025-07-25
+Opening range period: 20 minutes
+Analysis will plot super alerts
+Using SIP data feed
+Note: Charts will NOT be generated in multi-date mode
+Multi-date PCA analysis mode (no chart generation)
+Date range: 2025-06-25 to 2025-07-25
+Opening range period: 20 minutes
+
+Processing date range for PCA analysis: 2025-06-25 to 2025-07-25
+============================================================
+Found 16 CSV files to process:
+  - 20250625.csv
+  - 20250626.csv
+  - 20250630.csv
+  - 20250703.csv
+  - 20250709.csv
+  - 20250711.csv
+  - 20250714.csv
+  - 20250715.csv
+  - 20250716.csv
+  - 20250717.csv
+  - 20250718.csv
+  - 20250721.csv
+  - 20250722.csv
+  - 20250723.csv
+  - 20250724.csv
+  - 20250725.csv
+
+Phase 1: Collecting market data from 16 dates...
+--------------------------------------------------
+
+Collecting data from file 1/16: 20250625.csv
+Processing date: 2025-06-25
+Found 17 symbols: ['TIGR', 'QXO', 'NVTS', 'HIMS', 'PSTV']...
+✓ Collected data for 16 symbols on 2025-06-25
+
+Collecting data from file 2/16: 20250626.csv
+Processing date: 2025-06-26
+Found 9 symbols: ['ASTI', 'CYN', 'PSTV', 'VOR', 'ASEP']...
+✓ Collected data for 7 symbols on 2025-06-26
+
+Collecting data from file 3/16: 20250630.csv
+Processing date: 2025-06-30
+Found 11 symbols: ['JPON', 'VERO', 'BBAI', 'ARTL', 'VOR']...
+✓ Collected data for 10 symbols on 2025-06-30
+
+Collecting data from file 4/16: 20250703.csv
+Processing date: 2025-07-03
+Found 33 symbols: ['TIGR', 'ASTI', 'RZLV', 'GNS', 'WBUY']...
+✓ Collected data for 29 symbols on 2025-07-03
+
+Collecting data from file 5/16: 20250709.csv
+Processing date: 2025-07-09
+Found 12 symbols: ['KZIA', 'GAME', 'EVOK', 'BMGL', 'SOBR']...
+✓ Collected data for 12 symbols on 2025-07-09
+
+Collecting data from file 6/16: 20250711.csv
+Processing date: 2025-07-11
+Found 5 symbols: ['FTFT', 'MULN', 'BTOG', 'ARBK', 'ABVE']
+✓ Collected data for 5 symbols on 2025-07-11
+
+Collecting data from file 7/16: 20250714.csv
+Processing date: 2025-07-14
+Found
+... (truncated, full output was 11026386 characters)
+
+
+OPENING RANGE PERIOD: 25 MINUTES
+----------------------------------------
+Command: ~/miniconda3/envs/alpaca/bin/python code/orb.py --start 2025-06-25 --end 2025-07-25 --opening-range 25
+Start Time: 2025-07-27T14:29:04.097754
+Duration: 68.6 seconds
+Exit Code: 0
+Success: True
+
+PCA Analysis Metrics:
+  total_symbols: 143
+  total_rows: 144179
+  pca_components: 10
+  total_variance_explained: 97.25
+  first_component_variance: 36.34
+  processing_success: True
+  error_message: None
+  execution_summary: {'processed_files': 16, 'total_files': 16, 'success_rate': 100.0, 'start_date': '2025-06-25', 'end_date': '2025-07-25'}
+
+Execution Output (first 2000 characters):
+------------------------------
+Multi-date ORB analysis: 2025-06-25 to 2025-07-25
+Opening range period: 25 minutes
+Analysis will plot super alerts
+Using SIP data feed
+Note: Charts will NOT be generated in multi-date mode
+Multi-date PCA analysis mode (no chart generation)
+Date range: 2025-06-25 to 2025-07-25
+Opening range period: 25 minutes
+
+Processing date range for PCA analysis: 2025-06-25 to 2025-07-25
+============================================================
+Found 16 CSV files to process:
+  - 20250625.csv
+  - 20250626.csv
+  - 20250630.csv
+  - 20250703.csv
+  - 20250709.csv
+  - 20250711.csv
+  - 20250714.csv
+  - 20250715.csv
+  - 20250716.csv
+  - 20250717.csv
+  - 20250718.csv
+  - 20250721.csv
+  - 20250722.csv
+  - 20250723.csv
+  - 20250724.csv
+  - 20250725.csv
+
+Phase 1: Collecting market data from 16 dates...
+--------------------------------------------------
+
+Collecting data from file 1/16: 20250625.csv
+Processing date: 2025-06-25
+Found 17 symbols: ['QS', 'VOR', 'CNDS', 'NVTS', 'TIGR']...
+✓ Collected data for 16 symbols on 2025-06-25
+
+Collecting data from file 2/16: 20250626.csv
+Processing date: 2025-06-26
+Found 9 symbols: ['ASEP', 'VOR', 'BTAF', 'BEEM', 'ASTI']...
+✓ Collected data for 7 symbols on 2025-06-26
+
+Collecting data from file 3/16: 20250630.csv
+Processing date: 2025-06-30
+Found 11 symbols: ['VOR', 'JOBY', 'VERO', 'KLTO', 'ONDS']...
+✓ Collected data for 10 symbols on 2025-06-30
+
+Collecting data from file 4/16: 20250703.csv
+Processing date: 2025-07-03
+Found 33 symbols: ['VERO', 'TIGR', 'PSTV', 'LIDR', 'RZLV']...
+✓ Collected data for 29 symbols on 2025-07-03
+
+Collecting data from file 5/16: 20250709.csv
+Processing date: 2025-07-09
+Found 12 symbols: ['MBIO', 'BMGL', 'SCAG', 'EVOK', 'MBRX']...
+✓ Collected data for 12 symbols on 2025-07-09
+
+Collecting data from file 6/16: 20250711.csv
+Processing date: 2025-07-11
+Found 5 symbols: ['ABVE', 'FTFT', 'ARBK', 'BTOG', 'MULN']
+✓ Collected data for 5 symbols on 2025-07-11
+
+Collecting data from file 7/16: 20250714.csv
+Processing date: 2025-07-14
+Found
+... (truncated, full output was 11026373 characters)
+
+
+OPENING RANGE PERIOD: 30 MINUTES
+----------------------------------------
+Command: ~/miniconda3/envs/alpaca/bin/python code/orb.py --start 2025-06-25 --end 2025-07-25 --opening-range 30
+Start Time: 2025-07-27T14:30:12.737792
+Duration: 69.3 seconds
+Exit Code: 0
+Success: True
+
+PCA Analysis Metrics:
+  total_symbols: 143
+  total_rows: 144179
+  pca_components: 10
+  total_variance_explained: 97.24
+  first_component_variance: 36.32
+  processing_success: True
+  error_message: None
+  execution_summary: {'processed_files': 16, 'total_files': 16, 'success_rate': 100.0, 'start_date': '2025-06-25', 'end_date': '2025-07-25'}
+
+Execution Output (first 2000 characters):
+------------------------------
+Multi-date ORB analysis: 2025-06-25 to 2025-07-25
+Opening range period: 30 minutes
+Analysis will plot super alerts
+Using SIP data feed
+Note: Charts will NOT be generated in multi-date mode
+Multi-date PCA analysis mode (no chart generation)
+Date range: 2025-06-25 to 2025-07-25
+Opening range period: 30 minutes
+
+Processing date range for PCA analysis: 2025-06-25 to 2025-07-25
+============================================================
+Found 16 CSV files to process:
+  - 20250625.csv
+  - 20250626.csv
+  - 20250630.csv
+  - 20250703.csv
+  - 20250709.csv
+  - 20250711.csv
+  - 20250714.csv
+  - 20250715.csv
+  - 20250716.csv
+  - 20250717.csv
+  - 20250718.csv
+  - 20250721.csv
+  - 20250722.csv
+  - 20250723.csv
+  - 20250724.csv
+  - 20250725.csv
+
+Phase 1: Collecting market data from 16 dates...
+--------------------------------------------------
+
+Collecting data from file 1/16: 20250625.csv
+Processing date: 2025-06-25
+Found 17 symbols: ['QXO', 'QS', 'GCTK', 'GNS', 'ZVSA']...
+✓ Collected data for 16 symbols on 2025-06-25
+
+Collecting data from file 2/16: 20250626.csv
+Processing date: 2025-06-26
+Found 9 symbols: ['CYN', 'ASTI', 'ADIL', 'SRFM', 'PSTV']...
+✓ Collected data for 7 symbols on 2025-06-26
+
+Collecting data from file 3/16: 20250630.csv
+Processing date: 2025-06-30
+Found 11 symbols: ['LIDR', 'BMNR', 'ARTL', 'WBUY', 'BBAI']...
+✓ Collected data for 10 symbols on 2025-06-30
+
+Collecting data from file 4/16: 20250703.csv
+Processing date: 2025-07-03
+Found 33 symbols: ['QS', 'ZVSA', 'ARTL', 'VERO', 'PSTV']...
+✓ Collected data for 29 symbols on 2025-07-03
+
+Collecting data from file 5/16: 20250709.csv
+Processing date: 2025-07-09
+Found 12 symbols: ['GAME', 'SUGP', 'PROK', 'EVOK', 'CLDI']...
+✓ Collected data for 12 symbols on 2025-07-09
+
+Collecting data from file 6/16: 20250711.csv
+Processing date: 2025-07-11
+Found 5 symbols: ['BTOG', 'ABVE', 'MULN', 'FTFT', 'ARBK']
+✓ Collected data for 5 symbols on 2025-07-11
+
+Collecting data from file 7/16: 20250714.csv
+Processing date: 2025-07-14
+Found 1
+... (truncated, full output was 11026377 characters)
+
+

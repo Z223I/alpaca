@@ -1,0 +1,16 @@
+ORB ANALYSIS VISUALIZATION SUMMARY
+==================================================
+Generated: 2025-07-27 14:31:28
+
+GENERATED PLOTS:
+--------------------
+1. orb_analysis_comparison.png - Four-panel comprehensive comparison
+2. orb_variance_trend.png - Detailed variance trend analysis
+3. orb_statistics.png - Statistical analysis with error bars
+
+KEY FINDINGS:
+---------------
+Total Variance Range: 97.11% - 97.27%
+First Component Range: 34.11% - 36.37%
+Most Effective Period: 20 minutes
+Strongest First Component: 20 minutes
