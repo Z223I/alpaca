@@ -3,10 +3,12 @@ Superduper Alert Filter - Advanced Filtering Logic for Superduper Alert Generati
 
 This atom analyzes super alerts to determine which should be promoted to superduper alerts
 based on price movement patterns, consolidation analysis, and momentum indicators.
+Enhanced with full market data integration for more accurate trend analysis.
 """
 
 import json
 import logging
+import pandas as pd
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
@@ -14,13 +16,15 @@ import pytz
 
 
 class SuperduperAlertData:
-    """Data structure for superduper alert analysis."""
+    """Data structure for superduper alert analysis with full market data integration."""
     
     def __init__(self, symbol: str):
         self.symbol = symbol
         self.super_alerts = []  # List of super alerts for this symbol
-        self.price_progression = []  # Price changes over time
+        self.price_progression = []  # Price changes over time (from super alerts)
+        self.market_data = []  # Full market data for comprehensive trend analysis
         self.timeframe_minutes = 45  # Default timeframe
+        self.logger = logging.getLogger(__name__)
         
     def add_super_alert(self, super_alert: Dict[str, Any]) -> None:
         """Add a super alert to the analysis."""
@@ -52,9 +56,95 @@ class SuperduperAlertData:
             except Exception as e:
                 logging.warning(f"Error parsing timestamp {timestamp_str}: {e}")
     
+    def load_market_data(self, date_str: str, current_timestamp: datetime) -> bool:
+        """
+        Load full market data for comprehensive trend analysis.
+        
+        Args:
+            date_str: Date string in YYYY-MM-DD format
+            current_timestamp: Current alert timestamp for backtesting chronological filtering
+            
+        Returns:
+            True if market data was successfully loaded
+        """
+        try:
+            # Construct path to market data
+            market_data_dir = Path(f"historical_data/{date_str}/market_data")
+            if not market_data_dir.exists():
+                self.logger.warning(f"Market data directory not found: {market_data_dir}")
+                return False
+            
+            # Find market data files for this symbol
+            pattern = f"{self.symbol}_*.csv"
+            data_files = list(market_data_dir.glob(pattern))
+            
+            if not data_files:
+                self.logger.warning(f"No market data files found for {self.symbol} on {date_str}")
+                return False
+            
+            # Load and combine all data files
+            all_data = []
+            for file_path in sorted(data_files):
+                try:
+                    df = pd.read_csv(file_path)
+                    if not df.empty:
+                        all_data.append(df)
+                        self.logger.debug(f"Loaded {len(df)} market data records from {file_path.name}")
+                except Exception as e:
+                    self.logger.warning(f"Error loading market data from {file_path}: {e}")
+            
+            if not all_data:
+                self.logger.warning(f"No valid market data loaded for {self.symbol}")
+                return False
+            
+            # Combine all data
+            combined_data = pd.concat(all_data, ignore_index=True)
+            
+            # Ensure timestamp column exists and convert to datetime
+            if 'timestamp' not in combined_data.columns:
+                self.logger.warning(f"Market data missing timestamp column for {self.symbol}")
+                return False
+            
+            combined_data['timestamp'] = pd.to_datetime(combined_data['timestamp'])
+            
+            # Sort by timestamp and remove duplicates
+            combined_data = combined_data.sort_values('timestamp').drop_duplicates(subset=['timestamp']).reset_index(drop=True)
+            
+            # Filter data to only include timestamps before current_timestamp (for backtesting accuracy)
+            # Convert current_timestamp to timezone-naive if needed
+            if current_timestamp.tzinfo is not None:
+                et_tz = pytz.timezone('US/Eastern')
+                current_timestamp_naive = current_timestamp.astimezone(et_tz).replace(tzinfo=None)
+            else:
+                current_timestamp_naive = current_timestamp
+            
+            # Filter to data before current timestamp
+            mask = combined_data['timestamp'] <= current_timestamp_naive
+            filtered_data = combined_data[mask].copy()
+            
+            # Convert to list of dictionaries for easier processing
+            self.market_data = []
+            for _, row in filtered_data.iterrows():
+                self.market_data.append({
+                    'timestamp': row['timestamp'].to_pydatetime(),
+                    'price': float(row.get('close', row.get('price', 0))),
+                    'open': float(row.get('open', row.get('price', 0))),
+                    'high': float(row.get('high', row.get('price', 0))),
+                    'low': float(row.get('low', row.get('price', 0))),
+                    'volume': int(row.get('volume', 0)),
+                    'vwap': float(row.get('vwap', row.get('price', 0)))
+                })
+            
+            self.logger.info(f"Loaded {len(self.market_data)} market data points for {self.symbol} (filtered to before {current_timestamp_naive})")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error loading market data for {self.symbol}: {e}")
+            return False
+    
     def analyze_trend(self, timeframe_minutes: int = 45) -> Tuple[str, float, Dict[str, Any]]:
         """
-        Analyze price trend over the specified timeframe.
+        Analyze price trend over the specified timeframe using full market data.
         
         Args:
             timeframe_minutes: Minutes to look back for trend analysis
@@ -65,25 +155,45 @@ class SuperduperAlertData:
             - strength: Float from 0.0 to 1.0 indicating trend strength
             - analysis_data: Dictionary with detailed analysis metrics
         """
-        if len(self.price_progression) < 2:
-            return 'insufficient_data', 0.0, {'reason': 'Less than 2 data points'}
+        # Use market data if available, fallback to super alerts
+        data_source = self.market_data if self.market_data else self.price_progression
         
-        # Filter data points within timeframe
-        latest_time = self.price_progression[-1]['timestamp']
+        if len(data_source) < 2:
+            return 'insufficient_data', 0.0, {'reason': f'Less than 2 data points (source: {"market_data" if self.market_data else "super_alerts"})'}
+        
+        # Get latest timestamp (from super alerts to maintain superduper alert timing)
+        if self.price_progression:
+            latest_time = self.price_progression[-1]['timestamp']
+        elif data_source:
+            latest_time = data_source[-1]['timestamp']
+        else:
+            return 'insufficient_data', 0.0, {'reason': 'No timestamp reference available'}
+        
         cutoff_time = latest_time - timedelta(minutes=timeframe_minutes)
         
+        # Filter data points within timeframe
         relevant_data = [
-            point for point in self.price_progression 
+            point for point in data_source 
             if point['timestamp'] >= cutoff_time
         ]
         
         if len(relevant_data) < 2:
-            return 'insufficient_data', 0.0, {'reason': 'Insufficient data within timeframe'}
+            return 'insufficient_data', 0.0, {'reason': f'Insufficient data within timeframe (found {len(relevant_data)} points)'}
         
-        # Calculate trend metrics
+        # Calculate trend metrics using enhanced market data
         prices = [point['price'] for point in relevant_data]
         timestamps = [point['timestamp'] for point in relevant_data]
-        penetrations = [point['penetration'] for point in relevant_data]
+        
+        # Get penetration data from super alerts (only available there)
+        penetrations = []
+        if self.market_data:
+            # For market data, we need to map penetration from super alerts
+            super_alert_penetrations = {point['timestamp']: point['penetration'] for point in self.price_progression}
+            # Use interpolation or default to 0 for market data points without penetration info
+            penetrations = [super_alert_penetrations.get(point['timestamp'], 0) for point in relevant_data]
+        else:
+            # Using super alert data directly
+            penetrations = [point.get('penetration', 0) for point in relevant_data]
         
         # Price change analysis
         price_start = prices[0]
@@ -103,14 +213,18 @@ class SuperduperAlertData:
         avg_penetration = sum(penetrations) / len(penetrations) if penetrations else 0
         
         # Determine trend type and strength
+        using_market_data = bool(self.market_data)
         trend_type, strength = self._classify_trend(
             price_change_percent, price_momentum, price_volatility, 
-            penetration_change, avg_penetration
+            penetration_change, avg_penetration, using_market_data
         )
         
         analysis_data = {
             'timeframe_minutes': timeframe_minutes,
             'data_points': len(relevant_data),
+            'data_source': 'market_data' if self.market_data else 'super_alerts',
+            'market_data_points': len(self.market_data),
+            'super_alert_points': len(self.price_progression),
             'price_change_percent': round(price_change_percent, 3),
             'price_momentum': round(price_momentum, 6),
             'price_volatility': round(price_volatility, 4),
@@ -136,7 +250,7 @@ class SuperduperAlertData:
     
     def _classify_trend(self, price_change_percent: float, momentum: float, 
                        volatility: float, penetration_change: float, 
-                       avg_penetration: float) -> Tuple[str, float]:
+                       avg_penetration: float, using_market_data: bool = False) -> Tuple[str, float]:
         """
         Classify trend type and calculate strength.
         
@@ -150,17 +264,31 @@ class SuperduperAlertData:
         
         strength = 0.0
         
-        # Rising trend criteria
-        if (price_change_percent > RISING_THRESHOLD and 
-            momentum > MOMENTUM_THRESHOLD and 
-            penetration_change > 5):  # Increasing penetration
-            
+        # Rising trend criteria - adjusted for market data analysis        
+        if using_market_data:
+            # For market data: focus on price and momentum (penetration less reliable)
+            rising_condition = (price_change_percent > RISING_THRESHOLD and 
+                               momentum > MOMENTUM_THRESHOLD)
+        else:
+            # For super alert data: require penetration change
+            rising_condition = (price_change_percent > RISING_THRESHOLD and 
+                               momentum > MOMENTUM_THRESHOLD and 
+                               penetration_change > 5)
+        
+        if rising_condition:
             # Calculate strength based on multiple factors
             price_strength = min(price_change_percent / 5.0, 1.0)  # Max at 5%
             momentum_strength = min(momentum / 0.1, 1.0)  # Max at 0.1% per minute
-            penetration_strength = min(penetration_change / 20.0, 1.0)  # Max at 20%
             
-            strength = (price_strength + momentum_strength + penetration_strength) / 3.0
+            if using_market_data:
+                # For market data: weight price and momentum more heavily
+                volatility_strength = max(0, 1.0 - (volatility / 0.10))  # Lower volatility is better
+                strength = (price_strength * 0.4 + momentum_strength * 0.4 + volatility_strength * 0.2)
+            else:
+                # For super alert data: include penetration
+                penetration_strength = min(penetration_change / 20.0, 1.0)  # Max at 20%
+                strength = (price_strength + momentum_strength + penetration_strength) / 3.0
+            
             return 'rising', strength
         
         # Consolidating trend criteria
@@ -239,11 +367,32 @@ class SuperduperAlertFilter:
             # Clear previous data and reload with current day's alerts
             symbol_data.super_alerts = []
             symbol_data.price_progression = []
+            symbol_data.market_data = []  # Clear market data
             
             for super_alert in all_super_alerts:
                 symbol_data.add_super_alert(super_alert)
             
-            # Analyze trend
+            # Load full market data for enhanced trend analysis
+            latest_timestamp = latest_super_alert.get('timestamp')
+            if latest_timestamp:
+                try:
+                    # Parse the timestamp for market data filtering
+                    if latest_timestamp.endswith(('+0000', '-0400', '-0500')):
+                        clean_timestamp = latest_timestamp[:-5]
+                        parsed_timestamp = datetime.fromisoformat(clean_timestamp)
+                    else:
+                        parsed_timestamp = datetime.fromisoformat(latest_timestamp.replace('Z', ''))
+                    
+                    # Load market data up to this timestamp
+                    market_data_loaded = symbol_data.load_market_data(date_str, parsed_timestamp)
+                    if market_data_loaded:
+                        self.logger.debug(f"Enhanced trend analysis for {symbol} using {len(symbol_data.market_data)} market data points")
+                    else:
+                        self.logger.debug(f"Fallback trend analysis for {symbol} using {len(symbol_data.price_progression)} super alert points")
+                except Exception as e:
+                    self.logger.warning(f"Error parsing timestamp for market data loading: {e}")
+            
+            # Analyze trend (now with enhanced market data if available)
             trend_type, strength, analysis_data = symbol_data.analyze_trend(self.timeframe_minutes)
             
             # Decision logic for superduper alerts
@@ -374,15 +523,22 @@ class SuperduperAlertFilter:
         
         # Criteria for different trend types
         if trend_type == 'rising':
-            # Rising trend: strong upward momentum with increasing penetration
+            # The trend strength calculation already handles the logic properly
+            # For market data vs super alert data differences
+            data_source = analysis_data.get('data_source', 'super_alerts')
             price_change = analysis_data.get('price_change_percent', 0)
             momentum = analysis_data.get('price_momentum', 0)
-            penetration_change = analysis_data.get('penetration_change', 0)
             
-            if price_change > 2.0 and momentum > 0.03 and penetration_change > 10:
-                return True, f"Strong rising trend: {price_change:.2f}% price change, {penetration_change:.1f}% penetration increase"
+            if data_source == 'market_data':
+                # For market data: trust the strength calculation (already accounts for price & momentum)
+                return True, f"Strong rising trend (market data): {price_change:.2f}% price change, {momentum:.4f} momentum, strength {strength:.2f}"
             else:
-                return False, f"Rising trend too weak: price {price_change:.2f}%, momentum {momentum:.4f}, penetration change {penetration_change:.1f}%"
+                # For super alert data: also check penetration change
+                penetration_change = analysis_data.get('penetration_change', 0)
+                if price_change > 2.0 and momentum > 0.03 and penetration_change > 10:
+                    return True, f"Strong rising trend: {price_change:.2f}% price change, {penetration_change:.1f}% penetration increase"
+                else:
+                    return False, f"Rising trend too weak: price {price_change:.2f}%, momentum {momentum:.4f}, penetration change {penetration_change:.1f}%"
         
         elif trend_type == 'consolidating':
             # Consolidating: stable price with sustained high penetration
