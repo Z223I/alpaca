@@ -1,13 +1,22 @@
-# Superduper Alerts Backtesting Framework
+# ORB Alerts Backtesting Framework
 
 ## Overview
 
-This directory contains comprehensive backtesting tools for the Superduper Alerts system. The framework enables historical analysis, strategy validation, and performance evaluation using real market data.
+This directory contains comprehensive backtesting tools for the ORB (Opening Range Breakout) alerts system. The framework enables historical analysis, strategy validation, and performance evaluation using real market data.
 
 ## Files
 
+### `alerts_backtest.py`
+Main backtesting script for the basic ORB alerts system (`code/orb_alerts.py`):
+- Chronological market data replay simulation
+- ORB level calculation (fixed 15-minute period)
+- Breakout detection and confidence scoring
+- Alert generation with proper timing
+- Comparison with existing alerts
+- Comprehensive statistics and metrics
+
 ### `superduper_alerts_backtest.py`
-Main backtesting framework with multiple analysis modes:
+Backtesting framework for the superduper alerts system:
 - Single symbol backtesting
 - Batch processing for multiple symbols
 - Analysis-only mode (no alert generation)
@@ -15,6 +24,139 @@ Main backtesting framework with multiple analysis modes:
 - Comprehensive statistics and reporting
 
 ## Usage Examples
+
+## Basic ORB Alerts Backtesting (`alerts_backtest.py`)
+
+### Basic Usage
+```bash
+# Basic backtest for specific symbol and date
+python3 tests/backtesting/alerts_backtest.py --symbol MCVT --date 2025-07-25
+
+# Verbose output with detailed logging
+python3 tests/backtesting/alerts_backtest.py --symbol AAPL --date 2025-07-23 --verbose
+
+# Compare generated alerts with existing alerts
+python3 tests/backtesting/alerts_backtest.py --symbol MCVT --date 2025-07-25 --compare
+
+# Analysis mode - only analyze existing data without generating new alerts
+python3 tests/backtesting/alerts_backtest.py --symbol AAPL --date 2025-07-23 --analysis-only
+```
+
+### Arguments for `alerts_backtest.py`
+| Argument | Description | Required |
+|----------|-------------|----------|
+| `--symbol` | Stock symbol to backtest | Yes |
+| `--date` | Date in YYYY-MM-DD format | Yes |
+| `--verbose` | Enable detailed logging | No |
+| `--compare` | Compare generated alerts with existing alerts | No |
+| `--analysis-only` | Only analyze existing data without generating new alerts | No |
+
+### Output Example for `alerts_backtest.py`
+```
+================================================================================
+📊 ORB ALERTS BACKTEST RESULTS
+================================================================================
+🔍 Symbol: MCVT
+📅 Date: 2025-07-25
+⏱️ ORB Period: 15 minutes
+📊 Market Data Loaded: ✅
+📈 ORB Calculated: ✅
+
+🚨 Alert Generation:
+  Generated Alerts: 3
+  Existing Alerts: 2
+
+📈 Breakout Types:
+  Generated:
+    bullish_breakout: 2
+    bearish_breakdown: 1
+  Existing:
+    bullish_breakout: 2
+
+🎯 Confidence Statistics:
+  Generated: Mean=0.742, Min=0.650, Max=0.850
+  Existing: Mean=0.768, Min=0.720, Max=0.816
+
+🔍 Comparison Results:
+  Matches: 2
+  Missing in Generated: 0
+  Extra in Generated: 1
+  Recall: 1.000
+  Precision: 0.667
+  F1 Score: 0.800
+================================================================================
+```
+
+### Metrics Explained for `alerts_backtest.py`
+
+- **Recall**: Percentage of existing alerts that were reproduced (existing alerts found / total existing alerts)
+- **Precision**: Percentage of generated alerts that match existing ones (matches / total generated alerts)
+- **F1 Score**: Harmonic mean of precision and recall
+- **Matches**: Alerts that appear in both generated and existing sets
+- **Missing in Generated**: Existing alerts that weren't reproduced
+- **Extra in Generated**: New alerts not in the existing set
+
+### Technical Details for `alerts_backtest.py`
+
+#### ORB Calculation
+The framework calculates Opening Range Breakout levels using the first 15 minutes of trading data (9:30-9:45 AM ET):
+- **ORB High**: Highest price during the opening range
+- **ORB Low**: Lowest price during the opening range
+- **ORB Range**: Difference between high and low
+
+#### Breakout Detection
+Breakouts are detected when:
+- Price moves above ORB high (bullish breakout)
+- Price moves below ORB low (bearish breakdown)
+- Volume and confidence criteria are met
+
+#### Confidence Scoring
+Alerts are scored based on:
+- Volume ratio vs average volume
+- Technical indicators (EMAs, momentum)
+- Breakout strength and sustainability
+- Market context and timing
+
+### Data Structure for `alerts_backtest.py`
+
+Expected directory structure:
+```
+historical_data/
+└── YYYY-MM-DD/
+    ├── market_data/
+    │   └── SYMBOL_YYYYMMDD_HHMMSS.csv
+    └── alerts/
+        ├── bullish/
+        │   └── alert_SYMBOL_YYYYMMDD_HHMMSS.json
+        └── bearish/
+            └── alert_SYMBOL_YYYYMMDD_HHMMSS.json
+```
+
+#### Market Data Format
+CSV files with columns:
+- `timestamp`: ISO format timestamp
+- `symbol`: Stock symbol
+- `open`: Opening price
+- `high`: High price
+- `low`: Low price
+- `close`: Closing price
+- `volume`: Trading volume
+- `vwap`: Volume-weighted average price
+- `trade_count`: Number of trades
+
+#### Alert Data Format
+JSON files with alert information:
+- `symbol`: Stock symbol
+- `timestamp`: Alert generation time
+- `current_price`: Price at alert time
+- `orb_high`: ORB high level
+- `orb_low`: ORB low level
+- `breakout_type`: Type of breakout (bullish_breakout/bearish_breakdown)
+- `confidence_score`: Alert confidence score
+- `volume_ratio`: Volume ratio vs average
+- Additional technical indicators
+
+## Superduper Alerts Backtesting (`superduper_alerts_backtest.py`)
 
 ### Basic Symbol Backtest
 ```bash
@@ -214,6 +356,64 @@ for date in 2025-07-23 2025-07-24 2025-07-25; do
         --date $date --batch-mode --dry-run
 done
 ```
+
+### Troubleshooting `alerts_backtest.py`
+
+#### Common Issues
+
+1. **No market data found**
+   - Ensure historical data exists in `historical_data/YYYY-MM-DD/market_data/`
+   - Check that CSV files follow the expected naming convention
+   - Verify the date format is YYYY-MM-DD
+
+2. **ORB calculation failed**
+   - Verify market data has sufficient records during ORB period (9:30-9:45 AM)
+   - Check data quality and completeness
+   - Ensure timestamp format is correct
+
+3. **No alerts generated**
+   - This may be normal if no significant breakouts occurred
+   - Use `--verbose` to see detailed processing logs
+   - Verify confidence thresholds are appropriate
+
+4. **Interface errors**
+   - Ensure all atom dependencies are properly installed
+   - Check that the ORB calculator interface matches expected parameters
+   - Verify breakout detector configuration
+
+#### Debug Mode
+Enable verbose logging to see detailed processing information:
+```bash
+python3 tests/backtesting/alerts_backtest.py --symbol MCVT --date 2025-07-25 --verbose
+```
+
+This will show:
+- Data loading progress
+- ORB calculation details
+- Breakout detection logic
+- Confidence scoring steps
+- Alert generation process
+
+### Integration for `alerts_backtest.py`
+
+The backtesting framework integrates with the main ORB alerts system components:
+- `atoms/indicators/orb_calculator.py`: ORB level calculations
+- `atoms/alerts/breakout_detector.py`: Breakout signal detection
+- `atoms/alerts/confidence_scorer.py`: Alert confidence scoring
+- `atoms/alerts/alert_formatter.py`: Alert formatting and output
+- `atoms/websocket/data_buffer.py`: Market data management
+
+### Performance for `alerts_backtest.py`
+
+The framework is optimized for:
+- **Memory efficiency**: Processes data chronologically without loading entire datasets
+- **Accuracy**: Prevents future data leakage through chronological filtering
+- **Speed**: Efficient data structures and minimal I/O operations
+
+Typical performance:
+- ~1000 data points per second
+- Memory usage scales with data buffer size
+- Processing time proportional to market session length
 
 ## Troubleshooting
 
