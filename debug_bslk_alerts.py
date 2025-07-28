@@ -133,9 +133,7 @@ def debug_bslk_alert_generation():
                     print(f"   🚨 ALERT GENERATED: {alert.symbol} - {alert.priority.value}")
                     print(f"   📄 Alert message: {alert.alert_message}")
                     
-                    # Save to file
-                    json_file = alert_formatter.save_alert_to_file(alert, "json")
-                    print(f"   💾 Saved to: {json_file}")
+                    # Debug output only - no file saving needed
                 else:
                     print(f"   ❌ Alert not generated - confidence too low ({confidence.total_score:.3f} < {config.min_confidence_score})")
             else:

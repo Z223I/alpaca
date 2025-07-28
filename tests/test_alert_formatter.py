@@ -6,11 +6,7 @@ Tests the alert formatting, prioritization, and output generation.
 
 import pytest
 import json
-import csv
-import tempfile
-import os
 from datetime import datetime
-from pathlib import Path
 from unittest.mock import patch
 
 from atoms.alerts.alert_formatter import (
@@ -113,8 +109,7 @@ class TestAlertFormatter:
     
     def setup_method(self):
         """Setup test fixtures."""
-        self.temp_dir = tempfile.mkdtemp()
-        self.formatter = AlertFormatter(self.temp_dir)
+        self.formatter = AlertFormatter()
         
         # Create test breakout signal
         self.test_signal = BreakoutSignal(
@@ -136,10 +131,6 @@ class TestAlertFormatter:
             total_score=0.78
         )
     
-    def teardown_method(self):
-        """Clean up test fixtures."""
-        import shutil
-        shutil.rmtree(self.temp_dir)
     
     def test_formatter_initialization(self):
         """Test formatter initialization."""
@@ -219,50 +210,6 @@ class TestAlertFormatter:
         assert 'recommended_stop_loss' in data
         assert 'recommended_take_profit' in data
     
-    def test_save_alert_to_file_json(self):
-        """Test saving alert to JSON file."""
-        alert = self.formatter.create_alert(self.test_signal, self.test_confidence)
-        
-        filepath = self.formatter.save_alert_to_file(alert, "json")
-        
-        assert os.path.exists(filepath)
-        assert filepath.endswith(".json")
-        
-        # Verify file content
-        with open(filepath, 'r') as f:
-            data = json.load(f)
-            assert data['symbol'] == "AAPL"
-    
-    def test_save_alert_to_file_csv(self):
-        """Test saving alert to CSV file."""
-        alert = self.formatter.create_alert(self.test_signal, self.test_confidence)
-        
-        filepath = self.formatter.save_alert_to_file(alert, "csv")
-        
-        assert os.path.exists(filepath)
-        assert filepath.endswith(".csv")
-        
-        # Verify file content
-        with open(filepath, 'r', newline='') as csvfile:
-            reader = csv.DictReader(csvfile)
-            row = next(reader)
-            assert row['symbol'] == "AAPL"
-            assert float(row['current_price']) == 151.00
-    
-    def test_save_alert_to_file_txt(self):
-        """Test saving alert to text file."""
-        alert = self.formatter.create_alert(self.test_signal, self.test_confidence)
-        
-        filepath = self.formatter.save_alert_to_file(alert, "txt")
-        
-        assert os.path.exists(filepath)
-        assert filepath.endswith(".txt")
-        
-        # Verify file content
-        with open(filepath, 'r') as f:
-            content = f.read()
-            assert "AAPL" in content
-            assert "151.00" in content
     
     def test_get_alerts_by_priority(self):
         """Test filtering alerts by priority."""
@@ -401,16 +348,3 @@ class TestAlertFormatter:
         assert len(self.formatter.alert_history) == 1000  # Should be limited to 1000
         assert self.formatter.daily_alert_count == 1005  # Count should still be accurate
     
-    def test_filename_generation(self):
-        """Test alert filename generation."""
-        alert = self.formatter.create_alert(self.test_signal, self.test_confidence)
-        
-        filepath = self.formatter.save_alert_to_file(alert, "json")
-        filename = os.path.basename(filepath)
-        
-        # Should contain symbol and timestamp
-        assert alert.symbol in filename
-        assert filename.endswith(".json")
-        # Should contain timestamp components
-        assert "20250101" in filename
-        assert "103000" in filename

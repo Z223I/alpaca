@@ -228,7 +228,7 @@ class AlertsSummaryGenerator:
         bullish_super_alerts = []
         bearish_super_alerts = []
         
-        # Load bullish super alerts
+        # Load bullish superduper alerts
         bullish_super_dir = self.target_dir / "super_alerts" / "bullish"
         if bullish_super_dir.exists():
             for json_file in bullish_super_dir.glob("*.json"):
@@ -240,9 +240,9 @@ class AlertsSummaryGenerator:
                         bullish_super_alerts.append(super_alert)
                 except Exception as e:
                     if self.verbose:
-                        print(f"Error loading bullish super alert {json_file}: {e}")
+                        print(f"Error loading bullish superduper alert {json_file}: {e}")
         
-        # Load bearish super alerts (for future support)
+        # Load bearish superduper alerts
         bearish_super_dir = self.target_dir / "super_alerts" / "bearish"
         if bearish_super_dir.exists():
             for json_file in bearish_super_dir.glob("*.json"):
@@ -254,7 +254,7 @@ class AlertsSummaryGenerator:
                         bearish_super_alerts.append(super_alert)
                 except Exception as e:
                     if self.verbose:
-                        print(f"Error loading bearish super alert {json_file}: {e}")
+                        print(f"Error loading bearish superduper alert {json_file}: {e}")
         
         super_alerts = bullish_super_alerts + bearish_super_alerts
         
@@ -268,7 +268,7 @@ class AlertsSummaryGenerator:
                 'total_alerts': len(all_alerts),
                 'bullish_alerts': len(bullish_alerts),
                 'bearish_alerts': len(bearish_alerts),
-                'super_alerts': len(super_alerts),
+                'superduper_alerts': len(super_alerts),
                 'unique_symbols': len(set(alert.get('symbol') for alert in all_alerts))
             },
             'bullish_analysis': {
@@ -338,14 +338,14 @@ class AlertsSummaryGenerator:
         # Generate regular alerts charts
         regular_chart_files = self._generate_regular_alerts_charts(summary, summary_dir, date_str)
         
-        # Generate super alerts charts
-        super_chart_files = self._generate_super_alerts_charts(summary, summary_dir, date_str)
+        # Generate superduper alerts charts (bullish and bearish pie charts + bar charts)
+        super_chart_files = self._generate_superduper_alerts_charts(summary, summary_dir, date_str)
         
-        # Generate high-impact super alerts charts (20% above signal price)
-        high_impact_chart_files = self._generate_high_impact_super_alerts_charts(summary, summary_dir, date_str)
+        # Note: High-impact charts are not generated since all superduper alerts are already high impact
+        high_impact_chart_files = []
         
-        # Generate super alerts ratio bar charts (current_price / orb_high binned by 10%)
-        ratio_bar_chart_files = self._generate_super_alerts_ratio_bar_charts(summary, summary_dir, date_str)
+        # Generate superduper alerts ratio bar charts (current_price / orb_high binned by 10%)
+        ratio_bar_chart_files = self._generate_superduper_alerts_ratio_bar_charts(summary, summary_dir, date_str)
         
         # Combine all chart files
         chart_files = regular_chart_files + super_chart_files + high_impact_chart_files + ratio_bar_chart_files
@@ -353,7 +353,7 @@ class AlertsSummaryGenerator:
         print(f"💾 JSON summary saved to: {json_filepath}")
         print(f"📊 CSV summary saved to: {csv_filepath}")
         for chart_file in chart_files:
-            print(f"📈 Pie chart saved to: {chart_file}")
+            print(f"📈 Chart saved to: {chart_file}")
         
         return str(json_filepath), str(csv_filepath), chart_files
     
@@ -494,49 +494,64 @@ class AlertsSummaryGenerator:
         
         return chart_files
     
-    def _generate_super_alerts_charts(self, summary: Dict, summary_dir: Path, date_str: str) -> List[str]:
-        """Generate pie charts for super alerts by symbol count."""
+    def _generate_superduper_alerts_charts(self, summary: Dict, summary_dir: Path, date_str: str) -> List[str]:
+        """Generate bullish and bearish pie charts as well as bar charts for superduper alerts by symbol count."""
         chart_files = []
         
         # Set matplotlib style for better looking charts
         plt.style.use('default')
         
-        # Calculate super alert symbol statistics
-        bullish_super_stats = self._calculate_super_alert_symbol_statistics(
+        # Calculate superduper alert symbol statistics
+        bullish_superduper_stats = self._calculate_super_alert_symbol_statistics(
             summary['super_alerts']['bullish_alerts']
         )
-        bearish_super_stats = self._calculate_super_alert_symbol_statistics(
+        bearish_superduper_stats = self._calculate_super_alert_symbol_statistics(
             summary['super_alerts']['bearish_alerts']
         )
         
-        # Generate bullish super alerts pie chart
-        if bullish_super_stats:
-            bullish_super_chart = self._create_alert_pie_chart(
-                bullish_super_stats,
-                'Bullish Super Alerts by Symbol',
-                'bullish_super_alerts',
+        if self.verbose:
+            bullish_count = sum(stats['total_alerts'] for stats in bullish_superduper_stats.values()) if bullish_superduper_stats else 0
+            bearish_count = sum(stats['total_alerts'] for stats in bearish_superduper_stats.values()) if bearish_superduper_stats else 0
+            print(f"Generating superduper alerts charts: {bullish_count} bullish, {bearish_count} bearish")
+        
+        # Generate bullish superduper alerts pie chart
+        if bullish_superduper_stats:
+            bullish_superduper_chart = self._create_alert_pie_chart(
+                bullish_superduper_stats,
+                'Bullish Superduper Alerts by Symbol',
+                'bullish_superduper_alerts',
                 summary_dir,
                 date_str
             )
-            if bullish_super_chart:
-                chart_files.append(bullish_super_chart)
+            if bullish_superduper_chart:
+                chart_files.append(bullish_superduper_chart)
+                if self.verbose:
+                    print(f"Generated bullish superduper alerts pie chart")
+        elif self.verbose:
+            print("No bullish superduper alerts found for pie chart")
         
-        # Generate bearish super alerts pie chart (for future support)
-        if bearish_super_stats:
-            bearish_super_chart = self._create_alert_pie_chart(
-                bearish_super_stats,
-                'Bearish Super Alerts by Symbol',
-                'bearish_super_alerts',
+        # Generate bearish superduper alerts pie chart
+        if bearish_superduper_stats:
+            bearish_superduper_chart = self._create_alert_pie_chart(
+                bearish_superduper_stats,
+                'Bearish Superduper Alerts by Symbol',
+                'bearish_superduper_alerts',
                 summary_dir,
                 date_str
             )
-            if bearish_super_chart:
-                chart_files.append(bearish_super_chart)
+            if bearish_superduper_chart:
+                chart_files.append(bearish_superduper_chart)
+                if self.verbose:
+                    print(f"Generated bearish superduper alerts pie chart")
+        elif self.verbose:
+            print("No bearish superduper alerts found for pie chart")
         
-        # Generate combined super alerts bar chart
-        super_bar_chart = self._generate_super_alerts_bar_chart(summary, summary_dir, date_str)
-        if super_bar_chart:
-            chart_files.append(super_bar_chart)
+        # Generate combined superduper alerts bar chart (bullish positive, bearish negative)
+        superduper_bar_chart = self._generate_superduper_alerts_bar_chart(summary, summary_dir, date_str)
+        if superduper_bar_chart:
+            chart_files.append(superduper_bar_chart)
+            if self.verbose:
+                print(f"Generated superduper alerts bar chart")
         
         return chart_files
     
@@ -631,15 +646,15 @@ class AlertsSummaryGenerator:
         
         return dict(symbol_stats)
     
-    def _generate_super_alerts_ratio_bar_charts(self, summary: Dict, summary_dir: Path, date_str: str) -> List[str]:
-        """Generate bar charts for super alerts binned by (current_price / orb_high) ratio in 10% increments."""
+    def _generate_superduper_alerts_ratio_bar_charts(self, summary: Dict, summary_dir: Path, date_str: str) -> List[str]:
+        """Generate bar charts for superduper alerts binned by (current_price / orb_high) ratio in 10% increments."""
         chart_files = []
         
         # Set matplotlib style for better looking charts
         plt.style.use('default')
         
-        # Generate bullish super alerts ratio bar chart
-        bullish_ratio_chart = self._create_super_alerts_ratio_bar_chart(
+        # Generate bullish superduper alerts ratio bar chart
+        bullish_ratio_chart = self._create_superduper_alerts_ratio_bar_chart(
             summary['super_alerts']['bullish_alerts'], 
             'bullish', 
             summary_dir, 
@@ -648,8 +663,8 @@ class AlertsSummaryGenerator:
         if bullish_ratio_chart:
             chart_files.append(bullish_ratio_chart)
         
-        # Generate bearish super alerts ratio bar chart
-        bearish_ratio_chart = self._create_super_alerts_ratio_bar_chart(
+        # Generate bearish superduper alerts ratio bar chart
+        bearish_ratio_chart = self._create_superduper_alerts_ratio_bar_chart(
             summary['super_alerts']['bearish_alerts'], 
             'bearish', 
             summary_dir, 
@@ -659,23 +674,23 @@ class AlertsSummaryGenerator:
             chart_files.append(bearish_ratio_chart)
         
         if self.verbose and chart_files:
-            print(f"Generated {len(chart_files)} super alerts ratio bar charts")
+            print(f"Generated {len(chart_files)} superduper alerts ratio bar charts")
         
         return chart_files
     
-    def _create_super_alerts_ratio_bar_chart(self, super_alerts: List[Dict], alert_direction: str, 
+    def _create_superduper_alerts_ratio_bar_chart(self, superduper_alerts: List[Dict], alert_direction: str, 
                                            summary_dir: Path, date_str: str) -> Optional[str]:
-        """Create a bar chart for super alerts binned by (current_price / orb_high) ratio."""
-        if not super_alerts:
+        """Create a bar chart for superduper alerts binned by (current_price / orb_high) ratio."""
+        if not superduper_alerts:
             if self.verbose:
-                print(f"No {alert_direction} super alerts for ratio bar chart")
+                print(f"No {alert_direction} superduper alerts for ratio bar chart")
             return None
         
         # Calculate ratios and bin them
         ratios = []
         valid_alerts = 0
         
-        for alert in super_alerts:
+        for alert in superduper_alerts:
             original_alert = alert.get('original_alert', {})
             current_price = original_alert.get('current_price')
             orb_high = original_alert.get('orb_high')
@@ -689,7 +704,7 @@ class AlertsSummaryGenerator:
         
         if not ratios:
             if self.verbose:
-                print(f"No valid ratio data for {alert_direction} super alerts")
+                print(f"No valid ratio data for {alert_direction} superduper alerts")
             return None
         
         # Define bins (10% increments)
@@ -715,7 +730,7 @@ class AlertsSummaryGenerator:
         
         if len(filtered_counts) == 0:
             if self.verbose:
-                print(f"No data to plot for {alert_direction} super alerts ratio chart")
+                print(f"No data to plot for {alert_direction} superduper alerts ratio chart")
             return None
         
         # Create figure and axis
@@ -727,13 +742,13 @@ class AlertsSummaryGenerator:
         alpha = 0.7
         
         bars = ax.bar(x_pos, filtered_counts, color=color, alpha=alpha, 
-                     label=f'{alert_direction.title()} Super Alerts')
+                     label=f'{alert_direction.title()} Superduper Alerts')
         
         # Customize the chart
         ax.set_xlabel('Current Price / ORB High Ratio', fontsize=12, fontweight='bold')
-        ax.set_ylabel('Number of Super Alerts', fontsize=12, fontweight='bold')
+        ax.set_ylabel('Number of Superduper Alerts', fontsize=12, fontweight='bold')
         direction_title = alert_direction.title()
-        ax.set_title(f'{direction_title} Super Alerts Distribution by Price/ORB-High Ratio\n{self.target_date}', 
+        ax.set_title(f'{direction_title} Superduper Alerts Distribution by Price/ORB-High Ratio\n{self.target_date}', 
                     fontsize=14, fontweight='bold', pad=20)
         ax.set_xticks(x_pos)
         ax.set_xticklabels(filtered_labels, rotation=45, ha='right')
@@ -761,14 +776,14 @@ class AlertsSummaryGenerator:
         plt.tight_layout()
         
         # Save chart
-        chart_filename = f"bar_chart_{alert_direction}_super_alerts_ratio_{date_str}.png"
+        chart_filename = f"bar_chart_{alert_direction}_superduper_alerts_ratio_{date_str}.png"
         chart_filepath = summary_dir / chart_filename
         
         plt.savefig(chart_filepath, dpi=300, bbox_inches='tight')
         plt.close()
         
         if self.verbose:
-            print(f"Generated {alert_direction} super alerts ratio bar chart: {chart_filename}")
+            print(f"Generated {alert_direction} superduper alerts ratio bar chart: {chart_filename}")
             print(f"  Ratios range: {min(ratios):.2f}x to {max(ratios):.2f}x")
             print(f"  Mean ratio: {mean_ratio:.2f}x, Median: {median_ratio:.2f}x")
         
@@ -789,8 +804,8 @@ class AlertsSummaryGenerator:
         
         return dict(symbol_stats)
     
-    def _generate_super_alerts_bar_chart(self, summary: Dict, summary_dir: Path, date_str: str) -> Optional[str]:
-        """Generate a bar chart showing bullish (positive) and bearish (negative) super alerts by symbol."""
+    def _generate_superduper_alerts_bar_chart(self, summary: Dict, summary_dir: Path, date_str: str) -> Optional[str]:
+        """Generate a bar chart showing bullish (positive) and bearish (negative) superduper alerts by symbol."""
         bullish_stats = self._calculate_super_alert_symbol_statistics(
             summary['super_alerts']['bullish_alerts']
         )
@@ -807,7 +822,7 @@ class AlertsSummaryGenerator:
         
         if not all_symbols:
             if self.verbose:
-                print("No symbols found for super alerts bar chart")
+                print("No symbols found for superduper alerts bar chart")
             return None
         
         # Sort symbols alphabetically (ascending)
@@ -833,15 +848,15 @@ class AlertsSummaryGenerator:
         x_pos = range(len(sorted_symbols))
         
         # Plot bullish bars (positive, green)
-        bullish_bars = ax.bar(x_pos, bullish_counts, color='green', alpha=0.7, label='Bullish Super Alerts')
+        bullish_bars = ax.bar(x_pos, bullish_counts, color='green', alpha=0.7, label='Bullish Superduper Alerts')
         
         # Plot bearish bars (negative, red)
-        bearish_bars = ax.bar(x_pos, bearish_counts, color='red', alpha=0.7, label='Bearish Super Alerts')
+        bearish_bars = ax.bar(x_pos, bearish_counts, color='red', alpha=0.7, label='Bearish Superduper Alerts')
         
         # Customize the chart
         ax.set_xlabel('Symbols', fontsize=12, fontweight='bold')
-        ax.set_ylabel('Number of Super Alerts', fontsize=12, fontweight='bold')
-        ax.set_title(f'Super Alert Distribution by Symbol\n{self.target_date}', fontsize=14, fontweight='bold', pad=20)
+        ax.set_ylabel('Number of Superduper Alerts', fontsize=12, fontweight='bold')
+        ax.set_title(f'Superduper Alert Distribution by Symbol\n{self.target_date}', fontsize=14, fontweight='bold', pad=20)
         ax.set_xticks(x_pos)
         ax.set_xticklabels(sorted_symbols, rotation=45, ha='right')
         
@@ -865,7 +880,7 @@ class AlertsSummaryGenerator:
         plt.tight_layout()
         
         # Save chart
-        chart_filename = f"bar_chart_super_alerts_{date_str}.png"
+        chart_filename = f"bar_chart_superduper_alerts_{date_str}.png"
         chart_filepath = summary_dir / chart_filename
         
         plt.savefig(chart_filepath, dpi=300, bbox_inches='tight')
@@ -1022,7 +1037,7 @@ class AlertsSummaryGenerator:
         print(f"Total Alerts: {metadata['total_alerts']}")
         print(f"  📈 Bullish: {metadata['bullish_alerts']}")
         print(f"  📉 Bearish: {metadata['bearish_alerts']}")
-        print(f"  🚀 Super: {metadata['super_alerts']}")
+        print(f"  🚀 Superduper: {metadata['superduper_alerts']}")
         print(f"Unique Symbols: {metadata['unique_symbols']}")
         
         # Most active symbols
@@ -1107,7 +1122,7 @@ def main():
         print(f"   📄 JSON: {json_file}")
         print(f"   📊 CSV: {csv_file}")
         if chart_files:
-            print(f"   📈 Charts: {len(chart_files)} pie charts generated")
+            print(f"   📈 Charts: {len(chart_files)} charts generated")
         
     except Exception as e:
         print(f"❌ Error: {e}")

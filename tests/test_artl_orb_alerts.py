@@ -82,9 +82,9 @@ class TestARTLORBAlerts:
         return ConfidenceScorer()
     
     @pytest.fixture
-    def alert_formatter(self, tmp_path):
-        """Create alert formatter with temporary output directory."""
-        return AlertFormatter(str(tmp_path))
+    def alert_formatter(self):
+        """Create alert formatter."""
+        return AlertFormatter()
     
     def test_artl_orb_level_calculation(self, artl_data, artl_orb_levels):
         """Test ORB level calculation matches expected values."""

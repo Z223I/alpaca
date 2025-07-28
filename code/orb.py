@@ -38,7 +38,7 @@ class ORB:
         """Initialize the ORB class.
         
         Args:
-            plot_super_alerts: If True, plot super alerts. If False, plot regular alerts.
+            plot_super_alerts: If True, plot superduper alerts. If False, plot regular alerts.
             use_iex: If True, use IEX data feed. If False, use SIP data feed (default).
             opening_range_minutes: Opening range period in minutes (default: 15).
         """
@@ -94,7 +94,7 @@ class ORB:
 
     def _load_alerts_for_symbol(self, symbol: str, target_date: date) -> List[Dict[str, Any]]:
         """
-        Load alerts for a specific symbol and date. Loads super alerts or regular alerts based on plot_super_alerts setting.
+        Load alerts for a specific symbol and date. Loads superduper alerts or regular alerts based on plot_super_alerts setting.
         
         Args:
             symbol: Stock symbol to load alerts for
@@ -110,14 +110,14 @@ class ORB:
 
     def _load_super_alerts_for_symbol(self, symbol: str, target_date: date) -> List[Dict[str, Any]]:
         """
-        Load super alerts for a specific symbol and date from historical_data/super_alerts.
+        Load superduper alerts for a specific symbol and date from historical_data/superduper_alerts.
         
         Args:
             symbol: Stock symbol to load super alerts for
             target_date: Date to load super alerts for
             
         Returns:
-            List of super alert dictionaries containing timestamp, type, and alert data
+            List of superduper alert dictionaries containing timestamp, type, and alert data
         """
         alerts = []
         
@@ -186,10 +186,10 @@ class ORB:
                         alerts.append(alert_data)
                             
                     except Exception as e:
-                        print(f"Warning: Error loading super alert file {alert_file}: {e}")
+                        print(f"Warning: Error loading superduper alert file {alert_file}: {e}")
                         continue
             
-            # Sort super alerts by timestamp 
+            # Sort superduper alerts by timestamp 
             def safe_sort_key(alert):
                 timestamp_dt = alert.get('timestamp_dt')
                 if timestamp_dt is None:
@@ -208,7 +208,7 @@ class ORB:
             return alerts
             
         except Exception as e:
-            print(f"Error loading super alerts for {symbol} on {target_date}: {e}")
+            print(f"Error loading superduper alerts for {symbol} on {target_date}: {e}")
             return alerts
 
     def _load_regular_alerts_for_symbol(self, symbol: str, target_date: date) -> List[Dict[str, Any]]:
@@ -1468,7 +1468,7 @@ class ORB:
 
             # Generate chart for each symbol
             success_count = 0
-            alert_type_name = "super alerts" if self.plot_super_alerts else "regular alerts"
+            alert_type_name = "superduper alerts" if self.plot_super_alerts else "regular alerts"
             
             for symbol in symbols:
                 try:
@@ -1803,7 +1803,7 @@ def parse_arguments():
     parser.add_argument(
         "--plot-alerts",
         action="store_true",
-        help="Plot regular alerts instead of super alerts (default: plot super alerts)"
+        help="Plot regular alerts instead of superduper alerts (default: plot superduper alerts)"
     )
     
     parser.add_argument(
@@ -1865,8 +1865,8 @@ def main():
                 print("Please use YYYY-MM-DD format")
                 sys.exit(1)
         
-        # Determine whether to plot super alerts or regular alerts
-        plot_super_alerts = not args.plot_alerts  # Default is True (super alerts)
+        # Determine whether to plot superduper alerts or regular alerts
+        plot_super_alerts = not args.plot_alerts  # Default is True (superduper alerts)
         
         # Create and run ORB analysis
         orb = ORB(
@@ -1875,7 +1875,7 @@ def main():
             opening_range_minutes=args.opening_range
         )
         
-        alert_type = "super alerts" if plot_super_alerts else "regular alerts"
+        alert_type = "superduper alerts" if plot_super_alerts else "regular alerts"
         feed_type = "IEX" if args.use_iex else "SIP"
         
         if start_date and end_date:

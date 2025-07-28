@@ -6,12 +6,10 @@ for the ORB trading alerts system.
 """
 
 import json
-import csv
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
 from enum import Enum
-from pathlib import Path
 
 from atoms.alerts.breakout_detector import BreakoutSignal, BreakoutType
 from atoms.alerts.confidence_scorer import ConfidenceComponents
@@ -129,20 +127,8 @@ class ORBAlert:
 class AlertFormatter:
     """Alert formatting and output management."""
     
-    def __init__(self, output_dir: str = "alerts"):
-        """
-        Initialize alert formatter.
-        
-        Args:
-            output_dir: Directory for alert output files
-        """
-        self.output_dir = Path(output_dir)
-        self.output_dir.mkdir(exist_ok=True)
-        
-        # Create subdirectories for bullish and bearish alerts
-        (self.output_dir / "bullish").mkdir(exist_ok=True)
-        (self.output_dir / "bearish").mkdir(exist_ok=True)
-        
+    def __init__(self):
+        """Initialize alert formatter."""
         # Alert history
         self.alert_history: List[ORBAlert] = []
         self.daily_alert_count = 0
@@ -340,72 +326,6 @@ class AlertFormatter:
         
         return json.dumps(alert_dict, indent=2)
     
-    def save_alert_to_file(self, alert: ORBAlert, file_format: str = "json") -> str:
-        """
-        Save alert to file in appropriate subdirectory.
-        
-        Args:
-            alert: ORBAlert to save
-            file_format: Format to save ("json", "csv", "txt")
-            
-        Returns:
-            Path to saved file
-        """
-        # Determine subdirectory based on breakout type
-        if alert.breakout_type == BreakoutType.BULLISH_BREAKOUT:
-            subdir = "bullish"
-        elif alert.breakout_type == BreakoutType.BEARISH_BREAKDOWN:
-            subdir = "bearish"
-        else:
-            subdir = ""  # Save in root alerts directory for other types
-        
-        timestamp_str = alert.timestamp.strftime("%Y%m%d_%H%M%S")
-        filename = f"{alert.symbol}_{timestamp_str}.{file_format}"
-        
-        if subdir:
-            filepath = self.output_dir / subdir / filename
-        else:
-            filepath = self.output_dir / filename
-        
-        if file_format == "json":
-            with open(filepath, 'w') as f:
-                f.write(self.format_json_output(alert))
-        elif file_format == "csv":
-            self._save_alert_csv(alert, filepath)
-        elif file_format == "txt":
-            with open(filepath, 'w') as f:
-                f.write(self.format_console_output(alert))
-        
-        return str(filepath)
-    
-    def _save_alert_csv(self, alert: ORBAlert, filepath: Path) -> None:
-        """Save alert to CSV format."""
-        fieldnames = [
-            'symbol', 'timestamp', 'current_price', 'orb_high', 'orb_low',
-            'breakout_type', 'breakout_percentage', 'volume_ratio',
-            'confidence_score', 'priority', 'recommended_stop_loss',
-            'recommended_take_profit'
-        ]
-        
-        with open(filepath, 'w', newline='') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            
-            row = {
-                'symbol': alert.symbol,
-                'timestamp': alert.timestamp.isoformat(),
-                'current_price': alert.current_price,
-                'orb_high': alert.orb_high,
-                'orb_low': alert.orb_low,
-                'breakout_type': alert.breakout_type.value,
-                'breakout_percentage': alert.breakout_percentage,
-                'volume_ratio': alert.volume_ratio,
-                'confidence_score': alert.confidence_score,
-                'priority': alert.priority.value,
-                'recommended_stop_loss': alert.recommended_stop_loss,
-                'recommended_take_profit': alert.recommended_take_profit
-            }
-            writer.writerow(row)
     
     def get_alerts_by_priority(self, priority: AlertPriority) -> List[ORBAlert]:
         """

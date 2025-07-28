@@ -83,9 +83,9 @@ class TestBMNRORBAlerts:
         return ConfidenceScorer()
     
     @pytest.fixture
-    def alert_formatter(self, tmp_path):
-        """Create alert formatter with temporary output directory."""
-        return AlertFormatter(str(tmp_path))
+    def alert_formatter(self):
+        """Create alert formatter."""
+        return AlertFormatter()
     
     def test_bmnr_orb_level_calculation(self, bmnr_data, bmnr_orb_levels):
         """Test ORB level calculation matches expected values."""

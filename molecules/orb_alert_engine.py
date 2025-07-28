@@ -47,13 +47,12 @@ class AlertEngineStats:
 class ORBAlertEngine:
     """Main orchestrator for ORB trading alerts system."""
     
-    def __init__(self, symbols_file: str = None, output_dir: str = "alerts"):
+    def __init__(self, symbols_file: str = None):
         """
         Initialize ORB alert engine.
         
         Args:
             symbols_file: Path to symbols CSV file
-            output_dir: Directory for alert output files
         """
         # Initialize components
         # If symbols_file is provided, use it; otherwise SymbolManager will use current date file
@@ -69,7 +68,7 @@ class ORBAlertEngine:
         self.orb_calculator = ORBCalculator()
         self.breakout_detector = BreakoutDetector(self.orb_calculator)
         self.confidence_scorer = ConfidenceScorer()
-        self.alert_formatter = AlertFormatter(output_dir)
+        self.alert_formatter = AlertFormatter()
         
         # State management
         self.is_running = False
@@ -300,9 +299,6 @@ class ORBAlertEngine:
             print(console_output)
             self.logger.info(f"Generated alert: {alert.symbol} - {alert.priority.value}")
             
-            # File output
-            json_file = self.alert_formatter.save_alert_to_file(alert, "json")
-            self.logger.debug(f"Saved alert to: {json_file}")
             
             # Call registered callbacks
             for callback in self.alert_callbacks:
@@ -591,9 +587,6 @@ class ORBAlertEngine:
             
             self.logger.info(f"Generated alert: {alert.symbol} - {alert.priority.value} (gen_time: {generation_time_ms:.1f}ms)")
             
-            # File output
-            json_file = self.alert_formatter.save_alert_to_file(alert, "json")
-            self.logger.debug(f"Saved alert to: {json_file}")
             
             # Call registered callbacks
             for callback in self.alert_callbacks:

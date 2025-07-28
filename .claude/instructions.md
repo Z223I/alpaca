@@ -25,6 +25,13 @@ This is an ORB (Opening Range Breakout) trading system built for Alpaca API. Key
 - Historical data files are automatically cleaned up (only latest per symbol kept)
 - Environment variables are loaded from `.env` file for API credentials
 
+## Git Repository Management
+
+- **NEVER create git tags** without explicit user permission
+- Git tags should only be created by the user to mark important milestones
+- When asked to "list tags" or review tags, only display existing tags, do not create new ones
+- If tag creation is needed, ask the user to create them manually
+
 ## Common Patterns
 
 - Testing: `source ~/miniconda3/etc/profile.d/conda.sh && conda activate alpaca && ./test.sh orb`
