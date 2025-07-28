@@ -28,11 +28,11 @@ Be sure to watch stocks minute-by-minute for buying oportunities Jdun Trades sty
 
 
 
-- [ ] git tag -a v0.3.3 -m "Superduper charts fix."
+- [X] /commit and git tag -a v0.3.3 -m "Superduper charts fix."
 
-- [ ] Think hard. Update code/orb_alerts_summary.py: see historical_data/2025-07-28/alerts/summary/bar_chart_superduper_alerts_20250728.png has 5 symbols on the chart as having superduper alerts; There should only be VWAV see historical_data/2025-07-28/superduper_alerts/bullish/ dir. Once you have found the directory error, you will need two update the code for the other two superduper alert charts in that directory.
+- [X] Think hard. Update code/orb_alerts_summary.py: see historical_data/2025-07-28/alerts/summary/bar_chart_superduper_alerts_20250728.png has 5 symbols on the chart as having superduper alerts; There should only be VWAV see historical_data/2025-07-28/superduper_alerts/bullish/ dir. Once you have found the directory error, you will need two update the code for the other two superduper alert charts in that directory.
 
-- [ ] git tag -a v0.3.4 -m "Superduper summary charts fix."
+- [X] /commit and git tag -a v0.3.4 -m "Superduper summary charts fix."
 
 
 
