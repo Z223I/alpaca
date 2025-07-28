@@ -229,7 +229,7 @@ class AlertsSummaryGenerator:
         bearish_super_alerts = []
         
         # Load bullish superduper alerts
-        bullish_super_dir = self.target_dir / "super_alerts" / "bullish"
+        bullish_super_dir = self.target_dir / "superduper_alerts" / "bullish"
         if bullish_super_dir.exists():
             for json_file in bullish_super_dir.glob("*.json"):
                 try:
@@ -243,7 +243,7 @@ class AlertsSummaryGenerator:
                         print(f"Error loading bullish superduper alert {json_file}: {e}")
         
         # Load bearish superduper alerts
-        bearish_super_dir = self.target_dir / "super_alerts" / "bearish"
+        bearish_super_dir = self.target_dir / "superduper_alerts" / "bearish"
         if bearish_super_dir.exists():
             for json_file in bearish_super_dir.glob("*.json"):
                 try:
@@ -691,7 +691,8 @@ class AlertsSummaryGenerator:
         valid_alerts = 0
         
         for alert in superduper_alerts:
-            original_alert = alert.get('original_alert', {})
+            latest_super_alert = alert.get('latest_super_alert', {})
+            original_alert = latest_super_alert.get('original_alert', {})
             current_price = original_alert.get('current_price')
             orb_high = original_alert.get('orb_high')
             
