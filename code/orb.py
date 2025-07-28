@@ -124,7 +124,7 @@ class ORB:
         try:
             # Format date as YYYY-MM-DD for directory structure
             date_str = target_date.strftime('%Y-%m-%d')
-            alerts_base_dir = os.path.join('historical_data', date_str, 'super_alerts')
+            alerts_base_dir = os.path.join('historical_data', date_str, 'superduper_alerts')
             
             if not os.path.exists(alerts_base_dir):
                 return alerts
@@ -136,8 +136,8 @@ class ORB:
                 if not os.path.exists(alert_dir):
                     continue
                     
-                # Look for super alert files matching the symbol
-                alert_pattern = f"super_alert_{symbol}_*.json"
+                # Look for superduper alert files matching the symbol
+                alert_pattern = f"superduper_alert_{symbol}_*.json"
                 alert_files = glob.glob(os.path.join(alert_dir, alert_pattern))
                 
                 for alert_file in alert_files:

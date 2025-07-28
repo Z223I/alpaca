@@ -170,7 +170,7 @@ python3 tests/backtesting/superduper_alerts_backtest.py --symbol AAPL --date 202
 ### Dry Run Mode
 ```bash
 # Analysis without Telegram notifications
-python3 tests/backtesting/superduper_alerts_backtest.py --symbol MCVT --date 2025-07-25 --dry-run
+python3 tests/backtesting/superduper_alerts_backtest.py --symbol VWAV --date 2025-07-28 --dry-run
 ```
 
 ### Batch Processing

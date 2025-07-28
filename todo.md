@@ -25,7 +25,22 @@ Be sure to watch stocks minute-by-minute for buying oportunities Jdun Trades sty
 
 - [X] Think. Update code/orb_alerts_monitor.py: Add the arg --post-only-urgent; update the call to send_orb_alert by adding a bool argument for the new CLI arg; send_orb_alert is to send telegram messages per this new arg; send_orb_alert sends only urgent methods if --post-only-urgent, otherwise send all messages.
 
-- [ ] Think. Update code/orb.py: It should be putting super alerts on the candlestick charts; change that to superduper alerts.
+
+
+
+- [ ] git tag -a v0.3.2 -m "Superduper charts fix."
+
+- [ ] Think hard. Update code/orb_alerts_summary.py: see historical_data/2025-07-28/alerts/summary/bar_chart_superduper_alerts_20250728.png has 5 symbols on the chart as having superduper alerts; There should only be VWAV see historical_data/2025-07-28/superduper_alerts/bullish/ dir. Once you have found the directory error, you will need two update the code for the other two superduper alert charts in that directory.
+
+- [ ] git tag -a v0.3.3 -m "Superduper summary charts fix."
+
+
+
+
+
+
+
+- [X] Think. Update code/orb.py: It should be putting super alerts on the candlestick charts; change that to superduper alerts.
 
 - [X] Think hard. git switch -c accumulate_symbols.  Create atom/api/build_symbol_list.py: You are in an atoms/molecules architecture. Create an atom to combine all files of the form data/YYYYMMDD.csv; eliminate duplicate symbols; set all other fields to zero; Do not zero the fields of the most recent file.  It is important that all the data/columns of the most recent file are preserved.  You might just want to append it and remember to eliminate duplicate symbols. This is going to be ran every trading day.  You might just establish a file with the accumulated data and append to it daily. Create PyTests; copy real data for the tests. Do not integrate the atom.
 - [X] /read-instruction

@@ -304,7 +304,7 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
                 alert_count += 1
             
             if alert_count > 0:
-                print(f"Plotted {alert_count} super alerts for {symbol} (including out-of-market-hours alerts)")
+                print(f"Plotted {alert_count} superduper alerts for {symbol} (including out-of-market-hours alerts)")
 
         # Add legend if any indicators were calculated
         if ema_success or ema20_success or vwap_success:
@@ -333,6 +333,8 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
         ax1.set_title(title, fontsize=16, fontweight='bold')
         ax1.text(0.5, 0.95, f'{chart_date} ({timezone_name})', transform=ax1.transAxes, fontsize=12, 
                 ha='center', va='top', style='italic')
+        ax1.text(0.5, 0.90, 'Superduper Alerts', transform=ax1.transAxes, fontsize=11, 
+                ha='center', va='top', style='italic', color='darkblue')
         ax1.set_ylabel('Price ($)', fontsize=12)
         ax1.grid(True, alpha=0.3)
         
