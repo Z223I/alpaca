@@ -33,6 +33,7 @@ Be sure to watch stocks minute-by-minute for buying oportunities Jdun Trades sty
 - [X] Update code/orb_alerts_2.py: After calculating the ORB, for each stock: if the "Signal" field is zero, set it to orb high.
 
 
+- [ ] Think hard. Create tests/backtesting/alerts_backtest.py; Create a backtest for code/orb_alerts.py; It is to have CLI args for symbol and date; use --date and --symbol as the names. This backtest will be kept in the repo.
 
 - [X] Think hard. Create a PRD, specs/telegram_post_prd.md, to ceate Telegram atom to post messages to Telegram API. The atom needs to accept a message as a string and post it to Telegram. Use dotenv to retrieve Telegram keys or whatever.  Have a separate CSV containing users to which to post; the file name is to start with ".", be in the root dir, and added to .gitignore.
 
