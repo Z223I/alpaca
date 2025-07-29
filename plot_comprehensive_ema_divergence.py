@@ -319,13 +319,13 @@ def main():
     if len(above_mean_alerts) > 0:
         plot_comprehensive_chart(candlestick_filtered, above_mean_alerts,
                                 f"Above Mean EMA Divergence (≥{mean_divergence*100:.2f}%)",
-                                'comprehensive_above_mean_divergence_1200dpi.png',
+                                'comprehensive_above_mean_divergence.png',
                                 mean_divergence)
     
     if len(below_mean_alerts) > 0:
         plot_comprehensive_chart(candlestick_filtered, below_mean_alerts,
                                 f"Below Mean EMA Divergence (<{mean_divergence*100:.2f}%)",
-                                'comprehensive_below_mean_divergence_1200dpi.png',
+                                'comprehensive_below_mean_divergence.png',
                                 mean_divergence)
     
     # Print detailed analysis
