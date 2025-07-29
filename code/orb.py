@@ -883,7 +883,7 @@ class ORB:
                 print(f"DEBUG: Calculating EMA (9-period)...")
                 
             ema_success, ema_values = calculate_ema(
-                filtered_data, price_column='close', period=9)
+                filtered_data, period=9)
                 
             if isDebugging:
                 print(f"DEBUG: EMA calculation - Success: {ema_success}")
@@ -900,7 +900,7 @@ class ORB:
                 print(f"DEBUG: Calculating EMA (20-period)...")
                 
             ema20_success, ema20_values = calculate_ema(
-                filtered_data, price_column='close', period=20)
+                filtered_data, period=20)
                 
             if isDebugging:
                 print(f"DEBUG: EMA20 calculation - Success: {ema20_success}")

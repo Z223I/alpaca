@@ -114,11 +114,11 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
             orb_high = None
             orb_low = None
         
-        # Calculate EMA (9-period) for close prices
-        ema_success, ema_values = calculate_ema(symbol_data, price_column='close', period=9)
+        # Calculate EMA (9-period) using typical price (HLC/3)
+        ema_success, ema_values = calculate_ema(symbol_data, period=9)
         
-        # Calculate EMA (20-period) for close prices
-        ema20_success, ema20_values = calculate_ema(symbol_data, price_column='close', period=20)
+        # Calculate EMA (20-period) using typical price (HLC/3)
+        ema20_success, ema20_values = calculate_ema(symbol_data, period=20)
         
         # Calculate VWAP using typical price (HLC/3)
         vwap_success, vwap_values = calculate_vwap_typical(symbol_data)

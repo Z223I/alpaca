@@ -13,6 +13,7 @@ from enum import Enum
 
 from atoms.config.alert_config import config
 from atoms.indicators.orb_calculator import ORBLevel, ORBCalculator
+from atoms.utils.calculate_ema import calculate_ema
 
 
 class BreakoutType(Enum):
@@ -171,19 +172,32 @@ class BreakoutDetector:
         if len(symbol_data) < 9:
             return indicators
             
-        # Calculate EMA(9)
-        ema_9 = symbol_data['close'].ewm(span=9).mean().iloc[-1]
-        indicators['ema_9'] = ema_9
+        # Calculate EMA(9) using utility function
+        ema9_success, ema9_values = calculate_ema(symbol_data, period=9)
+        if ema9_success:
+            ema_9 = ema9_values.iloc[-1]
+            indicators['ema_9'] = ema_9
+        else:
+            indicators['ema_9'] = None
+            return indicators
         
         # Calculate EMA(20) if we have enough data
         if len(symbol_data) >= 20:
-            ema_20 = symbol_data['close'].ewm(span=20).mean().iloc[-1]
-            indicators['ema_20'] = ema_20
-            
-            # Calculate EMA9 vs EMA20 relationship
-            indicators['ema_9_above_20'] = ema_9 > ema_20
-            indicators['ema_9_below_20'] = ema_9 < ema_20
-            indicators['ema_divergence'] = (ema_9 - ema_20) / ema_20 if ema_20 > 0 else 0.0
+            ema20_success, ema20_values = calculate_ema(symbol_data, period=20)
+            if ema20_success:
+                ema_20 = ema20_values.iloc[-1]
+                indicators['ema_20'] = ema_20
+                
+                # Calculate EMA9 vs EMA20 relationship
+                indicators['ema_9_above_20'] = ema_9 > ema_20
+                indicators['ema_9_below_20'] = ema_9 < ema_20
+                indicators['ema_divergence'] = (ema_9 - ema_20) / ema_20 if ema_20 > 0 else 0.0
+            else:
+                # EMA20 calculation failed
+                indicators['ema_20'] = None
+                indicators['ema_9_above_20'] = None
+                indicators['ema_9_below_20'] = None
+                indicators['ema_divergence'] = None
         else:
             # Not enough data for EMA20
             indicators['ema_20'] = None

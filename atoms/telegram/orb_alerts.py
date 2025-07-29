@@ -135,6 +135,9 @@ def _extract_alert_message(alert_data: Dict[str, Any]) -> Optional[str]:
 
 def _format_orb_message(alert_message: str, alert_data: Dict[str, Any]) -> str:
     """Format the ORB alert message for Telegram."""
+    # Replace escaped newlines with actual newlines
+    alert_message = alert_message.replace('\\n', '\n')
+    
     # Add ORB alert prefix
     formatted = f"🚀 **ORB ALERT**\n\n{alert_message}"
     
