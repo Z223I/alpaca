@@ -1,5 +1,9 @@
 # 📈 Trading Alerts Signup Instructions
 
+## Note
+
+- Watch for alerts where "Momentum" is greater than 0.5/min.
+
 ## About the Alerts
 
 - Every alert will be at or above 20% of the ORB high;

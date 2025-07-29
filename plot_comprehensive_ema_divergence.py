@@ -113,15 +113,15 @@ def plot_comprehensive_chart(candlestick_df, alerts_df, title, filename, mean_di
         body_height = abs(row['close'] - row['open'])
         body_bottom = min(row['open'], row['close'])
         
-        width = 0.0003  # Smaller width for minute bars
+        width = 0.0008  # Wider width for better visibility
         rect = Rectangle((mdates.date2num(row['timestamp']) - width/2, body_bottom),
                         width, body_height, 
-                        facecolor=color, alpha=alpha, edgecolor='black', linewidth=0.3)
+                        facecolor=color, alpha=alpha, edgecolor='black', linewidth=0.5)
         ax1.add_patch(rect)
         
         # Draw the wicks
         ax1.plot([mdates.date2num(row['timestamp']), mdates.date2num(row['timestamp'])],
-                [row['low'], row['high']], color='black', linewidth=0.5, alpha=0.8)
+                [row['low'], row['high']], color='black', linewidth=2.0, alpha=0.8)
     
     # Plot EMA lines
     ax1.plot(candlestick_df['timestamp'], candlestick_df['ema_9'], 'blue', 
