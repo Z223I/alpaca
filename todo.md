@@ -1,5 +1,7 @@
 # TODO
 
+- [ ] Implement EMA divergence quality prediction system following specs/ema_divergence_prd.md (use only data from 2025-07-28 onwards)
+
 The remaining tasks are lower priority documentation and deployment tools:
   - Production configuration and deployment tools
   - Comprehensive API documentation
