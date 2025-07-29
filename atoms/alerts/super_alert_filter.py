@@ -73,7 +73,7 @@ class SuperAlertFilter:
         breakout_type = alert_data.get('breakout_type', '').lower()
         if breakout_type == 'bullish_breakout':
             if not self._passes_ema9_low_filter(alert_data):
-                return False, "Current candlestick low below EMA9"
+                return False, f"{symbol}: Current candlestick low below EMA9"
         
         # Filter 4: Signal price threshold
         symbol_info = self.symbol_data[symbol]

@@ -262,7 +262,7 @@ class ORBSuperduperAlertMonitor:
                 self.logger.warning(f"Super alerts directory does not exist: {self.super_alerts_dir}")
             
             # Print status
-            print("\\n" + "="*80)
+            print("\n" + "="*80)
             print("🎯 ORB SUPERDUPER ALERTS MONITOR ACTIVE")
             print(f"📁 Monitoring: {self.super_alerts_dir}")
             print(f"💾 Superduper alerts: {self.superduper_alerts_dir}")
@@ -273,7 +273,7 @@ class ORBSuperduperAlertMonitor:
                 print("🧪 TEST MODE: Superduper alerts will be marked as [TEST MODE]")
             if self.post_only_urgent:
                 print("⚡ URGENT ONLY: Only urgent superduper alerts will be sent via Telegram")
-            print("="*80 + "\\n")
+            print("="*80 + "\n")
             
             # Keep running
             while True:
