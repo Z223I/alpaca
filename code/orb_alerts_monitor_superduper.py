@@ -9,6 +9,7 @@ Usage:
     python3 code/orb_alerts_monitor_superduper.py                           # Monitor current date super alerts
     python3 code/orb_alerts_monitor_superduper.py --timeframe 60            # Use 60-minute analysis window
     python3 code/orb_alerts_monitor_superduper.py --test                    # Run in test mode
+    python3 code/orb_alerts_monitor_superduper.py --no-telegram             # Disable telegram notifications
 """
 
 import asyncio
@@ -52,7 +53,7 @@ class SuperAlertFileHandler(FileSystemEventHandler):
 class ORBSuperduperAlertMonitor:
     """Main ORB Superduper Alert Monitor that watches for super alerts and creates superduper alerts."""
     
-    def __init__(self, timeframe_minutes: int = 45, test_mode: bool = False, post_only_urgent: bool = False):
+    def __init__(self, timeframe_minutes: int = 45, test_mode: bool = False, post_only_urgent: bool = False, no_telegram: bool = False):
         """
         Initialize ORB Superduper Alert Monitor.
         
@@ -60,6 +61,7 @@ class ORBSuperduperAlertMonitor:
             timeframe_minutes: Time window for trend analysis (default 45)
             test_mode: Run in test mode (no actual alerts)
             post_only_urgent: Only send urgent telegram alerts
+            no_telegram: Disable telegram notifications
         """
         # Setup logging
         self.logger = self._setup_logging()
@@ -69,6 +71,7 @@ class ORBSuperduperAlertMonitor:
         self.superduper_alert_generator = None  # Will be initialized when directories are set up
         self.test_mode = test_mode
         self.post_only_urgent = post_only_urgent
+        self.no_telegram = no_telegram
         self.timeframe_minutes = timeframe_minutes
         
         # Alert monitoring setup
@@ -97,7 +100,10 @@ class ORBSuperduperAlertMonitor:
         self.logger.info(f"Monitoring super alerts in: {self.super_alerts_dir}")
         self.logger.info(f"Superduper alerts will be saved to: {self.superduper_alerts_dir}")
         self.logger.info(f"Trend analysis timeframe: {timeframe_minutes} minutes")
-        self.logger.info("📱 Telegram notifications enabled for superduper alerts")
+        if no_telegram:
+            self.logger.info("📵 Telegram notifications disabled")
+        else:
+            self.logger.info("📱 Telegram notifications enabled for superduper alerts")
     
     def _setup_logging(self) -> logging.Logger:
         """Setup logging configuration with Eastern Time."""
@@ -171,55 +177,69 @@ class ORBSuperduperAlertMonitor:
                 self.created_superduper_alerts.add(filename)
                 self.logger.info(f"✅ Superduper alert created and saved: {filename}")
                 
-                # Send Telegram notification
-                try:
-                    # Determine urgency based on trend type and strength
-                    is_urgent = self._determine_urgency(trend_type, trend_strength, analysis_data)
-                    
-                    self.logger.info(f"📊 Superduper analysis: {trend_type.upper()} trend, strength {trend_strength:.2f} {'(URGENT)' if is_urgent else '(REGULAR)'}")
-                    
-                    file_path = self.superduper_alerts_dir / filename
-                    result = send_orb_alert(str(file_path), urgent=is_urgent, post_only_urgent=self.post_only_urgent)
-                    
-                    urgency_type = "urgent" if is_urgent else "regular"
-                    if result['success']:
-                        if result.get('skipped'):
-                            self.logger.info(f"⏭️ Telegram superduper alert skipped ({urgency_type}): {result.get('reason', 'Non-urgent filtered')}")
-                        else:
-                            self.logger.info(f"📤 Telegram superduper alert sent ({urgency_type}): {result['sent_count']} users notified")
-                    else:
-                        self.logger.warning(f"❌ Telegram superduper alert failed ({urgency_type}): {result.get('error', 'Unknown error')}")
+                # Send Telegram notification (if enabled)
+                if not self.no_telegram:
+                    try:
+                        # Determine urgency based on momentum color thresholds
+                        urgency_level = self._determine_urgency(trend_type, trend_strength, analysis_data)
+                        momentum = abs(analysis_data.get('price_momentum', 0))
                         
-                except Exception as e:
-                    self.logger.error(f"❌ Error sending Telegram superduper alert: {e}")
+                        self.logger.info(f"📊 Superduper analysis: {trend_type.upper()} trend, strength {trend_strength:.2f}, momentum {momentum:.4f} ({urgency_level.upper()})")
+                        
+                        # Filter out red momentum alerts
+                        if urgency_level == 'filtered':
+                            self.logger.info(f"🔴 Telegram superduper alert filtered (red momentum < 0.3): {symbol}")
+                        else:
+                            # Send yellow as standard, green as urgent
+                            is_urgent = (urgency_level == 'urgent')
+                            
+                            file_path = self.superduper_alerts_dir / filename
+                            result = send_orb_alert(str(file_path), urgent=is_urgent, post_only_urgent=self.post_only_urgent)
+                            
+                            urgency_type = urgency_level
+                            if result['success']:
+                                if result.get('skipped'):
+                                    self.logger.info(f"⏭️ Telegram superduper alert skipped ({urgency_type}): {result.get('reason', 'Non-urgent filtered')}")
+                                else:
+                                    emoji = "🟢" if is_urgent else "🟡"
+                                    self.logger.info(f"📤 {emoji} Telegram superduper alert sent ({urgency_type}): {result['sent_count']} users notified")
+                            else:
+                                self.logger.warning(f"❌ Telegram superduper alert failed ({urgency_type}): {result.get('error', 'Unknown error')}")
+                            
+                    except Exception as e:
+                        self.logger.error(f"❌ Error sending Telegram superduper alert: {e}")
+                else:
+                    momentum = abs(analysis_data.get('price_momentum', 0))
+                    urgency_level = self._determine_urgency(trend_type, trend_strength, analysis_data)
+                    self.logger.info(f"📊 Superduper analysis: {trend_type.upper()} trend, strength {trend_strength:.2f}, momentum {momentum:.4f} ({urgency_level.upper()}) (Telegram disabled)")
             else:
                 self.logger.warning(f"⚠️ Failed to create superduper alert for {symbol} - no Telegram notification sent")
             
         except Exception as e:
             self.logger.error(f"Error processing super alert file {file_path}: {e}")
     
-    def _determine_urgency(self, trend_type: str, trend_strength: float, analysis_data: Dict) -> bool:
-        """Determine if superduper alert should be marked as urgent."""
-        # High urgency criteria
-        if trend_strength > 0.7:
-            return True
+    def _determine_urgency(self, trend_type: str, trend_strength: float, analysis_data: Dict) -> str:
+        """
+        Determine alert priority based on momentum color thresholds.
         
-        if trend_type == 'rising':
-            momentum = analysis_data.get('price_momentum', 0)
-            penetration_change = analysis_data.get('penetration_change', 0)
-            
-            # Rising with strong momentum
-            if momentum > 0.05 and penetration_change > 15:
-                return True
+        Returns:
+            'filtered' - Red momentum (< 0.3), don't send
+            'standard' - Yellow momentum (0.3 to < 0.5), standard post
+            'urgent' - Green momentum (>= 0.5), urgent post
+        """
+        momentum = abs(analysis_data.get('price_momentum', 0))
         
-        elif trend_type == 'consolidating':
-            avg_penetration = analysis_data.get('avg_penetration', 0)
-            
-            # High sustained penetration
-            if avg_penetration > 40 and trend_strength > 0.5:
-                return True
+        # Filter out red momentum alerts (< 0.3)
+        if momentum < 0.3:
+            return 'filtered'
         
-        return False
+        # Green momentum (>= 0.5) - urgent
+        elif momentum >= 0.5:
+            return 'urgent'
+        
+        # Yellow momentum (0.3 to < 0.5) - standard
+        else:
+            return 'standard'
     
     async def _scan_existing_super_alerts(self) -> None:
         """Scan existing super alert files on startup."""
@@ -268,7 +288,10 @@ class ORBSuperduperAlertMonitor:
             print(f"💾 Superduper alerts: {self.superduper_alerts_dir}")
             print(f"⏱️ Analysis timeframe: {self.timeframe_minutes} minutes")
             print("✅ Filtering: Rising trends & high-quality consolidation patterns")
-            print("📱 Telegram: Enhanced notifications for superduper alerts")
+            if self.no_telegram:
+                print("📵 Telegram: Notifications disabled")
+            else:
+                print("📱 Telegram: Enhanced notifications for superduper alerts")
             if self.test_mode:
                 print("🧪 TEST MODE: Superduper alerts will be marked as [TEST MODE]")
             if self.post_only_urgent:
@@ -308,7 +331,8 @@ class ORBSuperduperAlertMonitor:
             'monitoring_directory': str(self.super_alerts_dir),
             'superduper_alerts_directory': str(self.superduper_alerts_dir),
             'test_mode': self.test_mode,
-            'post_only_urgent': self.post_only_urgent
+            'post_only_urgent': self.post_only_urgent,
+            'no_telegram': self.no_telegram
         }
 
 
@@ -341,6 +365,12 @@ def parse_arguments():
         help="Only send telegram notifications for urgent superduper alerts"
     )
     
+    parser.add_argument(
+        "--no-telegram",
+        action="store_true",
+        help="Disable telegram notifications"
+    )
+    
     return parser.parse_args()
 
 
@@ -357,7 +387,8 @@ async def main():
         monitor = ORBSuperduperAlertMonitor(
             timeframe_minutes=args.timeframe,
             test_mode=args.test,
-            post_only_urgent=args.post_only_urgent
+            post_only_urgent=args.post_only_urgent,
+            no_telegram=args.no_telegram
         )
         
         if args.test:
@@ -365,6 +396,9 @@ async def main():
         
         if args.post_only_urgent:
             print("Urgent only mode - only urgent superduper alerts will be sent via Telegram")
+        
+        if args.no_telegram:
+            print("Telegram disabled - no telegram notifications will be sent")
         
         await monitor.start()
         

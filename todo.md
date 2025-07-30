@@ -8,6 +8,11 @@ The remaining tasks are lower priority documentation and deployment tools:
 
 Be sure to watch stocks minute-by-minute for buying oportunities Jdun Trades style but with 1 min candles.
 
+- [ ] Think hard.  Update code/orb_alerts_monitor_superduper.py: Add a new CLI arg --no-telegram; do not send Telegram posts when this arg is used.
+- [ ] Important, think hard. Update code/orb_alerts_monitor_superduper.py: This code generates superduper alerts; find the section that is marking in the "Trend Analysis" section of the alert and the "Momentum" value as red, yellow, and green; where is that code.  Do not change the code at this time.
+
+
+
 
 - [X] /read-instruction
 - [X] git switch -c superduper_alerts
