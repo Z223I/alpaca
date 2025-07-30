@@ -53,12 +53,12 @@ class SuperAlertFileHandler(FileSystemEventHandler):
 class ORBSuperduperAlertMonitor:
     """Main ORB Superduper Alert Monitor that watches for super alerts and creates superduper alerts."""
     
-    def __init__(self, timeframe_minutes: int = 45, test_mode: bool = False, post_only_urgent: bool = False, no_telegram: bool = False):
+    def __init__(self, timeframe_minutes: int = 30, test_mode: bool = False, post_only_urgent: bool = False, no_telegram: bool = False):
         """
         Initialize ORB Superduper Alert Monitor.
         
         Args:
-            timeframe_minutes: Time window for trend analysis (default 45)
+            timeframe_minutes: Time window for trend analysis (default 30)
             test_mode: Run in test mode (no actual alerts)
             post_only_urgent: Only send urgent telegram alerts
             no_telegram: Disable telegram notifications
@@ -343,8 +343,8 @@ def parse_arguments():
     parser.add_argument(
         "--timeframe",
         type=int,
-        default=45,
-        help="Time window in minutes for trend analysis (default: 45)"
+        default=30,
+        help="Time window in minutes for trend analysis (default: 30)"
     )
     
     parser.add_argument(
