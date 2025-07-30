@@ -27,9 +27,23 @@ class SuperduperAlertGenerator:
         self.superduper_alerts_dir = superduper_alerts_dir
         self.test_mode = test_mode
         self.logger = logging.getLogger(__name__)
+    
+    def _get_momentum_color_code(self, momentum: float) -> str:
+        """
+        Get color code for momentum text based on value.
         
-        # Ensure directory exists
-        self.superduper_alerts_dir.mkdir(parents=True, exist_ok=True)
+        Args:
+            momentum: Momentum value to color code
+            
+        Returns:
+            HTML color code string for the momentum value
+        """
+        if momentum < 0.3:
+            return "🔴"  # Red for < 0.3
+        elif momentum < 0.5:
+            return "🟡"  # Yellow for 0.3 to < 0.5
+        else:
+            return "🟢"  # Green for >= 0.5
     
     def create_superduper_alert(self, latest_super_alert: Dict[str, Any], 
                                trend_analysis: Dict[str, Any], 
@@ -153,9 +167,10 @@ class SuperduperAlertGenerator:
         # Add trend-specific details
         if trend_type == 'rising':
             penetration_change = trend_analysis.get('penetration_change', 0)
+            momentum_color = self._get_momentum_color_code(momentum)
             message_parts.extend([
                 f"• Price Movement: **+{price_change:.2f}%**",
-                f"• Momentum: **{momentum:.4f}%/min**",
+                f"• Momentum: {momentum_color} **{momentum:.4f}%/min**",
                 f"• Penetration Increase: **+{penetration_change:.1f}%**",
                 f"• Pattern: **Accelerating Breakout** 🚀"
             ])
