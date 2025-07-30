@@ -3,14 +3,30 @@ Symbol Management for ORB Alerts
 
 This module handles loading and managing the watchlist of symbols for ORB alerts.
 Reads from date-specific CSV files (YYYYMMDD.csv) and provides filtering capabilities.
+Includes file monitoring to automatically reload symbols when the file changes.
 """
 
 import csv
 import os
-from typing import List, Set, Optional
+from typing import List, Set, Optional, Callable
 from pathlib import Path
 from datetime import datetime
 import pytz
+import logging
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+
+
+class SymbolFileHandler(FileSystemEventHandler):
+    """File system event handler for monitoring symbol file changes."""
+    
+    def __init__(self, symbol_manager):
+        self.symbol_manager = symbol_manager
+        super().__init__()
+    
+    def on_modified(self, event):
+        if not event.is_directory and event.src_path == str(self.symbol_manager.symbols_file_path):
+            self.symbol_manager._handle_file_change()
 
 
 class SymbolManager:
@@ -24,8 +40,17 @@ class SymbolManager:
             symbols_file: Path to CSV file containing symbols. If None, uses current date file (data/YYYYMMDD.csv)
         """
         self.symbols_file = symbols_file or self._get_current_date_file()
+        self.symbols_file_path = Path(self.symbols_file).resolve()
         self._symbols: Set[str] = set()
+        self._change_callbacks: List[Callable[[List[str]], None]] = []
+        self.logger = logging.getLogger(__name__)
+        
+        # File monitoring setup
+        self._observer: Optional[Observer] = None
+        self._file_handler: Optional[SymbolFileHandler] = None
+        
         self._load_symbols()
+        self._start_file_monitoring()
     
     def _get_current_date_file(self) -> str:
         """
@@ -67,6 +92,8 @@ class SymbolManager:
         
         if not self._symbols:
             raise ValueError(f"No symbols found in {self.symbols_file}")
+        
+        self.logger.info(f"Loaded {len(self._symbols)} symbols from {self.symbols_file}")
     
     def get_symbols(self) -> List[str]:
         """
@@ -149,3 +176,82 @@ class SymbolManager:
     def __contains__(self, symbol: str) -> bool:
         """Check if symbol is in watchlist."""
         return symbol.upper() in self._symbols
+    
+    def add_change_callback(self, callback: Callable[[List[str]], None]) -> None:
+        """
+        Add a callback function to be called when symbols change.
+        
+        Args:
+            callback: Function to call with new symbols list when file changes
+        """
+        self._change_callbacks.append(callback)
+    
+    def _start_file_monitoring(self) -> None:
+        """Start monitoring the symbols file for changes."""
+        try:
+            if not self.symbols_file_path.exists():
+                self.logger.warning(f"Symbols file does not exist, skipping file monitoring: {self.symbols_file_path}")
+                return
+            
+            self._file_handler = SymbolFileHandler(self)
+            self._observer = Observer()
+            
+            # Monitor the directory containing the file
+            watch_dir = self.symbols_file_path.parent
+            self._observer.schedule(self._file_handler, str(watch_dir), recursive=False)
+            self._observer.start()
+            
+            self.logger.info(f"Started monitoring {self.symbols_file_path} for changes")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to start file monitoring: {e}")
+    
+    def _handle_file_change(self) -> None:
+        """Handle file change event by reloading symbols."""
+        try:
+            self.logger.info(f"Detected change in {self.symbols_file_path}, reloading symbols...")
+            
+            # Store old symbols for comparison
+            old_symbols = set(self._symbols)
+            
+            # Reload symbols
+            self._load_symbols()
+            
+            # Check if symbols actually changed
+            new_symbols = set(self._symbols)
+            if old_symbols != new_symbols:
+                added = new_symbols - old_symbols
+                removed = old_symbols - new_symbols
+                
+                if added:
+                    self.logger.info(f"Added symbols: {', '.join(sorted(added))}")
+                if removed:
+                    self.logger.info(f"Removed symbols: {', '.join(sorted(removed))}")
+                
+                self.logger.info(f"Symbol list updated: {len(old_symbols)} -> {len(new_symbols)} symbols")
+                
+                # Notify callbacks
+                for callback in self._change_callbacks:
+                    try:
+                        callback(self.get_symbols())
+                    except Exception as e:
+                        self.logger.error(f"Error in symbol change callback: {e}")
+            else:
+                self.logger.debug("File changed but symbol list is identical")
+                
+        except Exception as e:
+            self.logger.error(f"Error handling file change: {e}")
+    
+    def stop_monitoring(self) -> None:
+        """Stop file monitoring."""
+        if self._observer:
+            try:
+                self._observer.stop()
+                self._observer.join(timeout=5.0)
+                self.logger.info("Stopped file monitoring")
+            except Exception as e:
+                self.logger.error(f"Error stopping file monitoring: {e}")
+    
+    def __del__(self):
+        """Cleanup file monitoring on object destruction."""
+        self.stop_monitoring()

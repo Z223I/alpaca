@@ -84,6 +84,9 @@ class ORBAlertEngine:
         # Setup data handler
         self.stream_client.add_data_handler(self._handle_market_data)
         
+        # Setup symbol change monitoring
+        self.symbol_manager.add_change_callback(self._handle_symbol_change)
+        
     def add_alert_callback(self, callback: Callable[[ORBAlert], None]) -> None:
         """
         Add callback function to be called when alerts are generated.
@@ -157,6 +160,9 @@ class ORBAlertEngine:
         # await self._stop_phase3_systems()
         
         await self.stream_client.disconnect()
+        
+        # Stop file monitoring
+        self.symbol_manager.stop_monitoring()
         
         # Update stats
         if self.start_time:
@@ -309,6 +315,44 @@ class ORBAlertEngine:
             
         except Exception as e:
             self.logger.error(f"Error processing alert: {e}")
+    
+    def _handle_symbol_change(self, new_symbols: List[str]) -> None:
+        """
+        Handle symbol list changes by updating websocket subscriptions.
+        
+        Args:
+            new_symbols: New list of symbols to monitor
+        """
+        try:
+            if self.is_running:
+                self.logger.info(f"Symbol list changed, updating websocket subscriptions...")
+                
+                # Get current subscriptions
+                current_symbols = set(self.stream_client.get_subscribed_symbols() or [])
+                new_symbols_set = set(new_symbols)
+                
+                # Calculate changes
+                to_unsubscribe = current_symbols - new_symbols_set
+                to_subscribe = new_symbols_set - current_symbols
+                
+                # Update subscriptions
+                if to_unsubscribe:
+                    self.logger.info(f"Unsubscribing from {len(to_unsubscribe)} symbols: {', '.join(sorted(to_unsubscribe))}")
+                    self.stream_client.unsubscribe_symbols(list(to_unsubscribe))
+                
+                if to_subscribe:
+                    self.logger.info(f"Subscribing to {len(to_subscribe)} new symbols: {', '.join(sorted(to_subscribe))}")
+                    self.stream_client.subscribe_symbols(list(to_subscribe))
+                
+                if to_unsubscribe or to_subscribe:
+                    self.logger.info(f"Websocket subscriptions updated: {len(current_symbols)} -> {len(new_symbols_set)} symbols")
+                else:
+                    self.logger.debug("Symbol list changed but subscriptions remain the same")
+            else:
+                self.logger.info(f"Symbol list updated while engine is stopped, changes will take effect on next start")
+                
+        except Exception as e:
+            self.logger.error(f"Error handling symbol change: {e}")
     
     def get_stats(self) -> AlertEngineStats:
         """
