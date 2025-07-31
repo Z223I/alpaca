@@ -11,6 +11,7 @@ import os
 import time
 import json
 import signal
+import io
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -40,8 +41,12 @@ class TelegramPollingService:
             '/subscribe': self._handle_subscribe,
             '/unsubscribe': self._handle_unsubscribe,
             '/status': self._handle_status,
-            '/help': self._handle_help
+            '/help': self._handle_help,
+            '57chevy': self._handle_alpaca_command
         }
+        
+        # Authorized users for Alpaca commands
+        self.authorized_users = ['bruce']  # Case insensitive matching
         
         # Setup signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -167,13 +172,16 @@ class TelegramPollingService:
             display_name = f"{first_name} {last_name}".strip() or username or chat_id
             self._log(f"📨 Message from {display_name} ({chat_id}): {text}")
             
-            # Process commands
+            # Process commands and trigger words
             if text.startswith('/'):
                 command = text.split()[0].lower()
                 if command in self.command_handlers:
                     self.command_handlers[command](chat_id, username, first_name, last_name, text)
                 else:
                     self._handle_unknown_command(chat_id, text)
+            elif text.lower().startswith('57chevy'):
+                # Handle alpaca trigger word
+                self._handle_alpaca_command(chat_id, username, first_name, last_name, text)
             else:
                 # Handle non-command messages
                 self._handle_regular_message(chat_id, username, first_name, text)
@@ -310,6 +318,100 @@ Questions? Contact the bot administrator."""
         else:
             self._send_response(chat_id, "👋 Hello! Send /help to see available commands.")
     
+    def _handle_alpaca_command(self, chat_id: str, username: str, first_name: str, last_name: str, text: str):
+        """Handle 57chevy trigger for Alpaca trading commands."""
+        
+        # Check user authorization
+        if not self._is_authorized_user(username, first_name):
+            return  # Silently ignore unauthorized users
+        
+        try:
+            # Parse alpaca arguments from message
+            args = self._parse_alpaca_args(text)
+            
+            # Execute alpaca command
+            result = self._execute_alpaca_command(args)
+            
+            # Send result back to authorized user
+            self._send_response(chat_id, result)
+            
+        except Exception as e:
+            self._log(f"Error handling alpaca command: {e}", "ERROR")
+            self._send_response(chat_id, f"❌ Error processing command: {str(e)}")
+    
+    def _is_authorized_user(self, username: str, first_name: str) -> bool:
+        """Check if user is authorized for Alpaca commands."""
+        return (username and username.lower() in self.authorized_users) or \
+               (first_name and first_name.lower() in self.authorized_users)
+    
+    def _parse_alpaca_args(self, text: str) -> List[str]:
+        """Parse Alpaca arguments from Telegram message."""
+        # Remove trigger word and extract arguments
+        parts = text.strip().split()[1:]  # Skip '57chevy'
+        
+        # Convert single hyphens to double hyphens for Alpaca CLI compatibility
+        # Telegram changes -- to — (em dash) or - (single hyphen)
+        converted_parts = []
+        for part in parts:
+            if part.startswith('-') and not part.startswith('--'):
+                # Check if this is a negative number (starts with - followed by digits)
+                if len(part) > 1 and (part[1:].replace('.', '').isdigit()):
+                    # This is a negative number, keep as single hyphen
+                    converted_parts.append(part)
+                else:
+                    # Convert single hyphen to double hyphen and normalize case for CLI arguments
+                    converted_parts.append(('-' + part).lower())
+            elif part.startswith('--'):
+                # Normalize existing double hyphen arguments to lowercase
+                converted_parts.append(part.lower())
+            else:
+                # Non-hyphen arguments (like symbol names, values) keep original case
+                converted_parts.append(part)
+        
+        return converted_parts
+    
+    def _execute_alpaca_command(self, args: List[str]) -> str:
+        """Execute Alpaca command and return output."""
+        try:
+            import subprocess
+            
+            # Get project root directory
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            alpaca_script = os.path.join(project_root, 'code', 'alpaca.py')
+            
+            # Use conda environment python to execute the script
+            python_path = os.path.expanduser('~/miniconda3/envs/alpaca/bin/python')
+            
+            # Build command
+            cmd = [python_path, alpaca_script] + args
+            
+            # Execute command
+            result = subprocess.run(
+                cmd,
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            # Get output
+            output = result.stdout.strip()
+            error_output = result.stderr.strip()
+            
+            if result.returncode == 0:
+                if output:
+                    return f"✅ Command executed successfully:\n```\n{output}\n```"
+                else:
+                    return "✅ Command executed successfully (no output)"
+            else:
+                error_msg = error_output if error_output else output
+                return f"❌ Command failed (exit code: {result.returncode}):\n```\n{error_msg}\n```"
+                
+        except subprocess.TimeoutExpired:
+            return "❌ Command timed out after 30 seconds"
+        except Exception as e:
+            return f"❌ Error executing command: {str(e)}"
+    
     def _send_response(self, chat_id: str, message: str):
         """Send a response message to a specific chat."""
         try:
@@ -317,7 +419,7 @@ Questions? Contact the bot administrator."""
             payload = {
                 'chat_id': chat_id,
                 'text': message,
-                'parse_mode': 'HTML'
+                'parse_mode': 'Markdown'
             }
             
             response = requests.post(url, json=payload, timeout=30)
