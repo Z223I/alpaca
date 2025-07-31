@@ -10,6 +10,7 @@ A comprehensive Python-based trading system for automated stock trading using th
 - **After-Hours Trading**: Extended hours trading with limit orders only
 - **Short Selling**: Bearish trading strategies with proper risk management
 - **Position Management**: Automated position sizing based on portfolio risk
+- **Position Liquidation**: Close individual positions or liquidate entire portfolio
 - **Quote Retrieval**: Real-time market data and price quotes
 
 ### Advanced Features
@@ -58,9 +59,46 @@ python3 code/alpaca.py --buy --symbol AAPL --take-profit 160.00 --submit
 python3 code/alpaca.py --buy --symbol AAPL --after-hours --take-profit 160.00 --submit
 ```
 
-## Command Line Interface
+## Complete Command Line Reference
 
-### Basic Orders
+### Command Categories
+
+#### Trading Operations
+- `-b, --bracket-order` - Execute bracket order
+- `-f, --future-bracket-order` - Execute future bracket order with limit entry  
+- `--buy` - Execute a buy order for the specified symbol
+- `--sell-short` - Execute a short sell order for bearish predictions
+- `-q, --get-latest-quote` - Get latest quote for a symbol
+
+#### Liquidation Operations
+- `--liquidate` - Liquidate position for a specific symbol (requires --symbol)
+- `--liquidate-all` - Liquidate all open positions and optionally cancel all orders
+- `--cancel-orders` - Cancel all open orders (used with --liquidate-all)
+
+#### Order Parameters
+- `--symbol SYMBOL` - Stock symbol
+- `--quantity QUANTITY` - Number of shares
+- `--market-price MARKET_PRICE` - Current market price for bracket order
+- `--limit-price LIMIT_PRICE` - Limit price for future bracket order entry
+- `--stop-price STOP_PRICE` - Stop loss price for future bracket order
+- `--take-profit TAKE_PROFIT` - Take profit price for bracket orders
+- `--stop-loss STOP_LOSS` - Custom stop loss price for buy/short orders
+- `--amount AMOUNT` - Dollar amount to invest (calculates quantity automatically)
+
+#### Order Modifiers
+- `--submit` - Actually submit the order (default: False for dry run)
+- `--after-hours` - Execute order for after-hours/extended hours trading
+- `--custom-limit-price CUSTOM_LIMIT_PRICE` - Custom limit price for after-hours orders
+- `--calc-take-profit` - Calculate take profit as (latest_quote - stop_loss) * 1.5
+
+#### Display-Only Commands
+- `--positions` - Display current positions only (improved concise format)
+- `--cash` - Display cash balance only  
+- `--active-order` - Display active orders only
+
+### Usage Examples
+
+#### Basic Orders
 ```bash
 # Buy with automatic bracket order protection
 python3 code/alpaca.py --buy --symbol AAPL --take-profit 160.00 --submit
@@ -72,7 +110,34 @@ python3 code/alpaca.py --sell-short --symbol AAPL --take-profit 140.00 --submit
 python3 code/alpaca.py --buy --symbol AAPL --amount 1000 --stop-loss 145.00 --calc-take-profit --submit
 ```
 
-### Bracket Orders
+#### Position Liquidation
+```bash
+# Liquidate a specific position (dry run)
+python3 code/alpaca.py --liquidate --symbol AAPL
+
+# Actually liquidate a specific position
+python3 code/alpaca.py --liquidate --symbol AAPL --submit
+
+# Liquidate all positions (dry run)
+python3 code/alpaca.py --liquidate-all
+
+# Liquidate all positions and cancel all orders
+python3 code/alpaca.py --liquidate-all --cancel-orders --submit
+```
+
+#### Display Commands
+```bash
+# Show only positions (improved concise format)
+python3 code/alpaca.py --positions
+
+# Show only cash balance
+python3 code/alpaca.py --cash
+
+# Show only active orders
+python3 code/alpaca.py --active-order
+```
+
+#### Bracket Orders
 ```bash
 # Standard bracket order
 python3 code/alpaca.py --bracket-order --symbol AAPL --quantity 10 --market-price 150.00 --take-profit 160.00 --submit
@@ -81,7 +146,7 @@ python3 code/alpaca.py --bracket-order --symbol AAPL --quantity 10 --market-pric
 python3 code/alpaca.py --future-bracket-order --symbol AAPL --limit-price 148.00 --stop-price 140.00 --take-profit 160.00 --submit
 ```
 
-### After-Hours Trading
+#### After-Hours Trading
 ```bash
 # After-hours buy with protection
 python3 code/alpaca.py --buy --after-hours --symbol AAPL --take-profit 160.00 --stop-loss 145.00 --submit
@@ -149,6 +214,10 @@ Located in `code/alpaca.py`, this is the core trading class:
 - `_buy_after_hours_protected()`: After-hours buy with stop-loss/take-profit
 - `_sell_short_after_hours()`: Simple after-hours short orders
 - `_sell_short_after_hours_protected()`: After-hours short with protection
+
+#### Position Liquidation Methods  
+- `_liquidate_position()`: Close specific position and cancel related orders
+- `_liquidate_all()`: Close all positions and optionally cancel all orders
 
 #### Utility Methods
 - `_calculateQuantity()`: Automatic position sizing
@@ -290,9 +359,19 @@ flake8 code/ atoms/                # Lint codebase
 ## Support and Documentation
 
 ### Getting Help
-- Review the command line help: `python3 code/alpaca.py --help`
+- Review the complete command line help: `python3 code/alpaca.py --help`
 - Check test files for usage examples
 - Examine the `atoms/` modules for detailed functionality
+
+### Position Display Format
+The `--positions` command now shows a clean, concise table format:
+```
+positions:
+  Symbol    Qty      Avg Fill
+  ────────  ──────── ────────
+  AAPL           100  $150.25
+  TSLA            50  $245.80
+```
 
 ### Common Issues
 - **API Credentials**: Ensure `.env` file is properly configured

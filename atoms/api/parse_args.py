@@ -51,6 +51,14 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
     parser.add_argument('--amount', type=float, required=False,
                       help='Dollar amount to invest (will calculate quantity automatically)')
     
+    # Liquidation arguments
+    parser.add_argument('--liquidate', action='store_true',
+                      help='Liquidate position for a specific symbol (requires --symbol)')
+    parser.add_argument('--liquidate-all', action='store_true',
+                      help='Liquidate all open positions and optionally cancel all orders')
+    parser.add_argument('--cancel-orders', action='store_true',
+                      help='Cancel all open orders (used with --liquidate-all)')
+    
     # Display-only arguments
     parser.add_argument('--positions', action='store_true',
                       help='Display current positions only')
@@ -110,6 +118,26 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
     # Ensure buy and sell_short are mutually exclusive
     if args.buy and args.sell_short:
         parser.error("--buy and --sell-short cannot be used together")
+    
+    # Validate liquidation arguments
+    if args.liquidate:
+        if not args.symbol:
+            parser.error("--liquidate requires --symbol")
+        if args.liquidate_all:
+            parser.error("--liquidate and --liquidate-all cannot be used together")
+    
+    if args.liquidate_all:
+        if args.symbol:
+            parser.error("--liquidate-all cannot be used with --symbol")
+    
+    if args.cancel_orders and not args.liquidate_all:
+        parser.error("--cancel-orders can only be used with --liquidate-all")
+    
+    # Ensure liquidation is mutually exclusive with other operations
+    if args.liquidate or args.liquidate_all:
+        conflicting_args = [args.buy, args.sell_short, args.bracket_order, args.future_bracket_order, args.get_latest_quote]
+        if any(conflicting_args):
+            parser.error("Liquidation operations cannot be combined with other trading operations")
     
     # Validate after_hours arguments
     if args.after_hours:

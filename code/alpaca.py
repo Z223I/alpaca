@@ -632,6 +632,155 @@ class alpaca_private:
             print(f"  Symbol: {symbol}, Quantity: {quantity}, Limit Price: {limit_price}")
             return None
 
+    def _liquidate_position(self, symbol: str, submit_order: bool = False) -> Optional[Any]:
+        """
+        Liquidate a specific position and cancel related orders.
+
+        This method:
+        1. Cancels all open orders for the symbol
+        2. Closes the position using Alpaca's close_position API
+
+        Args:
+            symbol: The stock symbol to liquidate
+            submit_order: Whether to actually execute the liquidation (default: False for dry run)
+
+        Returns:
+            The order response from the liquidation or None if dry run/error
+        """
+        print(f"Liquidating position for {symbol}...")
+
+        # First, check if position exists
+        try:
+            positions = self.api.list_positions()
+            position = None
+            for pos in positions:
+                if pos.symbol == symbol:
+                    position = pos
+                    break
+            
+            if position is None:
+                print(f"✗ No position found for symbol {symbol}")
+                return None
+
+            print(f"  Current position: {position.qty} shares @ ${position.avg_entry_price}")
+            print(f"  Market value: ${position.market_value}")
+            print(f"  Unrealized P&L: ${position.unrealized_pl}")
+
+        except Exception as e:
+            print(f"✗ Error checking position for {symbol}: {str(e)}")
+            return None
+
+        # Cancel all open orders for this symbol
+        try:
+            orders = self.api.list_orders(status="open")
+            symbol_orders = [order for order in orders if order.symbol == symbol]
+            
+            if symbol_orders:
+                print(f"  Cancelling {len(symbol_orders)} open orders for {symbol}...")
+                for order in symbol_orders:
+                    if submit_order:
+                        self.api.cancel_order(order.id)
+                        print(f"    ✓ Cancelled order {order.id} ({order.side} {order.qty} @ {order.order_type})")
+                    else:
+                        print(f"    [DRY RUN] Would cancel order {order.id} ({order.side} {order.qty} @ {order.order_type})")
+            else:
+                print(f"  No open orders found for {symbol}")
+
+        except Exception as e:
+            print(f"  ⚠️  Error cancelling orders for {symbol}: {str(e)}")
+
+        # Close the position
+        if not submit_order:
+            print(f"[DRY RUN] Would liquidate position for {symbol} (use --submit to execute)")
+            return None
+
+        try:
+            # Use the older alpaca-trade-api close_position method
+            liquidation_order = self.api.close_position(symbol)
+            print(f"✓ Position liquidated successfully for {symbol}")
+            print(f"  Order ID: {liquidation_order.id}")
+            print(f"  Status: {liquidation_order.status}")
+            print(f"  Quantity: {liquidation_order.qty}")
+            print(f"  Side: {liquidation_order.side}")
+            return liquidation_order
+
+        except Exception as e:
+            print(f"✗ Failed to liquidate position for {symbol}: {str(e)}")
+            return None
+
+    def _liquidate_all(self, cancel_orders: bool = False, submit_order: bool = False) -> Optional[List[Any]]:
+        """
+        Liquidate all open positions and optionally cancel all orders.
+
+        This method:
+        1. Optionally cancels all open orders
+        2. Closes all positions using Alpaca's close_all_positions API
+
+        Args:
+            cancel_orders: Whether to cancel all open orders first
+            submit_order: Whether to actually execute the liquidation (default: False for dry run)
+
+        Returns:
+            List of order responses from liquidations or None if dry run/error
+        """
+        print("Liquidating all positions...")
+
+        # Check current positions
+        try:
+            positions = self.api.list_positions()
+            if not positions:
+                print("  No open positions to liquidate")
+                return []
+
+            print(f"  Found {len(positions)} positions to liquidate:")
+            total_value = 0
+            for pos in positions:
+                print(f"    {pos.symbol}: {pos.qty} shares @ ${pos.avg_entry_price} (${pos.market_value})")
+                total_value += float(pos.market_value)
+            print(f"  Total portfolio value: ${total_value:.2f}")
+
+        except Exception as e:
+            print(f"✗ Error checking positions: {str(e)}")
+            return None
+
+        # Cancel all orders if requested
+        if cancel_orders:
+            try:
+                orders = self.api.list_orders(status="open")
+                if orders:
+                    print(f"  Cancelling {len(orders)} open orders...")
+                    for order in orders:
+                        if submit_order:
+                            self.api.cancel_order(order.id)
+                            print(f"    ✓ Cancelled order {order.id} ({order.symbol} {order.side} {order.qty})")
+                        else:
+                            print(f"    [DRY RUN] Would cancel order {order.id} ({order.symbol} {order.side} {order.qty})")
+                else:
+                    print("  No open orders to cancel")
+
+            except Exception as e:
+                print(f"  ⚠️  Error cancelling orders: {str(e)}")
+
+        # Close all positions
+        if not submit_order:
+            print("[DRY RUN] Would liquidate all positions (use --submit to execute)")
+            return None
+
+        try:
+            # Use the older alpaca-trade-api close_all_positions method
+            liquidation_orders = self.api.close_all_positions()
+            print(f"✓ All positions liquidated successfully")
+            print(f"  Generated {len(liquidation_orders)} liquidation orders")
+            
+            for order in liquidation_orders:
+                print(f"    {order.symbol}: {order.side} {order.qty} shares (Order ID: {order.id})")
+            
+            return liquidation_orders
+
+        except Exception as e:
+            print(f"✗ Failed to liquidate all positions: {str(e)}")
+            return None
+
 
     def _bracketOrder(self, symbol: str, quantity: int, market_price: float, take_profit: float, submit_order: bool = False) -> Optional[Any]:
         """
@@ -885,6 +1034,25 @@ class alpaca_private:
                 if order_result is None and self.args.submit:
                     print("Failed to submit short order")
                     return 1
+
+        # Handle liquidation operations
+        if self.args.liquidate:
+            liquidation_result = self._liquidate_position(
+                symbol=self.args.symbol,
+                submit_order=self.args.submit
+            )
+            if liquidation_result is None and self.args.submit:
+                print("Failed to liquidate position")
+                return 1
+
+        if self.args.liquidate_all:
+            liquidation_result = self._liquidate_all(
+                cancel_orders=self.args.cancel_orders,
+                submit_order=self.args.submit
+            )
+            if liquidation_result is None and self.args.submit:
+                print("Failed to liquidate all positions")
+                return 1
 
         return 0
 
