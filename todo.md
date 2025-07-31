@@ -13,8 +13,8 @@ Be sure to watch stocks minute-by-minute for buying oportunities Jdun Trades sty
 - [ ] Important.  Think hard. Create a PRD, specs/telegram_alpaca_integration_prd.md: 1. Review code/alpaca.py to review the CLI options --positions --cash --active-order --buy. 2. Review molecules/telegram_polling.py. 3. Create the PRD to integrate calling alpaca.py from telegram_polling.py: a. the trigger word in the telegram message will be '57chevy' (any character case) and it will be the first word of the message; b. Important. Only use the args in the Telegram message. c. --positions --cash --active-order are to be available. d. --buy and the args that go with it are to be available. e. Arg verification is only to be performed by alpaca.py. f. Return the alpaca.py output only to Telegram user 'Bruce' g. Only 'Bruce' is to receive messages for this integration.  h. Only expect the trigger word and args because the execution of alpaca is implied.
 - [ ] /commit
 - [ ] git push
-- [ ] git switch -c telegram_alpaca_integration
 - [ ] /clear /read...
+- [ ] git switch -c telegram_alpaca_integration
 - [ ] Important.  Think hard.  Implement the instructions in the PRD specs/telegram_alpaca_integration_prd.md
 - [ ] /commit
 - [ ] git push
