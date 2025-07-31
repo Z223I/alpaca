@@ -8,6 +8,29 @@ The remaining tasks are lower priority documentation and deployment tools:
 
 Be sure to watch stocks minute-by-minute for buying oportunities Jdun Trades style but with 1 min candles.
 
+## BRB, Breakout Retest Breakout
+
+
+
+## Root Cause Analysis
+
+This stock rocketed.
+2025-07-31 13:00:00,320 ET - __main__ - INFO - 🚫 Filtered superduper alert for PAPL: Penetration too low: 0.0% (need 15.0%)
+2025-07-31 13:01:00,489 ET - __main__ - INFO - 🚫 Filtered superduper alert for PAPL: Penetration too low: 0.0% (need 15.0%)
+2025-07-31 13:02:00,466 ET - __main__ - INFO - 🚫 Filtered superduper alert for PAPL: Penetration too low: 0.0% (need 15.0%)
+2025-07-31 13:03:00,512 ET - __main__ - INFO - 🚫 Filtered superduper alert for PAPL: Penetration too low: 0.0% (need 15.0%)
+2025-07-31 13:05:00,453 ET - __main__ - INFO - 🚫 Filtered superduper alert for PAPL: Penetration too low: 0.0% (need 15.0%)
+2025-07-31 13:06:00,513 ET - __main__ - INFO - 🚫 Filtered superduper alert for PAPL: Penetration too low: 0.0% (need 15.0%)
+2025-07-31 13:09:00,517 ET - __main__ - INFO - 🚫 Filtered superduper alert for PAPL: Penetration too low: 0.0% (need 15.0%)
+2025-07-31 13:11:00,501 ET - __main__ - INFO - 🚫 Filtered superduper alert for PAPL: Penetration too low: 0.0% (need 15.0%)
+2025-07-31 13:14:00,586 ET - __main__ - INFO - 🚫 Filtered superduper alert for PAPL: Penetration too low: 0.0% (need 15.0%)
+2025-07-31 13:16:00,498 ET - __main__ - INFO - 🚫 Filtered superduper alert for PAPL: Penetration too low: 0.0% (need 15.0%)
+2025-07-31 13:17:00,552 ET - __main__ - INFO - 🚫 Filtered superduper alert for PAPL: Penetration too low: 0.0% (need 15.0%)
+2025-07-31 13:18:00,529 ET - __main__ - INFO - 🚫 Filtered superduper alert for PAPL: Penetration too low: 0.0% (need 15.0%)
+2025-07-31 13:19:00,471 ET - __main__ - INFO - 🚫 Filtered superduper alert for PAPL: Penetration too low: 0.0% (need 15.0%)
+
+
+## Telegram-Alpaca Integration
 
 - [X] /commit /clear /read...
 - [X] Important.  Think hard. Create a PRD, specs/telegram_alpaca_integration_prd.md: 1. Review code/alpaca.py to review the CLI options --positions --cash --active-order --buy. 2. Review molecules/telegram_polling.py. 3. Create the PRD to integrate calling alpaca.py from telegram_polling.py: a. the trigger word in the telegram message will be '57chevy' (any character case) and it will be the first word of the message; b. Important. Only use the args in the Telegram message. c. --positions --cash --active-order are to be available. d. --buy and the args that go with it are to be available. e. Arg verification is only to be performed by alpaca.py. f. Return the alpaca.py output only to Telegram user 'Bruce' g. Only 'Bruce' is to receive messages for this integration.  h. Only expect the trigger word and args because the execution of alpaca is implied.
@@ -20,8 +43,7 @@ Be sure to watch stocks minute-by-minute for buying oportunities Jdun Trades sty
 - [X] git push
 - [X] switch to master and merge current branch
 
-
-
+## Superduper Alerts
 - [X] Think hard.  Update code/orb_alerts_monitor_superduper.py: Add a new CLI arg --no-telegram; do not send Telegram posts when this arg is used.
 - [X] Important, think hard. Update code/orb_alerts_monitor_superduper.py: This code generates superduper alerts; find the section that is marking in the "Trend Analysis" section of the alert and the "Momentum" value as red, yellow, and green; where is that code.  Do not change the code at this time.
 - [X] Important, think hard. Update code/orb_alerts_monitor_superduper.py: This code generates superduper alerts; find the section that is creating the "Trend Analysis" section of the alert; find where it is doing the analisys for the last 45 minutes; change it to 30 minutes.
