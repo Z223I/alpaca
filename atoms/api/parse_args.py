@@ -50,6 +50,14 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
                       help='Calculate take profit as (latest_quote - stop_loss) * 1.5')
     parser.add_argument('--amount', type=float, required=False,
                       help='Dollar amount to invest (will calculate quantity automatically)')
+    
+    # Display-only arguments
+    parser.add_argument('--positions', action='store_true',
+                      help='Display current positions only')
+    parser.add_argument('--cash', action='store_true',
+                      help='Display cash balance only')
+    parser.add_argument('--active-order', action='store_true',
+                      help='Display active orders only')
 
     args = parser.parse_args(userArgs)
 
@@ -109,5 +117,17 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
             parser.error("--after-hours requires either --buy or --sell-short")
         if not args.symbol:
             parser.error("--after-hours requires --symbol")
+
+    # Validate display-only arguments
+    display_args = [args.positions, args.cash, args.active_order]
+    if any(display_args):
+        # Check if any non-display arguments are present
+        for arg_name, arg_value in vars(args).items():
+            if arg_name not in ['positions', 'cash', 'active_order']:
+                # Check if argument has been set to non-default value
+                if isinstance(arg_value, bool) and arg_value:
+                    parser.error("Display-only arguments (--positions, --cash, --active-order) cannot be combined with other operations")
+                elif arg_value is not None and not isinstance(arg_value, bool):
+                    parser.error("Display-only arguments (--positions, --cash, --active-order) cannot be combined with other operations")
 
     return args

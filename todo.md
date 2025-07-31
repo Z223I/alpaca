@@ -8,9 +8,23 @@ The remaining tasks are lower priority documentation and deployment tools:
 
 Be sure to watch stocks minute-by-minute for buying oportunities Jdun Trades style but with 1 min candles.
 
+
+- [ ] /commit /clear /read...
+- [ ] Important.  Think hard. Create a PRD, specs/telegram_alpaca_integration_prd.md: 1. Review code/alpaca.py to review the CLI options --positions --cash --active-order --buy. 2. Review molecules/telegram_polling.py. 3. Create the PRD to integrate calling alpaca.py from telegram_polling.py: a. the trigger word in the telegram message will be '57chevy' (any character case) and it will be the first word of the message; b. Important. Only use the args in the Telegram message. c. --positions --cash --active-order are to be available. d. --buy and the args that go with it are to be available. e. Arg verification is only to be performed by alpaca.py. f. Return the alpaca.py output only to Telegram user 'Bruce'
+- [ ] /commit
+- [ ] git push
+- [ ] git switch -c telegram_alpaca_integration
+- [ ] /clear /read...
+- [ ] Important.  Think hard.  Implement the instructions in the PRD specs/telegram_alpaca_integration_prd.md
+- [ ] /commit
+- [ ] git push
+- [ ] switch to master and merge current branch
+
+
+
 - [X] Think hard.  Update code/orb_alerts_monitor_superduper.py: Add a new CLI arg --no-telegram; do not send Telegram posts when this arg is used.
 - [X] Important, think hard. Update code/orb_alerts_monitor_superduper.py: This code generates superduper alerts; find the section that is marking in the "Trend Analysis" section of the alert and the "Momentum" value as red, yellow, and green; where is that code.  Do not change the code at this time.
-- [ ] Important, think hard. Update code/orb_alerts_monitor_superduper.py: This code generates superduper alerts; find the section that is creating the "Trend Analysis" section of the alert; find where it is doing the analisys for the last 45 minutes; change it to 30 minutes.
+- [X] Important, think hard. Update code/orb_alerts_monitor_superduper.py: This code generates superduper alerts; find the section that is creating the "Trend Analysis" section of the alert; find where it is doing the analisys for the last 45 minutes; change it to 30 minutes.
 
 
 

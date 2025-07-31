@@ -755,13 +755,26 @@ class alpaca_private:
         """
         Execute the main trading logic.
 
-        Prints current positions, cash balance, and active orders.
+        Prints current positions, cash balance, and active orders based on arguments.
         If bracket order arguments are provided, executes a bracket order.
 
         Returns:
             Exit code (0 for success)
         """
 
+        # Handle display-only arguments
+        display_args = [self.args.positions, self.args.cash, self.args.active_order]
+        if any(display_args):
+            # Only show requested information
+            if self.args.positions:
+                print_positions(self.api)
+            if self.args.cash:
+                print_cash(self.api)
+            if self.args.active_order:
+                print_active_orders(self.api)
+            return 0  # Exit early for display-only operations
+        
+        # Default behavior: show all information for other operations
         print_positions(self.api)
         print_cash(self.api)
         print_active_orders(self.api)
