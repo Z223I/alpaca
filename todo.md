@@ -8,13 +8,23 @@ The remaining tasks are lower priority documentation and deployment tools:
 
 Be sure to watch stocks minute-by-minute for buying oportunities Jdun Trades style but with 1 min candles.
 
-## BRB, Breakout Retest Breakout
+## BRB, Breakout(break above) Retest Breakout
+
+
+## Update Alpaca.py
+
+- [ ] /commit /clear /read...
+- [ ] Think hard. Update code/alpaca.py: 1. Research the alpaca trade api to find out how to liquidate a stock; liquidate all positions; 2. Update the code with CLI args for --liquidate --symbol <symbol> and --liquidate-all. There may be an option to close all other orders for the symbol. 3. for the CLI arg --positions, only display the most vital info, e.g., symbol, quantity and average fill.
+
+
 
 
 
 ## Root Cause Analysis
 
 This stock rocketed.
+
+- [X] Important. Think hard. Do a root cause analysis as to why penetration of this stock was 0.0%.  The stock rocketed briefly.
 2025-07-31 13:00:00,320 ET - __main__ - INFO - 🚫 Filtered superduper alert for PAPL: Penetration too low: 0.0% (need 15.0%)
 2025-07-31 13:01:00,489 ET - __main__ - INFO - 🚫 Filtered superduper alert for PAPL: Penetration too low: 0.0% (need 15.0%)
 2025-07-31 13:02:00,466 ET - __main__ - INFO - 🚫 Filtered superduper alert for PAPL: Penetration too low: 0.0% (need 15.0%)
