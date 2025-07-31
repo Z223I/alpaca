@@ -15,10 +15,10 @@ Be sure to watch stocks minute-by-minute for buying oportunities Jdun Trades sty
 - [X] git push
 - [X] /clear /read...
 - [X] git switch -c telegram_alpaca_integration
-- [ ] Important.  Think hard.  Implement the instructions in the PRD specs/telegram_alpaca_integration_prd.md
-- [ ] /commit
-- [ ] git push
-- [ ] switch to master and merge current branch
+- [X] Important.  Think hard.  Implement the instructions in the PRD specs/telegram_alpaca_integration_prd.md
+- [X] /commit
+- [X] git push
+- [X] switch to master and merge current branch
 
 
 
