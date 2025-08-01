@@ -15,10 +15,27 @@ Be sure to watch stocks minute-by-minute for buying oportunities Jdun Trades sty
 
 ## BRB, Breakout(break above) Retest Breakout
 
+
+
 ## --buy-trailing
 
-Same as --buy --amount
-Add --trailing-percent that defaults to .env variable
+- [ ] Think hard. Update code/alpaca.py:
+1. Create a new CLI arg --buy-trailing;
+2. Mirror --buy;
+3. Make --amount a required field for --buy-trailing;
+4. Add --trailing-percent that defaults to a value in atoms/api/config.py in a dataclass (file does not currently exist);
+5. CLI example: python alpaca.py --buy-trailing --symbol AAPL --amount 1000 --trailing-percent 7.5
+6. Python call example:
+api.submit_order(
+    symbol='AAPL',
+    qty=10,
+    side='buy',
+    type='trailing_stop',
+    time_in_force='gtc',
+    trail_percent='2'
+)
+7. Of course --submit is required for a real trade, otherwise it is a dry run
+8. Update README_alpaca.md
 
 
 ## Update Alpaca.py
