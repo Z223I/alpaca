@@ -16,10 +16,23 @@ Be sure to watch stocks minute-by-minute for buying oportunities Jdun Trades sty
 ## BRB, Breakout(break above) Retest Breakout
 
 
+## Buy Market
+
+- [ ] /commit /clear /read...
+- [ ] Important.  Think hard. Create a PRD, specs/buy_market_with_trailing_sell_prd.md: 1. Search internet for how to place a market buy order for Alpaca trading API version two; 2. Create code/alpace.py CLI arg --buy-market it will have the required --symbol and an optional --submit; 3. Test the new code; 4. Create code/alpace.py CLI arg --buy-market-trailing-sell it will have the required --symbol and an optional --submit; 5. buy-market-trailing-sell method: calls the newly created buy market method; polls the alpaca trading api until the order is filled or canceled; if filled, then call the trailing sell method with the number of shares purchased; 6. you will need to research how to determine if the order was placed; 7. Test the code; 8. Update README_alpaca.md.
+- [ ] /commit
+- [ ] git push
+- [ ] /clear /read...
+- [ ] git switch -c buy-market-trailing-sell
+- [ ] Important.  Think hard.  Implement the instructions in the PRD specs/buy_market_with_trailing_sell_prd.md
+- [ ] /commit
+- [ ] git push
+- [ ] switch to master and merge current branch
+
 
 ## --buy-trailing
 
-- [ ] Think hard. Update code/alpaca.py:
+- [X] Think hard. Update code/alpaca.py:
 1. Create a new CLI arg --buy-trailing;
 2. Mirror --buy;
 3. Make --amount a required field for --buy-trailing;
@@ -37,7 +50,7 @@ api.submit_order(
 7. Of course --submit is required for a real trade, otherwise it is a dry run
 8. Update README_alpaca.md
 
-- [ ] Important. Think hard. Change --buy-trailing to --sell-trailing so side='sell'; Update README_alpaca.md of course; Replace the required --amount with --quantity which is required; Give an example of a market buy --amount with a matching --sell-trailing --quantity (you will have to fake the quantity).
+- [X] Important. Think hard. Change --buy-trailing to --sell-trailing so side='sell'; Update README_alpaca.md of course; Replace the required --amount with --quantity which is required; Give an example of a market buy --amount with a matching --sell-trailing --quantity (you will have to fake the quantity).
 
 - [X] make ./code a python package
 
