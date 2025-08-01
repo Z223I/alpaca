@@ -6,6 +6,8 @@ A comprehensive Python-based trading system for automated stock trading using th
 
 ### Core Trading Capabilities
 - **Market & Limit Orders**: Execute buy and sell orders with various order types
+- **Market Buy Orders**: Simple market buy orders without bracket protection
+- **Market Buy with Trailing Sell**: Automated market buy followed by trailing sell when filled
 - **Trailing Orders**: Trailing sell orders that follow price movements upward with configurable trailing percentage
 - **Bracket Orders**: Automated stop-loss and take-profit protection
 - **After-Hours Trading**: Extended hours trading with limit orders only
@@ -56,9 +58,37 @@ python3 code/alpaca.py --buy --symbol AAPL --take-profit 160.00
 # Execute a buy order (live)
 python3 code/alpaca.py --buy --symbol AAPL --take-profit 160.00 --submit
 
+# Execute a simple market buy order (no protection)
+python3 code/alpaca.py --buy-market --symbol AAPL --submit
+
+# Execute market buy with automatic trailing sell
+python3 code/alpaca.py --buy-market-trailing-sell --symbol AAPL --submit
+
 # After-hours trading
 python3 code/alpaca.py --buy --symbol AAPL --after-hours --take-profit 160.00 --submit
 ```
+
+## Market Buy vs Regular Buy
+
+### Understanding the Differences
+
+**`--buy`** (Regular Buy with Bracket Protection):
+- Requires `--take-profit` or `--calc-take-profit`
+- Automatically includes stop-loss protection (default 5%)
+- Creates bracket orders with automatic risk management
+- Best for: Protected trades with defined exit strategy
+
+**`--buy-market`** (Simple Market Buy):
+- No bracket protection or automatic stops
+- Immediate market execution at current price
+- Requires manual position management
+- Best for: Quick entries when you'll manage exits manually
+
+**`--buy-market-trailing-sell`** (Automated Market Buy + Trailing Sell):
+- Executes market buy, then waits for fill
+- Automatically places trailing sell order when buy order fills
+- Combines speed of market execution with profit protection
+- Best for: Momentum plays where you want automatic profit-taking
 
 ## Complete Command Line Reference
 
@@ -68,6 +98,8 @@ python3 code/alpaca.py --buy --symbol AAPL --after-hours --take-profit 160.00 --
 - `-b, --bracket-order` - Execute bracket order
 - `-f, --future-bracket-order` - Execute future bracket order with limit entry  
 - `--buy` - Execute a buy order for the specified symbol
+- `--buy-market` - Execute a simple market buy order for the specified symbol
+- `--buy-market-trailing-sell` - Execute market buy then automatic trailing sell when filled
 - `--sell-trailing` - Execute a trailing sell order for the specified symbol
 - `--sell-short` - Execute a short sell order for bearish predictions
 - `-q, --get-latest-quote` - Get latest quote for a symbol
@@ -112,7 +144,19 @@ python3 code/alpaca.py --sell-short --symbol AAPL --take-profit 140.00 --submit
 # Buy with custom amount and calculated take profit
 python3 code/alpaca.py --buy --symbol AAPL --amount 1000 --stop-loss 145.00 --calc-take-profit --submit
 
-# Market buy followed by trailing sell order
+# Simple market buy order (no bracket protection)
+python3 code/alpaca.py --buy-market --symbol AAPL --submit
+
+# Market buy with custom dollar amount
+python3 code/alpaca.py --buy-market --symbol AAPL --amount 1000 --submit
+
+# Automated market buy with trailing sell (recommended)
+python3 code/alpaca.py --buy-market-trailing-sell --symbol AAPL --submit
+
+# Automated market buy with trailing sell and custom amount
+python3 code/alpaca.py --buy-market-trailing-sell --symbol AAPL --amount 1000 --submit
+
+# Manual market buy followed by trailing sell order
 python3 code/alpaca.py --buy --symbol AAPL --amount 1000 --take-profit 160.00 --submit
 python3 code/alpaca.py --sell-trailing --symbol AAPL --quantity 5 --submit
 
@@ -218,6 +262,9 @@ Located in `code/alpaca.py`, this is the core trading class:
 
 #### Core Trading Methods
 - `_buy()`: Execute buy orders with automatic bracket protection
+- `_buy_market()`: Execute simple market buy orders without bracket protection
+- `_buy_market_trailing_sell()`: Execute market buy with automatic trailing sell when filled
+- `_poll_order_status()`: Monitor order status until terminal state (filled/canceled)
 - `_sell_trailing()`: Execute trailing sell orders with configurable trailing percentage
 - `_sell_short()`: Execute short sell orders with protection
 - `_bracketOrder()`: Create standard bracket orders

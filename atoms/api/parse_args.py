@@ -38,6 +38,10 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
                       help='Get latest quote for a symbol')
     parser.add_argument('--buy', action='store_true',
                       help='Execute a buy order for the specified symbol')
+    parser.add_argument('--buy-market', action='store_true',
+                      help='Execute a simple market buy order for the specified symbol')
+    parser.add_argument('--buy-market-trailing-sell', action='store_true',
+                      help='Execute market buy then automatic trailing sell when filled')
     parser.add_argument('--sell-trailing', action='store_true',
                       help='Execute a trailing sell order for the specified symbol')
     parser.add_argument('--trailing-percent', type=float, required=False,
@@ -105,6 +109,16 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
         if not args.take_profit and not args.calc_take_profit:
             parser.error("--buy requires either --take-profit or --calc-take-profit")
     
+    # Validate buy-market arguments
+    if args.buy_market:
+        if not args.symbol:
+            parser.error("--buy-market requires --symbol")
+    
+    # Validate buy-market-trailing-sell arguments
+    if args.buy_market_trailing_sell:
+        if not args.symbol:
+            parser.error("--buy-market-trailing-sell requires --symbol")
+    
     # Validate sell-trailing arguments
     if args.sell_trailing:
         if not args.symbol:
@@ -126,13 +140,16 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
         if not args.take_profit and not args.calc_take_profit:
             parser.error("--sell-short requires either --take-profit or --calc-take-profit")
     
-    # Ensure buy, sell-trailing and sell_short are mutually exclusive
-    if args.buy and args.sell_short:
-        parser.error("--buy and --sell-short cannot be used together")
-    if args.buy and args.sell_trailing:
-        parser.error("--buy and --sell-trailing cannot be used together")
-    if args.sell_trailing and args.sell_short:
+    # Ensure buy, sell-trailing, sell_short, buy-market, and buy-market-trailing-sell are mutually exclusive
+    buy_operations = [args.buy, args.buy_market, args.buy_market_trailing_sell]
+    sell_operations = [args.sell_trailing, args.sell_short]
+    
+    if sum(buy_operations) > 1:
+        parser.error("--buy, --buy-market, and --buy-market-trailing-sell cannot be used together")
+    if sum(sell_operations) > 1:
         parser.error("--sell-trailing and --sell-short cannot be used together")
+    if any(buy_operations) and any(sell_operations):
+        parser.error("Buy and sell operations cannot be used together")
     
     # Validate liquidation arguments
     if args.liquidate:
@@ -150,14 +167,14 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
     
     # Ensure liquidation is mutually exclusive with other operations
     if args.liquidate or args.liquidate_all:
-        conflicting_args = [args.buy, args.sell_trailing, args.sell_short, args.bracket_order, args.future_bracket_order, args.get_latest_quote]
+        conflicting_args = [args.buy, args.buy_market, args.buy_market_trailing_sell, args.sell_trailing, args.sell_short, args.bracket_order, args.future_bracket_order, args.get_latest_quote]
         if any(conflicting_args):
             parser.error("Liquidation operations cannot be combined with other trading operations")
     
     # Validate after_hours arguments
     if args.after_hours:
-        if not (args.buy or args.sell_trailing or args.sell_short):
-            parser.error("--after-hours requires either --buy, --sell-trailing, or --sell-short")
+        if not (args.buy or args.buy_market or args.buy_market_trailing_sell or args.sell_trailing or args.sell_short):
+            parser.error("--after-hours requires either --buy, --buy-market, --buy-market-trailing-sell, --sell-trailing, or --sell-short")
         if not args.symbol:
             parser.error("--after-hours requires --symbol")
 

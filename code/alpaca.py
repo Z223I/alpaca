@@ -97,6 +97,179 @@ class alpaca_private:
 
         return quantity
 
+    def _buy_market(self, symbol: str, amount: Optional[float] = None, submit_order: bool = False) -> Optional[Any]:
+        """
+        Execute a simple market buy order without bracket order protection.
+
+        This method retrieves the latest quote, calculates position size based on
+        available cash and existing positions, and submits a market order for
+        immediate execution at current market price.
+
+        Args:
+            symbol: The stock symbol to buy
+            amount: Dollar amount to invest (optional, uses portfolio risk if not provided)
+            submit_order: Whether to actually submit the order (default: False for dry run)
+
+        Returns:
+            The order response from Alpaca API or None if dry run/error
+        """
+        # Get current market data for the symbol (using average of bid/ask)
+        market_price = get_latest_quote_avg(self.api, symbol)
+
+        # Calculate quantity based on amount or use portfolio risk logic
+        if amount is not None:
+            # Use specified dollar amount to calculate shares
+            quantity = round(amount / market_price)
+        else:
+            # Use existing portfolio risk calculation
+            quantity = self._calculateQuantity(market_price, "_buy_market")
+
+        # Display the order details that would be submitted
+        print(f"submit_order(\n"
+                f"    symbol='{symbol}',\n"
+                f"    qty={quantity},\n"
+                f"    side='buy',\n"
+                f"    type='market',\n"
+                f"    time_in_force='day'\n"
+                f")")
+
+        if not submit_order:
+            print("[DRY RUN] Market buy order not submitted (use --submit to execute)")
+            return None
+
+        # Submit the actual order if requested
+        if submit_order:
+            try:
+                order_response = self.api.submit_order(
+                    symbol=symbol,
+                    qty=quantity,
+                    side='buy',
+                    type='market',
+                    time_in_force='day'
+                )
+                print(f"✓ Market buy order submitted successfully: {order_response.id}")
+                print(f"  Status: {order_response.status}")
+                print(f"  Symbol: {order_response.symbol}")
+                print(f"  Quantity: {order_response.qty}")
+                print(f"  Market Price: ~${market_price:.2f}")
+                return order_response
+            except Exception as e:
+                print(f"✗ Market buy order submission failed: {str(e)}")
+                print(f"  Symbol: {symbol}, Quantity: {quantity}")
+                return None
+
+    def _poll_order_status(self, order_id: str, timeout_seconds: int = 60) -> Optional[Any]:
+        """
+        Poll order status until it reaches a terminal state or timeout.
+
+        Args:
+            order_id: The order ID to monitor
+            timeout_seconds: Maximum time to wait (default: 60 seconds)
+
+        Returns:
+            The final order object or None if timeout/error
+        """
+        import time
+        start_time = time.time()
+        poll_interval = 2  # Poll every 2 seconds
+        
+        print(f"Polling order status for {order_id}...")
+        
+        while (time.time() - start_time) < timeout_seconds:
+            try:
+                order = self.api.get_order(order_id)
+                current_status = order.status
+                print(f"  Order status: {current_status}")
+                
+                # Check for terminal states
+                if current_status in ['filled', 'canceled', 'rejected', 'expired']:
+                    print(f"✓ Order reached terminal state: {current_status}")
+                    return order
+                    
+                # Continue polling for non-terminal states
+                if current_status in ['new', 'accepted', 'partially_filled', 'pending_new', 'calculated', 'stopped', 'suspended']:
+                    time.sleep(poll_interval)
+                    continue
+                else:
+                    print(f"⚠️  Unknown order status: {current_status}")
+                    time.sleep(poll_interval)
+                    continue
+                    
+            except Exception as e:
+                print(f"✗ Error polling order status: {str(e)}")
+                return None
+        
+        print(f"⚠️  Order polling timeout after {timeout_seconds} seconds")
+        return None
+
+    def _buy_market_trailing_sell(self, symbol: str, amount: Optional[float] = None, trailing_percent: Optional[float] = None, submit_order: bool = False) -> Optional[Dict]:
+        """
+        Execute market buy order followed by automatic trailing sell when filled.
+
+        This method:
+        1. Executes a market buy order
+        2. Polls the order status until filled or canceled
+        3. If filled, automatically places a trailing sell order for the filled quantity
+
+        Args:
+            symbol: The stock symbol to trade
+            amount: Dollar amount to invest (optional, uses portfolio risk if not provided)
+            trailing_percent: Trailing percentage for sell order (optional, uses default if not provided)
+            submit_order: Whether to actually submit orders (default: False for dry run)
+
+        Returns:
+            Dictionary with buy and sell order responses, or None if error/dry run
+        """
+        print(f"Executing market buy with trailing sell for {symbol}...")
+        
+        # Step 1: Execute market buy order
+        buy_order = self._buy_market(symbol=symbol, amount=amount, submit_order=submit_order)
+        
+        if not submit_order:
+            print("[DRY RUN] Would poll order status and place trailing sell after fill")
+            return None
+            
+        if buy_order is None:
+            print("✗ Market buy order failed, aborting trailing sell setup")
+            return None
+            
+        # Step 2: Poll order status until filled or terminal state
+        final_order = self._poll_order_status(buy_order.id)
+        
+        if final_order is None:
+            print("✗ Order polling failed, cannot proceed with trailing sell")
+            return None
+            
+        if final_order.status != 'filled':
+            print(f"✗ Order not filled (status: {final_order.status}), cannot place trailing sell")
+            return None
+            
+        # Step 3: Extract filled quantity and place trailing sell
+        filled_qty = int(final_order.filled_qty) if hasattr(final_order, 'filled_qty') else int(final_order.qty)
+        print(f"✓ Buy order filled: {filled_qty} shares")
+        
+        # Execute trailing sell with the filled quantity
+        sell_order = self._sell_trailing(
+            symbol=symbol, 
+            quantity=filled_qty, 
+            trailing_percent=trailing_percent,
+            submit_order=True  # Always submit if we got this far
+        )
+        
+        if sell_order is None:
+            print("✗ Trailing sell order failed")
+            return {
+                'buy_order': final_order,
+                'sell_order': None,
+                'error': 'Trailing sell failed'
+            }
+        
+        print("✓ Market buy with trailing sell completed successfully")
+        return {
+            'buy_order': final_order,
+            'sell_order': sell_order
+        }
+
     def _buy(self, symbol: str, take_profit: Optional[float] = None, stop_loss: Optional[float] = None, amount: Optional[float] = None, submit_order: bool = False) -> Optional[Any]:
         """
         Execute a buy order with bracket order protection.
@@ -1058,6 +1231,29 @@ class alpaca_private:
                 if order_result is None and self.args.submit:
                     print("Failed to submit buy order")
                     return 1
+
+        # Handle buy-market order if requested
+        if self.args.buy_market:
+            order_result = self._buy_market(
+                symbol=self.args.symbol,
+                amount=self.args.amount,
+                submit_order=self.args.submit
+            )
+            if order_result is None and self.args.submit:
+                print("Failed to submit market buy order")
+                return 1
+
+        # Handle buy-market-trailing-sell order if requested
+        if self.args.buy_market_trailing_sell:
+            order_result = self._buy_market_trailing_sell(
+                symbol=self.args.symbol,
+                amount=self.args.amount,
+                trailing_percent=self.args.trailing_percent,
+                submit_order=self.args.submit
+            )
+            if order_result is None and self.args.submit:
+                print("Failed to submit market buy with trailing sell")
+                return 1
 
         # Handle trailing sell order if requested
         if self.args.sell_trailing:
