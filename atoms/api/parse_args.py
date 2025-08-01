@@ -38,6 +38,10 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
                       help='Get latest quote for a symbol')
     parser.add_argument('--buy', action='store_true',
                       help='Execute a buy order for the specified symbol')
+    parser.add_argument('--buy-trailing', action='store_true',
+                      help='Execute a trailing buy order for the specified symbol')
+    parser.add_argument('--trailing-percent', type=float, required=False,
+                      help='Trailing percentage for trailing buy order (default: 7.5)')
     parser.add_argument('--sell-short', action='store_true',
                       help='Execute a short sell order for bearish predictions')
     parser.add_argument('--after-hours', action='store_true',
@@ -101,6 +105,13 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
         if not args.take_profit and not args.calc_take_profit:
             parser.error("--buy requires either --take-profit or --calc-take-profit")
     
+    # Validate buy-trailing arguments
+    if args.buy_trailing:
+        if not args.symbol:
+            parser.error("--buy-trailing requires --symbol")
+        if not args.amount:
+            parser.error("--buy-trailing requires --amount")
+    
     # Validate sell_short arguments
     if args.sell_short:
         # Check for calc_take_profit usage warnings
@@ -115,9 +126,13 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
         if not args.take_profit and not args.calc_take_profit:
             parser.error("--sell-short requires either --take-profit or --calc-take-profit")
     
-    # Ensure buy and sell_short are mutually exclusive
+    # Ensure buy, buy-trailing and sell_short are mutually exclusive
     if args.buy and args.sell_short:
         parser.error("--buy and --sell-short cannot be used together")
+    if args.buy and args.buy_trailing:
+        parser.error("--buy and --buy-trailing cannot be used together")
+    if args.buy_trailing and args.sell_short:
+        parser.error("--buy-trailing and --sell-short cannot be used together")
     
     # Validate liquidation arguments
     if args.liquidate:
@@ -135,14 +150,14 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
     
     # Ensure liquidation is mutually exclusive with other operations
     if args.liquidate or args.liquidate_all:
-        conflicting_args = [args.buy, args.sell_short, args.bracket_order, args.future_bracket_order, args.get_latest_quote]
+        conflicting_args = [args.buy, args.buy_trailing, args.sell_short, args.bracket_order, args.future_bracket_order, args.get_latest_quote]
         if any(conflicting_args):
             parser.error("Liquidation operations cannot be combined with other trading operations")
     
     # Validate after_hours arguments
     if args.after_hours:
-        if not (args.buy or args.sell_short):
-            parser.error("--after-hours requires either --buy or --sell-short")
+        if not (args.buy or args.buy_trailing or args.sell_short):
+            parser.error("--after-hours requires either --buy, --buy-trailing, or --sell-short")
         if not args.symbol:
             parser.error("--after-hours requires --symbol")
 

@@ -37,6 +37,8 @@ api.submit_order(
 7. Of course --submit is required for a real trade, otherwise it is a dry run
 8. Update README_alpaca.md
 
+- [ ] make ./code a package
+
 
 ## Update Alpaca.py
 
