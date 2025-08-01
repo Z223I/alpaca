@@ -12,12 +12,12 @@ def notify_trade_execution(symbol: str, side: str, quantity: int, price: float, 
     try:
         message = f"🎯 Trade Executed: {side.upper()} {quantity} shares of {symbol} @ ${price:.2f} (Total: ${total_value:.2f})"
         result = send_message(message)
-        
+
         if result['success']:
             print(f"Telegram notification sent to {result['sent_count']} users")
         else:
             print(f"Telegram notification failed: {result['errors']}")
-            
+
     except Exception as e:
         print(f"Error sending Telegram notification: {e}")
 
@@ -26,7 +26,7 @@ def notify_bracket_order(symbol: str, quantity: int, entry_price: float, stop_pr
     try:
         stop_loss_pct = ((entry_price - stop_price) / entry_price) * 100
         take_profit_pct = ((target_price - entry_price) / entry_price) * 100
-        
+
         message = (
             f"🔄 Bracket Order Submitted\n"
             f"📊 {symbol}: {quantity} shares\n"
@@ -34,14 +34,14 @@ def notify_bracket_order(symbol: str, quantity: int, entry_price: float, stop_pr
             f"🛑 Stop: ${stop_price:.2f} (-{stop_loss_pct:.1f}%)\n"
             f"🎯 Target: ${target_price:.2f} (+{take_profit_pct:.1f}%)"
         )
-        
+
         result = send_message(message)
-        
+
         if result['success']:
             print(f"Bracket order notification sent to {result['sent_count']} users")
         else:
             print(f"Bracket order notification failed: {result['errors']}")
-            
+
     except Exception as e:
         print(f"Error sending bracket order notification: {e}")
 
@@ -50,10 +50,10 @@ def notify_error(error_type: str, error_message: str, symbol: str = None):
     try:
         symbol_text = f" for {symbol}" if symbol else ""
         message = f"❌ Trading Error{symbol_text}: {error_type} - {error_message}"
-        
+
         send_alert(message, level='error')
         print(f"Error notification sent via Telegram")
-        
+
     except Exception as e:
         print(f"Error sending error notification: {e}")
 

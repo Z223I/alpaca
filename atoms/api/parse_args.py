@@ -5,13 +5,13 @@ from typing import Optional, List
 def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
     """
     Parse command line arguments for the trading bot.
-    
+
     Args:
         userArgs: List of command line arguments to parse
-        
+
     Returns:
         Parsed arguments namespace
-        
+
     Raises:
         SystemExit: If required arguments are missing for bracket orders
     """
@@ -58,7 +58,7 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
                       help='Calculate take profit as (latest_quote - stop_loss) * 1.5')
     parser.add_argument('--amount', type=float, required=False,
                       help='Dollar amount to invest (will calculate quantity automatically)')
-    
+
     # Liquidation arguments
     parser.add_argument('--liquidate', action='store_true',
                       help='Liquidate position for a specific symbol (requires --symbol)')
@@ -66,7 +66,7 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
                       help='Liquidate all open positions and optionally cancel all orders')
     parser.add_argument('--cancel-orders', action='store_true',
                       help='Cancel all open orders (used with --liquidate-all)')
-    
+
     # Display-only arguments
     parser.add_argument('--positions', action='store_true',
                       help='Display current positions only')
@@ -81,7 +81,7 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
     if args.bracket_order:
         if not all([args.symbol, args.quantity, args.market_price, args.take_profit]):
             parser.error("--bracket-order requires --symbol, --quantity, --market-price, and --take-profit")
-    
+
     # Validate future bracket order arguments
     if args.future_bracket_order:
         if not all([args.symbol, args.limit_price, args.stop_price, args.take_profit]):
@@ -89,12 +89,12 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
         # Set default quantity to 0 for auto-calculation if not provided
         if args.quantity is None:
             args.quantity = 0
-    
+
     # Validate quote arguments
     if args.get_latest_quote:
         if not args.symbol:
             parser.error("--get-latest-quote requires --symbol")
-    
+
     # Validate buy arguments
     if args.buy:
         # Check for calc_take_profit usage warnings
@@ -102,30 +102,30 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
             parser.error("--calc-take-profit requires --stop-loss")
         if args.calc_take_profit and args.take_profit:
             print("Warning: --calc-take-profit used with --take-profit. --take-profit will be ignored.")
-        
+
         # Require symbol and either take_profit or calc_take_profit
         if not args.symbol:
             parser.error("--buy requires --symbol")
         if not args.take_profit and not args.calc_take_profit:
             parser.error("--buy requires either --take-profit or --calc-take-profit")
-    
+
     # Validate buy-market arguments
     if args.buy_market:
         if not args.symbol:
             parser.error("--buy-market requires --symbol")
-    
+
     # Validate buy-market-trailing-sell arguments
     if args.buy_market_trailing_sell:
         if not args.symbol:
             parser.error("--buy-market-trailing-sell requires --symbol")
-    
+
     # Validate sell-trailing arguments
     if args.sell_trailing:
         if not args.symbol:
             parser.error("--sell-trailing requires --symbol")
         if not args.quantity:
             parser.error("--sell-trailing requires --quantity")
-    
+
     # Validate sell_short arguments
     if args.sell_short:
         # Check for calc_take_profit usage warnings
@@ -133,44 +133,44 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
             parser.error("--calc-take-profit requires --stop-loss")
         if args.calc_take_profit and args.take_profit:
             print("Warning: --calc-take-profit used with --take-profit. --take-profit will be ignored.")
-        
+
         # Require symbol and either take_profit or calc_take_profit
         if not args.symbol:
             parser.error("--sell-short requires --symbol")
         if not args.take_profit and not args.calc_take_profit:
             parser.error("--sell-short requires either --take-profit or --calc-take-profit")
-    
+
     # Ensure buy, sell-trailing, sell_short, buy-market, and buy-market-trailing-sell are mutually exclusive
     buy_operations = [args.buy, args.buy_market, args.buy_market_trailing_sell]
     sell_operations = [args.sell_trailing, args.sell_short]
-    
+
     if sum(buy_operations) > 1:
         parser.error("--buy, --buy-market, and --buy-market-trailing-sell cannot be used together")
     if sum(sell_operations) > 1:
         parser.error("--sell-trailing and --sell-short cannot be used together")
     if any(buy_operations) and any(sell_operations):
         parser.error("Buy and sell operations cannot be used together")
-    
+
     # Validate liquidation arguments
     if args.liquidate:
         if not args.symbol:
             parser.error("--liquidate requires --symbol")
         if args.liquidate_all:
             parser.error("--liquidate and --liquidate-all cannot be used together")
-    
+
     if args.liquidate_all:
         if args.symbol:
             parser.error("--liquidate-all cannot be used with --symbol")
-    
+
     if args.cancel_orders and not args.liquidate_all:
         parser.error("--cancel-orders can only be used with --liquidate-all")
-    
+
     # Ensure liquidation is mutually exclusive with other operations
     if args.liquidate or args.liquidate_all:
         conflicting_args = [args.buy, args.buy_market, args.buy_market_trailing_sell, args.sell_trailing, args.sell_short, args.bracket_order, args.future_bracket_order, args.get_latest_quote]
         if any(conflicting_args):
             parser.error("Liquidation operations cannot be combined with other trading operations")
-    
+
     # Validate after_hours arguments
     if args.after_hours:
         if not (args.buy or args.buy_market or args.buy_market_trailing_sell or args.sell_trailing or args.sell_short):
@@ -189,7 +189,7 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
                     parser.error("Display-only arguments (--positions, --cash, --active-order) cannot be combined with other operations")
                 elif arg_value is not None and not isinstance(arg_value, bool):
                     parser.error("Display-only arguments (--positions, --cash, --active-order) cannot be combined with other operations")
-    
+
     # Normalize symbol to uppercase if provided
     if args.symbol:
         args.symbol = args.symbol.upper()

@@ -21,7 +21,7 @@ def calculate_vwap(df: pd.DataFrame,
     """
     # Initialize VWAP series with zeros
     vwap = pd.Series([0.0] * len(df), index=df.index)
-    
+
     if len(df) == 0:
         return False, vwap
 
@@ -56,7 +56,7 @@ def calculate_vwap_typical(df: pd.DataFrame) -> Tuple[bool, pd.Series]:
     """
     # Initialize VWAP series with zeros
     vwap = pd.Series([0.0] * len(df), index=df.index)
-    
+
     if len(df) == 0:
         return False, vwap
 
@@ -107,7 +107,7 @@ def calculate_vwap_ohlc(df: pd.DataFrame) -> Tuple[bool, pd.Series]:
     """
     # Initialize VWAP series with zeros
     vwap = pd.Series([0.0] * len(df), index=df.index)
-    
+
     if len(df) == 0:
         return False, vwap
 
@@ -145,11 +145,11 @@ if __name__ == "__main__":
         'volume': [1000, 1200, 800, 1500, 1100, 900, 1300, 1600, 1000,
                    1400, 1800, 1200, 1500, 1700]
     }
-    
+
     # Create DataFrame
     df = pd.DataFrame(candlestick_data)
     df.index = pd.date_range('2024-01-01', periods=len(df), freq='D')
-    
+
     print("Sample Candlestick Data:")
     print(df.head())
     print()

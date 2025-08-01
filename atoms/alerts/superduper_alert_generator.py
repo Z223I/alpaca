@@ -15,11 +15,11 @@ import pytz
 
 class SuperduperAlertGenerator:
     """Generates enhanced superduper alerts from filtered super alerts."""
-    
+
     def __init__(self, superduper_alerts_dir: Path, test_mode: bool = False):
         """
         Initialize the superduper alert generator.
-        
+
         Args:
             superduper_alerts_dir: Directory to save superduper alerts
             test_mode: Whether running in test mode
@@ -27,14 +27,14 @@ class SuperduperAlertGenerator:
         self.superduper_alerts_dir = superduper_alerts_dir
         self.test_mode = test_mode
         self.logger = logging.getLogger(__name__)
-    
+
     def _get_momentum_color_code(self, momentum: float) -> str:
         """
         Get color code for momentum text based on value.
-        
+
         Args:
             momentum: Momentum value to color code
-            
+
         Returns:
             HTML color code string for the momentum value
         """
@@ -44,43 +44,43 @@ class SuperduperAlertGenerator:
             return "🟡"  # Yellow for 0.3 to < 0.5
         else:
             return "🟢"  # Green for >= 0.5
-    
+
     def create_superduper_alert(self, latest_super_alert: Dict[str, Any], 
                                trend_analysis: Dict[str, Any], 
                                trend_type: str, trend_strength: float) -> Optional[Dict[str, Any]]:
         """
         Create a superduper alert with enhanced analysis and messaging.
-        
+
         Args:
             latest_super_alert: The triggering super alert
             trend_analysis: Detailed trend analysis data
             trend_type: Type of trend ('rising' or 'consolidating')
             trend_strength: Trend strength (0.0 to 1.0)
-            
+
         Returns:
             Superduper alert dictionary or None if creation failed
         """
         try:
             symbol = latest_super_alert['symbol']
-            
+
             # Create ET timestamp for when superduper alert is generated
             et_tz = pytz.timezone('US/Eastern')
             superduper_alert_time = datetime.now(et_tz)
             et_timestamp = superduper_alert_time.strftime('%Y-%m-%dT%H:%M:%S%z')
-            
+
             # Extract key metrics from latest super alert
             signal_analysis = latest_super_alert.get('signal_analysis', {})
             current_price = signal_analysis.get('current_price', 0)
             signal_price = signal_analysis.get('signal_price', 0)
             resistance_price = signal_analysis.get('resistance_price', 0)
             penetration = signal_analysis.get('penetration_percent', 0)
-            
+
             # Create enhanced message
             alert_message = self._create_enhanced_message(
                 symbol, current_price, signal_price, resistance_price, 
                 penetration, trend_type, trend_strength, trend_analysis
             )
-            
+
             # Create superduper alert data structure
             superduper_alert = {
                 "symbol": symbol,
@@ -115,39 +115,39 @@ class SuperduperAlertGenerator:
                 },
                 "alert_message": alert_message
             }
-            
+
             return superduper_alert
-            
+
         except Exception as e:
             self.logger.error(f"Error creating superduper alert for {latest_super_alert.get('symbol', 'unknown')}: {e}")
             return None
-    
+
     def _create_enhanced_message(self, symbol: str, current_price: float, 
                                signal_price: float, resistance_price: float,
                                penetration: float, trend_type: str, 
                                trend_strength: float, trend_analysis: Dict[str, Any]) -> str:
         """Create enhanced Telegram message for superduper alerts."""
-        
+
         # Trend type emojis and descriptions
         trend_emoji = {
             'rising': '🚀📈',
             'consolidating': '🔄📊'
         }
-        
+
         trend_desc = {
             'rising': 'STRONG UPTREND',
             'consolidating': 'CONSOLIDATING HIGH'
         }
-        
+
         # Strength indicators
         strength_emoji = '🔥' if trend_strength > 0.7 else '⚡' if trend_strength > 0.5 else '💫'
         strength_desc = 'VERY STRONG' if trend_strength > 0.7 else 'STRONG' if trend_strength > 0.5 else 'MODERATE'
-        
+
         # Price change and momentum
         price_change = trend_analysis.get('price_change_percent', 0)
         momentum = trend_analysis.get('price_momentum', 0)
         timeframe = trend_analysis.get('timeframe_minutes', 45)
-        
+
         # Create the message
         message_parts = [
             f"🎯🎯 **SUPERDUPER ALERT** 🎯🎯",
@@ -163,7 +163,7 @@ class SuperduperAlertGenerator:
             f"",
             f"📈 **Trend Analysis ({timeframe}m):**"
         ]
-        
+
         # Add trend-specific details
         if trend_type == 'rising':
             penetration_change = trend_analysis.get('penetration_change', 0)
@@ -183,11 +183,11 @@ class SuperduperAlertGenerator:
                 f"• Volatility: **{volatility:.3f}** (Low)",
                 f"• Pattern: **Sustained Strength** 🔄"
             ])
-        
+
         # Add urgency and risk assessment
         urgency = self._calculate_urgency_level(trend_type, trend_strength, trend_analysis)
         risk_level = self._assess_risk_level(trend_type, trend_strength, penetration)
-        
+
         message_parts.extend([
             f"",
             f"⚡ **Alert Level:** {urgency.upper()}",
@@ -200,55 +200,55 @@ class SuperduperAlertGenerator:
             f"",
             f"⏰ **Alert Generated:** {datetime.now(pytz.timezone('US/Eastern')).strftime('%H:%M:%S ET')}"
         ])
-        
+
         if self.test_mode:
             message_parts.insert(1, "🧪 **[TEST MODE]**")
-        
+
         return "\\n".join(message_parts)
-    
+
     def _calculate_momentum_score(self, trend_analysis: Dict[str, Any], trend_strength: float) -> float:
         """Calculate a momentum score from 0.0 to 1.0."""
         momentum = abs(trend_analysis.get('price_momentum', 0))
         penetration_change = abs(trend_analysis.get('penetration_change', 0))
-        
+
         # Normalize momentum (max at 0.1% per minute)
         momentum_component = min(momentum / 0.1, 1.0)
-        
+
         # Normalize penetration change (max at 30%)
         penetration_component = min(penetration_change / 30.0, 1.0)
-        
+
         # Combine with trend strength
         momentum_score = (momentum_component + penetration_component + trend_strength) / 3.0
-        
+
         return round(momentum_score, 3)
-    
+
     def _assess_breakout_quality(self, latest_super_alert: Dict[str, Any], 
                                 trend_analysis: Dict[str, Any]) -> str:
         """Assess the quality of the breakout."""
         penetration = latest_super_alert.get('signal_analysis', {}).get('penetration_percent', 0)
         volume_ratio = latest_super_alert.get('original_alert', {}).get('volume_ratio', 1.0)
         confidence = latest_super_alert.get('original_alert', {}).get('confidence_score', 0.5)
-        
+
         # Score based on multiple factors
         quality_score = 0
-        
+
         if penetration > 30:
             quality_score += 3
         elif penetration > 20:
             quality_score += 2
         elif penetration > 10:
             quality_score += 1
-        
+
         if volume_ratio > 3.0:
             quality_score += 2
         elif volume_ratio > 2.0:
             quality_score += 1
-        
+
         if confidence > 0.8:
             quality_score += 2
         elif confidence > 0.6:
             quality_score += 1
-        
+
         # Map score to quality
         if quality_score >= 6:
             return "EXCEPTIONAL"
@@ -258,7 +258,7 @@ class SuperduperAlertGenerator:
             return "MODERATE"
         else:
             return "LOW"
-    
+
     def _assess_risk_level(self, trend_type: str, trend_strength: float, penetration: float) -> str:
         """Assess risk level based on trend characteristics."""
         if trend_type == 'rising' and trend_strength > 0.6 and penetration > 25:
@@ -269,15 +269,15 @@ class SuperduperAlertGenerator:
             return "MODERATE"
         else:
             return "HIGH"
-    
+
     def _calculate_urgency_level(self, trend_type: str, trend_strength: float, 
                                trend_analysis: Dict[str, Any]) -> str:
         """Calculate urgency level for the alert."""
         momentum = abs(trend_analysis.get('price_momentum', 0))
         penetration_change = abs(trend_analysis.get('penetration_change', 0))
-        
+
         urgency_score = 0
-        
+
         # Trend strength component
         if trend_strength > 0.7:
             urgency_score += 3
@@ -285,17 +285,17 @@ class SuperduperAlertGenerator:
             urgency_score += 2
         else:
             urgency_score += 1
-        
+
         # Momentum component
         if momentum > 0.05:
             urgency_score += 2
         elif momentum > 0.03:
             urgency_score += 1
-        
+
         # Rising trend gets bonus urgency
         if trend_type == 'rising' and penetration_change > 15:
             urgency_score += 2
-        
+
         # Map to urgency levels
         if urgency_score >= 6:
             return "CRITICAL"
@@ -305,21 +305,21 @@ class SuperduperAlertGenerator:
             return "MODERATE"
         else:
             return "LOW"
-    
+
     def save_superduper_alert(self, superduper_alert: Dict[str, Any]) -> Optional[str]:
         """
         Save superduper alert to file.
-        
+
         Args:
             superduper_alert: Superduper alert data
-            
+
         Returns:
             Filename if saved successfully, None otherwise
         """
         try:
             symbol = superduper_alert['symbol']
             timestamp_str = superduper_alert['timestamp']
-            
+
             # Parse timestamp to get filename format
             et_tz = pytz.timezone('US/Eastern')
             try:
@@ -329,88 +329,88 @@ class SuperduperAlertGenerator:
                     superduper_alert_time = datetime.fromisoformat(clean_timestamp)
                 else:
                     superduper_alert_time = datetime.fromisoformat(timestamp_str.replace('Z', ''))
-                
+
                 # If no timezone info, assume ET
                 if superduper_alert_time.tzinfo is None:
                     superduper_alert_time = et_tz.localize(superduper_alert_time)
                 else:
                     superduper_alert_time = superduper_alert_time.astimezone(et_tz)
-                    
+
             except Exception:
                 # Fallback to current time
                 superduper_alert_time = datetime.now(et_tz)
-            
+
             # Generate filename
             filename = f"superduper_alert_{symbol}_{superduper_alert_time.strftime('%Y%m%d_%H%M%S')}.json"
             filepath = self.superduper_alerts_dir / filename
-            
+
             # Save to file
             with open(filepath, 'w') as f:
                 json.dump(superduper_alert, f, indent=2)
-            
+
             self.logger.debug(f"Superduper alert saved: {filename}")
             return filename
-            
+
         except Exception as e:
             self.logger.error(f"Error saving superduper alert: {e}")
             return None
-    
+
     def create_and_save_superduper_alert(self, latest_super_alert: Dict[str, Any], 
                                        trend_analysis: Dict[str, Any], 
                                        trend_type: str, trend_strength: float) -> Optional[str]:
         """
         Create and save a superduper alert in one operation.
-        
+
         Args:
             latest_super_alert: The triggering super alert
             trend_analysis: Detailed trend analysis data
             trend_type: Type of trend
             trend_strength: Trend strength
-            
+
         Returns:
             Filename if successful, None otherwise
         """
         superduper_alert = self.create_superduper_alert(
             latest_super_alert, trend_analysis, trend_type, trend_strength
         )
-        
+
         if superduper_alert is None:
             return None
-        
+
         filename = self.save_superduper_alert(superduper_alert)
         if filename is None:
             return None
-        
+
         # Display superduper alert
         self._display_superduper_alert(superduper_alert, filename)
-        
+
         return filename
-    
+
     def _display_superduper_alert(self, superduper_alert: Dict[str, Any], filename: str) -> None:
         """Display superduper alert information."""
         try:
             symbol = superduper_alert['symbol']
             trend_analysis = superduper_alert['trend_analysis']
             enhanced_metrics = superduper_alert['enhanced_metrics']
-            
+
             trend_type = trend_analysis['trend_type']
             trend_strength = trend_analysis['trend_strength']
             urgency_level = enhanced_metrics['urgency_level']
-            
+
             current_price = superduper_alert['latest_super_alert']['signal_analysis']['current_price']
             penetration = superduper_alert['latest_super_alert']['signal_analysis']['penetration_percent']
-            
+
             message = (f"🎯🎯 SUPERDUPER ALERT: {symbol} @ ${current_price:.4f}\n"
                       f"   Trend: {trend_type.upper()} | Strength: {trend_strength:.2f} | Urgency: {urgency_level}\n"
                       f"   Penetration: {penetration:.1f}% | Quality: {enhanced_metrics['breakout_quality']}\n"
                       f"   Saved: {filename}")
-            
+
             if self.test_mode:
                 print(f"[TEST MODE] {message}")
             else:
                 print(message)
-                
+
             self.logger.info(f"Superduper alert created for {symbol} - {trend_type} trend with {trend_strength:.2f} strength")
-            
+
         except Exception as e:
             self.logger.error(f"Error displaying superduper alert: {e}")

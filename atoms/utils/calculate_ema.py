@@ -30,7 +30,7 @@ def calculate_ema(df: pd.DataFrame, period: int = 9) -> Tuple[bool, pd.Series]:
 
     # Calculate typical price (HLC/3)
     typical_price = (df['high'] + df['low'] + df['close']) / 3
-    
+
     # Calculate EMA using pandas built-in function
     ema_values = typical_price.ewm(span=period, adjust=False).mean()
 

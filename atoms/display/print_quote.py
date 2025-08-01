@@ -5,7 +5,7 @@ from atoms.api.get_latest_quote import get_latest_quote
 def print_quote(api_client: Any, symbol: str) -> None:
     """
     Print the latest quote information for a symbol.
-    
+
     Args:
         api_client: Alpaca API client instance
         symbol: Stock symbol to get quote for

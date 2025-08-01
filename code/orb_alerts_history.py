@@ -38,11 +38,11 @@ from atoms.alerts.super_alert_generator import SuperAlertGenerator
 
 class AlertMonitorHistory:
     """End-of-day alert history processor that creates super alerts from historical alert data."""
-    
+
     def __init__(self, date: Optional[str] = None, symbols_file: Optional[str] = None, test_mode: bool = False):
         """
         Initialize Alert Monitor History.
-        
+
         Args:
             date: Target date in YYYY-MM-DD format (defaults to current ET date)
             symbols_file: Path to symbols CSV file
@@ -50,7 +50,7 @@ class AlertMonitorHistory:
         """
         # Setup logging
         self.logger = self._setup_logging()
-        
+
         # Set target date
         et_tz = pytz.timezone('US/Eastern')
         if date:
@@ -60,37 +60,37 @@ class AlertMonitorHistory:
                 raise ValueError(f"Invalid date format: {date}. Use YYYY-MM-DD format.")
         else:
             self.target_date = datetime.now(et_tz).strftime('%Y-%m-%d')
-        
+
         # Load symbol data with Signal and Resistance prices using atom
         self.symbol_loader = SymbolDataLoader(symbols_file)
         self.symbol_data = self.symbol_loader.load_symbol_data()
         self.test_mode = test_mode
-        
+
         # Initialize filtering and generation atoms
         self.super_alert_filter = SuperAlertFilter(self.symbol_data)
         self.super_alert_generator = None  # Will be initialized when directories are set up
-        
+
         # Directory setup
         self.alerts_dir = Path(f"historical_data/{self.target_date}/alerts/bullish")
         self.super_alerts_dir = Path(f"historical_data/{self.target_date}/super_alerts/bullish")
-        
+
         # Ensure super alerts directory exists
         self.super_alerts_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Initialize super alert generator now that directory is set up
         self.super_alert_generator = SuperAlertGenerator(self.super_alerts_dir, test_mode)
-        
+
         # Processed alerts tracking
         self.processed_alerts = []
         self.super_alerts_created = []
         self.filtered_alerts = []  # Track alerts filtered due to EMA9 below EMA20
-        
+
         self.logger.info(f"Alert Monitor History initialized in {'TEST' if test_mode else 'LIVE'} mode")
         self.logger.info(f"Processing date: {self.target_date}")
         self.logger.info(f"Reading alerts from: {self.alerts_dir}")
         self.logger.info(f"Super alerts will be saved to: {self.super_alerts_dir}")
         self.logger.info(f"Loaded {len(self.symbol_data)} symbols with Signal/Resistance data")
-    
+
     def _setup_logging(self) -> logging.Logger:
         """Setup logging configuration with Eastern Time."""
         class EasternFormatter(logging.Formatter):
@@ -100,7 +100,7 @@ class AlertMonitorHistory:
                 if datefmt:
                     return et_time.strftime(datefmt)
                 return et_time.strftime('%Y-%m-%d %H:%M:%S,%f')[:-3] + ' ET'
-        
+
         logger = logging.getLogger(__name__)
         if not logger.handlers:
             handler = logging.StreamHandler()
@@ -108,22 +108,22 @@ class AlertMonitorHistory:
             handler.setFormatter(formatter)
             logger.addHandler(handler)
             logger.setLevel(logging.INFO)
-        
+
         return logger
-    
+
     # Symbol data loading is now handled by SymbolDataLoader atom
-    
+
     def _process_alert_file(self, file_path: Path) -> None:
         """Process a single alert file."""
         try:
             with open(file_path, 'r') as f:
                 alert_data = json.load(f)
-            
+
             self.processed_alerts.append(alert_data)
-            
+
             # Use SuperAlertFilter to determine if we should create a super alert
             should_create, filter_reason = self.super_alert_filter.should_create_super_alert(alert_data)
-            
+
             if not should_create:
                 if filter_reason.startswith("Price") or filter_reason.startswith("No signal"):
                     # Log at debug level for price/signal issues
@@ -133,11 +133,11 @@ class AlertMonitorHistory:
                     self.filtered_alerts.append(alert_data)
                     self.logger.info(f"🚫 Filtered alert: {filter_reason}")
                 return
-            
+
             # Get symbol info and create super alert
             symbol = alert_data.get('symbol')
             symbol_info = self.super_alert_filter.get_symbol_info(symbol)
-            
+
             if symbol_info:
                 filename = self.super_alert_generator.create_and_save_super_alert(
                     alert_data, symbol_info, use_original_timestamp=True)
@@ -150,32 +150,32 @@ class AlertMonitorHistory:
                         super_alert["source_alert_file"] = str(file_path)
                         self.super_alerts_created.append(super_alert)
                         self.logger.info(f"Super alert created: {filename}")
-                
+
         except Exception as e:
             self.logger.error(f"Error processing alert file {file_path}: {e}")
-    
+
     # _create_super_alert_historical method is now handled by SuperAlertGenerator atom with use_original_timestamp=True
-    
+
     def process_alerts(self) -> None:
         """Process all alert files from the target date."""
         self.logger.info("Starting historical alert processing...")
-        
+
         try:
             if not self.alerts_dir.exists():
                 self.logger.error(f"Alerts directory does not exist: {self.alerts_dir}")
                 return
-                
+
             alert_files = list(self.alerts_dir.glob("alert_*.json"))
             self.logger.info(f"Found {len(alert_files)} alert files to process...")
-            
+
             if not alert_files:
                 self.logger.info("No alert files found to process")
                 return
-            
+
             # Process each alert file
             for alert_file in sorted(alert_files):
                 self._process_alert_file(alert_file)
-                
+
             # Print summary
             print("\n" + "="*80)
             print("📊 HISTORICAL ALERT PROCESSING COMPLETE")
@@ -190,7 +190,7 @@ class AlertMonitorHistory:
                 print("🧪 TEST MODE: No actual super alert files were created")
             print("✅ Filtering: Only bullish alerts with candlestick low >= EMA9 are allowed")
             print("="*80 + "\n")
-            
+
             # Print super alert details
             if self.super_alerts_created:
                 print("🚀 SUPER ALERTS GENERATED:")
@@ -200,10 +200,10 @@ class AlertMonitorHistory:
                     penetration = super_alert['signal_analysis']['penetration_percent']
                     print(f"   {symbol}: ${price:.2f} ({penetration:.1f}% penetration)")
                 print()
-            
+
         except Exception as e:
             self.logger.error(f"Error processing alerts: {e}")
-    
+
     def get_statistics(self) -> dict:
         """Get processing statistics."""
         return {
@@ -221,42 +221,42 @@ class AlertMonitorHistory:
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Alert Monitor History - End-of-Day Super Alert Generation System")
-    
+
     parser.add_argument(
         "--date",
         type=str,
         help="Target date to process in YYYY-MM-DD format (default: current ET date)"
     )
-    
+
     parser.add_argument(
         "--symbols-file",
         type=str,
         help="Path to symbols CSV file (default: data/YYYYMMDD.csv for target date)"
     )
-    
+
     parser.add_argument(
         "--test",
         action="store_true",
         help="Run in test mode (dry run)"
     )
-    
+
     parser.add_argument(
         "--verbose",
         action="store_true",
         help="Enable verbose logging"
     )
-    
+
     return parser.parse_args()
 
 
 def main():
     """Main entry point."""
     args = parse_arguments()
-    
+
     # Set logging level
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
-    
+
     # Create and run processor
     try:
         processor = AlertMonitorHistory(
@@ -264,16 +264,16 @@ def main():
             symbols_file=args.symbols_file,
             test_mode=args.test
         )
-        
+
         if args.test:
             print("Running in test mode - no super alert files will be created")
-        
+
         processor.process_alerts()
-        
+
         # Print final statistics
         stats = processor.get_statistics()
         logging.info(f"Processing complete. Statistics: {stats}")
-        
+
     except Exception as e:
         logging.error(f"Failed to process alert history: {e}")
         sys.exit(1)

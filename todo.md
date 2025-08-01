@@ -16,6 +16,28 @@ Be sure to watch stocks minute-by-minute for buying oportunities Jdun Trades sty
 ## BRB, Breakout(break above) Retest Breakout
 
 
+## Use JSON file instead of .env variables
+
+- [X] /commit /clear /read...
+- [X] See if claude -p uses the API or my subscription.
+- [X] git switch use-config-py
+- [ ] /exit
+- [ ] claude --dangerously-skip-permissions
+- [ ] /login
+- [ ] /read...
+- [ ] Important.  Think hard.  Implement the instructions specs/use_config_py_vs_env_variables.md.
+- [ ] /exit???
+
+
+- [ ] Oops! It implemented the code immediately.  Work on that. Use markdown!!!
+- [ ] /commit
+- [ ] git push
+- [ ] /clear /read...
+- [ ] git switch -c buy-market-trailing-sell
+- [ ] Important.  Think hard.  Implement the instructions in the PRD specs/buy_market_with_trailing_sell_prd.md
+- [ ] /commit
+- [ ] git push
+- [ ] switch to master and merge current branch
 
 
 

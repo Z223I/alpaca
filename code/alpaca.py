@@ -27,12 +27,18 @@ from atoms.display.print_quote import print_quote
 from atoms.utils.delay import delay
 from atoms.api.parse_args import parse_args
 
-# Load environment variables from .env file (optional)
+# Load configuration from config file (with fallback to environment variables)
 try:
-    from dotenv import load_dotenv
-    load_dotenv()
+    from alpaca_config import get_current_config
+    CONFIG_AVAILABLE = True
 except ImportError:
-    print("Warning: python-dotenv not installed. Using system environment variables only.")
+    CONFIG_AVAILABLE = False
+    # Load environment variables from .env file (fallback)
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ImportError:
+        print("Warning: python-dotenv not installed. Using system environment variables only.")
 
 
 class alpaca_private:
@@ -57,8 +63,16 @@ class alpaca_private:
         # Parse arguments
         self.args = parse_args(userArgs)
 
-        # Set portfolio risk from environment variable or use default
-        self.PORTFOLIO_RISK = float(os.getenv('PORTFOLIO_RISK', '0.10'))
+        # Set portfolio risk from config file or environment variable as fallback
+        if 'CONFIG_AVAILABLE' in globals() and CONFIG_AVAILABLE:
+            try:
+                config = get_current_config()
+                self.PORTFOLIO_RISK = config.portfolio_risk
+            except Exception as e:
+                print(f"Warning: Could not load portfolio risk from config ({e}), using environment variable")
+                self.PORTFOLIO_RISK = float(os.getenv('PORTFOLIO_RISK', '0.10'))
+        else:
+            self.PORTFOLIO_RISK = float(os.getenv('PORTFOLIO_RISK', '0.10'))
 
 
         # Initialize Alpaca API client using atom
@@ -172,20 +186,20 @@ class alpaca_private:
         import time
         start_time = time.time()
         poll_interval = 2  # Poll every 2 seconds
-        
+
         print(f"Polling order status for {order_id}...")
-        
+
         while (time.time() - start_time) < timeout_seconds:
             try:
                 order = self.api.get_order(order_id)
                 current_status = order.status
                 print(f"  Order status: {current_status}")
-                
+
                 # Check for terminal states
                 if current_status in ['filled', 'canceled', 'rejected', 'expired']:
                     print(f"✓ Order reached terminal state: {current_status}")
                     return order
-                    
+
                 # Continue polling for non-terminal states
                 if current_status in ['new', 'accepted', 'partially_filled', 'pending_new', 'calculated', 'stopped', 'suspended']:
                     time.sleep(poll_interval)
@@ -194,11 +208,11 @@ class alpaca_private:
                     print(f"⚠️  Unknown order status: {current_status}")
                     time.sleep(poll_interval)
                     continue
-                    
+
             except Exception as e:
                 print(f"✗ Error polling order status: {str(e)}")
                 return None
-        
+
         print(f"⚠️  Order polling timeout after {timeout_seconds} seconds")
         return None
 
@@ -221,33 +235,33 @@ class alpaca_private:
             Dictionary with buy and sell order responses, or None if error/dry run
         """
         print(f"Executing market buy with trailing sell for {symbol}...")
-        
+
         # Step 1: Execute market buy order
         buy_order = self._buy_market(symbol=symbol, amount=amount, submit_order=submit_order)
-        
+
         if not submit_order:
             print("[DRY RUN] Would poll order status and place trailing sell after fill")
             return None
-            
+
         if buy_order is None:
             print("✗ Market buy order failed, aborting trailing sell setup")
             return None
-            
+
         # Step 2: Poll order status until filled or terminal state
         final_order = self._poll_order_status(buy_order.id)
-        
+
         if final_order is None:
             print("✗ Order polling failed, cannot proceed with trailing sell")
             return None
-            
+
         if final_order.status != 'filled':
             print(f"✗ Order not filled (status: {final_order.status}), cannot place trailing sell")
             return None
-            
+
         # Step 3: Extract filled quantity and place trailing sell
         filled_qty = int(final_order.filled_qty) if hasattr(final_order, 'filled_qty') else int(final_order.qty)
         print(f"✓ Buy order filled: {filled_qty} shares")
-        
+
         # Execute trailing sell with the filled quantity
         sell_order = self._sell_trailing(
             symbol=symbol, 
@@ -255,7 +269,7 @@ class alpaca_private:
             trailing_percent=trailing_percent,
             submit_order=True  # Always submit if we got this far
         )
-        
+
         if sell_order is None:
             print("✗ Trailing sell order failed")
             return {
@@ -263,7 +277,7 @@ class alpaca_private:
                 'sell_order': None,
                 'error': 'Trailing sell failed'
             }
-        
+
         print("✓ Market buy with trailing sell completed successfully")
         return {
             'buy_order': final_order,
@@ -892,7 +906,7 @@ class alpaca_private:
                 if pos.symbol == symbol:
                     position = pos
                     break
-            
+
             if position is None:
                 print(f"✗ No position found for symbol {symbol}")
                 return None
@@ -909,7 +923,7 @@ class alpaca_private:
         try:
             orders = self.api.list_orders(status="open")
             symbol_orders = [order for order in orders if order.symbol == symbol]
-            
+
             if symbol_orders:
                 print(f"  Cancelling {len(symbol_orders)} open orders for {symbol}...")
                 for order in symbol_orders:
@@ -1006,10 +1020,10 @@ class alpaca_private:
             liquidation_orders = self.api.close_all_positions()
             print(f"✓ All positions liquidated successfully")
             print(f"  Generated {len(liquidation_orders)} liquidation orders")
-            
+
             for order in liquidation_orders:
                 print(f"    {order.symbol}: {order.side} {order.qty} shares (Order ID: {order.id})")
-            
+
             return liquidation_orders
 
         except Exception as e:
@@ -1157,7 +1171,7 @@ class alpaca_private:
             if self.args.active_order:
                 print_active_orders(self.api)
             return 0  # Exit early for display-only operations
-        
+
         # Default behavior: show all information for other operations
         print_positions(self.api)
         print_cash(self.api)

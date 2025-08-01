@@ -74,18 +74,18 @@ class ErrorRecord:
 class RetryManager:
     """
     Advanced retry manager with exponential backoff and circuit breaker.
-    
+
     Provides sophisticated error handling for production systems with:
     - Exponential backoff with jitter
     - Circuit breaker pattern
     - Error classification and tracking
     - Automatic recovery mechanisms
     """
-    
+
     def __init__(self, default_config: RetryConfig = None):
         """
         Initialize retry manager.
-        
+
         Args:
             default_config: Default retry configuration
         """
@@ -93,10 +93,10 @@ class RetryManager:
         self.circuit_breakers: Dict[str, 'CircuitBreaker'] = {}
         self.error_history: List[ErrorRecord] = []
         self.operation_stats: Dict[str, Dict[str, Any]] = {}
-        
+
         # Logging
         self.logger = logging.getLogger(__name__)
-        
+
         # Error classification patterns
         self.error_patterns = {
             ErrorType.NETWORK_ERROR: [
@@ -115,33 +115,33 @@ class RetryManager:
                 "memory", "disk", "cpu", "resource", "capacity"
             ]
         }
-    
+
     def classify_error(self, error: Exception) -> ErrorType:
         """
         Classify error type for appropriate handling.
-        
+
         Args:
             error: Exception to classify
-            
+
         Returns:
             ErrorType enum
         """
         error_message = str(error).lower()
-        
+
         for error_type, patterns in self.error_patterns.items():
             if any(pattern in error_message for pattern in patterns):
                 return error_type
-        
+
         return ErrorType.UNKNOWN_ERROR
-    
+
     def get_retry_delay(self, attempt: int, config: RetryConfig) -> float:
         """
         Calculate retry delay based on configuration.
-        
+
         Args:
             attempt: Current attempt number (0-based)
             config: Retry configuration
-            
+
         Returns:
             Delay in seconds
         """
@@ -151,17 +151,17 @@ class RetryManager:
             delay = config.base_delay * (attempt + 1)
         else:  # fixed
             delay = config.base_delay
-        
+
         # Apply maximum delay
         delay = min(delay, config.max_delay)
-        
+
         # Apply jitter if enabled
         if config.jitter:
             jitter_amount = delay * config.jitter_max
             delay += random.uniform(-jitter_amount, jitter_amount)
-        
+
         return max(0, delay)
-    
+
     async def execute_with_retry(self, 
                                 operation: Callable,
                                 operation_name: str,
@@ -170,33 +170,33 @@ class RetryManager:
                                 *args, **kwargs) -> Any:
         """
         Execute operation with retry logic and circuit breaker.
-        
+
         Args:
             operation: Function to execute
             operation_name: Name for logging and stats
             config: Retry configuration (uses default if None)
             circuit_breaker_config: Circuit breaker configuration
             *args, **kwargs: Arguments to pass to operation
-            
+
         Returns:
             Result of operation
-            
+
         Raises:
             Exception: If all retries exhausted or circuit breaker open
         """
         config = config or self.default_config
-        
+
         # Get or create circuit breaker
         circuit_breaker = None
         if circuit_breaker_config:
             circuit_breaker = self.get_circuit_breaker(circuit_breaker_config)
-        
+
         # Check circuit breaker state
         if circuit_breaker and not circuit_breaker.can_execute():
             raise Exception(f"Circuit breaker open for {operation_name}")
-        
+
         last_exception = None
-        
+
         for attempt in range(config.max_retries + 1):
             try:
                 # Execute operation
@@ -204,67 +204,67 @@ class RetryManager:
                     result = await operation(*args, **kwargs)
                 else:
                     result = operation(*args, **kwargs)
-                
+
                 # Record success
                 self._record_success(operation_name, attempt)
-                
+
                 # Reset circuit breaker on success
                 if circuit_breaker:
                     circuit_breaker.record_success()
-                
+
                 return result
-                
+
             except Exception as e:
                 last_exception = e
                 error_type = self.classify_error(e)
-                
+
                 # Check if this exception should trigger retry
                 if not any(isinstance(e, exc_type) for exc_type in config.retry_on_exceptions):
                     # Don't retry this type of exception
                     self._record_error(operation_name, error_type, str(e), attempt)
                     raise e
-                
+
                 # Record error
                 self._record_error(operation_name, error_type, str(e), attempt)
-                
+
                 # Record circuit breaker failure
                 if circuit_breaker:
                     circuit_breaker.record_failure()
-                
+
                 # Don't retry on last attempt
                 if attempt >= config.max_retries:
                     break
-                
+
                 # Calculate delay for next attempt
                 delay = self.get_retry_delay(attempt, config)
-                
+
                 self.logger.warning(
                     f"Retry {attempt + 1}/{config.max_retries} for {operation_name} "
                     f"after {delay:.2f}s delay. Error: {str(e)}"
                 )
-                
+
                 # Wait before retry
                 await asyncio.sleep(delay)
-        
+
         # All retries exhausted
         self.logger.error(f"All retries exhausted for {operation_name}")
         raise last_exception
-    
+
     def get_circuit_breaker(self, config: CircuitBreakerConfig) -> 'CircuitBreaker':
         """
         Get or create circuit breaker for operation.
-        
+
         Args:
             config: Circuit breaker configuration
-            
+
         Returns:
             CircuitBreaker instance
         """
         if config.name not in self.circuit_breakers:
             self.circuit_breakers[config.name] = CircuitBreaker(config)
-        
+
         return self.circuit_breakers[config.name]
-    
+
     def _record_success(self, operation_name: str, attempts: int) -> None:
         """Record successful operation."""
         if operation_name not in self.operation_stats:
@@ -275,13 +275,13 @@ class RetryManager:
                 'total_retry_attempts': 0,
                 'avg_attempts': 0.0
             }
-        
+
         stats = self.operation_stats[operation_name]
         stats['total_calls'] += 1
         stats['successful_calls'] += 1
         stats['total_retry_attempts'] += attempts
         stats['avg_attempts'] = stats['total_retry_attempts'] / stats['total_calls']
-    
+
     def _record_error(self, operation_name: str, error_type: ErrorType, 
                      error_message: str, attempt: int) -> None:
         """Record error occurrence."""
@@ -292,13 +292,13 @@ class RetryManager:
             operation_name=operation_name,
             retry_count=attempt
         )
-        
+
         self.error_history.append(error_record)
-        
+
         # Limit history size
         if len(self.error_history) > 1000:
             self.error_history = self.error_history[-1000:]
-        
+
         # Update operation stats
         if operation_name not in self.operation_stats:
             self.operation_stats[operation_name] = {
@@ -308,40 +308,40 @@ class RetryManager:
                 'total_retry_attempts': 0,
                 'avg_attempts': 0.0
             }
-        
+
         stats = self.operation_stats[operation_name]
         if attempt == 0:  # Only count as failed call on first attempt
             stats['total_calls'] += 1
             stats['failed_calls'] += 1
         stats['total_retry_attempts'] += 1
         stats['avg_attempts'] = stats['total_retry_attempts'] / stats['total_calls']
-    
+
     def get_error_statistics(self, hours: int = 24) -> Dict[str, Any]:
         """
         Get error statistics for the specified time window.
-        
+
         Args:
             hours: Number of hours to look back
-            
+
         Returns:
             Dictionary with error statistics
         """
         cutoff_time = datetime.now() - timedelta(hours=hours)
         recent_errors = [e for e in self.error_history if e.timestamp >= cutoff_time]
-        
+
         if not recent_errors:
             return {'total_errors': 0}
-        
+
         # Count by error type
         error_type_counts = {}
         for error in recent_errors:
             error_type_counts[error.error_type.value] = error_type_counts.get(error.error_type.value, 0) + 1
-        
+
         # Count by operation
         operation_counts = {}
         for error in recent_errors:
             operation_counts[error.operation_name] = operation_counts.get(error.operation_name, 0) + 1
-        
+
         return {
             'total_errors': len(recent_errors),
             'error_types': error_type_counts,
@@ -349,20 +349,20 @@ class RetryManager:
             'avg_retry_count': sum(e.retry_count for e in recent_errors) / len(recent_errors),
             'time_window_hours': hours
         }
-    
+
     def get_operation_statistics(self) -> Dict[str, Any]:
         """
         Get operation statistics.
-        
+
         Returns:
             Dictionary with operation statistics
         """
         return self.operation_stats.copy()
-    
+
     def export_error_report(self, filepath: str) -> None:
         """
         Export error report to JSON file.
-        
+
         Args:
             filepath: Path to output file
         """
@@ -389,25 +389,25 @@ class RetryManager:
                 for e in self.error_history[-100:]  # Last 100 errors
             ]
         }
-        
+
         Path(filepath).parent.mkdir(parents=True, exist_ok=True)
         with open(filepath, 'w') as f:
             json.dump(report, f, indent=2)
-        
+
         self.logger.info(f"Exported error report to {filepath}")
 
 
 class CircuitBreaker:
     """
     Circuit breaker implementation for fault tolerance.
-    
+
     Prevents cascading failures by stopping requests to failing services.
     """
-    
+
     def __init__(self, config: CircuitBreakerConfig):
         """
         Initialize circuit breaker.
-        
+
         Args:
             config: Circuit breaker configuration
         """
@@ -416,11 +416,11 @@ class CircuitBreaker:
         self.failure_count = 0
         self.last_failure_time: Optional[datetime] = None
         self.logger = logging.getLogger(__name__)
-    
+
     def can_execute(self) -> bool:
         """
         Check if circuit breaker allows execution.
-        
+
         Returns:
             True if execution is allowed
         """
@@ -436,19 +436,19 @@ class CircuitBreaker:
             return False
         else:  # HALF_OPEN
             return True
-    
+
     def record_success(self) -> None:
         """Record successful operation."""
         if self.state == CircuitState.HALF_OPEN:
             self.state = CircuitState.CLOSED
             self.failure_count = 0
             self.logger.info(f"Circuit breaker {self.config.name} recovered - CLOSED")
-    
+
     def record_failure(self) -> None:
         """Record failed operation."""
         self.failure_count += 1
         self.last_failure_time = datetime.now()
-        
+
         if self.state == CircuitState.HALF_OPEN:
             self.state = CircuitState.OPEN
             self.logger.warning(f"Circuit breaker {self.config.name} failed in HALF_OPEN - OPEN")
@@ -466,7 +466,7 @@ def retry_on_failure(max_retries: int = 3,
                     operation_name: str = None):
     """
     Decorator to add retry functionality to functions.
-    
+
     Args:
         max_retries: Maximum number of retries
         base_delay: Base delay between retries
@@ -485,14 +485,14 @@ def retry_on_failure(max_retries: int = 3,
                 max_delay=max_delay,
                 jitter=jitter
             )
-            
+
             op_name = operation_name or func.__name__
             retry_manager = RetryManager()
-            
+
             return await retry_manager.execute_with_retry(
                 func, op_name, retry_config, None, *args, **kwargs
             )
-        
+
         return wrapper
     return decorator
 

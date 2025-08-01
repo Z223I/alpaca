@@ -36,7 +36,7 @@ class ORB:
 
     def __init__(self, plot_super_alerts: bool = True, use_iex: bool = False, opening_range_minutes: int = 15):
         """Initialize the ORB class.
-        
+
         Args:
             plot_super_alerts: If True, plot superduper alerts. If False, plot regular alerts.
             use_iex: If True, use IEX data feed. If False, use SIP data feed (default).
@@ -47,7 +47,7 @@ class ORB:
 
         # Set portfolio risk from environment variable or use default
         self.PORTFOLIO_RISK = float(os.getenv('PORTFOLIO_RISK', '0.10'))
-        
+
         # Set debugging flag from environment variable or use default
         self.isDebugging = os.getenv('ORB_DEBUG', 'false').lower() in ['true', '1', 'yes']
 
@@ -67,10 +67,10 @@ class ORB:
     def _is_valid_date_csv(self, filename: str) -> bool:
         """
         Check if filename matches YYYYMMDD.csv format.
-        
+
         Args:
             filename: The filename to validate
-            
+
         Returns:
             True if filename matches YYYYMMDD.csv format, False otherwise
         """
@@ -78,28 +78,28 @@ class ORB:
             # Remove .csv extension
             if not filename.lower().endswith('.csv'):
                 return False
-                
+
             date_str = filename[:-4]  # Remove .csv
-            
+
             # Check if it's exactly 8 digits
             if len(date_str) != 8 or not date_str.isdigit():
                 return False
-                
+
             # Try to parse as date to ensure it's a valid date
             datetime.strptime(date_str, '%Y%m%d')
             return True
-            
+
         except ValueError:
             return False
 
     def _load_alerts_for_symbol(self, symbol: str, target_date: date) -> List[Dict[str, Any]]:
         """
         Load alerts for a specific symbol and date. Loads superduper alerts or regular alerts based on plot_super_alerts setting.
-        
+
         Args:
             symbol: Stock symbol to load alerts for
             target_date: Date to load alerts for
-            
+
         Returns:
             List of alert dictionaries containing timestamp, type, and alert data
         """
@@ -111,43 +111,43 @@ class ORB:
     def _load_super_alerts_for_symbol(self, symbol: str, target_date: date) -> List[Dict[str, Any]]:
         """
         Load superduper alerts for a specific symbol and date from historical_data/superduper_alerts.
-        
+
         Args:
             symbol: Stock symbol to load super alerts for
             target_date: Date to load super alerts for
-            
+
         Returns:
             List of superduper alert dictionaries containing timestamp, type, and alert data
         """
         alerts = []
-        
+
         try:
             # Format date as YYYY-MM-DD for directory structure
             date_str = target_date.strftime('%Y-%m-%d')
             alerts_base_dir = os.path.join('historical_data', date_str, 'superduper_alerts')
-            
+
             if not os.path.exists(alerts_base_dir):
                 return alerts
-            
+
             # Check both bullish and bearish super alert directories
             for alert_type in ['bullish', 'bearish']:
                 alert_dir = os.path.join(alerts_base_dir, alert_type)
-                
+
                 if not os.path.exists(alert_dir):
                     continue
-                    
+
                 # Look for superduper alert files matching the symbol
                 alert_pattern = f"superduper_alert_{symbol}_*.json"
                 alert_files = glob.glob(os.path.join(alert_dir, alert_pattern))
-                
+
                 for alert_file in alert_files:
                     try:
                         with open(alert_file, 'r') as f:
                             alert_data = json.load(f)
-                            
+
                         # Add alert type and parse timestamp
                         alert_data['alert_type'] = alert_type
-                        
+
                         # Parse timestamp to datetime object and handle timezone
                         if 'timestamp' in alert_data:
                             timestamp_str = alert_data['timestamp']
@@ -156,10 +156,10 @@ class ORB:
                                 if timestamp_str.endswith(('-0400', '-0500')):
                                     # Insert colon in timezone offset for proper ISO format
                                     timestamp_str = timestamp_str[:-2] + ':' + timestamp_str[-2:]
-                                
+
                                 # Parse the timestamp - super alerts are in ET timezone with offset
                                 alert_dt = datetime.fromisoformat(timestamp_str)
-                                
+
                             except ValueError as ve1:
                                 # Fallback: try parsing without timezone, then localize to ET
                                 try:
@@ -168,7 +168,7 @@ class ORB:
                                         timestamp_base = timestamp_str.split('+')[0].split('T')[0] + 'T' + timestamp_str.split('T')[1].split('-')[0].split('+')[0]
                                     else:
                                         timestamp_base = timestamp_str
-                                    
+
                                     alert_dt = datetime.fromisoformat(timestamp_base)
                                     # If timezone-naive, assume it's in ET timezone
                                     if alert_dt.tzinfo is None:
@@ -180,15 +180,15 @@ class ORB:
                             except OSError as oe:
                                 # Handle "date value out of range" errors
                                 continue
-                            
+
                             alert_data['timestamp_dt'] = alert_dt
-                        
+
                         alerts.append(alert_data)
-                            
+
                     except Exception as e:
                         print(f"Warning: Error loading superduper alert file {alert_file}: {e}")
                         continue
-            
+
             # Sort superduper alerts by timestamp 
             def safe_sort_key(alert):
                 timestamp_dt = alert.get('timestamp_dt')
@@ -202,11 +202,11 @@ class ORB:
                 else:
                     # Already timezone-aware
                     return timestamp_dt
-            
+
             alerts.sort(key=safe_sort_key)
-            
+
             return alerts
-            
+
         except Exception as e:
             print(f"Error loading superduper alerts for {symbol} on {target_date}: {e}")
             return alerts
@@ -214,35 +214,35 @@ class ORB:
     def _load_regular_alerts_for_symbol(self, symbol: str, target_date: date) -> List[Dict[str, Any]]:
         """
         Load regular alerts for a specific symbol and date from historical_data/alerts.
-        
+
         Args:
             symbol: Stock symbol to load regular alerts for
             target_date: Date to load regular alerts for
-            
+
         Returns:
             List of regular alert dictionaries containing timestamp, type, and alert data
         """
         alerts = []
-        
+
         try:
             # Format date as YYYY-MM-DD for directory structure
             date_str = target_date.strftime('%Y-%m-%d')
-            
+
             # Check bullish alerts directory
             bullish_dir = os.path.join('historical_data', date_str, 'alerts', 'bullish')
             if os.path.exists(bullish_dir):
                 # Look for alert files matching the symbol
                 alert_pattern = os.path.join(bullish_dir, f"alert_{symbol}_*.json")
                 alert_files = glob.glob(alert_pattern)
-                
+
                 for alert_file in alert_files:
                     try:
                         with open(alert_file, 'r') as f:
                             alert_data = json.load(f)
-                            
+
                         # Add alert type for display
                         alert_data['alert_type'] = 'bullish_alert'
-                        
+
                         # Parse timestamp for proper sorting
                         timestamp_str = alert_data.get('timestamp', '')
                         if timestamp_str:
@@ -251,10 +251,10 @@ class ORB:
                                 if timestamp_str.endswith(('-0400', '-0500')):
                                     # Insert colon in timezone offset for proper ISO format
                                     timestamp_str = timestamp_str[:-2] + ':' + timestamp_str[-2:]
-                                
+
                                 # Parse the timestamp - regular alerts are in ET timezone with offset
                                 alert_dt = datetime.fromisoformat(timestamp_str)
-                                
+
                             except ValueError:
                                 # Fallback: try parsing without timezone, then localize to ET
                                 try:
@@ -263,7 +263,7 @@ class ORB:
                                         timestamp_base = timestamp_str.split('+')[0].split('T')[0] + 'T' + timestamp_str.split('T')[1].split('-')[0].split('+')[0]
                                     else:
                                         timestamp_base = timestamp_str
-                                    
+
                                     alert_dt = datetime.fromisoformat(timestamp_base)
                                     # If timezone-naive, assume it's in ET timezone
                                     if alert_dt.tzinfo is None:
@@ -275,30 +275,30 @@ class ORB:
                             except OSError:
                                 # Handle "date value out of range" errors
                                 continue
-                            
+
                             alert_data['timestamp_dt'] = alert_dt
-                        
+
                         alerts.append(alert_data)
-                            
+
                     except Exception as e:
                         print(f"Warning: Error loading regular alert file {alert_file}: {e}")
                         continue
-            
+
             # Check bearish alerts directory
             bearish_dir = os.path.join('historical_data', date_str, 'alerts', 'bearish')
             if os.path.exists(bearish_dir):
                 # Look for alert files matching the symbol
                 alert_pattern = os.path.join(bearish_dir, f"alert_{symbol}_*.json")
                 alert_files = glob.glob(alert_pattern)
-                
+
                 for alert_file in alert_files:
                     try:
                         with open(alert_file, 'r') as f:
                             alert_data = json.load(f)
-                            
+
                         # Add alert type for display
                         alert_data['alert_type'] = 'bearish_alert'
-                        
+
                         # Parse timestamp for proper sorting
                         timestamp_str = alert_data.get('timestamp', '')
                         if timestamp_str:
@@ -307,10 +307,10 @@ class ORB:
                                 if timestamp_str.endswith(('-0400', '-0500')):
                                     # Insert colon in timezone offset for proper ISO format
                                     timestamp_str = timestamp_str[:-2] + ':' + timestamp_str[-2:]
-                                
+
                                 # Parse the timestamp - regular alerts are in ET timezone with offset
                                 alert_dt = datetime.fromisoformat(timestamp_str)
-                                
+
                             except ValueError:
                                 # Fallback: try parsing without timezone, then localize to ET
                                 try:
@@ -319,7 +319,7 @@ class ORB:
                                         timestamp_base = timestamp_str.split('+')[0].split('T')[0] + 'T' + timestamp_str.split('T')[1].split('-')[0].split('+')[0]
                                     else:
                                         timestamp_base = timestamp_str
-                                    
+
                                     alert_dt = datetime.fromisoformat(timestamp_base)
                                     # If timezone-naive, assume it's in ET timezone
                                     if alert_dt.tzinfo is None:
@@ -331,15 +331,15 @@ class ORB:
                             except OSError:
                                 # Handle "date value out of range" errors
                                 continue
-                            
+
                             alert_data['timestamp_dt'] = alert_dt
-                        
+
                         alerts.append(alert_data)
-                            
+
                     except Exception as e:
                         print(f"Warning: Error loading regular alert file {alert_file}: {e}")
                         continue
-            
+
             # Sort regular alerts by timestamp 
             def safe_sort_key(alert):
                 timestamp_dt = alert.get('timestamp_dt')
@@ -353,11 +353,11 @@ class ORB:
                 else:
                     # Already timezone-aware
                     return timestamp_dt
-            
+
             alerts.sort(key=safe_sort_key)
-            
+
             return alerts
-            
+
         except Exception as e:
             print(f"Error loading regular alerts for {symbol} on {target_date}: {e}")
             return alerts
@@ -365,35 +365,35 @@ class ORB:
     def _get_most_recent_csv(self) -> Optional[str]:
         """
         Get the most recent CSV file from the data directory.
-        
+
         Returns:
             Path to the most recent CSV file, or None if no files found
         """
         import os
         import glob
-        
+
         try:
             if not os.path.exists(self.data_directory):
                 return None
-                
+
             csv_pattern = os.path.join(self.data_directory, '*.csv')
             all_csv_files = glob.glob(csv_pattern)
-            
+
             # Filter to only include files matching YYYYMMDD.csv format
             csv_files = []
             for filepath in all_csv_files:
                 filename = os.path.basename(filepath)
                 if self._is_valid_date_csv(filename):
                     csv_files.append(filepath)
-            
+
             if not csv_files:
                 return None
-            
+
             # Sort by modification time (most recent first)
             csv_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
-            
+
             return csv_files[0]
-            
+
         except Exception as e:
             if self.isDebugging:
                 print(f"Error getting most recent CSV file: {e}")
@@ -426,17 +426,17 @@ class ORB:
 
             # Sort by modification time, most recent first
             csv_files.sort(key=os.path.getmtime, reverse=True)
-            
+
             # Pagination variables
             files_per_page = 5  # Show 5 files initially
             more_files_per_page = 10  # Show 10 more when requested
             current_display_count = min(files_per_page, len(csv_files))
-            
+
             def display_files(display_count):
                 """Display the specified number of files."""
                 print("\nAvailable CSV files (YYYYMMDD.csv format):")
                 print("=" * 50)
-                
+
                 for i in range(display_count):
                     filepath = csv_files[i]
                     filename = os.path.basename(filepath)
@@ -444,37 +444,37 @@ class ORB:
                     mod_date = datetime.fromtimestamp(mod_time).strftime('%Y-%m-%d %H:%M:%S')
                     default_marker = " (default)" if i == 0 else ""
                     print(f"{i + 1:2d}. {filename} - {mod_date}{default_marker}")
-                
+
                 remaining_files = len(csv_files) - display_count
                 if remaining_files > 0:
                     print(f"... {remaining_files} more files available")
-                
+
                 print("=" * 50)
-            
+
             # Display initial files
             display_files(current_display_count)
-            
+
             while True:
                 try:
                     # Build prompt based on available options
                     prompt_parts = [f"Select file (1-{current_display_count})"]
-                    
+
                     if current_display_count < len(csv_files):
                         remaining = len(csv_files) - current_display_count
                         show_count = min(more_files_per_page, remaining)
                         prompt_parts.append(f"'m' to show {show_count} more")
-                    
+
                     prompt_parts.append("Enter for default")
                     prompt = f"{', '.join(prompt_parts)}: "
-                    
+
                     response = input(prompt).strip().lower()
-                    
+
                     if response == "":
                         # Use default (most recent)
                         selected_file = csv_files[0]
                         print(f"Using default: {os.path.basename(selected_file)}")
                         return selected_file
-                    
+
                     if response == "m" or response == "more":
                         if current_display_count < len(csv_files):
                             # Show more files
@@ -486,7 +486,7 @@ class ORB:
                         else:
                             print("All files are already displayed.")
                             continue
-                    
+
                     # Try to parse as number
                     selection = int(response)
                     if 1 <= selection <= current_display_count:
@@ -495,13 +495,13 @@ class ORB:
                         return selected_file
                     else:
                         print(f"Please enter a number between 1 and {current_display_count}")
-                        
+
                 except ValueError:
                     print("Please enter a valid number, 'm' for more files, or press Enter for default")
                 except (EOFError, KeyboardInterrupt):
                     print("\nOperation cancelled by user.")
                     return None
-                    
+
         except Exception as e:
             print(f"Error selecting CSV file: {e}")
             return None
@@ -509,18 +509,18 @@ class ORB:
     def _get_csv_files_for_date_range(self, start_date: date, end_date: date) -> List[str]:
         """
         Get CSV files for a date range.
-        
+
         Args:
             start_date: Start date (inclusive)
             end_date: End date (inclusive)
-            
+
         Returns:
             List of CSV file paths that fall within the date range
         """
         try:
             csv_pattern = os.path.join(self.data_directory, '*.csv')
             all_csv_files = glob.glob(csv_pattern)
-            
+
             # Filter to only include files matching YYYYMMDD.csv format within date range
             matching_files = []
             for filepath in all_csv_files:
@@ -530,17 +530,17 @@ class ORB:
                         # Extract date from filename
                         date_str = filename.replace('.csv', '')
                         file_date = datetime.strptime(date_str, '%Y%m%d').date()
-                        
+
                         # Check if date is within range
                         if start_date <= file_date <= end_date:
                             matching_files.append(filepath)
                     except ValueError:
                         continue
-            
+
             # Sort by date
             matching_files.sort()
             return matching_files
-            
+
         except Exception as e:
             print(f"Error getting CSV files for date range: {e}")
             return []
@@ -649,7 +649,7 @@ class ORB:
                 feed = 'iex'
             else:
                 feed = 'sip'  # Default to SIP
-            
+
             base_url = os.getenv('ALPACA_BASE_URL', 'https://paper-api.alpaca.markets')
             trading_mode = 'paper' if 'paper' in base_url else 'live'
             print(f"Using {feed.upper()} data feed for {trading_mode} trading")
@@ -799,13 +799,13 @@ class ORB:
         """
         # Local debugging flag - set to True for detailed debug output
         isDebugging = True
-        
+
         try:
             if isDebugging:
                 print(f"\nDEBUG: Starting PCA data prep for symbol: {symbol}")
                 print(f"DEBUG: Input DataFrame shape: {df.shape}")
                 print(f"DEBUG: Input DataFrame columns: {list(df.columns)}")
-            
+
             # Extract symbol data using the dedicated atom
             symbol_data = extract_symbol_data(df, symbol)
 
@@ -820,26 +820,26 @@ class ORB:
             # Filter for market hours (9:30 AM to 4:00 PM ET) and take first N lines
             if isDebugging:
                 print(f"DEBUG: Filtering for market hours (9:30 AM to 4:00 PM ET)")
-                
+
             # Filter for market hours first
             market_hours_data = self._filter_stock_data_by_time(
                 symbol_data, 
                 time(9, 30),  # 9:30 AM ET
                 time(16, 0)   # 4:00 PM ET
             )
-            
+
             if market_hours_data is None or market_hours_data.empty:
                 print(f"No market hours data available for symbol: {symbol}")
                 return False
-                
+
             if isDebugging:
                 print(f"DEBUG: Market hours data shape: {market_hours_data.shape}")
                 print(f"DEBUG: Market hours range: {market_hours_data['timestamp'].min()} to {market_hours_data['timestamp'].max()}")
-                
+
             # Take the first N lines of market hours data
             if isDebugging:
                 print(f"DEBUG: Taking first {data_samples} lines of market hours data")
-                
+
             filtered_data = market_hours_data.head(data_samples).copy()
 
             if filtered_data is None or filtered_data.empty:
@@ -864,27 +864,27 @@ class ORB:
             # Calculate ORB levels using the proper ORBCalculator atom
             if isDebugging:
                 print(f"DEBUG: Calculating ORB levels using ORBCalculator...")
-                
+
             orb_calculator = ORBCalculator(orb_period_minutes=self.opening_range_minutes)
             orb_result = orb_calculator.calculate_orb_levels(symbol, filtered_data)
-            
+
             if orb_result is not None:
                 orb_high = orb_result.orb_high
                 orb_low = orb_result.orb_low
             else:
                 orb_high = None
                 orb_low = None
-            
+
             if isDebugging:
                 print(f"DEBUG: ORB levels calculated - High: {orb_high}, Low: {orb_low}")
 
             # Calculate EMA (9-period) for close prices
             if isDebugging:
                 print(f"DEBUG: Calculating EMA (9-period)...")
-                
+
             ema_success, ema_values = calculate_ema(
                 filtered_data, period=9)
-                
+
             if isDebugging:
                 print(f"DEBUG: EMA calculation - Success: {ema_success}")
                 print(f"DEBUG: EMA values type: {type(ema_values)}")
@@ -898,10 +898,10 @@ class ORB:
             # Calculate EMA (20-period) for close prices
             if isDebugging:
                 print(f"DEBUG: Calculating EMA (20-period)...")
-                
+
             ema20_success, ema20_values = calculate_ema(
                 filtered_data, period=20)
-                
+
             if isDebugging:
                 print(f"DEBUG: EMA20 calculation - Success: {ema20_success}")
                 print(f"DEBUG: EMA20 values type: {type(ema20_values)}")
@@ -915,9 +915,9 @@ class ORB:
             # Calculate VWAP using typical price (HLC/3)
             if isDebugging:
                 print(f"DEBUG: Calculating VWAP...")
-                
+
             vwap_success, vwap_values = calculate_vwap_typical(filtered_data)
-            
+
             if isDebugging:
                 print(f"DEBUG: VWAP calculation - Success: {vwap_success}")
                 print(f"DEBUG: VWAP values type: {type(vwap_values)}")
@@ -931,32 +931,32 @@ class ORB:
             # Calculate vector angle using all candlesticks
             if isDebugging:
                 print(f"DEBUG: Calculating vector angle (all {data_samples} candles)...")
-                
+
             vector_angle = calculate_vector_angle(
                 filtered_data, price_column='close', num_candles=data_samples)
-                
+
             if isDebugging:
                 print(f"DEBUG: Vector angle calculated: {vector_angle}")
 
             # Create independent features for PCA analysis
             if isDebugging:
                 print(f"DEBUG: Creating independent features for PCA analysis...")
-            
+
             # Calculate independent features
             pca_row_data = []
-            
+
             # Create a copy with reset index for easier processing
             data_reset = filtered_data.reset_index(drop=True)
-            
+
             for i in range(len(data_reset)):
                 row = data_reset.iloc[i]
-                
+
                 # Independent feature calculations
                 pca_row = {
                     'symbol': symbol,
                     'timestamp': row['timestamp']
                 }
-                
+
                 # 1. Return features (price-independent)
                 if i > 0:
                     prev_close = data_reset.iloc[i-1]['close']
@@ -965,26 +965,26 @@ class ORB:
                 else:
                     pca_row['return_open_close'] = 0.0
                     pca_row['return_prev_close'] = 0.0
-                
+
                 # 2. Volatility features
                 pca_row['intraday_range'] = (row['high'] - row['low']) / row['open']
                 pca_row['upper_wick'] = (row['high'] - max(row['open'], row['close'])) / row['open']
                 pca_row['lower_wick'] = (min(row['open'], row['close']) - row['low']) / row['open']
-                
+
                 # 3. Volume features
                 if i >= 5:  # Need at least 5 periods for rolling average
                     avg_volume = data_reset.iloc[max(0, i-4):i+1]['volume'].mean()
                     pca_row['volume_ratio'] = row['volume'] / avg_volume if avg_volume > 0 else 1.0
                 else:
                     pca_row['volume_ratio'] = 1.0
-                
+
                 # 4. Momentum features
                 if i >= 4:  # 5-period momentum
                     prev_close_5 = data_reset.iloc[i-4]['close']
                     pca_row['momentum_5'] = (row['close'] - prev_close_5) / prev_close_5
                 else:
                     pca_row['momentum_5'] = 0.0
-                
+
                 # 5. ORB-specific features
                 if orb_high is not None and orb_low is not None:
                     orb_range = orb_high - orb_low
@@ -1004,7 +1004,7 @@ class ORB:
                     pca_row['close_vs_orb_low'] = 0.0
                     pca_row['high_vs_orb_high'] = 0.0
                     pca_row['low_vs_orb_low'] = 0.0
-                
+
                 # 6. Technical indicator deviations
                 row_index = i
                 if (ema_success and ema_values is not None and 
@@ -1012,26 +1012,26 @@ class ORB:
                     pca_row['close_vs_ema'] = (row['close'] - ema_values[row_index]) / row['close']
                 else:
                     pca_row['close_vs_ema'] = 0.0
-                
+
                 if (ema20_success and ema20_values is not None and 
                         row_index < len(ema20_values) and ema20_values[row_index] is not None):
                     pca_row['close_vs_ema20'] = (row['close'] - ema20_values[row_index]) / row['close']
                 else:
                     pca_row['close_vs_ema20'] = 0.0
-                
+
                 if (vwap_success and vwap_values is not None and
                         row_index < len(vwap_values) and vwap_values[row_index] is not None):
                     pca_row['close_vs_vwap'] = (row['close'] - vwap_values[row_index]) / row['close']
                 else:
                     pca_row['close_vs_vwap'] = 0.0
-                
+
                 # 7. Vector angle (directional momentum)
                 pca_row['vector_angle'] = vector_angle
-                
+
                 # 8. Time-based features
                 minute_of_session = i  # 0-based minute from start
                 pca_row['session_progress'] = minute_of_session / (data_samples - 1)
-                
+
                 pca_row_data.append(pca_row)
 
             if isDebugging:
@@ -1057,7 +1057,7 @@ class ORB:
 
             print(f"PCA data prepared for {symbol}: "
                   f"{len(new_pca_df)} rows added")
-            
+
             # Print prepared DataFrame if debugging is enabled (using local isDebugging)
             if isDebugging:
                 print(f"\nDEBUG: Prepared PCA DataFrame for {symbol}:")
@@ -1067,7 +1067,7 @@ class ORB:
                 print(f"DataFrame shape: {new_pca_df.shape}")
                 print(f"DataFrame columns: {list(new_pca_df.columns)}")
                 print()
-            
+
             return True
 
         except Exception as e:
@@ -1132,52 +1132,52 @@ class ORB:
     def _perform_pca_analysis(self) -> bool:
         """
         Perform PCA analysis on all symbols in the market DataFrame.
-        
+
         This method iterates through all unique symbols in the market_df
         and calls _pca_data_prep for each symbol to collect PCA data.
-        
+
         Returns:
             True if successful for at least one symbol, False otherwise
         """
         # Local debugging flag - set to True for detailed debug output
         is_debugging = True
-        
+
         if not hasattr(self, 'market_df') or self.market_df is None:
             print("No market DataFrame available for PCA analysis.")
             return False
-            
+
         try:
             # Get unique symbols from the DataFrame
             symbols = self.market_df['symbol'].unique()
-            
+
             if len(symbols) == 0:
                 print("No symbols found in market DataFrame.")
                 return False
-                
+
             print(f"\nStarting PCA analysis for {len(symbols)} symbols...")
             print("=" * 50)
-            
+
             # Initialize success counter
             success_count = 0
-            
+
             # Process each symbol
             for symbol in symbols:
                 print(f"\nProcessing symbol: {symbol}")
                 success = self._pca_data_prep(self.market_df, symbol)
-                
+
                 if success:
                     success_count += 1
                     print(f"✓ PCA data preparation successful for {symbol}")
                 else:
                     print(f"✗ PCA data preparation failed for {symbol}")
-            
+
             print(f"\nPCA Analysis Summary:")
             print(f"Successful: {success_count}/{len(symbols)} symbols")
-            
+
             if hasattr(self, 'pca_data') and self.pca_data is not None:
                 print(f"Total PCA data rows collected: {len(self.pca_data)}")
                 print("PCA data columns:", list(self.pca_data.columns))
-            
+
             # Print PCA data if debugging is enabled
             if is_debugging and hasattr(self, 'pca_data') and self.pca_data is not None:
                 print(f"\nDEBUG: Complete PCA Data:")
@@ -1187,14 +1187,14 @@ class ORB:
                 print(f"Total rows: {len(self.pca_data)}")
                 print(f"Columns: {list(self.pca_data.columns)}")
                 print()
-            
+
             # Standardize the PCA data
             if success_count > 0:
                 print("\nStarting PCA data standardization...")
                 standardize_success = self._standardize_pca_data()
                 if standardize_success:
                     print("PCA data standardization completed successfully.")
-                    
+
                     # Perform PCA analysis on standardized data
                     print("\nPerforming PCA analysis...")
                     pca_analysis_success = self._perform_pca_computation()
@@ -1204,9 +1204,9 @@ class ORB:
                         print("PCA computation failed.")
                 else:
                     print("PCA data standardization failed.")
-            
+
             return success_count > 0
-            
+
         except Exception as e:
             print(f"Error performing PCA analysis: {e}")
             return False
@@ -1216,26 +1216,26 @@ class ORB:
         Standardize PCA data by removing symbol and timestamp columns,
         extracting volume and vector_angle, and performing statistical
         standardization on price columns.
-        
+
         Returns:
             True if successful, False otherwise
         """
         # Local debugging flag - set to True for detailed debug output
         is_debugging = True
-        
+
         if not hasattr(self, 'pca_data') or self.pca_data is None:
             print("No PCA data available for standardization.")
             return False
-            
+
         try:
             if is_debugging:
                 print(f"\nDEBUG: Starting PCA data standardization...")
                 print(f"DEBUG: Original PCA data shape: {self.pca_data.shape}")
                 print(f"DEBUG: Original columns: {list(self.pca_data.columns)}")
-            
+
             # Step 1: Remove symbol and timestamp, extract volume and vector_angle
             working_df = self.pca_data.copy()
-            
+
             # Remove symbol and timestamp columns (non-feature columns)
             columns_to_remove = ['symbol', 'timestamp']
             for col in columns_to_remove:
@@ -1243,19 +1243,19 @@ class ORB:
                     working_df = working_df.drop(columns=[col])
                     if is_debugging:
                         print(f"DEBUG: Removed column: {col}")
-            
+
             # All remaining columns are independent features - standardize them all together
             if is_debugging:
                 print(f"DEBUG: All features will be standardized together")
                 print(f"DEBUG: Feature columns: {list(working_df.columns)}")
-            
+
             # No need to separate features - they are all independent now
-            
+
             if is_debugging:
                 print(f"DEBUG: Independent feature columns: "
                       f"{list(working_df.columns)}")
                 print(f"DEBUG: Feature data shape: {working_df.shape}")
-            
+
             # Step 2: Perform statistical standardization on all features
             try:
                 from sklearn.preprocessing import StandardScaler
@@ -1263,7 +1263,7 @@ class ORB:
                 print("Error: scikit-learn not installed. "
                       "Install with: pip install scikit-learn")
                 return False
-            
+
             # Standardize all independent features together
             scaler = StandardScaler()
             feature_columns = working_df.columns.tolist()
@@ -1273,20 +1273,20 @@ class ORB:
                 columns=feature_columns,
                 index=working_df.index
             )
-            
+
             if is_debugging:
                 print(f"DEBUG: Standardized features shape: "
                       f"{standardized_df.shape}")
                 print("DEBUG: All features standardization completed")
-            
+
             # Store the standardized data
             self.pca_data_standardized = standardized_df
-            
+
             if is_debugging:
                 print(f"DEBUG: Final standardized data shape: "
                       f"{standardized_df.shape}")
                 print(f"DEBUG: Final columns: {list(standardized_df.columns)}")
-                
+
                 # Step 3: Print the resulting dataframe if debugging
                 print("\nDEBUG: Standardized PCA Data:")
                 print("=" * 80)
@@ -1295,10 +1295,10 @@ class ORB:
                 print(f"Total rows: {len(standardized_df)}")
                 print(f"Columns: {list(standardized_df.columns)}")
                 print()
-            
+
             print("PCA data standardization completed successfully.")
             return True
-            
+
         except Exception as e:
             print(f"Error standardizing PCA data: {e}")
             return False
@@ -1306,23 +1306,23 @@ class ORB:
     def _perform_pca_computation(self) -> bool:
         """
         Perform Principal Component Analysis on standardized data.
-        
+
         Returns:
             True if successful, False otherwise
         """
         # Local debugging flag - set to True for detailed debug output
         is_debugging = True
-        
+
         if not hasattr(self, 'pca_data_standardized') or self.pca_data_standardized is None:
             print("No standardized PCA data available for computation.")
             return False
-            
+
         try:
             if is_debugging:
                 print("\nDEBUG: Starting PCA computation...")
                 print(f"DEBUG: Standardized data shape: {self.pca_data_standardized.shape}")
                 print(f"DEBUG: Standardized data columns: {list(self.pca_data_standardized.columns)}")
-            
+
             # Import PCA from sklearn
             try:
                 from sklearn.decomposition import PCA
@@ -1330,45 +1330,45 @@ class ORB:
                 print("Error: scikit-learn not installed. "
                       "Install with: pip install scikit-learn")
                 return False
-            
+
             # Prepare data for PCA (remove any NaN values)
             pca_input_data = self.pca_data_standardized.dropna()
-            
+
             if pca_input_data.empty:
                 print("No valid data remaining after removing NaN values.")
                 return False
-                
+
             if is_debugging:
                 print(f"DEBUG: Data shape after NaN removal: {pca_input_data.shape}")
                 print(f"DEBUG: Input data ready for PCA")
-            
+
             # Determine number of components (use min of features or samples)
             n_features = pca_input_data.shape[1]
             n_samples = pca_input_data.shape[0]
             n_components = min(n_features, n_samples, 10)  # Limit to 10 components max
-            
+
             if is_debugging:
                 print(f"DEBUG: Number of features: {n_features}")
                 print(f"DEBUG: Number of samples: {n_samples}")
                 print(f"DEBUG: Using {n_components} components for PCA")
-            
+
             # Create and fit PCA
             pca = PCA(n_components=n_components)
             pca_result = pca.fit_transform(pca_input_data)
-            
+
             # Store PCA results
             self.pca_components = pca.components_
             self.pca_explained_variance = pca.explained_variance_
             self.pca_explained_variance_ratio = pca.explained_variance_ratio_
             self.pca_transformed_data = pca_result
             self.pca_feature_names = list(pca_input_data.columns)
-            
+
             if is_debugging:
                 print(f"DEBUG: PCA transformation completed")
                 print(f"DEBUG: Transformed data shape: {pca_result.shape}")
                 print(f"DEBUG: Explained variance ratio: {pca.explained_variance_ratio_}")
                 print(f"DEBUG: Cumulative explained variance: {pca.explained_variance_ratio_.cumsum()}")
-                
+
                 # Print detailed results
                 print("\nDEBUG: PCA Analysis Results:")
                 print("=" * 60)
@@ -1379,7 +1379,7 @@ class ORB:
                     print(f"PC{i+1}\t\t{pca.explained_variance_[i]:.4f}\t\t"
                           f"{pca.explained_variance_ratio_[i]:.4f}")
                 print("=" * 60)
-                
+
                 # Print feature loadings for first few components
                 print("\nDEBUG: Feature Loadings (First 3 Components):")
                 print("=" * 80)
@@ -1396,15 +1396,15 @@ class ORB:
                         print(f"  {feature}: {loading:.4f}")
                 print("=" * 80)
                 print()
-            
+
             # Summary for user
             total_variance_explained = pca.explained_variance_ratio_.sum()
             print(f"PCA completed with {n_components} components")
             print(f"Total variance explained: {total_variance_explained:.2%}")
             print(f"First component explains: {pca.explained_variance_ratio_[0]:.2%}")
-            
+
             return True
-            
+
         except Exception as e:
             print(f"Error performing PCA computation: {e}")
             return False
@@ -1459,7 +1459,7 @@ class ORB:
                 feed = 'iex'
             else:
                 feed = 'sip'  # Default to SIP
-            
+
             base_url = os.getenv('ALPACA_BASE_URL', 'https://paper-api.alpaca.markets')
             trading_mode = 'paper' if 'paper' in base_url else 'live'
             print(f"Using {feed.upper()} data feed for {trading_mode} trading")
@@ -1469,7 +1469,7 @@ class ORB:
             # Generate chart for each symbol
             success_count = 0
             alert_type_name = "superduper alerts" if self.plot_super_alerts else "regular alerts"
-            
+
             for symbol in symbols:
                 try:
                     # Fetch fresh, complete market data for this symbol
@@ -1483,11 +1483,11 @@ class ORB:
                         limit=10000,  # Ensure we get all data (6.5 hours * 60 minutes = 390 minutes max)
                         feed=feed  # Use IEX for paper trading, SIP for live trading
                     )
-                    
+
                     if not bars:
                         print(f"No market data available for {symbol}")
                         continue
-                    
+
                     # Convert bars to DataFrame format expected by plot_candle_chart
                     symbol_data = []
                     for bar in bars:
@@ -1501,48 +1501,48 @@ class ORB:
                             'symbol': symbol
                         }
                         symbol_data.append(bar_data)
-                    
+
                     # Create DataFrame for this symbol
                     symbol_df = pd.DataFrame(symbol_data)
                     symbol_df['timestamp'] = pd.to_datetime(symbol_df['timestamp'])
-                    
+
                     print(f"Retrieved {len(symbol_df)} minutes of data for {symbol}")
                     if len(symbol_df) > 0:
                         min_time = symbol_df['timestamp'].min()
                         max_time = symbol_df['timestamp'].max()
                         print(f"Data range: {min_time} to {max_time}")
-                        
+
                         # Check if we got the full trading session
                         expected_start = start_time.replace(tzinfo=None)
                         expected_end = end_time.replace(tzinfo=None)
-                        
+
                         if min_time.replace(tzinfo=None) > expected_start:
                             actual_start_et = min_time.astimezone(et_tz)
                             expected_premarket_start = start_time
                             print(f"⚠️  Data starts later than expected premarket start ({expected_premarket_start.strftime('%H:%M %Z')}) - actual start: {actual_start_et.strftime('%H:%M:%S %Z')}")
                         if max_time.replace(tzinfo=None) < expected_end:
                             print(f"⚠️  Data ends earlier than expected market close (4:00 PM)")
-                        
+
                         # Calculate coverage
                         session_duration = (expected_end - expected_start).total_seconds() / 60  # minutes
                         actual_duration = (max_time - min_time).total_seconds() / 60  # minutes
                         coverage = (actual_duration / session_duration) * 100 if session_duration > 0 else 0
                         print(f"Session coverage: {coverage:.1f}% ({len(symbol_df)} of ~{session_duration:.0f} possible minutes)")
-                    
+
                     # Load alerts for this symbol if csv_date is available
                     alerts = []
                     if self.csv_date:
                         alerts = self._load_alerts_for_symbol(symbol, self.csv_date)
                         if alerts:
                             print(f"Loaded {len(alerts)} {alert_type_name} for {symbol}")
-                    
+
                     # Generate chart with fresh data and alerts
                     if plot_candle_chart(symbol_df, symbol, plots_dir, alerts):
                         success_count += 1
                         print(f"✓ Chart generated for {symbol}")
                     else:
                         print(f"✗ Failed to generate chart for {symbol}")
-                        
+
                 except Exception as e:
                     print(f"Error processing {symbol}: {e}")
                     continue
@@ -1560,46 +1560,46 @@ class ORB:
         """
         Process multiple dates for PCA analysis without chart generation.
         Collects data from all dates first, then performs PCA in a single pass.
-        
+
         Args:
             start_date: Start date for analysis
             end_date: End date for analysis
-            
+
         Returns:
             True if successful, False otherwise
         """
         print(f"\nProcessing date range for PCA analysis: {start_date} to {end_date}")
         print("=" * 60)
-        
+
         # Get CSV files for the date range
         csv_files = self._get_csv_files_for_date_range(start_date, end_date)
-        
+
         if not csv_files:
             print(f"No CSV files found for date range {start_date} to {end_date}")
             return False
-        
+
         print(f"Found {len(csv_files)} CSV files to process:")
         for csv_file in csv_files:
             filename = os.path.basename(csv_file)
             print(f"  - {filename}")
-        
+
         # Initialize counters and data collection
         total_files = len(csv_files)
         successful_files = 0
         all_market_data = {}  # Collect all market data across dates
-        
+
         # Phase 1: Collect market data from all dates
         print(f"\nPhase 1: Collecting market data from {total_files} dates...")
         print("-" * 50)
-        
+
         for i, csv_file in enumerate(csv_files, 1):
             filename = os.path.basename(csv_file)
             print(f"\nCollecting data from file {i}/{total_files}: {filename}")
-            
+
             try:
                 # Load CSV data
                 csv_data = read_csv(csv_file)
-                
+
                 # Extract date from filename
                 date_str = filename.replace('.csv', '')
                 try:
@@ -1608,11 +1608,11 @@ class ORB:
                 except ValueError:
                     print(f"Warning: Could not parse date from filename '{filename}'")
                     continue
-                
+
                 if not csv_data:
                     print(f"Warning: No data in CSV file {filename}")
                     continue
-                
+
                 # Extract symbols from CSV data
                 symbols = []
                 for row in csv_data:
@@ -1620,22 +1620,22 @@ class ORB:
                         symbols.append(row['symbol'])
                     elif 'Symbol' in row and row['Symbol']:
                         symbols.append(row['Symbol'])
-                
+
                 if not symbols:
                     print(f"No symbols found in {filename}")
                     continue
-                
+
                 symbols = list(set(symbols))  # Remove duplicates
                 print(f"Found {len(symbols)} symbols: {symbols[:5]}{'...' if len(symbols) > 5 else ''}")
-                
+
                 # Get market data for this date
                 et_tz = pytz.timezone('America/New_York')
                 start_time = datetime.combine(file_date, time(4, 0), tzinfo=et_tz)
                 end_time = datetime.combine(file_date, time(16, 0), tzinfo=et_tz)
-                
+
                 # Determine which feed to use
                 feed = 'iex' if self.use_iex else 'sip'
-                
+
                 date_market_data = {}
                 for symbol in symbols:
                     try:
@@ -1646,7 +1646,7 @@ class ORB:
                             end=end_time.isoformat(),
                             feed=feed
                         )
-                        
+
                         if bars:
                             symbol_data = []
                             for bar in bars:
@@ -1661,13 +1661,13 @@ class ORB:
                                     'date': file_date.strftime('%Y-%m-%d')
                                 }
                                 symbol_data.append(bar_data)
-                            
+
                             date_market_data[symbol] = symbol_data
-                            
+
                     except Exception as e:
                         print(f"Error getting data for {symbol} on {file_date}: {e}")
                         continue
-                
+
                 if date_market_data:
                     # Store market data with date key
                     all_market_data[file_date.strftime('%Y-%m-%d')] = date_market_data
@@ -1675,62 +1675,62 @@ class ORB:
                     print(f"✓ Collected data for {len(date_market_data)} symbols on {file_date}")
                 else:
                     print(f"✗ No market data collected for {file_date}")
-                
+
             except Exception as e:
                 print(f"Error processing {filename}: {e}")
                 continue
-        
+
         if not all_market_data:
             print("No market data collected from any date")
             return False
-        
+
         # Phase 2: Combine all market data into single DataFrame
         print(f"\nPhase 2: Combining market data from {len(all_market_data)} successful dates...")
         print("-" * 50)
-        
+
         combined_data = []
         total_symbols = set()
-        
+
         for date_str, date_data in all_market_data.items():
             for symbol, bars in date_data.items():
                 combined_data.extend(bars)
                 total_symbols.add(symbol)
-        
+
         if not combined_data:
             print("No combined market data available")
             return False
-        
+
         # Create combined DataFrame
         combined_df = pd.DataFrame(combined_data)
         combined_df['timestamp'] = pd.to_datetime(combined_df['timestamp'])
-        
+
         print(f"Combined DataFrame created:")
         print(f"  - Total rows: {len(combined_df):,}")
         print(f"  - Unique symbols: {len(total_symbols)}")
         print(f"  - Date range: {combined_df['date'].min()} to {combined_df['date'].max()}")
         print(f"  - Symbols: {sorted(list(total_symbols))[:10]}{'...' if len(total_symbols) > 10 else ''}")
-        
+
         # Store combined DataFrame
         self.market_df = combined_df
-        
+
         # Phase 3: Perform single-pass PCA analysis across all dates
         print(f"\nPhase 3: Performing single-pass PCA analysis across all dates...")
         print("-" * 50)
-        
+
         pca_success = self._perform_pca_analysis()
-        
+
         if pca_success:
             print(f"\n✓ Multi-date PCA analysis completed successfully!")
             print(f"Data processing summary:")
             print(f"  - Processed files: {successful_files}/{total_files}")
             print(f"  - Total symbols: {len(total_symbols)}")
             print(f"  - Date range: {start_date} to {end_date}")
-            
+
             if hasattr(self, 'pca_data') and self.pca_data is not None:
                 print(f"  - PCA data rows: {len(self.pca_data):,}")
                 unique_dates_in_pca = self.pca_data['timestamp'].dt.date.nunique() if 'timestamp' in self.pca_data.columns else len(all_market_data)
                 print(f"  - Dates in PCA: {unique_dates_in_pca}")
-            
+
             return True
         else:
             print(f"✗ Multi-date PCA analysis failed")
@@ -1739,7 +1739,7 @@ class ORB:
     def Exec(self, start_date: Optional[date] = None, end_date: Optional[date] = None) -> bool:
         """
         Execute the ORB analysis process.
-        
+
         Args:
             start_date: Optional start date for multi-date analysis
             end_date: Optional end date for multi-date analysis
@@ -1753,11 +1753,11 @@ class ORB:
             print(f"Date range: {start_date} to {end_date}")
             print(f"Opening range period: {self.opening_range_minutes} minutes")
             return self._process_date_range_for_pca(start_date, end_date)
-        
+
         # Original single-date processing with chart generation
         print("Single-date analysis mode (with chart generation)")
         print(f"Opening range period: {self.opening_range_minutes} minutes")
-        
+
         success = self._load_and_process_csv_data()
 
         if not success:
@@ -1799,38 +1799,38 @@ class ORB:
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="ORB Analysis Tool")
-    
+
     parser.add_argument(
         "--plot-alerts",
         action="store_true",
         help="Plot regular alerts instead of superduper alerts (default: plot superduper alerts)"
     )
-    
+
     parser.add_argument(
         "--use-iex",
         action="store_true",
         help="Use IEX data feed instead of SIP (default: SIP)"
     )
-    
+
     parser.add_argument(
         "--start",
         type=str,
         help="Start date for multi-date analysis (YYYY-MM-DD format)"
     )
-    
+
     parser.add_argument(
         "--end",
         type=str,
         help="End date for multi-date analysis (YYYY-MM-DD format)"
     )
-    
+
     parser.add_argument(
         "--opening-range",
         type=int,
         default=15,
         help="Opening range period in minutes (default: 15)"
     )
-    
+
     return parser.parse_args()
 
 
@@ -1842,42 +1842,42 @@ def main():
     try:
         # Parse command line arguments
         args = parse_arguments()
-        
+
         # Validate date arguments
         start_date = None
         end_date = None
-        
+
         if args.start or args.end:
             if not (args.start and args.end):
                 print("Error: Both --start and --end must be provided for multi-date analysis")
                 sys.exit(1)
-            
+
             try:
                 start_date = datetime.strptime(args.start, '%Y-%m-%d').date()
                 end_date = datetime.strptime(args.end, '%Y-%m-%d').date()
-                
+
                 if start_date > end_date:
                     print("Error: Start date must be before or equal to end date")
                     sys.exit(1)
-                    
+
             except ValueError as e:
                 print(f"Error parsing dates: {e}")
                 print("Please use YYYY-MM-DD format")
                 sys.exit(1)
-        
+
         # Determine whether to plot superduper alerts or regular alerts
         plot_super_alerts = not args.plot_alerts  # Default is True (superduper alerts)
-        
+
         # Create and run ORB analysis
         orb = ORB(
             plot_super_alerts=plot_super_alerts, 
             use_iex=args.use_iex,
             opening_range_minutes=args.opening_range
         )
-        
+
         alert_type = "superduper alerts" if plot_super_alerts else "regular alerts"
         feed_type = "IEX" if args.use_iex else "SIP"
-        
+
         if start_date and end_date:
             print(f"Multi-date ORB analysis: {start_date} to {end_date}")
             print(f"Opening range period: {args.opening_range} minutes")
@@ -1889,7 +1889,7 @@ def main():
             print(f"Opening range period: {args.opening_range} minutes")
             print(f"Analysis will plot {alert_type}")
             print(f"Using {feed_type} data feed")
-        
+
         success = orb.Exec(start_date=start_date, end_date=end_date)
 
         if success:

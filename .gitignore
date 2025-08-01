@@ -141,3 +141,6 @@ historical_data/
 
 # Telegram user database
 .telegram_users.csv
+
+# Alpaca configuration file (contains credentials)
+code/alpaca_config.py
