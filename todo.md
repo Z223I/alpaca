@@ -8,17 +8,23 @@ The remaining tasks are lower priority documentation and deployment tools:
 
 Be sure to watch stocks minute-by-minute for buying oportunities Jdun Trades style but with 1 min candles.
 
+## Multiple Accounts
+
+- [ ] Update to handle multiple account types and people.
+
+
 ## BRB, Breakout(break above) Retest Breakout
+
+## --buy-trailing
+
+Same as --buy --amount
+Add --trailing-percent that defaults to .env variable
 
 
 ## Update Alpaca.py
 
-- [ ] /commit /clear /read...
-- [ ] Think hard. Update code/alpaca.py: 1. Research the alpaca trade api to find out how to liquidate a stock; liquidate all positions; 2. Update the code with CLI args for --liquidate --symbol <symbol> and --liquidate-all. There may be an option to close all other orders for the symbol. 3. for the CLI arg --positions, only display the most vital info, e.g., symbol, quantity and average fill.
-
-
-
-
+- [X] /commit /clear /read...
+- [X] Think hard. Update code/alpaca.py: 1. Research the alpaca trade api to find out how to liquidate a stock; liquidate all positions; 2. Update the code with CLI args for --liquidate --symbol <symbol> and --liquidate-all. There may be an option to close all other orders for the symbol. 3. for the CLI arg --positions, only display the most vital info, e.g., symbol, quantity and average fill.
 
 ## Root Cause Analysis
 
