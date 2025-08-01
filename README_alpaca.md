@@ -6,7 +6,7 @@ A comprehensive Python-based trading system for automated stock trading using th
 
 ### Core Trading Capabilities
 - **Market & Limit Orders**: Execute buy and sell orders with various order types
-- **Trailing Orders**: Trailing buy orders that follow price movements with configurable trailing percentage
+- **Trailing Orders**: Trailing sell orders that follow price movements upward with configurable trailing percentage
 - **Bracket Orders**: Automated stop-loss and take-profit protection
 - **After-Hours Trading**: Extended hours trading with limit orders only
 - **Short Selling**: Bearish trading strategies with proper risk management
@@ -68,7 +68,7 @@ python3 code/alpaca.py --buy --symbol AAPL --after-hours --take-profit 160.00 --
 - `-b, --bracket-order` - Execute bracket order
 - `-f, --future-bracket-order` - Execute future bracket order with limit entry  
 - `--buy` - Execute a buy order for the specified symbol
-- `--buy-trailing` - Execute a trailing buy order for the specified symbol
+- `--sell-trailing` - Execute a trailing sell order for the specified symbol
 - `--sell-short` - Execute a short sell order for bearish predictions
 - `-q, --get-latest-quote` - Get latest quote for a symbol
 
@@ -86,7 +86,7 @@ python3 code/alpaca.py --buy --symbol AAPL --after-hours --take-profit 160.00 --
 - `--take-profit TAKE_PROFIT` - Take profit price for bracket orders
 - `--stop-loss STOP_LOSS` - Custom stop loss price for buy/short orders
 - `--amount AMOUNT` - Dollar amount to invest (calculates quantity automatically)
-- `--trailing-percent TRAILING_PERCENT` - Trailing percentage for trailing buy order (default: 7.5%)
+- `--trailing-percent TRAILING_PERCENT` - Trailing percentage for trailing sell order (default: 7.5%)
 
 #### Order Modifiers
 - `--submit` - Actually submit the order (default: False for dry run)
@@ -112,11 +112,15 @@ python3 code/alpaca.py --sell-short --symbol AAPL --take-profit 140.00 --submit
 # Buy with custom amount and calculated take profit
 python3 code/alpaca.py --buy --symbol AAPL --amount 1000 --stop-loss 145.00 --calc-take-profit --submit
 
-# Trailing buy order with default 7.5% trailing percentage
-python3 code/alpaca.py --buy-trailing --symbol AAPL --amount 1000 --submit
+# Market buy followed by trailing sell order
+python3 code/alpaca.py --buy --symbol AAPL --amount 1000 --take-profit 160.00 --submit
+python3 code/alpaca.py --sell-trailing --symbol AAPL --quantity 5 --submit
 
-# Trailing buy order with custom trailing percentage
-python3 code/alpaca.py --buy-trailing --symbol AAPL --amount 1000 --trailing-percent 5.0 --submit
+# Trailing sell order with default 7.5% trailing percentage
+python3 code/alpaca.py --sell-trailing --symbol AAPL --quantity 10 --submit
+
+# Trailing sell order with custom trailing percentage
+python3 code/alpaca.py --sell-trailing --symbol AAPL --quantity 10 --trailing-percent 5.0 --submit
 ```
 
 #### Position Liquidation
@@ -214,7 +218,7 @@ Located in `code/alpaca.py`, this is the core trading class:
 
 #### Core Trading Methods
 - `_buy()`: Execute buy orders with automatic bracket protection
-- `_buy_trailing()`: Execute trailing buy orders with configurable trailing percentage
+- `_sell_trailing()`: Execute trailing sell orders with configurable trailing percentage
 - `_sell_short()`: Execute short sell orders with protection
 - `_bracketOrder()`: Create standard bracket orders
 - `_futureBracketOrder()`: Create limit entry bracket orders

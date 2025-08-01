@@ -37,7 +37,9 @@ api.submit_order(
 7. Of course --submit is required for a real trade, otherwise it is a dry run
 8. Update README_alpaca.md
 
-- [ ] make ./code a package
+- [ ] Important. Think hard. Change --buy-trailing to --sell-trailing so side='sell'; Update README_alpaca.md of course; Replace the required --amount with --quantity which is required; Give an example of a market buy --amount with a matching --sell-trailing --quantity (you will have to fake the quantity).
+
+- [X] make ./code a python package
 
 
 ## Update Alpaca.py

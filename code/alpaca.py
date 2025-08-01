@@ -178,17 +178,17 @@ class alpaca_private:
                 print(f"  Symbol: {symbol}, Quantity: {quantity}")
                 return None
 
-    def _buy_trailing(self, symbol: str, amount: float, trailing_percent: Optional[float] = None, submit_order: bool = False) -> Optional[Any]:
+    def _sell_trailing(self, symbol: str, quantity: int, trailing_percent: Optional[float] = None, submit_order: bool = False) -> Optional[Any]:
         """
-        Execute a trailing buy order.
+        Execute a trailing sell order.
 
-        This method creates a trailing stop buy order that will follow the stock price
-        downward at a specified percentage distance, and execute a buy when the price
-        starts moving up by the trailing percentage.
+        This method creates a trailing stop sell order that will follow the stock price
+        upward at a specified percentage distance, and execute a sell when the price
+        starts moving down by the trailing percentage.
 
         Args:
-            symbol: The stock symbol to buy
-            amount: Dollar amount to invest (required)
+            symbol: The stock symbol to sell
+            quantity: Number of shares to sell (required)
             trailing_percent: Trailing percentage (optional, uses default from config if not provided)
             submit_order: Whether to actually submit the order (default: False for dry run)
 
@@ -202,21 +202,18 @@ class alpaca_private:
         # Get current market data for the symbol (using average of bid/ask)
         market_price = get_latest_quote_avg(self.api, symbol)
 
-        # Calculate quantity based on amount
-        quantity = round(amount / market_price)
-
         # Display the order details that would be submitted
         print(f"submit_order(\n"
                 f"    symbol='{symbol}',\n"
                 f"    qty={quantity},\n"
-                f"    side='buy',\n"
+                f"    side='sell',\n"
                 f"    type='trailing_stop',\n"
                 f"    time_in_force='gtc',\n"
                 f"    trail_percent='{trailing_percent}'\n"
                 f")")
 
         if not submit_order:
-            print("[DRY RUN] Trailing buy order not submitted (use --submit to execute)")
+            print("[DRY RUN] Trailing sell order not submitted (use --submit to execute)")
             return None
 
         # Submit the actual order if requested
@@ -225,12 +222,12 @@ class alpaca_private:
                 order_response = self.api.submit_order(
                     symbol=symbol,
                     qty=quantity,
-                    side='buy',
+                    side='sell',
                     type='trailing_stop',
                     time_in_force='gtc',
                     trail_percent=str(trailing_percent)
                 )
-                print(f"✓ Trailing buy order submitted successfully: {order_response.id}")
+                print(f"✓ Trailing sell order submitted successfully: {order_response.id}")
                 print(f"  Status: {order_response.status}")
                 print(f"  Symbol: {order_response.symbol}")
                 print(f"  Quantity: {order_response.qty}")
@@ -238,7 +235,7 @@ class alpaca_private:
                 print(f"  Current Market Price: ~${market_price:.2f}")
                 return order_response
             except Exception as e:
-                print(f"✗ Trailing buy order submission failed: {str(e)}")
+                print(f"✗ Trailing sell order submission failed: {str(e)}")
                 print(f"  Symbol: {symbol}, Quantity: {quantity}, Trail Percent: {trailing_percent}%")
                 return None
 
@@ -1062,16 +1059,16 @@ class alpaca_private:
                     print("Failed to submit buy order")
                     return 1
 
-        # Handle trailing buy order if requested
-        if self.args.buy_trailing:
-            order_result = self._buy_trailing(
+        # Handle trailing sell order if requested
+        if self.args.sell_trailing:
+            order_result = self._sell_trailing(
                 symbol=self.args.symbol,
-                amount=self.args.amount,
+                quantity=self.args.quantity,
                 trailing_percent=self.args.trailing_percent,
                 submit_order=self.args.submit
             )
             if order_result is None and self.args.submit:
-                print("Failed to submit trailing buy order")
+                print("Failed to submit trailing sell order")
                 return 1
 
         # Handle sell-short order if requested
