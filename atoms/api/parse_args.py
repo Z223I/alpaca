@@ -189,5 +189,9 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
                     parser.error("Display-only arguments (--positions, --cash, --active-order) cannot be combined with other operations")
                 elif arg_value is not None and not isinstance(arg_value, bool):
                     parser.error("Display-only arguments (--positions, --cash, --active-order) cannot be combined with other operations")
+    
+    # Normalize symbol to uppercase if provided
+    if args.symbol:
+        args.symbol = args.symbol.upper()
 
     return args

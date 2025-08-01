@@ -16,11 +16,22 @@ Be sure to watch stocks minute-by-minute for buying oportunities Jdun Trades sty
 ## BRB, Breakout(break above) Retest Breakout
 
 
+
+
+
+## Cancel all existing orders
+
+
+
+## Symbol.toupper()
+
+- [X] do it in arg parse.
+
 ## Buy Market
 
 - [ X] /commit /clear /read...
 - [X] Important.  Think hard. Create a PRD, specs/buy_market_with_trailing_sell_prd.md: 1. Search internet for how to place a market buy order for Alpaca trading API version two; 2. Create code/alpace.py CLI arg --buy-market it will have the required --symbol and an optional --submit; 3. Test the new code; 4. Create code/alpace.py CLI arg --buy-market-trailing-sell it will have the required --symbol and an optional --submit; 5. buy-market-trailing-sell method: calls the newly created buy market method; polls the alpaca trading api until the order is filled or canceled; if filled, then call the trailing sell method with the number of shares purchased; 6. you will need to research how to determine if the order was placed; 7. Test the code; 8. Update README_alpaca.md.
-- [X] Oops! It implemented the code immediately.  Work on that.
+- [X] Oops! It implemented the code immediately.  Work on that. Use markdown!!!
 - [X] /commit
 - [X] git push
 - [ ] /clear /read...
