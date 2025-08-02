@@ -26,13 +26,13 @@ new branch
 
 ## Autopilot
 
-- [ ] /commit /clear /read...
-- [ ] git switch -c autopilot
-- [ ] /exit
-- [ ] claude --dangerously-skip-permissions
-- [ ] /login
-- [ ] /read...
-- [ ] Update code/alpaca_config.py: update "CONFIG": for the accounts paper, live, and cash add the fields auto_trade="no"; auto_amount=10
+- [X] claude --dangerously-skip-permissions
+- [X] /login
+- [X] /commit /clear /read...
+- [X] git switch -c autopilot
+- [X] /read...
+- [X] Update code/alpaca_config.py: update "CONFIG": for the accounts paper, live, and cash add the fields auto_trade="no"; auto_amount=10
+- [X] Update code/alpaca_config.py: update "CONFIG": Duplicate the "Primary" account and use the names "Bruce" and "Dale".
 - [ ] Important. Think hard. Update code/alpaca_config.py: for every
 
 ## Telegram Updates
