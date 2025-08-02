@@ -7,6 +7,7 @@ Designed to work with ORB super alert files from the historical_data directory.
 
 import json
 import os
+import shutil
 from typing import Optional, Dict, Any
 from datetime import datetime
 
@@ -79,6 +80,10 @@ def send_orb_alert(file_path: str, urgent: bool = True, post_only_urgent: bool =
             'alert_type': alert_data.get('alert_type', 'UNKNOWN'),
             'original_message': alert_message
         })
+
+        # Store superduper alerts that were actually sent
+        if result.get('success', False) and not result.get('skipped', False):
+            _store_sent_superduper_alert(file_path, alert_data)
 
         return result
 
@@ -205,3 +210,156 @@ def _extract_risk_info(alert_data: Dict[str, Any]) -> Optional[str]:
             risk_parts.append(f"R/R: {risk_reward:.1f}")
 
     return " | ".join(risk_parts) if risk_parts else None
+
+def _store_sent_superduper_alert(file_path: str, alert_data: Dict[str, Any]) -> None:
+    """
+    Store superduper alerts that were actually sent to the historical data directory.
+    
+    Directory structure: historical_data/YYYY-MM-DD/superduper_alerts_sent/{bullish,bearish}/{yellow,green}
+    
+    Args:
+        file_path (str): Original path to the alert file
+        alert_data (dict): The alert data that was sent
+    """
+    try:
+        # Extract target date from file path (historical_data/YYYY-MM-DD/...)
+        target_date = _extract_date_from_path(file_path)
+        
+        # Extract alert properties to determine directory placement
+        alert_type = alert_data.get('alert_type', '').lower()
+        symbol = alert_data.get('symbol', 'UNKNOWN')
+        
+        # Determine sentiment (bullish/bearish) from alert data
+        sentiment = _determine_alert_sentiment(alert_data)
+        if not sentiment:
+            return  # Skip if we can't determine sentiment
+        
+        # Determine alert level (yellow/green) from alert data  
+        alert_level = _determine_alert_level(alert_data)
+        if not alert_level:
+            return  # Skip if we can't determine alert level
+        
+        # Create target directory structure
+        base_dir = f"historical_data/{target_date}/superduper_alerts_sent"
+        target_dir = os.path.join(base_dir, sentiment, alert_level)
+        
+        # Create directories if they don't exist
+        os.makedirs(target_dir, exist_ok=True)
+        
+        # Generate target filename
+        original_filename = os.path.basename(file_path)
+        target_file = os.path.join(target_dir, original_filename)
+        
+        # Copy the alert file to the sent directory
+        shutil.copy2(file_path, target_file)
+        
+        print(f"Stored sent superduper alert: {target_file}")
+        
+    except Exception as e:
+        print(f"Error storing sent superduper alert: {e}")
+
+def _determine_alert_sentiment(alert_data: Dict[str, Any]) -> Optional[str]:
+    """
+    Determine if alert is bullish or bearish from alert data.
+    
+    Returns:
+        str: 'bullish' or 'bearish', or None if cannot determine
+    """
+    # Check alert message for sentiment indicators
+    alert_message = alert_data.get('alert_message', '').lower()
+    
+    # Look for bullish indicators
+    bullish_indicators = ['buy', 'long', 'bullish', 'upward', 'breakout', 'above', 'bull', 'green']
+    bearish_indicators = ['sell', 'short', 'bearish', 'downward', 'breakdown', 'below', 'bear', 'red']
+    
+    bullish_score = sum(1 for indicator in bullish_indicators if indicator in alert_message)
+    bearish_score = sum(1 for indicator in bearish_indicators if indicator in alert_message)
+    
+    if bullish_score > bearish_score:
+        return 'bullish'
+    elif bearish_score > bullish_score:
+        return 'bearish'
+    
+    # Check in original_alert if available
+    original_alert = alert_data.get('original_alert', {})
+    if isinstance(original_alert, dict):
+        original_message = original_alert.get('alert_message', '').lower()
+        
+        bullish_score = sum(1 for indicator in bullish_indicators if indicator in original_message)
+        bearish_score = sum(1 for indicator in bearish_indicators if indicator in original_message)
+        
+        if bullish_score > bearish_score:
+            return 'bullish'
+        elif bearish_score > bullish_score:
+            return 'bearish'
+    
+    # Default fallback - could be enhanced with more sophisticated logic
+    return None
+
+def _determine_alert_level(alert_data: Dict[str, Any]) -> Optional[str]:
+    """
+    Determine if alert is yellow or green level from the actual light indicators.
+    Superduper alerts already have green/yellow lights based on trend analysis and momentum.
+    
+    Returns:
+        str: 'yellow' or 'green', or None if cannot determine
+    """
+    # Check alert message for light indicators
+    alert_message = alert_data.get('alert_message', '').lower()
+    
+    # Look for light indicators
+    if 'green light' in alert_message or '🟢' in alert_message or 'green🔥' in alert_message:
+        return 'green'
+    elif 'yellow light' in alert_message or '🟡' in alert_message or 'yellow🔥' in alert_message:
+        return 'yellow'
+    
+    # Check for color words
+    if 'green' in alert_message and 'yellow' not in alert_message:
+        return 'green'
+    elif 'yellow' in alert_message and 'green' not in alert_message:
+        return 'yellow'
+    
+    # Check in original_alert if available
+    original_alert = alert_data.get('original_alert', {})
+    if isinstance(original_alert, dict):
+        original_message = original_alert.get('alert_message', '').lower()
+        
+        if 'green light' in original_message or '🟢' in original_message:
+            return 'green'
+        elif 'yellow light' in original_message or '🟡' in original_message:
+            return 'yellow'
+        
+        if 'green' in original_message and 'yellow' not in original_message:
+            return 'green'
+        elif 'yellow' in original_message and 'green' not in original_message:
+            return 'yellow'
+    
+    # Check for any trend/momentum indicators that might specify color
+    trend_info = alert_data.get('trend_analysis', {})
+    if isinstance(trend_info, dict):
+        momentum_color = trend_info.get('momentum_color', '').lower()
+        if momentum_color in ['green', 'yellow']:
+            return momentum_color
+    
+    return None
+
+def _extract_date_from_path(file_path: str) -> str:
+    """
+    Extract date from file path in format historical_data/YYYY-MM-DD/...
+    
+    Args:
+        file_path (str): Path to the alert file
+        
+    Returns:
+        str: Date in YYYY-MM-DD format, or current date if not found
+    """
+    import re
+    
+    # Look for date pattern in path
+    date_match = re.search(r'historical_data/(\d{4}-\d{2}-\d{2})/', file_path)
+    
+    if date_match:
+        return date_match.group(1)
+    
+    # Fallback to current date if no date found in path
+    return datetime.now().strftime('%Y-%m-%d')

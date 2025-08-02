@@ -7,6 +7,7 @@ movement patterns, momentum, and consolidation to identify the highest quality a
 
 Usage:
     python3 code/orb_alerts_monitor_superduper.py                           # Monitor current date super alerts
+    python3 code/orb_alerts_monitor_superduper.py --date 2025-08-01         # Monitor specific date super alerts
     python3 code/orb_alerts_monitor_superduper.py --timeframe 60            # Use 60-minute analysis window
     python3 code/orb_alerts_monitor_superduper.py --test                    # Run in test mode
     python3 code/orb_alerts_monitor_superduper.py --no-telegram             # Disable telegram notifications
@@ -53,7 +54,7 @@ class SuperAlertFileHandler(FileSystemEventHandler):
 class ORBSuperduperAlertMonitor:
     """Main ORB Superduper Alert Monitor that watches for super alerts and creates superduper alerts."""
 
-    def __init__(self, timeframe_minutes: int = 30, test_mode: bool = False, post_only_urgent: bool = False, no_telegram: bool = False):
+    def __init__(self, timeframe_minutes: int = 30, test_mode: bool = False, post_only_urgent: bool = False, no_telegram: bool = False, date: Optional[str] = None):
         """
         Initialize ORB Superduper Alert Monitor.
 
@@ -62,6 +63,7 @@ class ORBSuperduperAlertMonitor:
             test_mode: Run in test mode (no actual alerts)
             post_only_urgent: Only send urgent telegram alerts
             no_telegram: Disable telegram notifications
+            date: Date in YYYY-MM-DD format (default: current date)
         """
         # Setup logging
         self.logger = self._setup_logging()
@@ -75,10 +77,21 @@ class ORBSuperduperAlertMonitor:
         self.timeframe_minutes = timeframe_minutes
 
         # Alert monitoring setup
-        et_tz = pytz.timezone('US/Eastern')
-        current_date = datetime.now(et_tz).strftime('%Y-%m-%d')
-        self.super_alerts_dir = Path(f"historical_data/{current_date}/super_alerts/bullish")
-        self.superduper_alerts_dir = Path(f"historical_data/{current_date}/superduper_alerts/bullish")
+        if date:
+            # Validate date format
+            try:
+                datetime.strptime(date, '%Y-%m-%d')
+                target_date = date
+            except ValueError:
+                raise ValueError(f"Invalid date format: {date}. Expected YYYY-MM-DD format.")
+        else:
+            # Use current date
+            et_tz = pytz.timezone('US/Eastern')
+            target_date = datetime.now(et_tz).strftime('%Y-%m-%d')
+        
+        self.target_date = target_date
+        self.super_alerts_dir = Path(f"historical_data/{target_date}/super_alerts/bullish")
+        self.superduper_alerts_dir = Path(f"historical_data/{target_date}/superduper_alerts/bullish")
 
         # Ensure directories exist
         self.super_alerts_dir.mkdir(parents=True, exist_ok=True)
@@ -97,6 +110,7 @@ class ORBSuperduperAlertMonitor:
         self.created_superduper_alerts = set()  # Track created superduper alerts
 
         self.logger.info(f"ORB Superduper Alert Monitor initialized in {'TEST' if test_mode else 'LIVE'} mode")
+        self.logger.info(f"Target date: {target_date}")
         self.logger.info(f"Monitoring super alerts in: {self.super_alerts_dir}")
         self.logger.info(f"Superduper alerts will be saved to: {self.superduper_alerts_dir}")
         self.logger.info(f"Trend analysis timeframe: {timeframe_minutes} minutes")
@@ -284,6 +298,7 @@ class ORBSuperduperAlertMonitor:
             # Print status
             print("\n" + "="*80)
             print("🎯 ORB SUPERDUPER ALERTS MONITOR ACTIVE")
+            print(f"📅 Target date: {self.target_date}")
             print(f"📁 Monitoring: {self.super_alerts_dir}")
             print(f"💾 Superduper alerts: {self.superduper_alerts_dir}")
             print(f"⏱️ Analysis timeframe: {self.timeframe_minutes} minutes")
@@ -371,6 +386,12 @@ def parse_arguments():
         help="Disable telegram notifications"
     )
 
+    parser.add_argument(
+        "--date",
+        type=str,
+        help="Date in YYYY-MM-DD format (default: current date)"
+    )
+
     return parser.parse_args()
 
 
@@ -388,7 +409,8 @@ async def main():
             timeframe_minutes=args.timeframe,
             test_mode=args.test,
             post_only_urgent=args.post_only_urgent,
-            no_telegram=args.no_telegram
+            no_telegram=args.no_telegram,
+            date=args.date
         )
 
         if args.test:

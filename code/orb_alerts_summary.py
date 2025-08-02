@@ -107,6 +107,75 @@ class AlertsSummaryGenerator:
 
         return alerts
 
+    def _load_sent_superduper_alerts(self) -> Tuple[List[Dict], List[Dict], List[Dict], List[Dict]]:
+        """Load sent superduper alerts from the directory structure."""
+        sent_bullish_yellow = []
+        sent_bullish_green = []
+        sent_bearish_yellow = []
+        sent_bearish_green = []
+        
+        # Path to sent superduper alerts directory
+        sent_alerts_dir = self.target_dir / "superduper_alerts_sent"
+        
+        if not sent_alerts_dir.exists():
+            if self.verbose:
+                print("No sent superduper alerts directory found")
+            return sent_bullish_yellow, sent_bullish_green, sent_bearish_yellow, sent_bearish_green
+        
+        # Load bullish yellow alerts
+        bullish_yellow_dir = sent_alerts_dir / "bullish" / "yellow"
+        if bullish_yellow_dir.exists():
+            sent_bullish_yellow = self._load_sent_alert_files(bullish_yellow_dir, "bullish_yellow")
+        
+        # Load bullish green alerts
+        bullish_green_dir = sent_alerts_dir / "bullish" / "green"
+        if bullish_green_dir.exists():
+            sent_bullish_green = self._load_sent_alert_files(bullish_green_dir, "bullish_green")
+        
+        # Load bearish yellow alerts
+        bearish_yellow_dir = sent_alerts_dir / "bearish" / "yellow"
+        if bearish_yellow_dir.exists():
+            sent_bearish_yellow = self._load_sent_alert_files(bearish_yellow_dir, "bearish_yellow")
+        
+        # Load bearish green alerts
+        bearish_green_dir = sent_alerts_dir / "bearish" / "green"
+        if bearish_green_dir.exists():
+            sent_bearish_green = self._load_sent_alert_files(bearish_green_dir, "bearish_green")
+        
+        if self.verbose:
+            total_sent = len(sent_bullish_yellow) + len(sent_bullish_green) + len(sent_bearish_yellow) + len(sent_bearish_green)
+            print(f"Loaded {total_sent} sent superduper alerts:")
+            print(f"  Bullish Yellow: {len(sent_bullish_yellow)}")
+            print(f"  Bullish Green: {len(sent_bullish_green)}")
+            print(f"  Bearish Yellow: {len(sent_bearish_yellow)}")
+            print(f"  Bearish Green: {len(sent_bearish_green)}")
+        
+        return sent_bullish_yellow, sent_bullish_green, sent_bearish_yellow, sent_bearish_green
+
+    def _load_sent_alert_files(self, directory: Path, alert_category: str) -> List[Dict]:
+        """Load all sent alert files from a specific category directory."""
+        alerts = []
+        
+        if not directory.exists():
+            return alerts
+        
+        # Load all JSON files in the directory
+        for json_file in directory.glob("*.json"):
+            try:
+                with open(json_file, 'r') as f:
+                    alert_data = json.load(f)
+                    alert_data['_source_file'] = json_file.name
+                    alert_data['_sent_category'] = alert_category
+                    alerts.append(alert_data)
+            except Exception as e:
+                if self.verbose:
+                    print(f"Error loading sent alert {json_file}: {e}")
+        
+        # Sort by timestamp if available
+        alerts.sort(key=lambda x: x.get('timestamp', ''))
+        
+        return alerts
+
     def _calculate_symbol_statistics(self, alerts: List[Dict]) -> Dict:
         """Calculate statistics per symbol."""
         symbol_stats = defaultdict(lambda: {
@@ -258,6 +327,22 @@ class AlertsSummaryGenerator:
 
         super_alerts = bullish_super_alerts + bearish_super_alerts
 
+        # Load sent superduper alerts
+        sent_bullish_yellow, sent_bullish_green, sent_bearish_yellow, sent_bearish_green = self._load_sent_superduper_alerts()
+        sent_superduper_alerts = {
+            'bullish': {
+                'yellow': sent_bullish_yellow,
+                'green': sent_bullish_green,
+                'total': sent_bullish_yellow + sent_bullish_green
+            },
+            'bearish': {
+                'yellow': sent_bearish_yellow,
+                'green': sent_bearish_green,
+                'total': sent_bearish_yellow + sent_bearish_green
+            },
+            'all': sent_bullish_yellow + sent_bullish_green + sent_bearish_yellow + sent_bearish_green
+        }
+
         # Generate statistics
         all_alerts = bullish_alerts + bearish_alerts
 
@@ -288,6 +373,14 @@ class AlertsSummaryGenerator:
                 'alerts': super_alerts,
                 'bullish_alerts': bullish_super_alerts,
                 'bearish_alerts': bearish_super_alerts
+            },
+            'sent_superduper_alerts': {
+                'total_count': len(sent_superduper_alerts['all']),
+                'bullish_yellow_count': len(sent_superduper_alerts['bullish']['yellow']),
+                'bullish_green_count': len(sent_superduper_alerts['bullish']['green']),
+                'bearish_yellow_count': len(sent_superduper_alerts['bearish']['yellow']),
+                'bearish_green_count': len(sent_superduper_alerts['bearish']['green']),
+                'data': sent_superduper_alerts
             },
             'overall_statistics': {
                 'most_active_symbols': self._get_most_active_symbols(all_alerts),
@@ -347,8 +440,11 @@ class AlertsSummaryGenerator:
         # Generate superduper alerts ratio bar charts (current_price / orb_high binned by 10%)
         ratio_bar_chart_files = self._generate_superduper_alerts_ratio_bar_charts(summary, summary_dir, date_str)
 
+        # Generate sent superduper alerts charts
+        sent_chart_files = self._generate_sent_superduper_alerts_charts(summary, summary_dir, date_str)
+
         # Combine all chart files
-        chart_files = regular_chart_files + super_chart_files + high_impact_chart_files + ratio_bar_chart_files
+        chart_files = regular_chart_files + super_chart_files + high_impact_chart_files + ratio_bar_chart_files + sent_chart_files
 
         print(f"💾 JSON summary saved to: {json_filepath}")
         print(f"📊 CSV summary saved to: {csv_filepath}")
@@ -777,7 +873,7 @@ class AlertsSummaryGenerator:
         plt.tight_layout()
 
         # Save chart
-        chart_filename = f"bar_chart_{alert_direction}_superduper_alerts_ratio_{date_str}.png"
+        chart_filename = f"superduper_alerts_bar_chart_ratio_{alert_direction}_{date_str}.png"
         chart_filepath = summary_dir / chart_filename
 
         plt.savefig(chart_filepath, dpi=300, bbox_inches='tight')
@@ -881,7 +977,7 @@ class AlertsSummaryGenerator:
         plt.tight_layout()
 
         # Save chart
-        chart_filename = f"bar_chart_superduper_alerts_{date_str}.png"
+        chart_filename = f"superduper_alerts_bar_chart_symbols_{date_str}.png"
         chart_filepath = summary_dir / chart_filename
 
         plt.savefig(chart_filepath, dpi=300, bbox_inches='tight')
@@ -940,7 +1036,7 @@ class AlertsSummaryGenerator:
         ax.axis('equal')
 
         # Save chart
-        chart_filename = f"pie_chart_{alert_type}_{date_str}.png"
+        chart_filename = f"{alert_type}_pie_chart_{date_str}.png"
         chart_filepath = summary_dir / chart_filename
 
         plt.tight_layout()
@@ -1021,7 +1117,365 @@ class AlertsSummaryGenerator:
         plt.tight_layout()
 
         # Save chart
-        chart_filename = f"bar_chart_alerts_{date_str}.png"
+        chart_filename = f"alerts_bar_chart_symbols_{date_str}.png"
+        chart_filepath = summary_dir / chart_filename
+
+        plt.savefig(chart_filepath, dpi=300, bbox_inches='tight')
+        plt.close()
+
+        return str(chart_filepath)
+
+    def _generate_sent_superduper_alerts_charts(self, summary: Dict, summary_dir: Path, date_str: str) -> List[str]:
+        """Generate charts for sent superduper alerts showing bullish/bearish and yellow/green distributions."""
+        chart_files = []
+        
+        # Set matplotlib style for better looking charts
+        plt.style.use('default')
+        
+        sent_data = summary['sent_superduper_alerts']['data']
+        
+        # Generate pie chart showing bullish vs bearish sent alerts
+        sentiment_pie_chart = self._create_sent_alerts_sentiment_pie_chart(sent_data, summary_dir, date_str)
+        if sentiment_pie_chart:
+            chart_files.append(sentiment_pie_chart)
+        
+        # Generate pie chart showing yellow vs green sent alerts
+        level_pie_chart = self._create_sent_alerts_level_pie_chart(sent_data, summary_dir, date_str)
+        if level_pie_chart:
+            chart_files.append(level_pie_chart)
+        
+        # Generate matrix bar chart showing bullish/bearish x yellow/green
+        matrix_bar_chart = self._create_sent_alerts_matrix_bar_chart(sent_data, summary_dir, date_str)
+        if matrix_bar_chart:
+            chart_files.append(matrix_bar_chart)
+        
+        # Generate symbol distribution charts for sent alerts
+        symbol_charts = self._create_sent_alerts_symbol_charts(sent_data, summary_dir, date_str)
+        chart_files.extend(symbol_charts)
+        
+        # Generate bar chart showing bullish/bearish sent alerts by symbol (mirroring regular alerts bar chart)
+        sent_alerts_bar_chart = self._generate_sent_superduper_alerts_bar_chart(sent_data, summary_dir, date_str)
+        if sent_alerts_bar_chart:
+            chart_files.append(sent_alerts_bar_chart)
+        
+        if self.verbose and chart_files:
+            print(f"Generated {len(chart_files)} sent superduper alerts charts")
+        
+        return chart_files
+
+    def _create_sent_alerts_sentiment_pie_chart(self, sent_data: Dict, summary_dir: Path, date_str: str) -> Optional[str]:
+        """Create pie chart showing bullish vs bearish sent alerts distribution."""
+        bullish_count = len(sent_data['bullish']['total'])
+        bearish_count = len(sent_data['bearish']['total'])
+        
+        if bullish_count == 0 and bearish_count == 0:
+            if self.verbose:
+                print("No sent superduper alerts for sentiment pie chart")
+            return None
+        
+        # Create figure and axis
+        fig, ax = plt.subplots(figsize=(10, 8))
+        
+        # Data for pie chart
+        counts = [bullish_count, bearish_count]
+        labels = ['Bullish Sent', 'Bearish Sent']
+        colors = ['green', 'red']
+        
+        # Filter out zero values
+        non_zero_data = [(count, label, color) for count, label, color in zip(counts, labels, colors) if count > 0]
+        if not non_zero_data:
+            return None
+        
+        filtered_counts, filtered_labels, filtered_colors = zip(*non_zero_data)
+        
+        # Create pie chart
+        wedges, texts, autotexts = ax.pie(
+            filtered_counts,
+            labels=filtered_labels,
+            autopct='%1.1f%%',
+            colors=filtered_colors,
+            startangle=90
+        )
+        
+        # Customize appearance
+        ax.set_title(f'Sent Superduper Alerts - Sentiment Distribution\n{self.target_date}', 
+                    fontsize=14, fontweight='bold', pad=20)
+        
+        # Make percentage text more readable
+        for autotext in autotexts:
+            autotext.set_color('white')
+            autotext.set_fontweight('bold')
+            autotext.set_fontsize(10)
+        
+        # Add legend with counts
+        legend_labels = [f'{label}: {count} alerts' for label, count in zip(filtered_labels, filtered_counts)]
+        ax.legend(wedges, legend_labels, title="Alert Counts", loc="center left", 
+                 bbox_to_anchor=(1, 0, 0.5, 1))
+        
+        # Equal aspect ratio ensures that pie is drawn as a circle
+        ax.axis('equal')
+        
+        # Save chart
+        chart_filename = f"sent_superduper_alerts_pie_chart_sentiment_{date_str}.png"
+        chart_filepath = summary_dir / chart_filename
+        
+        plt.tight_layout()
+        plt.savefig(chart_filepath, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        return str(chart_filepath)
+
+    def _create_sent_alerts_level_pie_chart(self, sent_data: Dict, summary_dir: Path, date_str: str) -> Optional[str]:
+        """Create pie chart showing yellow vs green sent alerts distribution."""
+        yellow_count = len(sent_data['bullish']['yellow']) + len(sent_data['bearish']['yellow'])
+        green_count = len(sent_data['bullish']['green']) + len(sent_data['bearish']['green'])
+        
+        if yellow_count == 0 and green_count == 0:
+            if self.verbose:
+                print("No sent superduper alerts for level pie chart")
+            return None
+        
+        # Create figure and axis
+        fig, ax = plt.subplots(figsize=(10, 8))
+        
+        # Data for pie chart
+        counts = [yellow_count, green_count]
+        labels = ['Yellow Alerts', 'Green Alerts']
+        colors = ['gold', 'limegreen']
+        
+        # Filter out zero values
+        non_zero_data = [(count, label, color) for count, label, color in zip(counts, labels, colors) if count > 0]
+        if not non_zero_data:
+            return None
+        
+        filtered_counts, filtered_labels, filtered_colors = zip(*non_zero_data)
+        
+        # Create pie chart
+        wedges, texts, autotexts = ax.pie(
+            filtered_counts,
+            labels=filtered_labels,
+            autopct='%1.1f%%',
+            colors=filtered_colors,
+            startangle=90
+        )
+        
+        # Customize appearance
+        ax.set_title(f'Sent Superduper Alerts - Alert Level Distribution\n{self.target_date}', 
+                    fontsize=14, fontweight='bold', pad=20)
+        
+        # Make percentage text more readable
+        for autotext in autotexts:
+            autotext.set_color('white')
+            autotext.set_fontweight('bold')
+            autotext.set_fontsize(10)
+        
+        # Add legend with counts
+        legend_labels = [f'{label}: {count} alerts' for label, count in zip(filtered_labels, filtered_counts)]
+        ax.legend(wedges, legend_labels, title="Alert Counts", loc="center left", 
+                 bbox_to_anchor=(1, 0, 0.5, 1))
+        
+        # Equal aspect ratio ensures that pie is drawn as a circle
+        ax.axis('equal')
+        
+        # Save chart
+        chart_filename = f"sent_superduper_alerts_pie_chart_level_{date_str}.png"
+        chart_filepath = summary_dir / chart_filename
+        
+        plt.tight_layout()
+        plt.savefig(chart_filepath, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        return str(chart_filepath)
+
+    def _create_sent_alerts_matrix_bar_chart(self, sent_data: Dict, summary_dir: Path, date_str: str) -> Optional[str]:
+        """Create matrix bar chart showing bullish/bearish x yellow/green distribution."""
+        # Get counts for each category
+        bullish_yellow = len(sent_data['bullish']['yellow'])
+        bullish_green = len(sent_data['bullish']['green'])
+        bearish_yellow = len(sent_data['bearish']['yellow'])
+        bearish_green = len(sent_data['bearish']['green'])
+        
+        total_alerts = bullish_yellow + bullish_green + bearish_yellow + bearish_green
+        if total_alerts == 0:
+            if self.verbose:
+                print("No sent superduper alerts for matrix bar chart")
+            return None
+        
+        # Create figure and axis
+        fig, ax = plt.subplots(figsize=(12, 8))
+        
+        # Data for grouped bar chart
+        categories = ['Bullish', 'Bearish']
+        yellow_counts = [bullish_yellow, bearish_yellow]
+        green_counts = [bullish_green, bearish_green]
+        
+        x_pos = np.arange(len(categories))
+        width = 0.35  # Width of bars
+        
+        # Create bars
+        yellow_bars = ax.bar(x_pos - width/2, yellow_counts, width, label='Yellow Alerts', color='gold', alpha=0.8)
+        green_bars = ax.bar(x_pos + width/2, green_counts, width, label='Green Alerts', color='limegreen', alpha=0.8)
+        
+        # Customize the chart
+        ax.set_xlabel('Alert Sentiment', fontsize=12, fontweight='bold')
+        ax.set_ylabel('Number of Sent Alerts', fontsize=12, fontweight='bold')
+        ax.set_title(f'Sent Superduper Alerts - Matrix Distribution\n{self.target_date}', 
+                    fontsize=14, fontweight='bold', pad=20)
+        ax.set_xticks(x_pos)
+        ax.set_xticklabels(categories)
+        
+        # Add legend
+        ax.legend()
+        
+        # Add grid for better readability
+        ax.grid(True, alpha=0.3, axis='y')
+        
+        # Add value labels on bars
+        def add_value_labels(bars):
+            for bar in bars:
+                height = bar.get_height()
+                if height > 0:
+                    ax.text(bar.get_x() + bar.get_width()/2., height + 0.1,
+                           f'{int(height)}', ha='center', va='bottom', fontweight='bold', fontsize=10)
+        
+        add_value_labels(yellow_bars)
+        add_value_labels(green_bars)
+        
+        # Add total count text
+        ax.text(0.02, 0.98, f'Total Sent: {total_alerts} alerts', transform=ax.transAxes, 
+                fontsize=12, verticalalignment='top', fontweight='bold',
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+        
+        # Adjust layout
+        plt.tight_layout()
+        
+        # Save chart
+        chart_filename = f"sent_superduper_alerts_bar_chart_matrix_{date_str}.png"
+        chart_filepath = summary_dir / chart_filename
+        
+        plt.savefig(chart_filepath, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        return str(chart_filepath)
+
+    def _create_sent_alerts_symbol_charts(self, sent_data: Dict, summary_dir: Path, date_str: str) -> List[str]:
+        """Create symbol distribution charts for sent superduper alerts."""
+        chart_files = []
+        
+        # Combine all sent alerts for symbol analysis
+        all_sent_alerts = sent_data['all']
+        
+        if not all_sent_alerts:
+            if self.verbose:
+                print("No sent superduper alerts for symbol charts")
+            return chart_files
+        
+        # Calculate symbol statistics
+        symbol_stats = self._calculate_sent_alert_symbol_statistics(all_sent_alerts)
+        
+        if symbol_stats:
+            # Create pie chart for symbol distribution
+            symbol_pie_chart = self._create_alert_pie_chart(
+                symbol_stats,
+                'Sent Superduper Alerts by Symbol',
+                'sent_superduper_alerts_pie_chart_symbols',
+                summary_dir,
+                date_str
+            )
+            if symbol_pie_chart:
+                chart_files.append(symbol_pie_chart)
+        
+        return chart_files
+
+    def _calculate_sent_alert_symbol_statistics(self, sent_alerts: List[Dict]) -> Dict:
+        """Calculate symbol statistics for sent alerts."""
+        symbol_stats = defaultdict(lambda: {
+            'total_alerts': 0,
+            'alerts': []
+        })
+        
+        for alert in sent_alerts:
+            symbol = alert.get('symbol', 'UNKNOWN')
+            stats = symbol_stats[symbol]
+            stats['total_alerts'] += 1
+            stats['alerts'].append(alert)
+        
+        return dict(symbol_stats)
+
+    def _generate_sent_superduper_alerts_bar_chart(self, sent_data: Dict, summary_dir: Path, date_str: str) -> Optional[str]:
+        """Generate a bar chart showing bullish (positive) and bearish (negative) sent superduper alerts by symbol."""
+        # Calculate symbol statistics for bullish and bearish sent alerts
+        bullish_sent_stats = self._calculate_sent_alert_symbol_statistics(sent_data['bullish']['total'])
+        bearish_sent_stats = self._calculate_sent_alert_symbol_statistics(sent_data['bearish']['total'])
+
+        # Combine all symbols from both bullish and bearish sent alerts
+        all_symbols = set()
+        if bullish_sent_stats:
+            all_symbols.update(bullish_sent_stats.keys())
+        if bearish_sent_stats:
+            all_symbols.update(bearish_sent_stats.keys())
+
+        if not all_symbols:
+            if self.verbose:
+                print("No symbols found for sent superduper alerts bar chart")
+            return None
+
+        # Sort symbols alphabetically (ascending)
+        sorted_symbols = sorted(all_symbols)
+
+        # Prepare data for bar chart
+        bullish_counts = []
+        bearish_counts = []
+
+        for symbol in sorted_symbols:
+            # Get bullish count (positive)
+            bullish_count = bullish_sent_stats.get(symbol, {}).get('total_alerts', 0)
+            bullish_counts.append(bullish_count)
+
+            # Get bearish count (negative for chart display)
+            bearish_count = bearish_sent_stats.get(symbol, {}).get('total_alerts', 0)
+            bearish_counts.append(-bearish_count)  # Negative for bearish
+
+        # Create figure and axis
+        fig, ax = plt.subplots(figsize=(12, 8))
+
+        # Create bar chart
+        x_pos = range(len(sorted_symbols))
+
+        # Plot bullish bars (positive, green)
+        bullish_bars = ax.bar(x_pos, bullish_counts, color='green', alpha=0.7, label='Bullish Sent Alerts')
+
+        # Plot bearish bars (negative, red)
+        bearish_bars = ax.bar(x_pos, bearish_counts, color='red', alpha=0.7, label='Bearish Sent Alerts')
+
+        # Customize the chart
+        ax.set_xlabel('Symbols', fontsize=12, fontweight='bold')
+        ax.set_ylabel('Number of Sent Superduper Alerts', fontsize=12, fontweight='bold')
+        ax.set_title(f'Sent Superduper Alert Distribution by Symbol\n{self.target_date}', fontsize=14, fontweight='bold', pad=20)
+        ax.set_xticks(x_pos)
+        ax.set_xticklabels(sorted_symbols, rotation=45, ha='right')
+
+        # Add horizontal line at y=0
+        ax.axhline(y=0, color='black', linestyle='-', linewidth=0.8)
+
+        # Add legend
+        ax.legend(loc='upper right')
+
+        # Add grid for better readability
+        ax.grid(True, alpha=0.3, axis='y')
+
+        # Add value labels on bars
+        for i, (bull_count, bear_count) in enumerate(zip(bullish_counts, bearish_counts)):
+            if bull_count > 0:
+                ax.text(i, bull_count + 0.1, str(bull_count), ha='center', va='bottom', fontweight='bold', fontsize=9)
+            if bear_count < 0:
+                ax.text(i, bear_count - 0.1, str(-bear_count), ha='center', va='top', fontweight='bold', fontsize=9)
+
+        # Adjust layout to prevent label cutoff
+        plt.tight_layout()
+
+        # Save chart
+        chart_filename = f"sent_superduper_alerts_bar_chart_symbols_{date_str}.png"
         chart_filepath = summary_dir / chart_filename
 
         plt.savefig(chart_filepath, dpi=300, bbox_inches='tight')
@@ -1040,6 +1494,16 @@ class AlertsSummaryGenerator:
         print(f"  📉 Bearish: {metadata['bearish_alerts']}")
         print(f"  🚀 Superduper: {metadata['superduper_alerts']}")
         print(f"Unique Symbols: {metadata['unique_symbols']}")
+        
+        # Sent superduper alerts summary
+        sent_alerts = summary.get('sent_superduper_alerts', {})
+        if sent_alerts.get('total_count', 0) > 0:
+            print(f"\n📤 SENT SUPERDUPER ALERTS:")
+            print(f"  Total Sent: {sent_alerts['total_count']}")
+            print(f"  📈🟡 Bullish Yellow: {sent_alerts['bullish_yellow_count']}")
+            print(f"  📈🟢 Bullish Green: {sent_alerts['bullish_green_count']}")
+            print(f"  📉🟡 Bearish Yellow: {sent_alerts['bearish_yellow_count']}")
+            print(f"  📉🟢 Bearish Green: {sent_alerts['bearish_green_count']}")
 
         # Most active symbols
         most_active = summary['overall_statistics']['most_active_symbols']
