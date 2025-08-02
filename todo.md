@@ -17,7 +17,19 @@ Be sure to watch stocks minute-by-minute for buying oportunities Jdun Trades sty
 
 ## Alpaca MCP server using my implementation
 
+new branch
 
+
+## Telegram Updates
+
+- [ ] /commit /clear /read...
+- [ ] git switch -c telegram
+- [ ] /exit
+- [ ] claude --dangerously-skip-permissions
+- [ ] /login
+- [ ] /read...
+- [ ] Important. Think hard. Update atoms/telegram/orb_alerts.py the method send_orb_alert at the very end of the method to store superduper alerts actually sent.  Use the directory structure historical_data/2025-08-01/superduper_alerts_sent. There is to be bullish and bearish directories below that. Then have another level of sub directories for yellow and green superduper alerts sent.
+- [ ] Important. Think hard. Now update code/orb_alerts_summary.py to generate plots for the sent superduper alerts.
 
 
 ## Use config.py file instead of .env variables
