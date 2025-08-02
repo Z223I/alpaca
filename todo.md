@@ -22,14 +22,15 @@ new branch
 
 ## Telegram Updates
 
-- [ ] /commit /clear /read...
-- [ ] git switch -c telegram
-- [ ] /exit
-- [ ] claude --dangerously-skip-permissions
-- [ ] /login
-- [ ] /read...
-- [ ] Important. Think hard. Update atoms/telegram/orb_alerts.py the method send_orb_alert at the very end of the method to store superduper alerts actually sent.  Use the directory structure historical_data/2025-08-01/superduper_alerts_sent. There is to be bullish and bearish directories below that. Then have another level of sub directories for yellow and green superduper alerts sent.
-- [ ] Important. Think hard. Now update code/orb_alerts_summary.py to generate plots for the sent superduper alerts.
+- [X] /commit /clear /read...
+- [X] git switch -c telegram
+- [X] /exit
+- [X] claude --dangerously-skip-permissions
+- [X] /login
+- [X] /read...
+- [X] Important. Think hard. Update atoms/telegram/orb_alerts.py the method send_orb_alert at the very end of the method to store superduper alerts actually sent.  Use the directory structure historical_data/2025-08-01/superduper_alerts_sent. There is to be bullish and bearish directories below that. Then have another level of sub directories for yellow and green superduper alerts sent.
+- [X] Important. Think hard. Now update code/orb_alerts_summary.py to generate plots for the sent superduper alerts.
+- [ ] Important. Think hard. Now update code/orb.py: It currently generate plots for superduper alerts; change that to sent superduper alerts and plot the green and yellow ones on the same chart using green and yellow.
 
 
 ## Use config.py file instead of .env variables

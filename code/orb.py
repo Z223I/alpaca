@@ -38,7 +38,7 @@ class ORB:
         """Initialize the ORB class.
 
         Args:
-            plot_super_alerts: If True, plot superduper alerts. If False, plot regular alerts.
+            plot_super_alerts: If True, plot sent superduper alerts. If False, plot regular alerts.
             use_iex: If True, use IEX data feed. If False, use SIP data feed (default).
             opening_range_minutes: Opening range period in minutes (default: 15).
         """
@@ -94,14 +94,14 @@ class ORB:
 
     def _load_alerts_for_symbol(self, symbol: str, target_date: date) -> List[Dict[str, Any]]:
         """
-        Load alerts for a specific symbol and date. Loads superduper alerts or regular alerts based on plot_super_alerts setting.
+        Load alerts for a specific symbol and date. Loads sent superduper alerts or regular alerts based on plot_super_alerts setting.
 
         Args:
             symbol: Stock symbol to load alerts for
             target_date: Date to load alerts for
 
         Returns:
-            List of alert dictionaries containing timestamp, type, and alert data
+            List of alert dictionaries containing timestamp, type, level, and alert data
         """
         if self.plot_super_alerts:
             return self._load_super_alerts_for_symbol(symbol, target_date)
@@ -110,93 +110,101 @@ class ORB:
 
     def _load_super_alerts_for_symbol(self, symbol: str, target_date: date) -> List[Dict[str, Any]]:
         """
-        Load superduper alerts for a specific symbol and date from historical_data/superduper_alerts.
+        Load sent superduper alerts for a specific symbol and date from historical_data/superduper_alerts_sent.
 
         Args:
-            symbol: Stock symbol to load super alerts for
-            target_date: Date to load super alerts for
+            symbol: Stock symbol to load sent super alerts for
+            target_date: Date to load sent super alerts for
 
         Returns:
-            List of superduper alert dictionaries containing timestamp, type, and alert data
+            List of sent superduper alert dictionaries containing timestamp, type, level, and alert data
         """
         alerts = []
 
         try:
             # Format date as YYYY-MM-DD for directory structure
             date_str = target_date.strftime('%Y-%m-%d')
-            alerts_base_dir = os.path.join('historical_data', date_str, 'superduper_alerts')
+            alerts_base_dir = os.path.join('historical_data', date_str, 'superduper_alerts_sent')
 
             if not os.path.exists(alerts_base_dir):
                 return alerts
 
-            # Check both bullish and bearish super alert directories
+            # Check both bullish and bearish sent alert directories
             for alert_type in ['bullish', 'bearish']:
-                alert_dir = os.path.join(alerts_base_dir, alert_type)
+                alert_type_dir = os.path.join(alerts_base_dir, alert_type)
 
-                if not os.path.exists(alert_dir):
+                if not os.path.exists(alert_type_dir):
                     continue
 
-                # Look for superduper alert files matching the symbol
-                alert_pattern = f"superduper_alert_{symbol}_*.json"
-                alert_files = glob.glob(os.path.join(alert_dir, alert_pattern))
+                # Check both yellow and green alert levels
+                for alert_level in ['yellow', 'green']:
+                    alert_level_dir = os.path.join(alert_type_dir, alert_level)
 
-                for alert_file in alert_files:
-                    try:
-                        with open(alert_file, 'r') as f:
-                            alert_data = json.load(f)
-
-                        # Add alert type and parse timestamp
-                        alert_data['alert_type'] = alert_type
-
-                        # Parse timestamp to datetime object and handle timezone
-                        if 'timestamp' in alert_data:
-                            timestamp_str = alert_data['timestamp']
-                            try:
-                                # Handle timezone format: convert -0400 to -04:00 for Python compatibility
-                                if timestamp_str.endswith(('-0400', '-0500')):
-                                    # Insert colon in timezone offset for proper ISO format
-                                    timestamp_str = timestamp_str[:-2] + ':' + timestamp_str[-2:]
-
-                                # Parse the timestamp - super alerts are in ET timezone with offset
-                                alert_dt = datetime.fromisoformat(timestamp_str)
-
-                            except ValueError as ve1:
-                                # Fallback: try parsing without timezone, then localize to ET
-                                try:
-                                    if '+' in timestamp_str or timestamp_str.count('-') > 2:
-                                        # Remove timezone if present for fallback parsing
-                                        timestamp_base = timestamp_str.split('+')[0].split('T')[0] + 'T' + timestamp_str.split('T')[1].split('-')[0].split('+')[0]
-                                    else:
-                                        timestamp_base = timestamp_str
-
-                                    alert_dt = datetime.fromisoformat(timestamp_base)
-                                    # If timezone-naive, assume it's in ET timezone
-                                    if alert_dt.tzinfo is None:
-                                        et_tz = pytz.timezone('America/New_York')
-                                        alert_dt = et_tz.localize(alert_dt)
-                                except (ValueError, OSError) as ve2:
-                                    # More specific error reporting
-                                    continue
-                            except OSError as oe:
-                                # Handle "date value out of range" errors
-                                continue
-
-                            alert_data['timestamp_dt'] = alert_dt
-
-                        alerts.append(alert_data)
-
-                    except Exception as e:
-                        print(f"Warning: Error loading superduper alert file {alert_file}: {e}")
+                    if not os.path.exists(alert_level_dir):
                         continue
 
-            # Sort superduper alerts by timestamp 
+                    # Look for superduper alert files matching the symbol
+                    alert_pattern = f"superduper_alert_{symbol}_*.json"
+                    alert_files = glob.glob(os.path.join(alert_level_dir, alert_pattern))
+
+                    for alert_file in alert_files:
+                        try:
+                            with open(alert_file, 'r') as f:
+                                alert_data = json.load(f)
+
+                            # Add alert type, level, and parse timestamp
+                            alert_data['alert_type'] = alert_type
+                            alert_data['alert_level'] = alert_level
+
+                            # Parse timestamp to datetime object and handle timezone
+                            if 'timestamp' in alert_data:
+                                timestamp_str = alert_data['timestamp']
+                                try:
+                                    # Handle timezone format: convert -0400 to -04:00 for Python compatibility
+                                    if timestamp_str.endswith(('-0400', '-0500')):
+                                        # Insert colon in timezone offset for proper ISO format
+                                        timestamp_str = timestamp_str[:-2] + ':' + timestamp_str[-2:]
+
+                                    # Parse the timestamp - super alerts are in ET timezone with offset
+                                    alert_dt = datetime.fromisoformat(timestamp_str)
+
+                                except ValueError as ve1:
+                                    # Fallback: try parsing without timezone, then localize to ET
+                                    try:
+                                        if '+' in timestamp_str or timestamp_str.count('-') > 2:
+                                            # Remove timezone if present for fallback parsing
+                                            timestamp_base = timestamp_str.split('+')[0].split('T')[0] + 'T' + timestamp_str.split('T')[1].split('-')[0].split('+')[0]
+                                        else:
+                                            timestamp_base = timestamp_str
+
+                                        alert_dt = datetime.fromisoformat(timestamp_base)
+                                        # If timezone-naive, assume it's in ET timezone
+                                        if alert_dt.tzinfo is None:
+                                            et_tz = pytz.timezone('America/New_York')
+                                            alert_dt = et_tz.localize(alert_dt)
+                                    except (ValueError, OSError) as ve2:
+                                        # More specific error reporting
+                                        continue
+                                except OSError as oe:
+                                    # Handle "date value out of range" errors
+                                    continue
+
+                                alert_data['timestamp_dt'] = alert_dt
+
+                            alerts.append(alert_data)
+
+                        except Exception as e:
+                            print(f"Warning: Error loading sent superduper alert file {alert_file}: {e}")
+                            continue
+
+            # Sort sent superduper alerts by timestamp 
             def safe_sort_key(alert):
                 timestamp_dt = alert.get('timestamp_dt')
                 if timestamp_dt is None:
                     # Return a timezone-aware max datetime for alerts without timestamps
                     return datetime.max.replace(tzinfo=pytz.UTC)
                 elif timestamp_dt.tzinfo is None:
-                    # If timestamp is timezone-naive, make it timezone-aware (assume ET)
+                    # If timezone is timezone-naive, make it timezone-aware (assume ET)
                     et_tz = pytz.timezone('America/New_York')
                     return et_tz.localize(timestamp_dt)
                 else:
@@ -208,7 +216,7 @@ class ORB:
             return alerts
 
         except Exception as e:
-            print(f"Error loading superduper alerts for {symbol} on {target_date}: {e}")
+            print(f"Error loading sent superduper alerts for {symbol} on {target_date}: {e}")
             return alerts
 
     def _load_regular_alerts_for_symbol(self, symbol: str, target_date: date) -> List[Dict[str, Any]]:
@@ -1468,7 +1476,7 @@ class ORB:
 
             # Generate chart for each symbol
             success_count = 0
-            alert_type_name = "superduper alerts" if self.plot_super_alerts else "regular alerts"
+            alert_type_name = "sent superduper alerts" if self.plot_super_alerts else "regular alerts"
 
             for symbol in symbols:
                 try:
@@ -1803,7 +1811,7 @@ def parse_arguments():
     parser.add_argument(
         "--plot-alerts",
         action="store_true",
-        help="Plot regular alerts instead of superduper alerts (default: plot superduper alerts)"
+        help="Plot regular alerts instead of sent superduper alerts (default: plot sent superduper alerts)"
     )
 
     parser.add_argument(
@@ -1865,8 +1873,8 @@ def main():
                 print("Please use YYYY-MM-DD format")
                 sys.exit(1)
 
-        # Determine whether to plot superduper alerts or regular alerts
-        plot_super_alerts = not args.plot_alerts  # Default is True (superduper alerts)
+        # Determine whether to plot sent superduper alerts or regular alerts
+        plot_super_alerts = not args.plot_alerts  # Default is True (sent superduper alerts)
 
         # Create and run ORB analysis
         orb = ORB(
@@ -1875,7 +1883,7 @@ def main():
             opening_range_minutes=args.opening_range
         )
 
-        alert_type = "superduper alerts" if plot_super_alerts else "regular alerts"
+        alert_type = "sent superduper alerts" if plot_super_alerts else "regular alerts"
         feed_type = "IEX" if args.use_iex else "SIP"
 
         if start_date and end_date:

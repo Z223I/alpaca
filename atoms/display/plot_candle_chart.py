@@ -26,7 +26,7 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
         df: DataFrame with columns ['timestamp', 'open', 'high', 'low', 'close', 'volume']
         symbol: Stock symbol name
         output_dir: Directory to save the chart
-        alerts: Optional list of alert dictionaries with timestamp_dt and alert_type
+        alerts: Optional list of alert dictionaries with timestamp_dt, alert_type, and alert_level
 
     Returns:
         True if successful, False otherwise
@@ -254,6 +254,7 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
             for alert in alerts:
                 alert_time = alert.get('timestamp_dt')
                 alert_type = alert.get('alert_type', 'unknown')
+                alert_level = alert.get('alert_level', 'unknown')
 
                 if not alert_time:
                     continue
@@ -264,11 +265,17 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
 
                 # Debug: Show each alert time comparison
                 within_range = chart_start_time <= alert_time <= chart_end_time
-                print(f"DEBUG: Alert at {alert_time} ({'in' if within_range else 'out of'} range)")
+                print(f"DEBUG: Alert at {alert_time} ({'in' if within_range else 'out of'} range) - {alert_type} {alert_level}")
 
                 # Show ALL alerts regardless of chart timeframe (removed market hours filtering)
-                # Set color based on alert type
-                color = 'green' if alert_type == 'bullish' else 'red'
+                # Set color based on alert level (green for green alerts, yellow for yellow alerts)
+                if alert_level == 'green':
+                    color = 'green'
+                elif alert_level == 'yellow':
+                    color = 'gold'  # Use gold for better visibility than pure yellow
+                else:
+                    # Fallback to old logic if alert_level is not available
+                    color = 'green' if alert_type == 'bullish' else 'red'
                 alpha = 0.3
 
                 # For alerts outside the chart timeframe, draw them at the chart edges
@@ -304,7 +311,7 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
                 alert_count += 1
 
             if alert_count > 0:
-                print(f"Plotted {alert_count} superduper alerts for {symbol} (including out-of-market-hours alerts)")
+                print(f"Plotted {alert_count} sent superduper alerts for {symbol} (including out-of-market-hours alerts)")
 
         # Add legend if any indicators were calculated
         if ema_success or ema20_success or vwap_success:
@@ -333,7 +340,7 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
         ax1.set_title(title, fontsize=16, fontweight='bold')
         ax1.text(0.5, 0.95, f'{chart_date} ({timezone_name})', transform=ax1.transAxes, fontsize=12, 
                 ha='center', va='top', style='italic')
-        ax1.text(0.5, 0.90, 'Superduper Alerts', transform=ax1.transAxes, fontsize=11, 
+        ax1.text(0.5, 0.90, 'Sent Superduper Alerts', transform=ax1.transAxes, fontsize=11, 
                 ha='center', va='top', style='italic', color='darkblue')
         ax1.set_ylabel('Price ($)', fontsize=12)
         ax1.grid(True, alpha=0.3)
