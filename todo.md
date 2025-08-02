@@ -20,6 +20,10 @@ Be sure to watch stocks minute-by-minute for buying oportunities Jdun Trades sty
 new branch
 
 
+## Trade
+
+- [ ] Update telegram monitor to accept "trade" from Bruce only to trade the last alert.  Keep the symbol and price for the last sent alert in a variable.  Use that when "trade" is received to place an Alpaca trade.
+
 ## Telegram Updates
 
 - [X] /commit /clear /read...
