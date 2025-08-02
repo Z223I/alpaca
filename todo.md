@@ -24,6 +24,17 @@ new branch
 
 - [ ] Update telegram monitor to accept "trade" from Bruce only to trade the last alert.  Keep the symbol and price for the last sent alert in a variable.  Use that when "trade" is received to place an Alpaca trade.
 
+## Autopilot
+
+- [ ] /commit /clear /read...
+- [ ] git switch -c autopilot
+- [ ] /exit
+- [ ] claude --dangerously-skip-permissions
+- [ ] /login
+- [ ] /read...
+- [ ] Update code/alpaca_config.py: update "CONFIG": for the accounts paper, live, and cash add the fields auto_trade="no"; auto_amount=10
+- [ ] Important. Think hard. Update code/alpaca_config.py: for every
+
 ## Telegram Updates
 
 - [X] /commit /clear /read...
@@ -34,7 +45,7 @@ new branch
 - [X] /read...
 - [X] Important. Think hard. Update atoms/telegram/orb_alerts.py the method send_orb_alert at the very end of the method to store superduper alerts actually sent.  Use the directory structure historical_data/2025-08-01/superduper_alerts_sent. There is to be bullish and bearish directories below that. Then have another level of sub directories for yellow and green superduper alerts sent.
 - [X] Important. Think hard. Now update code/orb_alerts_summary.py to generate plots for the sent superduper alerts.
-- [ ] Important. Think hard. Now update code/orb.py: It currently generate plots for superduper alerts; change that to sent superduper alerts and plot the green and yellow ones on the same chart using green and yellow.
+- [X] Important. Think hard. Now update code/orb.py: It currently generate plots for superduper alerts; change that to sent superduper alerts and plot the green and yellow ones on the same chart using green and yellow.
 
 
 ## Use config.py file instead of .env variables
