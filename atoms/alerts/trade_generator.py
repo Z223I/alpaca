@@ -31,6 +31,38 @@ class TradeGenerator:
         self.trades_dir = trades_dir
         self.test_mode = test_mode
         self.logger = logging.getLogger(__name__)
+        
+        # Trade limit configuration for testing safety
+        self.max_trades_per_session = 1 if test_mode else 12
+        self.trades_executed_count = 0
+        
+        self.logger.info(f"TradeGenerator initialized: max_trades={self.max_trades_per_session}, test_mode={test_mode}")
+
+    def can_execute_trade(self) -> bool:
+        """
+        Check if we can execute another trade within the session limit.
+        
+        Returns:
+            True if trade can be executed, False if limit reached
+        """
+        return self.trades_executed_count < self.max_trades_per_session
+    
+    def get_remaining_trades(self) -> int:
+        """
+        Get the number of trades remaining in this session.
+        
+        Returns:
+            Number of trades remaining
+        """
+        return max(0, self.max_trades_per_session - self.trades_executed_count)
+    
+    def reset_trade_counter(self) -> None:
+        """
+        Reset the trade counter (useful for testing or new trading sessions).
+        """
+        old_count = self.trades_executed_count
+        self.trades_executed_count = 0
+        self.logger.info(f"Trade counter reset: {old_count} → 0")
 
     def extract_symbol_from_filename(self, filename: str) -> Optional[str]:
         """
@@ -194,8 +226,8 @@ class TradeGenerator:
                 "--sell-trailing",
                 "--symbol", symbol,
                 "--quantity", str(auto_amount),
-                "--trailing-percent", str(trailing_percent)
-                # Note: No --submit flag for dry run as per specs
+                "--trailing-percent", str(trailing_percent),
+                "--submit"  # Added --submit flag for actual trade execution
             ]
 
             self.logger.info(f"Executing trade command for {symbol}: {' '.join(cmd)}")
@@ -221,14 +253,21 @@ class TradeGenerator:
             trade_record['execution_status']['stderr'] = result.stderr
             trade_record['execution_status']['results'] = result.stdout if result.stdout else result.stderr
 
-            # Check if it was a dry run (which is expected)
+            # Check execution results - we're now doing actual trades with --submit
             if "DRY RUN" in result.stdout:
                 trade_record['execution_status']['dry_run_executed'] = True
                 trade_record['execution_status']['success'] = "no"  # Dry run always marked as "no" per specs
-                self.logger.info(f"Dry run trade executed successfully for {symbol}")
+                self.logger.info(f"Dry run trade executed for {symbol} (unexpected - should be actual trade)")
             else:
                 trade_record['execution_status']['dry_run_executed'] = False
-                trade_record['execution_status']['success'] = "yes" if result.returncode == 0 else "no"
+                # Success based on return code and output content
+                success = result.returncode == 0 and ("error" not in result.stdout.lower() and "failed" not in result.stdout.lower())
+                trade_record['execution_status']['success'] = "yes" if success else "no"
+                
+                if success:
+                    self.logger.info(f"✅ Actual trade executed successfully for {symbol}")
+                else:
+                    self.logger.warning(f"❌ Trade execution failed for {symbol}: {result.stdout}")
 
             return trade_record
 
@@ -341,6 +380,12 @@ class TradeGenerator:
             Filename if successful, None otherwise
         """
         try:
+            # Check trade limit before processing
+            if self.trades_executed_count >= self.max_trades_per_session:
+                symbol = superduper_alert.get('symbol', 'UNKNOWN')
+                self.logger.warning(f"🚫 Trade limit reached for {symbol}: {self.trades_executed_count}/{self.max_trades_per_session} trades executed this session")
+                return None
+            
             # Check if alert has green momentum indicator
             if not self.has_green_momentum_indicator(superduper_alert):
                 symbol = superduper_alert.get('symbol', 'UNKNOWN')
@@ -390,6 +435,10 @@ class TradeGenerator:
 
                         # Display trade execution
                         self._display_trade_execution(trade_record, filename)
+
+                        # Increment trade counter for session limit tracking
+                        self.trades_executed_count += 1
+                        self.logger.info(f"Trade counter: {self.trades_executed_count}/{self.max_trades_per_session}")
 
                         result_filename = filename
                         trade_executed = True

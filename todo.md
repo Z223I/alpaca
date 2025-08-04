@@ -28,9 +28,21 @@ new branch
 
 
 
+
+
+
+Maybe not. Should be saved by date historical_data/Bruce/paper/trade_AAPL_20250804_153708.json
+
 ## No Yellow Alerts
 
-- [ ]
+- [ ] Important.  Think hard.
+
+## Trade Generator (autopilot) Update
+
+- [X] Important.  Think hard.  Update atoms/alerts/trade_generator.py: There is only one trade to be allowed during my testing.
+- [X] Add --submit and verify one trade.
+- [X] Change from one trade to five.
+- [X] Change five to twelve.
 
 ## Autopilot 2
 
@@ -44,10 +56,10 @@ new branch
 
 ### Spec File
 - [X] /commit
-- [ ] Important. Think hard. Implement the instructions in specs/trade_generator_2a.md
-- [ ] Nudge Claude in the correct direction.
-- [ ] Important. Think hard. Mirror code/orb_alerts_monitor_superduper.py to create code/orb_alerts_trade_stocks.py.  Use the atom just created to monitor historical_data/YYYY-MM-DD/superduper_alerts_sent/bullish/green/
-- [ ] Important.  Think hard. Review .telegram_users.csv.  Update the notifications to only be sent to telegram user for which the trade was made.
+- [X] Important. Think hard. Implement the instructions in specs/trade_generator_2a.md
+- [X] Nudge Claude in the correct direction.
+- [X] Important. Think hard. Mirror code/orb_alerts_monitor_superduper.py to create code/orb_alerts_trade_stocks.py.  Use the atom just created to monitor historical_data/YYYY-MM-DD/superduper_alerts_sent/bullish/green/
+- [X] Important.  Think hard. Review .telegram_users.csv.  Update the notifications to only be sent to telegram user for which the trade was made.
 
 ## Update Green Light
 

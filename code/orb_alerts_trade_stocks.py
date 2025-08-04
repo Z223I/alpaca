@@ -387,7 +387,9 @@ class ORBTradeStocksMonitor:
                 print("🧪 TEST MODE: Trades will be marked as [TEST MODE]")
             if self.post_only_urgent:
                 print("⚡ URGENT ONLY: Only urgent trade notifications will be sent via Telegram")
-            print("💡 Single Trade Limit: Only first eligible trade per session (safety)")
+            trade_limit = self.trade_generator.max_trades_per_session
+            remaining = self.trade_generator.get_remaining_trades()
+            print(f"💡 Trade Limit: {remaining}/{trade_limit} trades remaining ({'TEST' if self.test_mode else 'LIVE'} mode)")
             print("="*80 + "\n")
 
             # Keep running
