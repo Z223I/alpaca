@@ -36,7 +36,9 @@ new branch
 - [ ] /login
 - [ ] /commit /clear /read...
 - [ ] /read...
-- [ ] 
+- [ ] Review code/orb_alerts_monitor.py: Is this the file that designates if the trend analysis momentum is green and yellow?
+- [ ] It is in atoms/alerts/superduper_alert_generator.py.  Update 0.5 to 0.75 as the dividing line between yellow and green
+- [ ] /commit
 
 ## Autopilot 2
 

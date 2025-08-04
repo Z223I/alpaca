@@ -40,10 +40,10 @@ class SuperduperAlertGenerator:
         """
         if momentum < 0.3:
             return "🔴"  # Red for < 0.3
-        elif momentum < 0.5:
-            return "🟡"  # Yellow for 0.3 to < 0.5
+        elif momentum < 0.75:
+            return "🟡"  # Yellow for 0.3 to < 0.75
         else:
-            return "🟢"  # Green for >= 0.5
+            return "🟢"  # Green for >= 0.75
 
     def create_superduper_alert(self, latest_super_alert: Dict[str, Any], 
                                trend_analysis: Dict[str, Any], 
