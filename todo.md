@@ -42,7 +42,7 @@ new branch
 - [X] /commit
 - [ ] Important. Think hard. Implement the instructions in specs/trade_generator_2a.md
 - [ ] Nudge Claude in the correct direction.
-- [ ] Important. Think hard. You have finished creating 
+- [ ] Important. Think hard. Mirror code/orb_alerts_monitor_superduper.py to create code/orb_alerts_trade_stocks.py.  Use the atom just created to monitor historical_data/YYYY-MM-DD/superduper_alerts_sent/bullish/green/
 
 ## Update Green Light
 
