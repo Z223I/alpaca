@@ -24,6 +24,10 @@ new branch
 
 - [ ] Update telegram monitor to accept "trade" from Bruce only to trade the last alert.  Keep the symbol and price for the last sent alert in a variable.  Use that when "trade" is received to place an Alpaca trade.
 
+## Mermaid Diagram
+
+
+
 ## Autopilot
 
 ### Config
@@ -36,11 +40,9 @@ new branch
 - [X] Update code/alpaca_config.py: update "CONFIG": for the accounts paper, live, and cash add the fields auto_trade="no"; auto_amount=10
 - [X] Update code/alpaca_config.py: update "CONFIG": Duplicate the "Primary" account and use the names "Bruce" and "Dale".
 
-###
+### Spec File
 - [ ] /commit
 - [ ] Important. Think hard. Implement the instructions in specs/trade_generator.md
-- [ ] Important. Think hard.
-- [ ] Important. Think hard.
 
 ## Telegram Updates
 
