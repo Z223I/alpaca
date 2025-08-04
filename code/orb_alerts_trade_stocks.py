@@ -139,30 +139,22 @@ class ORBTradeStocksMonitor:
 
         return logger
 
-    def _map_account_to_telegram_user(self, account_name: str) -> Optional[str]:
+    def _get_telegram_user_for_account(self, account_name: str) -> Optional[str]:
         """
-        Map trading account name to telegram username for targeted notifications.
+        Get telegram username that matches the account name directly.
         
         Args:
             account_name: Account name from alpaca config (e.g., "Bruce", "Dale", "Primary")
             
         Returns:
-            Telegram username to send notification to, or None if no mapping found
+            Account name as telegram username (direct match), or None if not found
         """
-        # Account name to telegram username mapping
-        # Based on alpaca_config.py accounts and .telegram_users.csv usernames
-        account_mapping = {
-            "Bruce": "Bruce",              # Bruce account → Bruce telegram user
-            "Dale": "Dale Wilson",         # Dale account → Dale Wilson telegram user  
-            "Primary": "Bruce"             # Primary account → Bruce telegram user (default)
-        }
-        
-        mapped_user = account_mapping.get(account_name)
-        if mapped_user:
-            self.logger.debug(f"Mapped account '{account_name}' to telegram user '{mapped_user}'")
-            return mapped_user
+        # Account names should match telegram usernames directly
+        if account_name:
+            self.logger.debug(f"Using account name '{account_name}' as telegram username")
+            return account_name
         else:
-            self.logger.warning(f"No telegram user mapping found for account '{account_name}'")
+            self.logger.warning(f"Empty account name provided")
             return None
 
     async def _process_new_superduper_alert_file(self, file_path: str) -> None:
@@ -296,8 +288,8 @@ class ORBTradeStocksMonitor:
                     'target_user': 'N/A'
                 }
 
-            # Map account name to telegram username
-            target_username = self._map_account_to_telegram_user(account_name)
+            # Get telegram username (direct match with account name)
+            target_username = self._get_telegram_user_for_account(account_name)
             
             if not target_username:
                 self.logger.warning(f"No telegram user found for account '{account_name}', skipping notification")
@@ -390,7 +382,7 @@ class ORBTradeStocksMonitor:
                 print("📵 Telegram: Notifications disabled")
             else:
                 print("📱 Telegram: Targeted trade notifications enabled (account-specific users)")
-                print("🎯 Account mapping: Bruce→Bruce, Dale→Dale Wilson, Primary→Bruce")
+                print("🎯 Direct matching: Account name = Telegram username")
             if self.test_mode:
                 print("🧪 TEST MODE: Trades will be marked as [TEST MODE]")
             if self.post_only_urgent:
