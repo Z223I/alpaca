@@ -8,7 +8,6 @@ You are a highly skilled Python developer and software architect.
 
 ### Background Information
 
-XXX Review code/orb_alerts_monitor_superduper.py
 Review atoms/alerts/superduper_alert_generator.py
 Review code/alpaca_config.py
 Review code/alpaca.py to see what object is returned in an order confirmation.  And then determine what fields are in the object.  Search the internet if necessary.
@@ -46,6 +45,8 @@ The code that you are mirroring is saving alert information to a file.
 
 This new code is going to save information about stock trades using alpaca.py.  You will store the trades in the directory
 structure historical_data/YYYY-MM-DD/<account name>/<account> (account will be paper, live, or cash).  Use JSON.
+
+The new code will not be doing any calculations.  The old code does.  Calculations are not needed.
 
 code/alpaca.py will give the results of the trade.  Keep the results as a text string. Keep a success field with "yes" or "no". Have fields for symbol, quantity, average fill price.  You should have figured out what fields are in an order confirmation already.
 

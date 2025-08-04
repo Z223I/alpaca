@@ -25,7 +25,7 @@ Test.
 
 ### Task
 
-Mirror atoms/alerts/superduper_alert_generator.py: create trade_generator.py.
+Mirror atoms/alerts/superduper_alert_generator.py: create atoms/alerts/trade_generator.py.
 
 ## Low Level Requirements
 

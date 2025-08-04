@@ -28,31 +28,31 @@ new branch
 
 
 
-## Update Green Light
+## Autopilot 2
 
 ### Config
 
 - [ ] claude --dangerously-skip-permissions
 - [ ] /login
 - [ ] /commit /clear /read...
+- [ ] git switch -c trade-generator-2
 - [ ] /read...
-- [ ] Review code/orb_alerts_monitor.py: Is this the file that designates if the trend analysis momentum is green and yellow?
-- [ ] It is in atoms/alerts/superduper_alert_generator.py.  Update 0.5 to 0.75 as the dividing line between yellow and green
-- [ ] /commit
 
-## Autopilot 2
+### Spec File
+- [ ] /commit
+- [ ] Important. Think hard. Implement the instructions in specs/trade_generator_2a.md
+
+## Update Green Light
 
 ### Config
 
 - [X] claude --dangerously-skip-permissions
 - [X] /login
 - [X] /commit /clear /read...
-- [X] git switch -c autopilot-2
 - [X] /read...
-
-### Spec File
-- [ ] /commit
-- [ ] Important. Think hard. Implement the instructions in specs/trade_generator.md
+- [X] Review code/orb_alerts_monitor.py: Is this the file that designates if the trend analysis momentum is green and yellow?
+- [X] It is in atoms/alerts/superduper_alert_generator.py.  Update 0.5 to 0.75 as the dividing line between yellow and green
+- [X] /commit
 
 ## Autopilot
 
