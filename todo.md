@@ -28,6 +28,30 @@ new branch
 
 
 
+## Update Green Light
+
+### Config
+
+- [ ] claude --dangerously-skip-permissions
+- [ ] /login
+- [ ] /commit /clear /read...
+- [ ] /read...
+- [ ] 
+
+## Autopilot 2
+
+### Config
+
+- [X] claude --dangerously-skip-permissions
+- [X] /login
+- [X] /commit /clear /read...
+- [X] git switch -c autopilot-2
+- [X] /read...
+
+### Spec File
+- [ ] /commit
+- [ ] Important. Think hard. Implement the instructions in specs/trade_generator.md
+
 ## Autopilot
 
 ### Config

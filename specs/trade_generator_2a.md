@@ -8,7 +8,7 @@ You are a highly skilled Python developer and software architect.
 
 ### Background Information
 
-Review code/orb_alerts_monitor_superduper.py
+XXX Review code/orb_alerts_monitor_superduper.py
 Review atoms/alerts/superduper_alert_generator.py
 Review code/alpaca_config.py
 Review code/alpaca.py to see what object is returned in an order confirmation.  And then determine what fields are in the object.  Search the internet if necessary.
@@ -25,7 +25,7 @@ Test.
 
 ### Task
 
-Mirror atoms/alerts/superduper_alert_generator.py: create trade_generator.py.
+Mirror atoms/alerts/superduper_alert_generator.py: create atoms/alerts/trade_generator.py.
 
 ## Low Level Requirements
 
