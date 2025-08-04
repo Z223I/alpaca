@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 import pytz
 
+from .config import get_momentum_thresholds
+
 
 class SuperduperAlertGenerator:
     """Generates enhanced superduper alerts from filtered super alerts."""
@@ -27,23 +29,19 @@ class SuperduperAlertGenerator:
         self.superduper_alerts_dir = superduper_alerts_dir
         self.test_mode = test_mode
         self.logger = logging.getLogger(__name__)
+        self.momentum_thresholds = get_momentum_thresholds()
 
     def _get_momentum_color_code(self, momentum: float) -> str:
         """
-        Get color code for momentum text based on value.
+        Get color code for momentum text based on centralized configuration.
 
         Args:
             momentum: Momentum value to color code
 
         Returns:
-            HTML color code string for the momentum value
+            Color emoji string for the momentum value
         """
-        if momentum < 0.3:
-            return "🔴"  # Red for < 0.3
-        elif momentum < 0.75:
-            return "🟡"  # Yellow for 0.3 to < 0.75
-        else:
-            return "🟢"  # Green for >= 0.75
+        return self.momentum_thresholds.get_momentum_color_emoji(momentum)
 
     def create_superduper_alert(self, latest_super_alert: Dict[str, Any], 
                                trend_analysis: Dict[str, Any], 

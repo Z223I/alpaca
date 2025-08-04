@@ -31,6 +31,7 @@ sys.path.append('/home/wilsonb/dl/github.com/z223i/alpaca')
 
 from atoms.alerts.superduper_alert_filter import SuperduperAlertFilter
 from atoms.alerts.superduper_alert_generator import SuperduperAlertGenerator
+from atoms.alerts.config import get_momentum_thresholds
 from atoms.telegram.orb_alerts import send_orb_alert
 
 
@@ -67,6 +68,9 @@ class ORBSuperduperAlertMonitor:
         """
         # Setup logging
         self.logger = self._setup_logging()
+
+        # Initialize momentum configuration
+        self.momentum_thresholds = get_momentum_thresholds()
 
         # Initialize filtering and generation atoms
         self.superduper_alert_filter = SuperduperAlertFilter(timeframe_minutes)
@@ -200,11 +204,12 @@ class ORBSuperduperAlertMonitor:
 
                         self.logger.info(f"📊 Superduper analysis: {trend_type.upper()} trend, strength {trend_strength:.2f}, momentum {momentum:.4f} ({urgency_level.upper()})")
 
-                        # Filter out red momentum alerts
+                        # Filter out red and yellow momentum alerts
                         if urgency_level == 'filtered':
-                            self.logger.info(f"🔴 Telegram superduper alert filtered (red momentum < 0.3): {symbol}")
+                            green_threshold = self.momentum_thresholds.green_threshold
+                            self.logger.info(f"🚫 Telegram superduper alert filtered (momentum < {green_threshold}): {symbol}")
                         else:
-                            # Send yellow as standard, green as urgent
+                            # Only green momentum alerts are sent (urgent)
                             is_urgent = (urgency_level == 'urgent')
 
                             file_path = self.superduper_alerts_dir / filename
@@ -234,26 +239,14 @@ class ORBSuperduperAlertMonitor:
 
     def _determine_urgency(self, trend_type: str, trend_strength: float, analysis_data: Dict) -> str:
         """
-        Determine alert priority based on momentum color thresholds.
+        Determine alert priority based on centralized momentum thresholds.
 
         Returns:
-            'filtered' - Red momentum (< 0.3), don't send
-            'standard' - Yellow momentum (0.3 to < 0.5), standard post
-            'urgent' - Green momentum (>= 0.5), urgent post
+            'filtered' - Red and yellow momentum, don't send to Telegram
+            'urgent' - Green momentum, urgent Telegram notification
         """
         momentum = abs(analysis_data.get('price_momentum', 0))
-
-        # Filter out red momentum alerts (< 0.3)
-        if momentum < 0.3:
-            return 'filtered'
-
-        # Green momentum (>= 0.5) - urgent
-        elif momentum >= 0.5:
-            return 'urgent'
-
-        # Yellow momentum (0.3 to < 0.5) - standard
-        else:
-            return 'standard'
+        return self.momentum_thresholds.get_urgency_level(momentum)
 
     async def _scan_existing_super_alerts(self) -> None:
         """Scan existing super alert files on startup."""
