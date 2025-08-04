@@ -87,6 +87,86 @@ class TelegramPoster:
             'errors': errors
         }
 
+    def send_message_to_user(self, message: str, username: str, urgent: bool = False) -> Dict:
+        """
+        Send message to a specific user by username.
+
+        Args:
+            message (str): Message content to send
+            username (str): Username to send to
+            urgent (bool): If True, ignore user notification preferences
+
+        Returns:
+            dict: {
+                'success': bool,
+                'sent_count': int,
+                'failed_count': int,
+                'errors': list,
+                'target_user': str
+            }
+        """
+        # Validate configuration
+        try:
+            self.config.validate_config()
+        except ValueError as e:
+            return {
+                'success': False,
+                'sent_count': 0,
+                'failed_count': 0,
+                'errors': [f"Configuration error: {str(e)}"],
+                'target_user': username
+            }
+
+        # Check if Telegram is enabled
+        if not self.config.ENABLED:
+            return {
+                'success': True,
+                'sent_count': 0,
+                'failed_count': 0,
+                'errors': ['Telegram notifications disabled'],
+                'target_user': username
+            }
+
+        # Find the specific user
+        user = self.user_manager.get_user_by_username(username)
+        if not user:
+            return {
+                'success': False,
+                'sent_count': 0,
+                'failed_count': 1,
+                'errors': [f'User "{username}" not found or not enabled'],
+                'target_user': username
+            }
+
+        # Send message to the specific user
+        chat_id = user.get('chat_id')
+        if not chat_id:
+            return {
+                'success': False,
+                'sent_count': 0,
+                'failed_count': 1,
+                'errors': [f'Invalid chat_id for user: {username}'],
+                'target_user': username
+            }
+
+        success = self._send_to_chat(chat_id, message, urgent)
+        if success:
+            return {
+                'success': True,
+                'sent_count': 1,
+                'failed_count': 0,
+                'errors': [],
+                'target_user': username
+            }
+        else:
+            return {
+                'success': False,
+                'sent_count': 0,
+                'failed_count': 1,
+                'errors': [f'Failed to send to {username}'],
+                'target_user': username
+            }
+
     def _send_to_chat(self, chat_id: str, message: str, urgent: bool = False) -> bool:
         """Send message to a specific chat with retry logic."""
         url = f"{self.base_url}/sendMessage"

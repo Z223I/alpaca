@@ -69,6 +69,26 @@ class UserManager:
 
         return users
 
+    def get_user_by_username(self, username: str) -> Optional[Dict[str, str]]:
+        """
+        Find a user by username (case-insensitive).
+        
+        Args:
+            username: Username to search for
+            
+        Returns:
+            User dict if found and enabled, None otherwise
+        """
+        if not username:
+            return None
+            
+        users = self.get_active_users()
+        for user in users:
+            user_name = user.get('username', '').strip()
+            if user_name.lower() == username.lower():
+                return user
+        return None
+
     def add_user(self, chat_id: str, username: str = "", enabled: bool = True, notes: str = "") -> bool:
         """Add new user to CSV file."""
         try:

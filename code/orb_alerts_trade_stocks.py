@@ -30,6 +30,7 @@ sys.path.append('/home/wilsonb/dl/github.com/z223i/alpaca')
 
 from atoms.alerts.trade_generator import TradeGenerator  # noqa: E402
 from atoms.telegram.orb_alerts import send_orb_alert  # noqa: E402
+from atoms.telegram.telegram_post import TelegramPoster  # noqa: E402
 
 
 class SuperduperAlertFileHandler(FileSystemEventHandler):
@@ -101,6 +102,9 @@ class ORBTradeStocksMonitor:
         self.observer = Observer()
         self.file_handler = None  # Will be set when event loop is available
 
+        # Telegram integration for targeted notifications
+        self.telegram_poster = TelegramPoster() if not no_telegram else None
+
         # Processed alerts tracking
         self.processed_superduper_alerts = set()
         self.filtered_superduper_alerts = set()  # Track filtered superduper alerts
@@ -134,6 +138,32 @@ class ORBTradeStocksMonitor:
             logger.setLevel(logging.INFO)
 
         return logger
+
+    def _map_account_to_telegram_user(self, account_name: str) -> Optional[str]:
+        """
+        Map trading account name to telegram username for targeted notifications.
+        
+        Args:
+            account_name: Account name from alpaca config (e.g., "Bruce", "Dale", "Primary")
+            
+        Returns:
+            Telegram username to send notification to, or None if no mapping found
+        """
+        # Account name to telegram username mapping
+        # Based on alpaca_config.py accounts and .telegram_users.csv usernames
+        account_mapping = {
+            "Bruce": "Bruce",              # Bruce account → Bruce telegram user
+            "Dale": "Dale Wilson",         # Dale account → Dale Wilson telegram user  
+            "Primary": "Bruce"             # Primary account → Bruce telegram user (default)
+        }
+        
+        mapped_user = account_mapping.get(account_name)
+        if mapped_user:
+            self.logger.debug(f"Mapped account '{account_name}' to telegram user '{mapped_user}'")
+            return mapped_user
+        else:
+            self.logger.warning(f"No telegram user mapping found for account '{account_name}'")
+            return None
 
     async def _process_new_superduper_alert_file(self, file_path: str) -> None:
         """Process a new superduper alert file and execute trade if conditions are met."""
@@ -183,21 +213,26 @@ class ORBTradeStocksMonitor:
                             # Determine urgency - all executed trades are considered urgent
                             is_urgent = True
 
-                            # Send notification using original superduper alert format but with trade info
-                            result = await self._send_trade_notification(trade_message, is_urgent)
+                            # Send targeted notification to specific user based on account
+                            result = await self._send_trade_notification(trade_message, is_urgent, account_name)
 
                             if result['success']:
                                 if result.get('skipped'):
                                     reason = result.get('reason', 'Non-urgent filtered')
-                                    self.logger.info(f"⏭️ Telegram trade notification skipped: {reason}")
+                                    target_user = result.get('target_user', 'unknown')
+                                    self.logger.info(f"⏭️ Telegram trade notification skipped for {target_user}: {reason}")
                                 else:
                                     emoji = "💰"
-                                    count = result['sent_count']
-                                    msg = f"📤 {emoji} Telegram trade notification sent: {count} users notified"
+                                    target_user = result.get('target_user', 'unknown')
+                                    account_name = result.get('account_name', 'unknown')
+                                    msg = f"📤 {emoji} Telegram trade notification sent to {target_user} for {account_name} account"
                                     self.logger.info(msg)
                             else:
-                                error = result.get('error', 'Unknown error')
-                                self.logger.warning(f"❌ Telegram trade notification failed: {error}")
+                                target_user = result.get('target_user', 'unknown')
+                                account_name = result.get('account_name', 'unknown')
+                                errors = result.get('errors', ['Unknown error'])
+                                error_msg = ', '.join(errors) if isinstance(errors, list) else str(errors)
+                                self.logger.warning(f"❌ Telegram trade notification failed for {target_user} ({account_name}): {error_msg}")
 
                     except Exception as e:
                         self.logger.error(f"❌ Error sending Telegram trade notification: {e}")
@@ -249,23 +284,60 @@ class ORBTradeStocksMonitor:
 
         return "\\n".join(message_parts)
 
-    async def _send_trade_notification(self, message: str, is_urgent: bool) -> Dict:
-        """Send trade notification via Telegram."""
+    async def _send_trade_notification(self, message: str, is_urgent: bool, account_name: str) -> Dict:
+        """Send targeted trade notification via Telegram to specific user based on account."""
         try:
-            # Create a temporary file with the trade message for Telegram sending
-            temp_message_file = self.trades_dir / "temp_trade_notification.txt"
-            with open(temp_message_file, 'w') as f:
-                f.write(message)
+            if not self.telegram_poster:
+                return {
+                    'success': True,
+                    'sent_count': 0,
+                    'failed_count': 0,
+                    'errors': ['Telegram notifications disabled'],
+                    'target_user': 'N/A'
+                }
 
-            result = send_orb_alert(str(temp_message_file), urgent=is_urgent, post_only_urgent=self.post_only_urgent)
+            # Map account name to telegram username
+            target_username = self._map_account_to_telegram_user(account_name)
+            
+            if not target_username:
+                self.logger.warning(f"No telegram user found for account '{account_name}', skipping notification")
+                return {
+                    'success': False,
+                    'sent_count': 0,
+                    'failed_count': 1,
+                    'errors': [f'No telegram user mapping for account: {account_name}'],
+                    'target_user': account_name,
+                    'account_name': account_name
+                }
 
-            # Clean up temp file
-            if temp_message_file.exists():
-                temp_message_file.unlink()
+            # Check if we should send based on urgency filter
+            if self.post_only_urgent and not is_urgent:
+                return {
+                    'success': True,
+                    'skipped': True,
+                    'reason': 'Non-urgent message filtered by post_only_urgent setting',
+                    'sent_count': 0,
+                    'target_user': target_username,
+                    'account_name': account_name
+                }
 
+            # Send targeted message to specific user
+            result = self.telegram_poster.send_message_to_user(message, target_username, urgent=is_urgent)
+            
+            # Add account information to the result
+            result['account_name'] = account_name
+            
             return result
+
         except Exception as e:
-            return {'success': False, 'error': str(e)}
+            return {
+                'success': False,
+                'sent_count': 0,
+                'failed_count': 1,
+                'errors': [f'Exception occurred: {str(e)}'],
+                'target_user': account_name,
+                'account_name': account_name
+            }
 
     async def _scan_existing_superduper_alerts(self) -> None:
         """Scan existing superduper alert files on startup."""
@@ -317,7 +389,8 @@ class ORBTradeStocksMonitor:
             if self.no_telegram:
                 print("📵 Telegram: Notifications disabled")
             else:
-                print("📱 Telegram: Trade execution notifications enabled")
+                print("📱 Telegram: Targeted trade notifications enabled (account-specific users)")
+                print("🎯 Account mapping: Bruce→Bruce, Dale→Dale Wilson, Primary→Bruce")
             if self.test_mode:
                 print("🧪 TEST MODE: Trades will be marked as [TEST MODE]")
             if self.post_only_urgent:
