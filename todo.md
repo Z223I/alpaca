@@ -32,15 +32,17 @@ new branch
 
 ### Config
 
-- [ ] claude --dangerously-skip-permissions
-- [ ] /login
-- [ ] /commit /clear /read...
-- [ ] git switch -c trade-generator-2
-- [ ] /read...
+- [X] claude --dangerously-skip-permissions
+- [X] /login
+- [X] /commit /clear /read...
+- [X] git switch -c trade-generator-2
+- [X] /read...
 
 ### Spec File
-- [ ] /commit
+- [X] /commit
 - [ ] Important. Think hard. Implement the instructions in specs/trade_generator_2a.md
+- [ ] Nudge Claude in the correct direction.
+- [ ] Important. Think hard. You have finished creating 
 
 ## Update Green Light
 
