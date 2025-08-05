@@ -42,6 +42,8 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 - [ ] stop <symbol>
 
 
+- [ ] Finish Daily_Instructions.md
+
 ## EOD
 
 - [ ] No trades after 15:30 ET.
@@ -49,9 +51,26 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 - [ ] Cancel all orders
 - [ ] Today's PNL
 
+
+
+
 ## PNL
 
-- [ ]
+### Config
+
+- [ ] claude --dangerously-skip-permissions
+- [ ] /login
+- [ ] /commit /clear /read...
+- [ ] git switch -c PNL
+- [ ] /read...
+
+### Spec File
+
+- [ ] Important. Think hard. Implement the instructions in specs/PNL.md
+- [ ] Nudge.
+- [ ] /commit
+- [ ] Publish the branch
+- [ ] git switch master; merge current branch
 
 ## Resistance Pricing
 

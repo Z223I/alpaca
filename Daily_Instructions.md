@@ -1,5 +1,13 @@
 # Daily Instructions
 
+Always running
+
+```bash
+./start_telegram_polling.sh
+```
+
+Morning
+
 ## Collect Symbols
 
 ### Windows Machine
@@ -30,4 +38,18 @@ Produces superduper alerts.
 
 ```bash
 python code/orb_alerts_monitor_superduper.py --verbose
+```
+
+After market close
+
+ORB Alert Summary
+
+```bash
+python code/orb_alerts_summary.py
+```
+
+ORB Analysis with Charts
+
+```bash
+python3 code/orb.py
 ```
