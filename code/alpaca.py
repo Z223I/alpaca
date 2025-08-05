@@ -1030,6 +1030,62 @@ class alpaca_private:
             print(f"✗ Failed to liquidate all positions: {str(e)}")
             return None
 
+    def _cancel_all_orders(self, submit_order: bool = False) -> Optional[List[Any]]:
+        """
+        Cancel all open orders.
+
+        This method lists all open orders and cancels them individually,
+        since the legacy alpaca-trade-api library doesn't have a direct
+        cancel all orders method.
+
+        Args:
+            submit_order: Whether to actually cancel the orders (default: False for dry run)
+
+        Returns:
+            List of cancelled order IDs or None if dry run/error
+        """
+        print("Cancelling all open orders...")
+
+        # Get all open orders
+        try:
+            orders = self.api.list_orders(status="open")
+            if not orders:
+                print("  No open orders to cancel")
+                return []
+
+            print(f"  Found {len(orders)} open orders to cancel:")
+            for order in orders:
+                print(f"    {order.id}: {order.symbol} {order.side} {order.qty} @ {order.order_type} ({order.status})")
+
+        except Exception as e:
+            print(f"✗ Error retrieving open orders: {str(e)}")
+            return None
+
+        if not submit_order:
+            print("[DRY RUN] Orders not cancelled (use --submit to execute)")
+            return None
+
+        # Cancel all orders
+        cancelled_orders = []
+        failed_cancellations = []
+
+        for order in orders:
+            try:
+                self.api.cancel_order(order.id)
+                cancelled_orders.append(order.id)
+                print(f"  ✓ Cancelled order {order.id} ({order.symbol} {order.side} {order.qty})")
+            except Exception as e:
+                failed_cancellations.append((order.id, str(e)))
+                print(f"  ✗ Failed to cancel order {order.id}: {str(e)}")
+
+        # Summary
+        print(f"\n✓ Successfully cancelled {len(cancelled_orders)} orders")
+        if failed_cancellations:
+            print(f"✗ Failed to cancel {len(failed_cancellations)} orders:")
+            for order_id, error in failed_cancellations:
+                print(f"    {order_id}: {error}")
+
+        return cancelled_orders
 
     def _bracketOrder(self, symbol: str, quantity: int, market_price: float, take_profit: float, submit_order: bool = False) -> Optional[Any]:
         """
@@ -1336,6 +1392,15 @@ class alpaca_private:
             )
             if liquidation_result is None and self.args.submit:
                 print("Failed to liquidate all positions")
+                return 1
+
+        # Handle cancel all orders operation
+        if self.args.cancel_all_orders:
+            cancel_result = self._cancel_all_orders(
+                submit_order=True  # Always execute cancellation for --cancel-all-orders
+            )
+            if cancel_result is None:
+                print("Failed to cancel all orders")
                 return 1
 
         return 0

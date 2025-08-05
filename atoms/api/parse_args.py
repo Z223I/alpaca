@@ -67,6 +67,10 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
     parser.add_argument('--cancel-orders', action='store_true',
                       help='Cancel all open orders (used with --liquidate-all)')
 
+    # Cancel all orders argument
+    parser.add_argument('--cancel-all-orders', action='store_true',
+                      help='Cancel all open orders immediately (cannot be combined with other arguments)')
+
     # Display-only arguments
     parser.add_argument('--positions', action='store_true',
                       help='Display current positions only')
@@ -177,6 +181,17 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
             parser.error("--after-hours requires either --buy, --buy-market, --buy-market-trailing-sell, --sell-trailing, or --sell-short")
         if not args.symbol:
             parser.error("--after-hours requires --symbol")
+
+    # Validate cancel-all-orders argument (must be standalone)
+    if args.cancel_all_orders:
+        # Check if any other arguments are present
+        for arg_name, arg_value in vars(args).items():
+            if arg_name != 'cancel_all_orders':
+                # Check if argument has been set to non-default value
+                if isinstance(arg_value, bool) and arg_value:
+                    parser.error("--cancel-all-orders cannot be combined with any other arguments")
+                elif arg_value is not None and not isinstance(arg_value, bool):
+                    parser.error("--cancel-all-orders cannot be combined with any other arguments")
 
     # Validate display-only arguments
     display_args = [args.positions, args.cash, args.active_order]

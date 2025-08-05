@@ -108,6 +108,7 @@ python3 code/alpaca.py --buy --symbol AAPL --after-hours --take-profit 160.00 --
 - `--liquidate` - Liquidate position for a specific symbol (requires --symbol)
 - `--liquidate-all` - Liquidate all open positions and optionally cancel all orders
 - `--cancel-orders` - Cancel all open orders (used with --liquidate-all)
+- `--cancel-all-orders` - Cancel all open orders immediately (cannot be combined with other arguments)
 
 #### Order Parameters
 - `--symbol SYMBOL` - Stock symbol
@@ -180,6 +181,9 @@ python3 code/alpaca.py --liquidate-all
 
 # Liquidate all positions and cancel all orders
 python3 code/alpaca.py --liquidate-all --cancel-orders --submit
+
+# Cancel all open orders immediately (no dry run)
+python3 code/alpaca.py --cancel-all-orders
 ```
 
 #### Display Commands
@@ -279,6 +283,7 @@ Located in `code/alpaca.py`, this is the core trading class:
 #### Position Liquidation Methods  
 - `_liquidate_position()`: Close specific position and cancel related orders
 - `_liquidate_all()`: Close all positions and optionally cancel all orders
+- `_cancel_all_orders()`: Cancel all open orders without closing positions
 
 #### Utility Methods
 - `_calculateQuantity()`: Automatic position sizing
