@@ -58,19 +58,19 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 
 ### Config
 
-- [ ] claude --dangerously-skip-permissions
-- [ ] /login
-- [ ] /commit /clear
-- [ ] git switch -c feature/PNL
-- [ ] /read...
+- [X] claude --dangerously-skip-permissions
+- [X] /login
+- [X] /commit /clear
+- [X] git switch -c feature/PNL
+- [X] /read...
 
 ### Spec File
 
-- [ ] Important. Think hard. Implement the instructions in specs/PNL.md
-- [ ] I forgot to give you valid Alpaca login info.  See code/alpaca_config.py.  Use the "Primary":"paper" account info for testing. 
-- [ ] /commit
-- [ ] Publish the branch
-- [ ] git switch master; merge current branch
+- [X] Important. Think hard. Implement the instructions in specs/PNL.md
+- [X] I forgot to give you valid Alpaca login info.  See code/alpaca_config.py.  Use the "Primary":"paper" account info for testing.
+- [X] /commit
+- [X] Publish the branch
+- [X] git switch master; merge current branch
 
 ## Resistance Pricing
 
