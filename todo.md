@@ -31,10 +31,6 @@ new branch
 
 
 
-Maybe not. Should be saved by date historical_data/Bruce/paper/trade_AAPL_20250804_153708.json
-
-
-
 - [ ] Max losses per day
 
 - [ ] When loading stocks, create stocks.json file with every stock having trading='yes'
