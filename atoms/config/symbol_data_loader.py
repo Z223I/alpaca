@@ -6,10 +6,6 @@ This atom handles loading symbol data from CSV files for super alert generation.
 
 import csv
 import logging
-import sys
-import select
-import threading
-import time
 from typing import Dict, Optional
 from pathlib import Path
 
@@ -37,33 +33,6 @@ class SymbolDataLoader:
             current_date = datetime.now(et_tz).strftime('%Y%m%d')
             self.symbols_file = f"data/{current_date}.csv"
 
-    def _get_user_input_with_timeout(self, prompt: str, timeout: int = 10) -> Optional[str]:
-        """
-        Get user input with a timeout.
-
-        Args:
-            prompt: Prompt to display to user
-            timeout: Timeout in seconds
-
-        Returns:
-            User input string or None if timeout
-        """
-        print(prompt, end='', flush=True)
-
-        # For non-Unix systems or if stdin is not a TTY, return None immediately
-        if not hasattr(select, 'select') or not sys.stdin.isatty():
-            time.sleep(timeout)
-            print(f"\nNo response after {timeout} seconds, using automatic fix.")
-            return None
-
-        # Use select to wait for input with timeout
-        ready, _, _ = select.select([sys.stdin], [], [], timeout)
-
-        if ready:
-            return sys.stdin.readline().strip()
-        else:
-            print(f"\nNo response after {timeout} seconds, using automatic fix.")
-            return None
 
     def _validate_and_fix_inverted_prices(self, symbol: str, signal_price: float,
                                           resistance_price: float) -> tuple[float, float]:
@@ -93,7 +62,7 @@ class SymbolDataLoader:
             # Prompt user for new resistance value
             prompt = (f"Enter new Resistance price for {symbol} (or press Enter to auto-fix "
                       f"to ${signal_price * 1.10:.4f}): ")
-            user_response = self._get_user_input_with_timeout(prompt)
+            user_response = input(prompt)
 
             if user_response is not None and user_response.strip():
                 try:

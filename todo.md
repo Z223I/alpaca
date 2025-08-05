@@ -28,13 +28,23 @@ new branch
 
 
 
+Training wheels. No more than X positions at a time. Put it in the configuration file that would be the alpaca configuration file.
 
+Work on filtering. May have to pass candlestick info all the way through the pipeline. Require the candle be at least 50% green and candle close be at 25% or above (H-L).Include the last three candle sticks and the current one.  I think the chart has 1 minute candles.
+
+
+- [ ] For orb_alerts, get next resistance from Oracle.  No timing out. Can press <Enter> to autofix.
 
 
 - [ ] Max losses per day
 
 - [ ] When loading stocks, create stocks.json file with every stock having trading='yes'
 - [ ] stop <symbol>
+
+
+## Resistance Pricing
+
+- [ ] Think hard.  Update code/orb_alerts.py: The code is currently applying an automatic timeout for resistance inversion. Delete that. I will enter the info or press <Enter>.
 
 ## Cancel All Orders
 
