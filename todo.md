@@ -42,9 +42,20 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 - [ ] stop <symbol>
 
 
+## EOD
+
+- [ ] No trades after 15:30 ET.
+- [ ] Close all positions
+- [ ] Cancel all orders
+- [ ] Today's PNL
+
+## PNL
+
+- [ ]
+
 ## Resistance Pricing
 
-- [ ] Think hard.  Update code/orb_alerts.py: The code is currently applying an automatic timeout for resistance inversion. Delete that. I will enter the info or press <Enter>.
+- [X] Think hard.  Update code/orb_alerts.py: The code is currently applying an automatic timeout for resistance inversion. Delete that. I will enter the info or press <Enter>.
 
 ## Cancel All Orders
 
