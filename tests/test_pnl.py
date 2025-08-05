@@ -231,27 +231,10 @@ class TestAlpacaDailyPnL:
 
         mock_print.assert_called_with("Unable to calculate daily P&L")
 
-    @patch.dict('os.environ', {
-        'ALPACA_API_KEY': 'test_key',
-        'ALPACA_SECRET_KEY': 'test_secret',
-        'ALPACA_BASE_URL': 'https://test-api.alpaca.markets'
-    })
     @patch('atoms.api.pnl.AlpacaDailyPnL.display_daily_summary')
-    def test_create_pnl_with_env_vars(self, mock_display):
-        """Test create_pnl method with environment variables."""
-        client = AlpacaDailyPnL("dummy", "dummy")
+    def test_create_pnl_uses_instance_vars(self, mock_display):
+        """Test create_pnl method uses instance variables."""
+        client = AlpacaDailyPnL("test_key", "test_secret", "https://test-api.alpaca.markets")
         client.create_pnl()
 
         mock_display.assert_called_once()
-
-    @patch.dict('os.environ', {}, clear=True)
-    def test_create_pnl_missing_env_vars(self):
-        """Test create_pnl method with missing environment variables."""
-        client = AlpacaDailyPnL("dummy", "dummy")
-
-        with patch('builtins.print') as mock_print:
-            client.create_pnl()
-
-        mock_print.assert_called_with(
-            "Please set ALPACA_API_KEY and ALPACA_SECRET_KEY environment variables"
-        )
