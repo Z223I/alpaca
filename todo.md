@@ -47,14 +47,15 @@ Maybe not. Should be saved by date historical_data/Bruce/paper/trade_AAPL_202508
 - [X] claude --dangerously-skip-permissions
 - [X] /login
 - [X] /commit /clear /read...
-- [X] git switch -c cancel-all-orders
+- [ ] git switch -c cancel-all-orders
 - [X] /read...
 
 ### Spec File
 - [X] /commit
-- [] Important. Think hard. Implement the instructions in specs/cancel_all_orders.md
-- [ ] Nudge.  Do not require --submit.
-- [ ] /commit
+- [X] Important. Think hard. Implement the instructions in specs/cancel_all_orders.md
+- [X] Nudge.  Do not require --submit.
+- [X] /commit
+- [ ] Publish the branch
 - [ ] git switch master; merge current branch
 
 ## No Yellow Alerts
