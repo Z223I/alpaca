@@ -142,17 +142,5 @@ class AlpacaDailyPnL:
             print("Unable to calculate daily P&L")
 
     def create_pnl(self):
-        """Create PnL summary using environment variables"""
-        API_KEY = os.getenv('ALPACA_API_KEY')
-        SECRET_KEY = os.getenv('ALPACA_SECRET_KEY')
-
-        if not API_KEY or not SECRET_KEY:
-            print("Please set ALPACA_API_KEY and ALPACA_SECRET_KEY "
-                  "environment variables")
-            return
-
-        BASE_URL = os.getenv('ALPACA_BASE_URL',
-                             "https://paper-api.alpaca.markets")
-
-        alpaca_client = AlpacaDailyPnL(API_KEY, SECRET_KEY, BASE_URL)
-        alpaca_client.display_daily_summary()
+        """Create PnL summary using instance credentials"""
+        self.display_daily_summary()
