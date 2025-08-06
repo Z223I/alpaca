@@ -2,11 +2,13 @@ import requests
 import json
 from datetime import datetime, timedelta
 import os
+from .api_error_handler import handle_requests_api_error
 
 
 class AlpacaDailyPnL:
     def __init__(self, api_key, secret_key,
-                 base_url="https://paper-api.alpaca.markets"):
+                 base_url="https://paper-api.alpaca.markets",
+                 account_name=None, environment=None):
         """
         Initialize Alpaca API client
 
@@ -15,10 +17,14 @@ class AlpacaDailyPnL:
             secret_key: Your Alpaca secret key
             base_url: API base URL (use "https://api.alpaca.markets"
                      for live trading)
+            account_name: Account name for debugging context
+            environment: Environment for debugging context
         """
         self.api_key = api_key
         self.secret_key = secret_key
         self.base_url = base_url
+        self.account_name = account_name
+        self.environment = environment
         self.headers = {
             'APCA-API-KEY-ID': api_key,
             'APCA-API-SECRET-KEY': secret_key,
@@ -33,23 +39,14 @@ class AlpacaDailyPnL:
         if response.status_code == 200:
             return response.json()
         else:
-            # Display configuration details on 403 errors to help with debugging
-            if response.status_code == 403:
-                print("\n" + "="*60)
-                print("🔒 403 FORBIDDEN ERROR - Account Configuration Check")
-                print("="*60)
-                print(f"API Key:      {self.api_key}")
-                print(f"Secret Key:   {self.secret_key[:8]}...{self.secret_key[-4:] if len(self.secret_key) > 12 else '***'}")
-                print(f"Base URL:     {self.base_url}")
-                print("\nPlease verify:")
-                print("• API Key matches your account configuration")
-                print("• Secret Key is correct and not expired")
-                print("• Base URL matches your account type (paper vs live)")
-                print("• Account has proper permissions")
-                print("="*60)
-            
-            raise Exception(f"Error getting account info: "
-                            f"{response.status_code} - {response.text}")
+            handle_requests_api_error(
+                response, 
+                self.api_key, 
+                self.secret_key, 
+                self.base_url,
+                self.account_name, 
+                self.environment
+            )
 
     def get_portfolio_history(self, period="1D", timeframe="1Min",
                               extended_hours=None):
@@ -75,8 +72,14 @@ class AlpacaDailyPnL:
         if response.status_code == 200:
             return response.json()
         else:
-            raise Exception(f"Error getting portfolio history: "
-                            f"{response.status_code} - {response.text}")
+            handle_requests_api_error(
+                response, 
+                self.api_key, 
+                self.secret_key, 
+                self.base_url,
+                self.account_name, 
+                self.environment
+            )
 
     def calculate_daily_pnl(self):
         """Calculate current day profit and loss with percentage"""
@@ -126,8 +129,14 @@ class AlpacaDailyPnL:
         if response.status_code == 200:
             return response.json()
         else:
-            raise Exception(f"Error getting positions: "
-                            f"{response.status_code} - {response.text}")
+            handle_requests_api_error(
+                response, 
+                self.api_key, 
+                self.secret_key, 
+                self.base_url,
+                self.account_name, 
+                self.environment
+            )
 
     def display_daily_summary(self):
         """Display a formatted daily P&L summary"""

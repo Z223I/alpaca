@@ -99,8 +99,8 @@ class AlpacaPrivate:
             The calculated quantity of shares to buy
         """
         # Get current account information
-        cash = get_cash(self.api)
-        positions = get_positions(self.api)
+        cash = get_cash(self.api, self.account_name, self.account)
+        positions = get_positions(self.api, self.account_name, self.account)
 
         # TODO: Update logic to properly handle different portfolio risk values
         if self.PORTFOLIO_RISK != 0.50:
@@ -133,7 +133,7 @@ class AlpacaPrivate:
             The order response from Alpaca API or None if dry run/error
         """
         # Get current market data for the symbol (using average of bid/ask)
-        market_price = get_latest_quote_avg(self.api, symbol)
+        market_price = get_latest_quote_avg(self.api, symbol, self.account_name, self.account)
 
         # Calculate quantity based on amount or use portfolio risk logic
         if amount is not None:
@@ -305,7 +305,7 @@ class AlpacaPrivate:
             submit_order: Whether to actually submit the order (default: False for dry run)
         """
         # Get current market data for the symbol (using average of bid/ask)
-        market_price = get_latest_quote_avg(self.api, symbol)
+        market_price = get_latest_quote_avg(self.api, symbol, self.account_name, self.account)
 
         # Use custom stop loss or calculate default
         if stop_loss is not None:
@@ -392,7 +392,7 @@ class AlpacaPrivate:
             trailing_percent = TradingConfig.DEFAULT_TRAILING_PERCENT
 
         # Get current market data for the symbol (using average of bid/ask)
-        market_price = get_latest_quote_avg(self.api, symbol)
+        market_price = get_latest_quote_avg(self.api, symbol, self.account_name, self.account)
 
         # Display the order details that would be submitted
         print(f"submit_order(\n"
@@ -447,7 +447,7 @@ class AlpacaPrivate:
             submit_order: Whether to actually submit the order (default: False for dry run)
         """
         # Get current market data for the symbol (using average of bid/ask)
-        market_price = get_latest_quote_avg(self.api, symbol)
+        market_price = get_latest_quote_avg(self.api, symbol, self.account_name, self.account)
 
         # Calculate limit price if not provided (slightly above market for better fill probability)
         if limit_price is None:
@@ -517,7 +517,7 @@ class AlpacaPrivate:
             submit_order: Whether to actually submit the order (default: False for dry run)
         """
         # Get current market data for the symbol (using average of bid/ask)
-        market_price = get_latest_quote_avg(self.api, symbol)
+        market_price = get_latest_quote_avg(self.api, symbol, self.account_name, self.account)
 
         # Use custom stop loss or calculate default (ABOVE entry price for shorts)
         if stop_loss is not None:
@@ -602,7 +602,7 @@ class AlpacaPrivate:
             submit_order: Whether to actually submit the order (default: False for dry run)
         """
         # Get current market data for the symbol (using average of bid/ask)
-        market_price = get_latest_quote_avg(self.api, symbol)
+        market_price = get_latest_quote_avg(self.api, symbol, self.account_name, self.account)
 
         # Calculate limit price if not provided (slightly below market for better fill probability)
         if limit_price is None:
@@ -725,7 +725,7 @@ class AlpacaPrivate:
             submit_order: Whether to actually submit the order (default: False for dry run)
         """
         # Get current market data for the symbol (using average of bid/ask)
-        market_price = get_latest_quote_avg(self.api, symbol)
+        market_price = get_latest_quote_avg(self.api, symbol, self.account_name, self.account)
 
         # Calculate limit price if not provided (slightly above market for better fill probability)
         if limit_price is None:
@@ -814,7 +814,7 @@ class AlpacaPrivate:
             submit_order: Whether to actually submit the order (default: False for dry run)
         """
         # Get current market data for the symbol (using average of bid/ask)
-        market_price = get_latest_quote_avg(self.api, symbol)
+        market_price = get_latest_quote_avg(self.api, symbol, self.account_name, self.account)
 
         # Calculate limit price if not provided (slightly below market for better fill probability)
         if limit_price is None:
@@ -1227,21 +1227,14 @@ class AlpacaPrivate:
                 # Get account credentials using class variables
                 if CONFIG_AVAILABLE:
                     api_key, secret_key, base_url = get_api_credentials("alpaca", self.account_name, self.account)
-                    pnl_client = AlpacaDailyPnL(api_key, secret_key, base_url)
+                    pnl_client = AlpacaDailyPnL(api_key, secret_key, base_url, self.account_name, self.account)
                     pnl_client.create_pnl()
                 else:
                     print(f"Error: Configuration not available. "
                           f"Unable to access {self.account_name}:{self.account} account credentials.")
                     return 1
             except Exception as e:
-                error_message = str(e)
-                print(f"Error generating PNL report: {error_message}")
-                
-                # Additional context for 403 errors
-                if "403" in error_message or "forbidden" in error_message.lower():
-                    print(f"\n💡 Current account settings: --account-name {self.account_name} --account {self.account}")
-                    print("   Double-check your account configuration in code/alpaca_config.py")
-                
+                print(f"Error generating PNL report: {str(e)}")
                 return 1
             return 0  # Exit early for PNL operation
 
@@ -1250,16 +1243,16 @@ class AlpacaPrivate:
         if any(display_args):
             # Only show requested information
             if self.args.positions:
-                print_positions(self.api)
+                print_positions(self.api, self.account_name, self.account)
             if self.args.cash:
-                print_cash(self.api)
+                print_cash(self.api, self.account_name, self.account)
             if self.args.active_order:
                 print_active_orders(self.api)
             return 0  # Exit early for display-only operations
 
         # Default behavior: show all information for other operations
-        print_positions(self.api)
-        print_cash(self.api)
+        print_positions(self.api, self.account_name, self.account)
+        print_cash(self.api, self.account_name, self.account)
         print_active_orders(self.api)
 
         # Handle bracket order if requested
@@ -1291,7 +1284,7 @@ class AlpacaPrivate:
 
         # Handle quote request if requested
         if self.args.get_latest_quote:
-            print_quote(self.api, self.args.symbol)
+            print_quote(self.api, self.args.symbol, self.account_name, self.account)
 
         # Handle buy order if requested
         if self.args.buy:
