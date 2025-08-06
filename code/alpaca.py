@@ -1234,7 +1234,14 @@ class AlpacaPrivate:
                           f"Unable to access {self.account_name}:{self.account} account credentials.")
                     return 1
             except Exception as e:
-                print(f"Error generating PNL report: {str(e)}")
+                error_message = str(e)
+                print(f"Error generating PNL report: {error_message}")
+                
+                # Additional context for 403 errors
+                if "403" in error_message or "forbidden" in error_message.lower():
+                    print(f"\n💡 Current account settings: --account-name {self.account_name} --account {self.account}")
+                    print("   Double-check your account configuration in code/alpaca_config.py")
+                
                 return 1
             return 0  # Exit early for PNL operation
 
