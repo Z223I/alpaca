@@ -58,21 +58,22 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 
 ### Config
 
-- [ ] claude --dangerously-skip-permissions
-- [ ] /login
-- [ ] /commit
-- [ ] Sync changes
-- [ ] /clear
-- [ ] git switch -c feature/PNL-integration
-- [ ] /read...
+- [X] claude --dangerously-skip-permissions
+- [X] /login
+- [X] /commit
+- [X] Sync changes
+- [X] /clear
+- [X] git switch -c feature/PNL-integration
+- [X] /read...
 
 ### Spec File
 
-- [ ] Important. Think hard. Implement the instructions in specs/PNL-integration.md
-- [ ] Nudge
-- [ ] /commit
-- [ ] Publish the branch
-- [ ] git switch master; merge current branch
+- [X] Important. Think hard. Implement the instructions in specs/PNL-integration.md
+- [X] Nudge
+- [X] /commit
+- [X] Publish the branch
+- [X] git switch master; merge current branch
+- [X] Sync changes
 
 ## PNL
 
