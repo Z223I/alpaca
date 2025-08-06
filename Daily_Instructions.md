@@ -40,6 +40,14 @@ Produces superduper alerts.
 python code/orb_alerts_monitor_superduper.py --verbose
 ```
 
+### ORB Trades
+
+Generates trades. Configuration required.
+
+```bash
+python code/orb_alerts_trade_stocks.py --verbose
+```
+
 After market close
 
 ORB Alert Summary

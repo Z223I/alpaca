@@ -54,6 +54,24 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 
 
 
+## PNL Integration
+
+### Config
+
+- [ ] claude --dangerously-skip-permissions
+- [ ] /login
+- [ ] /commit /clear
+- [ ] git switch -c feature/PNL-integration
+- [ ] /read...
+
+### Spec File
+
+- [ ] I forgot to give you valid Alpaca login info.  See code/alpaca_config.py.  Use the "Primary":"paper" account info for testing.
+- [ ] Important. Think hard. Implement the instructions in specs/PNL-integration.md
+- [ ] /commit
+- [ ] Publish the branch
+- [ ] git switch master; merge current branch
+
 ## PNL
 
 ### Config
