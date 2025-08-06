@@ -79,7 +79,30 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
     parser.add_argument('--active-order', action='store_true',
                       help='Display active orders only')
 
+    # PNL report argument
+    parser.add_argument('--PNL', action='store_true',
+                      help='Display daily profit/loss summary (standalone use only)')
+
+    # Account configuration arguments
+    parser.add_argument('--account-name', type=str, default='Primary',
+                      help='Account name to use (default: Primary)')
+    parser.add_argument('--account', type=str, default='paper',
+                      help='Account environment to use: paper, live, cash (default: paper)')
+
     args = parser.parse_args(userArgs)
+
+    # Validate account configuration arguments
+    # Import here to avoid circular imports
+    try:
+        from alpaca_config import get_current_config
+        config = get_current_config()
+        # Validate that the account configuration exists
+        try:
+            config.get_environment_config("alpaca", args.account_name, args.account)
+        except (KeyError, AttributeError) as e:
+            parser.error(f"Invalid account configuration {args.account_name}:{args.account} - {e}")
+    except ImportError:
+        parser.error("Account validation requires alpaca_config.py to be available")
 
     # Validate bracket order arguments
     if args.bracket_order:
@@ -193,12 +216,23 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
                 elif arg_value is not None and not isinstance(arg_value, bool):
                     parser.error("--cancel-all-orders cannot be combined with any other arguments")
 
+    # Validate PNL argument (must be standalone except for account configuration)
+    if args.PNL:
+        # Check if any other arguments are present (excluding account configuration)
+        for arg_name, arg_value in vars(args).items():
+            if arg_name not in ['PNL', 'account_name', 'account']:
+                # Check if argument has been set to non-default value
+                if isinstance(arg_value, bool) and arg_value:
+                    parser.error("--PNL cannot be combined with any other arguments (except account configuration)")
+                elif arg_value is not None and not isinstance(arg_value, bool):
+                    parser.error("--PNL cannot be combined with any other arguments (except account configuration)")
+
     # Validate display-only arguments
     display_args = [args.positions, args.cash, args.active_order]
     if any(display_args):
-        # Check if any non-display arguments are present
+        # Check if any non-display arguments are present (excluding account configuration)
         for arg_name, arg_value in vars(args).items():
-            if arg_name not in ['positions', 'cash', 'active_order']:
+            if arg_name not in ['positions', 'cash', 'active_order', 'account_name', 'account']:
                 # Check if argument has been set to non-default value
                 if isinstance(arg_value, bool) and arg_value:
                     parser.error("Display-only arguments (--positions, --cash, --active-order) cannot be combined with other operations")

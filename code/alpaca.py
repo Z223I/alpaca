@@ -20,6 +20,7 @@ from atoms.api.get_latest_quote import get_latest_quote
 from atoms.api.get_latest_quote_avg import get_latest_quote_avg
 from atoms.api.init_alpaca_client import init_alpaca_client
 from atoms.api.config import TradingConfig
+from atoms.api.pnl import AlpacaDailyPnL
 from atoms.display.print_cash import print_cash
 from atoms.display.print_orders import print_active_orders
 from atoms.display.print_positions import print_positions
@@ -29,7 +30,7 @@ from atoms.api.parse_args import parse_args
 
 # Load configuration from config file (with fallback to environment variables)
 try:
-    from alpaca_config import get_current_config
+    from alpaca_config import get_current_config, get_api_credentials
     CONFIG_AVAILABLE = True
 except ImportError:
     CONFIG_AVAILABLE = False
@@ -41,7 +42,7 @@ except ImportError:
         print("Warning: python-dotenv not installed. Using system environment variables only.")
 
 
-class alpaca_private:
+class AlpacaPrivate:
     """
     Alpaca trading API wrapper for automated trading operations.
 
@@ -49,7 +50,7 @@ class alpaca_private:
     including order management, position tracking, and bracket order execution.
     """
 
-    STOP_LOSS_PERCENT = 0.05 # Default stop loss percentage (5.0%)
+    STOP_LOSS_PERCENT = 0.05  # Default stop loss percentage (5.0%)
 
     def __init__(self, userArgs: Optional[List[str]] = None) -> None:
         """
@@ -62,6 +63,10 @@ class alpaca_private:
 
         # Parse arguments
         self.args = parse_args(userArgs)
+        
+        # Set account configuration from command line arguments
+        self.account_name = self.args.account_name
+        self.account = self.args.account
 
         # Set portfolio risk from config file or environment variable as fallback
         if 'CONFIG_AVAILABLE' in globals() and CONFIG_AVAILABLE:
@@ -75,8 +80,8 @@ class alpaca_private:
             self.PORTFOLIO_RISK = float(os.getenv('PORTFOLIO_RISK', '0.10'))
 
 
-        # Initialize Alpaca API client using atom
-        self.api = init_alpaca_client()
+        # Initialize Alpaca API client using account configuration
+        self.api = init_alpaca_client("alpaca", self.account_name, self.account)
 
 
         self.active_orders = []
@@ -1216,6 +1221,23 @@ class alpaca_private:
             Exit code (0 for success)
         """
 
+        # Handle PNL report (standalone operation)
+        if self.args.PNL:
+            try:
+                # Get account credentials using class variables
+                if CONFIG_AVAILABLE:
+                    api_key, secret_key, base_url = get_api_credentials("alpaca", self.account_name, self.account)
+                    pnl_client = AlpacaDailyPnL(api_key, secret_key, base_url)
+                    pnl_client.create_pnl()
+                else:
+                    print(f"Error: Configuration not available. "
+                          f"Unable to access {self.account_name}:{self.account} account credentials.")
+                    return 1
+            except Exception as e:
+                print(f"Error generating PNL report: {str(e)}")
+                return 1
+            return 0  # Exit early for PNL operation
+
         # Handle display-only arguments
         display_args = [self.args.positions, self.args.cash, self.args.active_order]
         if any(display_args):
@@ -1418,7 +1440,7 @@ def execMain(userArgs: Optional[List[str]] = None) -> int:
     """
     # sourcery skip: inline-immediately-returned-variable
 
-    alpacaObj = alpaca_private(userArgs)
+    alpacaObj = AlpacaPrivate(userArgs)
 
     exitValue = alpacaObj.Exec()
 
