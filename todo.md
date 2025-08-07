@@ -52,6 +52,18 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 - [ ] Today's PNL
 
 
+## Filter Red Candle
+
+### Config
+
+- [X] /clear
+- [X] /read...
+
+### Spec File
+
+- [X] Important. Think hard. Implement the instructions in specs/red-candle.md
+- [X] Nudge
+- [ ] /commit
 
 
 ## PNL Integration

@@ -69,6 +69,10 @@ class SuperAlertFilter:
         if symbol not in self.symbol_data:
             return False, f"No signal data for {symbol}"
 
+        # Filter 2: Red candle filter
+        if not self._passes_red_candle_filter(alert_data):
+            return False, f"{symbol}: Red candlestick or missing OHLC data filtered"
+
         # Filter 3: Candlestick low vs EMA9 filter (for bullish alerts only)
         breakout_type = alert_data.get('breakout_type', '').lower()
         if breakout_type == 'bullish_breakout':
@@ -120,6 +124,59 @@ class SuperAlertFilter:
             return True
 
         return True
+
+    def _passes_red_candle_filter(self, alert_data: Dict[str, Any]) -> bool:
+        """
+        Check if alert passes the red candle filter (reject red candles where open > close).
+
+        Args:
+            alert_data: Alert data dictionary
+
+        Returns:
+            True if alert passes the filter (not a red candle)
+        """
+        symbol = alert_data.get('symbol')
+        
+        # Get the current candlestick open and close prices from the original alert data
+        original_alert = alert_data.get('original_alert', alert_data)
+        
+        # Try multiple field names for open price
+        open_price = original_alert.get('open_price')
+        if open_price is None:
+            open_price = original_alert.get('open')
+        if open_price is None:
+            open_price = alert_data.get('open_price')
+        if open_price is None:
+            open_price = alert_data.get('open')
+            
+        # Try multiple field names for close price  
+        close_price = original_alert.get('close_price')
+        if close_price is None:
+            close_price = original_alert.get('close')
+        if close_price is None:
+            close_price = alert_data.get('close_price')
+        if close_price is None:
+            close_price = alert_data.get('close')
+
+        if open_price is not None and close_price is not None:
+            # Filter out red candles (open > close)
+            if open_price > close_price:
+                self.filtered_alerts.add(f"{symbol}_{alert_data.get('timestamp', 'unknown')}")
+                self.logger.info(f"🚫 Filtered red candle alert for {symbol}: Open ${open_price:.4f} > Close ${close_price:.4f}")
+                return False
+            else:
+                self.logger.debug(f"✅ Allowing green/doji candle for {symbol}: Open ${open_price:.4f} <= Close ${close_price:.4f}")
+                return True
+        elif open_price is None:
+            self.filtered_alerts.add(f"{symbol}_{alert_data.get('timestamp', 'unknown')}")
+            self.logger.info(f"🚫 Filtered alert for {symbol}: No open price data available for red candle filter")
+            return False
+        elif close_price is None:
+            self.filtered_alerts.add(f"{symbol}_{alert_data.get('timestamp', 'unknown')}")
+            self.logger.info(f"🚫 Filtered alert for {symbol}: No close price data available for red candle filter")
+            return False
+
+        return False
 
     def get_symbol_info(self, symbol: str) -> Optional[SuperAlertData]:
         """Get SuperAlertData for a symbol."""
