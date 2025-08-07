@@ -366,8 +366,8 @@ class ORBTradeStocksMonitor:
             current_loop = asyncio.get_running_loop()
             self.file_handler = SuperduperAlertFileHandler(self, current_loop)
 
-            # Process existing superduper alerts first
-            await self._scan_existing_superduper_alerts()
+            # Skip processing existing superduper alerts on startup to avoid executing trades on stale alerts
+            # await self._scan_existing_superduper_alerts()
 
             # Start file system monitoring
             if self.superduper_alerts_dir.exists():
