@@ -256,6 +256,12 @@ class ORBTradeStocksMonitor:
         success_emoji = "✅" if success == "yes" else "🔄"  # ✅ for real success, 🔄 for dry run
         dry_run_text = " (DRY RUN)" if execution_status.get('dry_run_executed', False) else ""
 
+        # Color-code the status
+        if success.upper() == "YES":
+            status_text = "🟢 **YES**"
+        else:
+            status_text = "🔴 **NO**"
+
         message_parts = [
             "💰💰 **TRADE EXECUTED** 💰💰",
             "",
@@ -263,9 +269,9 @@ class ORBTradeStocksMonitor:
             f"📊 **Account:** {account}",
             "",
             "📈 **Trade Details:**",
-            "• Command: Trailing Sell Order",
-            f"• Quantity: {amount} shares",
-            f"• Status: {success.upper()}",
+            "• Command: Buy Market with Trailing Sell",
+            f"• Amount: ${amount}",
+            f"• Status: {status_text}",
             "• Trigger: Green Momentum Superduper Alert",
             "",
             f"⏰ **Executed:** {datetime.now(pytz.timezone('US/Eastern')).strftime('%H:%M:%S ET')}",
@@ -274,7 +280,7 @@ class ORBTradeStocksMonitor:
         if execution_status.get('dry_run_executed', False):
             message_parts.insert(-1, "🧪 **DRY RUN MODE** - No actual trade placed")
 
-        return "\\n".join(message_parts)
+        return "\n".join(message_parts)
 
     async def _send_trade_notification(self, message: str, is_urgent: bool, account_name: str) -> Dict:
         """Send targeted trade notification via Telegram to specific user based on account."""

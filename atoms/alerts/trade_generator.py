@@ -2,7 +2,7 @@
 Trade Generator - Executes Automated Trades Based on Superduper Alerts
 
 This atom handles the execution of trades based on superduper alerts by creating
-trade records and executing trailing sell orders through alpaca.py for configured accounts.
+trade records and executing buy-market-trailing-sell orders through alpaca.py for configured accounts.
 Only processes alerts with green momentum indicators (🟢) for high-quality signals.
 """
 
@@ -182,7 +182,7 @@ class TradeGenerator:
                 "trailing_percent": trailing_percent,
                 "trigger_alert": superduper_alert,
                 "trade_parameters": {
-                    "command_type": "sell_trailing",
+                    "command_type": "buy_market_trailing_sell",
                     "quantity": auto_amount,
                     "trailing_percent": trailing_percent,
                     "dry_run": True  # Always dry run as per specs
@@ -223,9 +223,9 @@ class TradeGenerator:
             cmd = [
                 sys.executable,
                 str(alpaca_script),
-                "--sell-trailing",
+                "--buy-market-trailing-sell",
                 "--symbol", symbol,
-                "--quantity", str(auto_amount),
+                "--amount", str(auto_amount),
                 "--trailing-percent", str(trailing_percent),
                 "--submit"  # Added --submit flag for actual trade execution
             ]

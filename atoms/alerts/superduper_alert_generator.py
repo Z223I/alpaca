@@ -202,7 +202,7 @@ class SuperduperAlertGenerator:
         if self.test_mode:
             message_parts.insert(1, "🧪 **[TEST MODE]**")
 
-        return "\\n".join(message_parts)
+        return "\n".join(message_parts)
 
     def _calculate_momentum_score(self, trend_analysis: Dict[str, Any], trend_strength: float) -> float:
         """Calculate a momentum score from 0.0 to 1.0."""
