@@ -54,6 +54,10 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 - [ ] Cancel all orders
 - [ ] Today's PNL
 
+## ORB Alerts Watchdog
+
+- [ ] Create a watchdog program in ./code to ensure code/orb_alerts.py is running.  If not "python3 code/orb_alerts.py --verbose". Can you have the watchdog launch orb_alerts on start-up and display its output to the console.  That would be better.
+
 
 ## Filter Red Candle
 
