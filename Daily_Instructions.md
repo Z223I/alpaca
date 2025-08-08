@@ -20,9 +20,19 @@ Morning
 
 Produces alerts.
 
+#### ORB Alerts Watchdog
+
+Monitors and manages the orb_alerts.py process automatically. Launches orb_alerts on startup, displays output to console, and restarts if the process dies.
+
 ```bash
-python3 code/orb_alerts.py --verbose
+python3 code/orb_watchdog.py
 ```
+
+Features:
+- Automatic startup and restart of orb_alerts.py
+- Live output display with [ORB] prefix
+- Graceful shutdown with Ctrl+C
+- Uses conda environment automatically
 
 ### ORB Super Alerts
 
