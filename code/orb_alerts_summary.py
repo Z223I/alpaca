@@ -565,7 +565,7 @@ class AlertsSummaryGenerator:
         bullish_chart = self._create_alert_pie_chart(
             summary['bullish_analysis']['symbol_statistics'],
             'Bullish Alerts by Symbol',
-            'bullish_alerts',
+            'alerts_bullish',
             summary_dir,
             date_str
         )
@@ -576,7 +576,7 @@ class AlertsSummaryGenerator:
         bearish_chart = self._create_alert_pie_chart(
             summary['bearish_analysis']['symbol_statistics'],
             'Bearish Alerts by Symbol',
-            'bearish_alerts',
+            'alerts_bearish',
             summary_dir,
             date_str
         )
@@ -615,7 +615,7 @@ class AlertsSummaryGenerator:
             bullish_superduper_chart = self._create_alert_pie_chart(
                 bullish_superduper_stats,
                 'Bullish Superduper Alerts by Symbol',
-                'bullish_superduper_alerts',
+                'superduper_alerts_bullish',
                 summary_dir,
                 date_str
             )
@@ -631,7 +631,7 @@ class AlertsSummaryGenerator:
             bearish_superduper_chart = self._create_alert_pie_chart(
                 bearish_superduper_stats,
                 'Bearish Superduper Alerts by Symbol',
-                'bearish_superduper_alerts',
+                'superduper_alerts_bearish',
                 summary_dir,
                 date_str
             )

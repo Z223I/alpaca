@@ -24,6 +24,9 @@ new branch
 
 - [ ] Update telegram monitor to accept "trade" from Bruce only to trade the last alert.  Keep the symbol and price for the last sent alert in a variable.  Use that when "trade" is received to place an Alpaca trade.
 
+## Yahoo
+- [ ] Update for increase in volume over N months average.
+
 ## Mermaid Diagram
 
 
