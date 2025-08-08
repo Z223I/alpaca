@@ -23,7 +23,7 @@ class SuperduperAlertData:
         self.super_alerts = []  # List of super alerts for this symbol
         self.price_progression = []  # Price changes over time (from super alerts)
         self.market_data = []  # Full market data for comprehensive trend analysis
-        self.timeframe_minutes = 45  # Default timeframe
+        self.timeframe_minutes = 30  # Default timeframe
         self.logger = logging.getLogger(__name__)
 
     def add_super_alert(self, super_alert: Dict[str, Any]) -> None:
@@ -142,7 +142,7 @@ class SuperduperAlertData:
             self.logger.error(f"Error loading market data for {self.symbol}: {e}")
             return False
 
-    def analyze_trend(self, timeframe_minutes: int = 45) -> Tuple[str, float, Dict[str, Any]]:
+    def analyze_trend(self, timeframe_minutes: int = 30) -> Tuple[str, float, Dict[str, Any]]:
         """
         Analyze price trend over the specified timeframe using full market data.
 
@@ -208,6 +208,24 @@ class SuperduperAlertData:
         time_span_minutes = (timestamps[-1] - timestamps[0]).total_seconds() / 60
         price_momentum = price_change_percent / max(time_span_minutes, 1)  # % per minute
 
+        # Calculate short-term momentum using last 5 minutes
+        cutoff_time_5min = latest_time - timedelta(minutes=5)
+        recent_data = [
+            point for point in relevant_data 
+            if point['timestamp'] >= cutoff_time_5min
+        ]
+        
+        if len(recent_data) >= 2:
+            recent_prices = [point['price'] for point in recent_data]
+            recent_timestamps = [point['timestamp'] for point in recent_data]
+            recent_price_start = recent_prices[0]
+            recent_price_end = recent_prices[-1]
+            recent_price_change_percent = ((recent_price_end - recent_price_start) / recent_price_start) * 100
+            recent_time_span_minutes = (recent_timestamps[-1] - recent_timestamps[0]).total_seconds() / 60
+            price_momentum_short = recent_price_change_percent / max(recent_time_span_minutes, 1)  # % per minute
+        else:
+            price_momentum_short = 0.0
+
         # Penetration trend analysis
         penetration_change = penetrations[-1] - penetrations[0] if penetrations else 0
         avg_penetration = sum(penetrations) / len(penetrations) if penetrations else 0
@@ -227,6 +245,7 @@ class SuperduperAlertData:
             'super_alert_points': len(self.price_progression),
             'price_change_percent': round(price_change_percent, 3),
             'price_momentum': round(price_momentum, 6),
+            'price_momentum_short': round(price_momentum_short, 6),
             'price_volatility': round(price_volatility, 4),
             'penetration_change': round(penetration_change, 2),
             'avg_penetration': round(avg_penetration, 2),
@@ -315,7 +334,7 @@ class SuperduperAlertData:
 class SuperduperAlertFilter:
     """Filters super alerts for superduper alert generation."""
 
-    def __init__(self, timeframe_minutes: int = 45):
+    def __init__(self, timeframe_minutes: int = 30):
         """
         Initialize the superduper alert filter.
 

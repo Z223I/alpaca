@@ -144,7 +144,8 @@ class SuperduperAlertGenerator:
         # Price change and momentum
         price_change = trend_analysis.get('price_change_percent', 0)
         momentum = trend_analysis.get('price_momentum', 0)
-        timeframe = trend_analysis.get('timeframe_minutes', 45)
+        momentum_short = trend_analysis.get('price_momentum_short', 0)
+        timeframe = trend_analysis.get('timeframe_minutes', 30)
 
         # Create the message
         message_parts = [
@@ -166,9 +167,11 @@ class SuperduperAlertGenerator:
         if trend_type == 'rising':
             penetration_change = trend_analysis.get('penetration_change', 0)
             momentum_color = self._get_momentum_color_code(momentum)
+            momentum_short_color = self._get_momentum_color_code(momentum_short)
             message_parts.extend([
                 f"• Price Movement: **+{price_change:.2f}%**",
                 f"• Momentum: {momentum_color} **{momentum:.4f}%/min**",
+                f"• Momentum Short: {momentum_short_color} **{momentum_short:.4f}%/min**",
                 f"• Penetration Increase: **+{penetration_change:.1f}%**",
                 f"• Pattern: **Accelerating Breakout** 🚀"
             ])
