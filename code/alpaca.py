@@ -1035,6 +1035,73 @@ class AlpacaPrivate:
             print(f"✗ Failed to liquidate all positions: {str(e)}")
             return None
 
+    def _take_profit_percent(self, symbol: str, quantity: int, take_profit_percent: float, submit_order: bool = False, current_price: Optional[float] = None) -> Optional[Any]:
+        """
+        Execute a take profit order at a percentage above the current market price.
+
+        This method creates a limit sell order at a calculated price based on the 
+        current market price plus the specified percentage.
+
+        Args:
+            symbol: The stock symbol to sell
+            quantity: Number of shares to sell (required)
+            take_profit_percent: Percentage above current market price for take profit
+            submit_order: Whether to actually submit the order (default: False for dry run)
+            current_price: Optional current price to use for calculation (if None, fetches from market)
+
+        Returns:
+            The order response from Alpaca API or None if dry run/error
+        """
+        # Use provided current price or get current market data for the symbol
+        if current_price is not None:
+            market_price = current_price
+            print(f"  Using provided current price: ${market_price:.2f}")
+        else:
+            market_price = get_latest_quote_avg(self.api, symbol, self.account_name, self.account)
+            print(f"  Fetched current market price: ${market_price:.2f}")
+
+        # Calculate take profit price based on percentage
+        take_profit_price = round(market_price * (1 + take_profit_percent / 100), 2)
+
+        # Display the order details that would be submitted
+        print(f"submit_order(\n"
+                f"    symbol='{symbol}',\n"
+                f"    qty={quantity},\n"
+                f"    side='sell',\n"
+                f"    type='limit',\n"
+                f"    time_in_force='gtc',\n"
+                f"    limit_price={take_profit_price}\n"
+                f")")
+        print(f"  Take Profit Percent: {take_profit_percent}%")
+        print(f"  Take Profit Price: ${take_profit_price:.2f}")
+
+        if not submit_order:
+            print("[DRY RUN] Take profit order not submitted (use --submit to execute)")
+            return None
+
+        # Submit the actual order if requested
+        if submit_order:
+            try:
+                order_response = self.api.submit_order(
+                    symbol=symbol,
+                    qty=quantity,
+                    side='sell',
+                    type='limit',
+                    time_in_force='gtc',
+                    limit_price=str(take_profit_price)
+                )
+                print(f"✓ Take profit order submitted successfully: {order_response.id}")
+                print(f"  Status: {order_response.status}")
+                print(f"  Symbol: {order_response.symbol}")
+                print(f"  Quantity: {order_response.qty}")
+                print(f"  Limit Price: ${take_profit_price:.2f}")
+                print(f"  Current Market Price: ${market_price:.2f}")
+                return order_response
+            except Exception as e:
+                print(f"✗ Take profit order submission failed: {str(e)}")
+                print(f"  Symbol: {symbol}, Quantity: {quantity}, Take Profit Price: {take_profit_price}")
+                return None
+
     def _cancel_all_orders(self, submit_order: bool = False) -> Optional[List[Any]]:
         """
         Cancel all open orders.
@@ -1423,6 +1490,18 @@ class AlpacaPrivate:
             )
             if cancel_result is None:
                 print("Failed to cancel all orders")
+                return 1
+
+        # Handle take-profit-percent order if requested
+        if self.args.take_profit_percent:
+            order_result = self._take_profit_percent(
+                symbol=self.args.symbol,
+                quantity=self.args.quantity,
+                take_profit_percent=self.args.take_profit_percent,
+                submit_order=self.args.submit
+            )
+            if order_result is None and self.args.submit:
+                print("Failed to submit take profit percent order")
                 return 1
 
         return 0

@@ -54,9 +54,20 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 - [ ] Cancel all orders
 - [ ] Today's PNL
 
+## Major Resistance
+
+- [ ] Add a major resistance field and pass it through the alerts.
+- [ ] Color code major resistance in the superduper alert generator.
+- [ ] Add time of day signals with green and then yellow for the afternoon
+
+## Trailing Sell
+
+- [X] Change from 5 to 7.5.
+- [ ] Can I add a take profit at N perent?
+
 ## ORB Alerts Watchdog
 
-- [ ] Create a watchdog program in ./code to ensure code/orb_alerts.py is running.  If not "python3 code/orb_alerts.py --verbose". Can you have the watchdog launch orb_alerts on start-up and display its output to the console.  That would be better.
+- [X] Create a watchdog program in ./code to ensure code/orb_alerts.py is running.  If not "python3 code/orb_alerts.py --verbose". Can you have the watchdog launch orb_alerts on start-up and display its output to the console.  That would be better.
 
 
 ## Filter Red Candle

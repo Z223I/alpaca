@@ -32,6 +32,8 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
                       help='Stop loss price for future bracket order')
     parser.add_argument('--take-profit', type=float, required=False,
                       help='Take profit price for bracket orders')
+    parser.add_argument('--take-profit-percent', type=float, required=False,
+                      help='Take profit percentage above current market price (requires --symbol and --quantity)')
     parser.add_argument('--submit', action='store_true',
                       help='Actually submit the bracket order (default: False)')
     parser.add_argument('-q', '--get-latest-quote', action='store_true',
@@ -226,6 +228,17 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
                     parser.error("--PNL cannot be combined with any other arguments (except account configuration)")
                 elif arg_value is not None and not isinstance(arg_value, bool):
                     parser.error("--PNL cannot be combined with any other arguments (except account configuration)")
+
+    # Validate take-profit-percent arguments
+    if args.take_profit_percent:
+        if not args.symbol:
+            parser.error("--take-profit-percent requires --symbol")
+        if not args.quantity:
+            parser.error("--take-profit-percent requires --quantity")
+        if args.quantity <= 0:
+            parser.error("--take-profit-percent requires --quantity to be greater than 0")
+        if args.take_profit_percent <= 0:
+            parser.error("--take-profit-percent must be greater than 0")
 
     # Validate display-only arguments
     display_args = [args.positions, args.cash, args.active_order]
