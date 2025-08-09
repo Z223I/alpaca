@@ -2,7 +2,7 @@
 Trade Generator - Executes Automated Trades Based on Superduper Alerts
 
 This atom handles the execution of trades based on superduper alerts by creating
-trade records and executing buy-market-trailing-sell orders through alpaca.py for configured accounts.
+trade records and executing buy-market-trailing-sell-take-profit-percent orders through alpaca.py for configured accounts.
 Only processes alerts with green momentum indicators (🟢) for high-quality signals.
 """
 
@@ -149,7 +149,7 @@ class TradeGenerator:
             return None
 
     def create_trade_record(self, superduper_alert: Dict[str, Any], account_name: str,
-                            account_type: str, auto_amount: int, trailing_percent: float) -> Optional[Dict[str, Any]]:
+                            account_type: str, auto_amount: int, trailing_percent: float, take_profit_percent: float) -> Optional[Dict[str, Any]]:
         """
         Create a trade record from superduper alert data.
 
@@ -159,6 +159,7 @@ class TradeGenerator:
             account_type: Type of account (paper, live, cash)
             auto_amount: Amount to trade
             trailing_percent: Trailing percentage
+            take_profit_percent: Take profit percentage
 
         Returns:
             Trade record dictionary or None if creation failed
@@ -180,11 +181,13 @@ class TradeGenerator:
                 "account_type": account_type,
                 "auto_amount": auto_amount,
                 "trailing_percent": trailing_percent,
+                "take_profit_percent": take_profit_percent,
                 "trigger_alert": superduper_alert,
                 "trade_parameters": {
-                    "command_type": "buy_market_trailing_sell",
+                    "command_type": "buy_market_trailing_sell_take_profit_percent",
                     "quantity": auto_amount,
                     "trailing_percent": trailing_percent,
+                    "take_profit_percent": take_profit_percent,
                     "dry_run": True  # Always dry run as per specs
                 },
                 "execution_status": {
@@ -216,6 +219,7 @@ class TradeGenerator:
             symbol = trade_record['symbol']
             auto_amount = trade_record['auto_amount']
             trailing_percent = trade_record['trailing_percent']
+            take_profit_percent = trade_record['take_profit_percent']
 
             # Build the alpaca.py command
             alpaca_script = Path(__file__).parent.parent.parent / "code" / "alpaca.py"
@@ -223,10 +227,11 @@ class TradeGenerator:
             cmd = [
                 sys.executable,
                 str(alpaca_script),
-                "--buy-market-trailing-sell",
+                "--buy-market-trailing-sell-take-profit-percent",
                 "--symbol", symbol,
                 "--amount", str(auto_amount),
                 "--trailing-percent", str(trailing_percent),
+                "--take-profit-percent", str(take_profit_percent),
                 "--submit"  # Added --submit flag for actual trade execution
             ]
 
@@ -419,7 +424,7 @@ class TradeGenerator:
                         # Create trade record
                         trade_record = self.create_trade_record(
                             superduper_alert, account_name, account_type,
-                            env_config.auto_amount, env_config.trailing_percent
+                            env_config.auto_amount, env_config.trailing_percent, env_config.take_profit_percent
                         )
 
                         if trade_record is None:

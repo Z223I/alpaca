@@ -289,6 +289,170 @@ class AlpacaPrivate:
             'sell_order': sell_order
         }
 
+    def _buy_market_trailing_sell_take_profit_percent(self, symbol: str, take_profit_percent: float, amount: Optional[float] = None, trailing_percent: Optional[float] = None, submit_order: bool = False) -> Optional[Dict]:
+        """
+        Execute market buy order followed by automatic trailing sell and take profit percent order when filled.
+
+        This method:
+        1. Executes a market buy order
+        2. Polls the order status until filled or canceled
+        3. If filled, automatically places a trailing sell order for the filled quantity
+        4. Also places a take profit percent order using the filled quantity and average fill price
+
+        Args:
+            symbol: The stock symbol to trade
+            take_profit_percent: Percentage above average fill price for take profit order
+            amount: Dollar amount to invest (optional, uses portfolio risk if not provided)
+            trailing_percent: Trailing percentage for sell order (optional, uses default if not provided)
+            submit_order: Whether to actually submit orders (default: False for dry run)
+
+        Returns:
+            Dictionary with buy, trailing sell, and take profit order responses, or None if error/dry run
+        """
+        print(f"Executing market buy with trailing sell and take profit percent for {symbol}...")
+
+        # Step 1: Execute market buy order
+        buy_order = self._buy_market(symbol=symbol, amount=amount, submit_order=submit_order)
+
+        if not submit_order:
+            print("[DRY RUN] Would poll order status and place trailing sell + take profit percent after fill")
+            # In dry run mode, simulate the take profit calculation with estimated quantity
+            # Get estimated quantity from the buy order simulation
+            market_price = get_latest_quote_avg(self.api, symbol, self.account_name, self.account)
+            if amount is not None:
+                estimated_qty = round(amount / market_price)
+            else:
+                estimated_qty = self._calculateQuantity(market_price, "_buy_market_trailing_sell_take_profit_percent")
+            
+            print(f"\n[DRY RUN] Simulating complete workflow:")
+            print(f"  1. Buy Order: Would fill {estimated_qty} shares @ ${market_price:.2f}")
+            print(f"  2. Trailing Sell: Would place trailing sell order (default {trailing_percent or 7.5}%)")
+            print(f"  3. Trailing Sell Polling: Would monitor for acceptance/rejection")
+            print(f"  4. Take Profit: Would place take profit order at {take_profit_percent}% above fill price")
+            print(f"  5. Take Profit Polling: Would monitor for acceptance/rejection")
+            
+            # Show what the take profit order would look like
+            print(f"\n[DRY RUN] Take profit order simulation:")
+            self._take_profit_percent(
+                symbol=symbol,
+                quantity=estimated_qty,
+                take_profit_percent=take_profit_percent,
+                submit_order=False,
+                current_price=market_price
+            )
+            return None
+
+        if buy_order is None:
+            print("✗ Market buy order failed, aborting trailing sell and take profit setup")
+            return None
+
+        # Step 2: Poll order status until filled or terminal state
+        final_order = self._poll_order_status(buy_order.id)
+
+        if final_order is None:
+            print("✗ Order polling failed, cannot proceed with trailing sell and take profit")
+            return None
+
+        if final_order.status != 'filled':
+            print(f"✗ Order not filled (status: {final_order.status}), cannot place trailing sell and take profit")
+            return None
+
+        # Step 3: Extract filled quantity and average fill price
+        filled_qty = int(final_order.filled_qty) if hasattr(final_order, 'filled_qty') else int(final_order.qty)
+        filled_avg_price = float(final_order.filled_avg_price) if hasattr(final_order, 'filled_avg_price') and final_order.filled_avg_price else None
+        
+        print(f"✓ Buy order filled: {filled_qty} shares")
+        if filled_avg_price:
+            print(f"  Average fill price: ${filled_avg_price:.2f}")
+        else:
+            print("  Warning: No average fill price available, using current market price")
+
+        # Step 4: Execute trailing sell with the filled quantity
+        sell_order = self._sell_trailing(
+            symbol=symbol, 
+            quantity=filled_qty, 
+            trailing_percent=trailing_percent,
+            submit_order=True  # Always submit if we got this far
+        )
+
+        if sell_order is None:
+            print("✗ Trailing sell order failed")
+            return {
+                'buy_order': final_order,
+                'sell_order': None,
+                'take_profit_order': None,
+                'error': 'Trailing sell failed'
+            }
+
+        # Step 5: Poll trailing sell order status
+        print(f"\n--- Polling Trailing Sell Order ---")
+        final_sell_order = self._poll_order_status(sell_order.id, timeout_seconds=30)
+        
+        if final_sell_order is None:
+            print("✗ Trailing sell order polling failed or timeout")
+            sell_status = "polling_failed"
+        elif final_sell_order.status in ['canceled', 'rejected', 'expired']:
+            print(f"✗ Trailing sell order failed with status: {final_sell_order.status}")
+            sell_status = "failed"
+        else:
+            print(f"✓ Trailing sell order successfully placed with status: {final_sell_order.status}")
+            sell_status = "success"
+
+        # Step 6: Execute take profit percent order
+        take_profit_order = self._take_profit_percent(
+            symbol=symbol,
+            quantity=filled_qty,
+            take_profit_percent=take_profit_percent,
+            submit_order=True,  # Always submit if we got this far
+            current_price=filled_avg_price  # Use average fill price if available
+        )
+
+        if take_profit_order is None:
+            print("✗ Take profit percent order failed")
+            return {
+                'buy_order': final_order,
+                'sell_order': final_sell_order or sell_order,
+                'sell_status': sell_status,
+                'take_profit_order': None,
+                'take_profit_status': "submission_failed",
+                'error': 'Take profit percent failed'
+            }
+
+        # Step 7: Poll take profit order status
+        print(f"\n--- Polling Take Profit Order ---")
+        final_take_profit_order = self._poll_order_status(take_profit_order.id, timeout_seconds=30)
+        
+        if final_take_profit_order is None:
+            print("✗ Take profit order polling failed or timeout")
+            take_profit_status = "polling_failed"
+        elif final_take_profit_order.status in ['canceled', 'rejected', 'expired']:
+            print(f"✗ Take profit order failed with status: {final_take_profit_order.status}")
+            take_profit_status = "failed"
+        else:
+            print(f"✓ Take profit order successfully placed with status: {final_take_profit_order.status}")
+            take_profit_status = "success"
+
+        # Step 8: Summary and results
+        print(f"\n--- Order Execution Summary ---")
+        print(f"✓ Buy Order: FILLED ({filled_qty} shares @ ${filled_avg_price:.2f})")
+        print(f"{'✓' if sell_status == 'success' else '✗'} Trailing Sell: {sell_status.upper()}")
+        print(f"{'✓' if take_profit_status == 'success' else '✗'} Take Profit: {take_profit_status.upper()}")
+        
+        overall_success = sell_status == "success" and take_profit_status == "success"
+        if overall_success:
+            print("✓ All orders completed successfully")
+        else:
+            print("⚠️  Some orders encountered issues - monitor positions carefully")
+
+        return {
+            'buy_order': final_order,
+            'sell_order': final_sell_order or sell_order,
+            'sell_status': sell_status,
+            'take_profit_order': final_take_profit_order or take_profit_order,
+            'take_profit_status': take_profit_status,
+            'overall_success': overall_success
+        }
+
     def _buy(self, symbol: str, take_profit: Optional[float] = None, stop_loss: Optional[float] = None, amount: Optional[float] = None, submit_order: bool = False) -> Optional[Any]:
         """
         Execute a buy order with bracket order protection.
@@ -1414,6 +1578,19 @@ class AlpacaPrivate:
                 print("Failed to submit market buy with trailing sell")
                 return 1
 
+        # Handle buy-market-trailing-sell-take-profit-percent order if requested
+        if self.args.buy_market_trailing_sell_take_profit_percent:
+            order_result = self._buy_market_trailing_sell_take_profit_percent(
+                symbol=self.args.symbol,
+                take_profit_percent=self.args.take_profit_percent,
+                amount=self.args.amount,
+                trailing_percent=self.args.trailing_percent,
+                submit_order=self.args.submit
+            )
+            if order_result is None and self.args.submit:
+                print("Failed to submit market buy with trailing sell and take profit percent")
+                return 1
+
         # Handle trailing sell order if requested
         if self.args.sell_trailing:
             order_result = self._sell_trailing(
@@ -1492,8 +1669,8 @@ class AlpacaPrivate:
                 print("Failed to cancel all orders")
                 return 1
 
-        # Handle take-profit-percent order if requested
-        if self.args.take_profit_percent:
+        # Handle take-profit-percent order if requested (standalone only, not combined operations)
+        if self.args.take_profit_percent and not self.args.buy_market_trailing_sell_take_profit_percent:
             order_result = self._take_profit_percent(
                 symbol=self.args.symbol,
                 quantity=self.args.quantity,

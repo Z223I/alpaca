@@ -44,6 +44,8 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
                       help='Execute a simple market buy order for the specified symbol')
     parser.add_argument('--buy-market-trailing-sell', action='store_true',
                       help='Execute market buy then automatic trailing sell when filled')
+    parser.add_argument('--buy-market-trailing-sell-take-profit-percent', action='store_true',
+                      help='Execute market buy, trailing sell, and take profit percent order (requires --symbol, --take-profit-percent)')
     parser.add_argument('--sell-trailing', action='store_true',
                       help='Execute a trailing sell order for the specified symbol')
     parser.add_argument('--trailing-percent', type=float, required=False,
@@ -148,6 +150,13 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
         if not args.symbol:
             parser.error("--buy-market-trailing-sell requires --symbol")
 
+    # Validate buy-market-trailing-sell-take-profit-percent arguments
+    if args.buy_market_trailing_sell_take_profit_percent:
+        if not args.symbol:
+            parser.error("--buy-market-trailing-sell-take-profit-percent requires --symbol")
+        if not args.take_profit_percent:
+            parser.error("--buy-market-trailing-sell-take-profit-percent requires --take-profit-percent")
+
     # Validate sell-trailing arguments
     if args.sell_trailing:
         if not args.symbol:
@@ -170,11 +179,11 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
             parser.error("--sell-short requires either --take-profit or --calc-take-profit")
 
     # Ensure buy, sell-trailing, sell_short, buy-market, and buy-market-trailing-sell are mutually exclusive
-    buy_operations = [args.buy, args.buy_market, args.buy_market_trailing_sell]
+    buy_operations = [args.buy, args.buy_market, args.buy_market_trailing_sell, args.buy_market_trailing_sell_take_profit_percent]
     sell_operations = [args.sell_trailing, args.sell_short]
 
     if sum(buy_operations) > 1:
-        parser.error("--buy, --buy-market, and --buy-market-trailing-sell cannot be used together")
+        parser.error("--buy, --buy-market, --buy-market-trailing-sell, and --buy-market-trailing-sell-take-profit-percent cannot be used together")
     if sum(sell_operations) > 1:
         parser.error("--sell-trailing and --sell-short cannot be used together")
     if any(buy_operations) and any(sell_operations):
@@ -196,14 +205,14 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
 
     # Ensure liquidation is mutually exclusive with other operations
     if args.liquidate or args.liquidate_all:
-        conflicting_args = [args.buy, args.buy_market, args.buy_market_trailing_sell, args.sell_trailing, args.sell_short, args.bracket_order, args.future_bracket_order, args.get_latest_quote]
+        conflicting_args = [args.buy, args.buy_market, args.buy_market_trailing_sell, args.buy_market_trailing_sell_take_profit_percent, args.sell_trailing, args.sell_short, args.bracket_order, args.future_bracket_order, args.get_latest_quote]
         if any(conflicting_args):
             parser.error("Liquidation operations cannot be combined with other trading operations")
 
     # Validate after_hours arguments
     if args.after_hours:
-        if not (args.buy or args.buy_market or args.buy_market_trailing_sell or args.sell_trailing or args.sell_short):
-            parser.error("--after-hours requires either --buy, --buy-market, --buy-market-trailing-sell, --sell-trailing, or --sell-short")
+        if not (args.buy or args.buy_market or args.buy_market_trailing_sell or args.buy_market_trailing_sell_take_profit_percent or args.sell_trailing or args.sell_short):
+            parser.error("--after-hours requires either --buy, --buy-market, --buy-market-trailing-sell, --buy-market-trailing-sell-take-profit-percent, --sell-trailing, or --sell-short")
         if not args.symbol:
             parser.error("--after-hours requires --symbol")
 
@@ -233,9 +242,10 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
     if args.take_profit_percent:
         if not args.symbol:
             parser.error("--take-profit-percent requires --symbol")
-        if not args.quantity:
+        # Only require quantity for standalone take-profit-percent, not for combined operations
+        if not args.buy_market_trailing_sell_take_profit_percent and not args.quantity:
             parser.error("--take-profit-percent requires --quantity")
-        if args.quantity <= 0:
+        if args.quantity and args.quantity <= 0:
             parser.error("--take-profit-percent requires --quantity to be greater than 0")
         if args.take_profit_percent <= 0:
             parser.error("--take-profit-percent must be greater than 0")
