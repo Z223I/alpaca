@@ -60,10 +60,17 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 - [ ] Color code major resistance in the superduper alert generator.
 - [ ] Add time of day signals with green and then yellow for the afternoon
 
+
+
+
+## Test new trade placement
+
+- [ ] ~/miniconda3/envs/alpaca/bin/python execute_aapl_trade.py
+
 ## Trailing Sell
 
 - [X] Change from 5 to 7.5.
-- [ ] Can I add a take profit at N perent?
+- [X] Can I add a take profit at N perent? Yes.  Update.
 
 ## ORB Alerts Watchdog
 

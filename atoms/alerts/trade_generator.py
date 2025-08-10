@@ -9,6 +9,7 @@ Only processes alerts with green momentum indicators (🟢) for high-quality sig
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime
@@ -194,6 +195,7 @@ class TradeGenerator:
                     "initiated": False,
                     "completed": False,
                     "success": "no",  # Will be updated after execution
+                    "reason": None,  # Will be populated with failure/success reason
                     "execution_time": None,
                     "results": None
                 }
@@ -262,6 +264,7 @@ class TradeGenerator:
             if "DRY RUN" in result.stdout:
                 trade_record['execution_status']['dry_run_executed'] = True
                 trade_record['execution_status']['success'] = "no"  # Dry run always marked as "no" per specs
+                trade_record['execution_status']['reason'] = "Dry run execution (not actual trade)"
                 self.logger.info(f"Dry run trade executed for {symbol} (unexpected - should be actual trade)")
             else:
                 trade_record['execution_status']['dry_run_executed'] = False
@@ -270,9 +273,13 @@ class TradeGenerator:
                 trade_record['execution_status']['success'] = "yes" if success else "no"
                 
                 if success:
+                    trade_record['execution_status']['reason'] = "Trade executed successfully"
                     self.logger.info(f"✅ Actual trade executed successfully for {symbol}")
                 else:
-                    self.logger.warning(f"❌ Trade execution failed for {symbol}: {result.stdout}")
+                    # Extract failure reason from alpaca output
+                    failure_reason = self._extract_failure_reason(result.stdout, result.stderr)
+                    trade_record['execution_status']['reason'] = failure_reason
+                    self.logger.warning(f"❌ Trade execution failed for {symbol}: {failure_reason}")
 
             return trade_record
 
@@ -280,6 +287,7 @@ class TradeGenerator:
             self.logger.error(f"Trade execution timeout for {trade_record['symbol']}")
             trade_record['execution_status']['completed'] = True
             trade_record['execution_status']['success'] = "no"
+            trade_record['execution_status']['reason'] = "Command execution timed out (60 seconds)"
             trade_record['execution_status']['error'] = "Command timeout"
             trade_record['execution_status']['results'] = "Command execution timed out"
             return trade_record
@@ -288,9 +296,98 @@ class TradeGenerator:
             self.logger.error(f"Error executing trade for {trade_record['symbol']}: {e}")
             trade_record['execution_status']['completed'] = True
             trade_record['execution_status']['success'] = "no"
+            trade_record['execution_status']['reason'] = f"Execution error: {str(e)}"
             trade_record['execution_status']['error'] = str(e)
             trade_record['execution_status']['results'] = f"Execution error: {str(e)}"
             return trade_record
+
+    def _extract_failure_reason(self, stdout: str, stderr: str) -> str:
+        """
+        Extract meaningful failure reason from alpaca command output.
+        
+        Args:
+            stdout: Standard output from alpaca command
+            stderr: Standard error from alpaca command
+            
+        Returns:
+            Human-readable failure reason
+        """
+        try:
+            # Combine stdout and stderr for analysis
+            full_output = f"{stdout}\n{stderr}".lower()
+            
+            # Common failure patterns and their human-readable explanations
+            failure_patterns = [
+                # Market/Quote related errors
+                (r"no quote found for", "Market data unavailable (symbol may not exist or market closed)"),
+                (r"market is closed", "Market is closed - orders cannot be executed"),
+                (r"market hours", "Outside market trading hours"),
+                
+                # Account/Authentication errors
+                (r"unauthorized", "Authentication failed - check API credentials"),
+                (r"insufficient.*funds", "Insufficient funds in account"),
+                (r"buying power", "Insufficient funds in account"),
+                (r"account.*restricted", "Account trading restrictions in place"),
+                
+                # Order validation errors
+                (r"invalid.*symbol", "Invalid or unrecognized stock symbol"),
+                (r"minimum.*quantity", "Order quantity below minimum requirements"),
+                (r"maximum.*quantity", "Order quantity exceeds maximum allowed"),
+                (r"invalid.*price", "Invalid order price specified"),
+                
+                # API/Network errors
+                (r"connection.*error", "Network connection error to Alpaca API"),
+                (r"timeout", "Request timeout - API may be overloaded"),
+                (r"rate.*limit", "API rate limit exceeded"),
+                (r"server.*error", "Alpaca server error (HTTP 5xx)"),
+                (r"server error occurred", "Alpaca server error (HTTP 5xx)"),
+                
+                # Order specific errors
+                (r"order.*rejected", "Order rejected by broker"),
+                (r"order.*canceled", "Order was canceled"),
+                (r"failed.*to.*submit", "Failed to submit order to broker"),
+                (r"position.*not.*found", "Position does not exist for trailing sell"),
+                
+                # General trading errors
+                (r"trading.*halted", "Trading halted for this symbol"),
+                (r"not.*tradable", "Symbol is not tradable"),
+                (r"fractional.*shares", "Fractional shares not supported for this symbol"),
+            ]
+            
+            # Search for known patterns
+            for pattern, reason in failure_patterns:
+                if re.search(pattern, full_output):
+                    return reason
+            
+            # Extract specific error messages from stderr
+            if stderr:
+                # Look for APIError messages
+                api_error_match = re.search(r"APIError:\s*(.+?)(?:\n|$)", stderr)
+                if api_error_match:
+                    return f"API Error: {api_error_match.group(1).strip()}"
+                
+                # Look for Exception messages
+                exception_match = re.search(r"Exception:\s*(.+?)(?:\n|$)", stderr)
+                if exception_match:
+                    return f"Exception: {exception_match.group(1).strip()}"
+                
+                # Look for generic error patterns
+                error_match = re.search(r"error:\s*(.+?)(?:\n|$)", stderr, re.IGNORECASE)
+                if error_match:
+                    return f"Error: {error_match.group(1).strip()}"
+            
+            # Check for specific failed operations in stdout
+            if "failed" in stdout.lower():
+                failed_match = re.search(r"✗\s*(.+?)(?:\n|$)", stdout)
+                if failed_match:
+                    return f"Operation failed: {failed_match.group(1).strip()}"
+            
+            # If no specific pattern matched, return generic failure with snippet
+            output_snippet = (stdout[:100] if stdout else stderr[:100] if stderr else "No output").strip()
+            return f"Trade execution failed: {output_snippet}{'...' if len(output_snippet) == 100 else ''}"
+            
+        except Exception as e:
+            return f"Failed to parse error reason: {str(e)}"
 
     def save_trade_record(self, trade_record: Dict[str, Any]) -> Optional[str]:
         """
@@ -357,9 +454,10 @@ class TradeGenerator:
             success = execution_status['success']
             amount = trade_record['auto_amount']
 
+            reason = execution_status.get('reason', 'No reason provided')
             message = (f"💰 TRADE EXECUTED: {symbol} on {account_name}/{account_type}\n"
                        f"   Amount: ${amount} | Success: {success.upper()}\n"
-                       f"   Result: {execution_status.get('results', 'No output')[:100]}...\n"
+                       f"   Reason: {reason}\n"
                        f"   Saved: {filename}")
 
             if self.test_mode:
