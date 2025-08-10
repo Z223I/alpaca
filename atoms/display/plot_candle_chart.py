@@ -16,6 +16,7 @@ from ..indicators.orb_calculator import ORBCalculator
 from ..utils.extract_symbol_data import extract_symbol_data
 from ..utils.calculate_ema import calculate_ema
 from ..utils.calculate_vwap import calculate_vwap_typical
+from ..utils.calculate_macd import calculate_macd
 
 
 def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', alerts: Optional[List] = None) -> bool:
@@ -123,10 +124,15 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
         # Calculate VWAP using typical price (HLC/3)
         vwap_success, vwap_values = calculate_vwap_typical(symbol_data)
 
-        # Create figure with subplots (price and volume)
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), 
-                                       gridspec_kw={'height_ratios': [3, 1]},
-                                       sharex=True)
+        # Calculate MACD (FastLength=12, SlowLength=26, Source=close, SignalLength=9)
+        macd_success, macd_values = calculate_macd(symbol_data, fast_length=12, slow_length=26, 
+                                                  signal_length=9, source='close')
+
+        # Create figure with subplots (price, MACD, and volume)
+        # Height ratios: Price=3, MACD=1.2 (80% of 1.5), Volume=0.9 (90% of 1.0)
+        fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 12), 
+                                           gridspec_kw={'height_ratios': [3, 1.2, 0.9]},
+                                           sharex=True)
 
         # Create secondary Y axis for price/ORB high ratio
         ax1_secondary = ax1.twinx()
@@ -365,19 +371,27 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
         # Format Y-axis to show prices with 2 decimal places
         ax1.yaxis.set_major_formatter(FuncFormatter(lambda x, _: f'${x:.2f}'))
 
-        # Plot volume on bottom subplot
-        ax2.bar(symbol_data['timestamp'], symbol_data['volume'], 
-               color='blue', alpha=0.6, width=0.0008)
-        ax2.set_ylabel('Volume', fontsize=12)
-        ax2.set_xlabel(f'Time ({timezone_name})', fontsize=12)
-        ax2.grid(True, alpha=0.3)
+        # Plot MACD on middle subplot
+        if macd_success:
+            # Plot MACD line
+            ax2.plot(symbol_data['timestamp'], macd_values['macd'], 
+                    color='blue', linewidth=1.5, alpha=0.8, label='MACD')
+            
+            # Plot Signal line
+            ax2.plot(symbol_data['timestamp'], macd_values['signal'], 
+                    color='red', linewidth=1.5, alpha=0.8, label='Signal')
+            
+            # Plot Histogram as bars
+            colors = ['green' if h >= 0 else 'red' for h in macd_values['histogram']]
+            ax2.bar(symbol_data['timestamp'], macd_values['histogram'], 
+                   color=colors, alpha=0.6, width=0.0008, label='Histogram')
+            
+            ax2.set_ylabel('MACD', fontsize=12)
+            ax2.grid(True, alpha=0.3)
+            ax2.legend(loc='upper left', fontsize=10)
+            ax2.axhline(y=0, color='black', linestyle='-', linewidth=0.5, alpha=0.7)
 
-        # Set x-axis formatter to show time in ET timezone for volume chart too
-        ax2.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M', tz=et_tz))
-        ax2.xaxis.set_major_locator(mdates.HourLocator(interval=1))  # Show every hour
-        ax2.xaxis.set_minor_locator(mdates.MinuteLocator(interval=30))  # Minor ticks every 30 minutes
-
-        # Set same x-axis limits for volume chart to match price chart
+        # Set x-axis limits for MACD chart to match price chart
         if len(symbol_data) > 0:
             # Get the date from the first timestamp
             first_timestamp = symbol_data['timestamp'].iloc[0]
@@ -389,8 +403,37 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
 
             ax2.set_xlim(session_start, session_end)
 
+        # Plot volume on bottom subplot
+        ax3.bar(symbol_data['timestamp'], symbol_data['volume'], 
+               color='blue', alpha=0.6, width=0.0008)
+        ax3.set_ylabel('Volume', fontsize=12)
+        ax3.set_xlabel(f'Time ({timezone_name})', fontsize=12)
+        ax3.grid(True, alpha=0.3)
+
+        # Set x-axis formatter for MACD chart
+        ax2.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M', tz=et_tz))
+        ax2.xaxis.set_major_locator(mdates.HourLocator(interval=1))  # Show every hour
+        ax2.xaxis.set_minor_locator(mdates.MinuteLocator(interval=30))  # Minor ticks every 30 minutes
+
+        # Set x-axis formatter to show time in ET timezone for volume chart too
+        ax3.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M', tz=et_tz))
+        ax3.xaxis.set_major_locator(mdates.HourLocator(interval=1))  # Show every hour
+        ax3.xaxis.set_minor_locator(mdates.MinuteLocator(interval=30))  # Minor ticks every 30 minutes
+
+        # Set same x-axis limits for volume chart to match price chart
+        if len(symbol_data) > 0:
+            # Get the date from the first timestamp
+            first_timestamp = symbol_data['timestamp'].iloc[0]
+            trading_date = first_timestamp.date()
+
+            # Create full trading session boundaries in ET timezone
+            session_start = et_tz.localize(datetime.combine(trading_date, time(9, 30)))
+            session_end = et_tz.localize(datetime.combine(trading_date, time(16, 0)))
+
+            ax3.set_xlim(session_start, session_end)
+
         # Rotate x-axis labels
-        plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45)
+        plt.setp(ax3.xaxis.get_majorticklabels(), rotation=45)
 
         # Adjust layout
         plt.tight_layout()
