@@ -93,9 +93,13 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
     parser.add_argument('--date', type=str, required=False,
                       help='Date for chart data in YYYY-MM-DD format (default: today)')
 
+    # Position monitoring argument
+    parser.add_argument('--monitor-positions', action='store_true',
+                      help='Monitor positions continuously, liquidate when MACD score is red (polls every minute)')
+
     # Account configuration arguments
-    parser.add_argument('--account-name', type=str, default='Primary',
-                      help='Account name to use (default: Primary)')
+    parser.add_argument('--account-name', type=str, default='Bruce',
+                      help='Account name to use (default: Bruce)')
     parser.add_argument('--account', type=str, default='paper',
                       help='Account environment to use: paper, live, cash (default: paper)')
 
@@ -243,6 +247,17 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
                     parser.error("--PNL cannot be combined with any other arguments (except account configuration)")
                 elif arg_value is not None and not isinstance(arg_value, bool):
                     parser.error("--PNL cannot be combined with any other arguments (except account configuration)")
+
+    # Validate monitor-positions argument (must be standalone except for account configuration)
+    if args.monitor_positions:
+        # Check if any other arguments are present (excluding account configuration)
+        for arg_name, arg_value in vars(args).items():
+            if arg_name not in ['monitor_positions', 'account_name', 'account']:
+                # Check if argument has been set to non-default value
+                if isinstance(arg_value, bool) and arg_value:
+                    parser.error("--monitor-positions cannot be combined with any other arguments (except account configuration)")
+                elif arg_value is not None and not isinstance(arg_value, bool):
+                    parser.error("--monitor-positions cannot be combined with any other arguments (except account configuration)")
 
     # Validate take-profit-percent arguments
     if args.take_profit_percent:

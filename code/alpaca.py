@@ -1,21 +1,20 @@
-#import requests
+# import requests
 # import json
 # import math
 # import time
 import sys
 import os
 import math
+import time
 from typing import Optional, List, Dict, Any
-from datetime import datetime, date, time
+from datetime import datetime, date, time as dt_time
 import pytz
 import pandas as pd
 import json
 import glob
 
 import alpaca_trade_api as tradeapi   # pip3 install alpaca-trade-api -U
-import argparse
 
-import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from atoms.api.get_cash import get_cash
@@ -31,9 +30,11 @@ from atoms.display.print_orders import print_active_orders
 from atoms.display.print_positions import print_positions
 from atoms.display.print_quote import print_quote
 from atoms.display.generate_chart_from_df import generate_chart_from_dataframe
-from atoms.utils.macd_alert_scorer import score_alerts_with_macd
+from atoms.utils.macd_alert_scorer import score_alerts_with_macd, MACDAlertScorer
+from atoms.utils.calculate_macd import calculate_macd
 from atoms.utils.delay import delay
 from atoms.api.parse_args import parse_args
+from atoms.telegram.telegram_post import TelegramPoster
 
 # Load configuration from config file (with fallback to environment variables)
 try:
@@ -86,10 +87,8 @@ class AlpacaPrivate:
         else:
             self.PORTFOLIO_RISK = float(os.getenv('PORTFOLIO_RISK', '0.10'))
 
-
         # Initialize Alpaca API client using account configuration
         self.api = init_alpaca_client("alpaca", self.account_name, self.account)
-
 
         self.active_orders = []
 
@@ -1655,6 +1654,300 @@ class AlpacaPrivate:
             print(f"✗ Error generating plot: {e}")
             return False
 
+    def _sendTelegramLiquidationNotification(self, symbol: str, reason: str, macd_details: Dict[str, Any]) -> None:
+        """
+        Send Telegram notification when a position is liquidated.
+        
+        Args:
+            symbol: Stock symbol that was liquidated
+            reason: Reason for liquidation
+            macd_details: MACD analysis details for context
+        """
+        try:
+            # Use account name directly for Telegram username
+            account_holder = self.account_name
+            
+            # Format the notification message
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            message = f"""🚨 POSITION LIQUIDATED 🚨
+
+Account: {self.account_name} ({account_holder})
+Symbol: {symbol}
+Time: {timestamp}
+Environment: {self.account}
+
+Reason: {reason}
+
+MACD Details:
+• MACD Line: {macd_details.get('macd_line', 'N/A'):.3f}
+• Signal Line: {macd_details.get('signal_line', 'N/A'):.3f}
+• Histogram: {macd_details.get('histogram', 'N/A'):.3f}
+• Score: {macd_details.get('score', 'N/A')}/4 ({macd_details.get('color', 'N/A').upper()})
+
+This position was automatically liquidated due to poor MACD conditions."""
+            
+            # Send notification to the specific account holder
+            telegram_poster = TelegramPoster()
+            result = telegram_poster.send_message_to_user(
+                message=message,
+                username=account_holder,
+                urgent=True  # Mark as urgent for liquidation alerts
+            )
+            
+            if result['success']:
+                print(f"    ✓ Telegram notification sent to {account_holder}")
+            else:
+                print(f"    ⚠️  Failed to send Telegram notification to {account_holder}: {result['errors']}")
+                
+        except Exception as e:
+            print(f"    ⚠️  Error sending Telegram notification: {str(e)}")
+
+    def _sendTelegramLiquidationFailureNotification(self, symbol: str, reason: str, macd_details: Dict[str, Any]) -> None:
+        """
+        Send Telegram notification when a position liquidation fails.
+        
+        Args:
+            symbol: Stock symbol that failed to liquidate
+            reason: Reason for attempted liquidation
+            macd_details: MACD analysis details for context
+        """
+        try:
+            # Use account name directly for Telegram username
+            account_holder = self.account_name
+            
+            # Format the failure notification message
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            message = f"""⚠️ LIQUIDATION FAILED ⚠️
+
+Account: {self.account_name} ({account_holder})
+Symbol: {symbol}
+Time: {timestamp}
+Environment: {self.account}
+
+ATTEMPTED LIQUIDATION - FAILED TO EXECUTE
+
+Reason for liquidation attempt: {reason}
+
+MACD Details (indicating poor conditions):
+• MACD Line: {macd_details.get('macd_line', 'N/A'):.3f}
+• Signal Line: {macd_details.get('signal_line', 'N/A'):.3f}
+• Histogram: {macd_details.get('histogram', 'N/A'):.3f}
+• Score: {macd_details.get('score', 'N/A')}/4 ({macd_details.get('color', 'N/A').upper()})
+
+⚠️ MANUAL INTERVENTION REQUIRED ⚠️
+The system attempted to liquidate this position due to poor MACD conditions but the liquidation failed. Please review the position manually and take appropriate action."""
+            
+            # Send notification to the specific account holder
+            telegram_poster = TelegramPoster()
+            result = telegram_poster.send_message_to_user(
+                message=message,
+                username=account_holder,
+                urgent=True  # Mark as urgent for failed liquidation alerts
+            )
+            
+            if result['success']:
+                print(f"    ✓ Telegram failure notification sent to {account_holder}")
+            else:
+                print(f"    ⚠️  Failed to send Telegram failure notification to {account_holder}: {result['errors']}")
+                
+        except Exception as e:
+            print(f"    ⚠️  Error sending Telegram failure notification: {str(e)}")
+
+    def _monitorPositions(self) -> None:
+        """
+        Monitor positions continuously and liquidate when MACD score is red.
+        
+        This method:
+        1. Polls positions every minute
+        2. For each unique symbol, collects market data
+        3. Calculates MACD and scores it
+        4. Liquidates position if MACD score is red
+        
+        The polling continues until the script instance is stopped.
+        """
+        print("Starting position monitoring...")
+        print("Polling every 60 seconds. Press Ctrl+C to stop.")
+        print("Will liquidate positions when MACD score is RED")
+        print("=" * 60)
+        
+        macd_scorer = MACDAlertScorer()
+        
+        try:
+            while True:
+                try:
+                    # Get current positions
+                    positions = get_positions(self.api, self.account_name, self.account)
+                    
+                    if not positions:
+                        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] No positions found")
+                    else:
+                        # Create a list of unique stock symbols
+                        unique_symbols = list(set(pos.symbol for pos in positions))
+                        
+                        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Monitoring {len(unique_symbols)} symbols: {', '.join(unique_symbols)}")
+                        
+                        # Process each unique symbol
+                        for symbol in unique_symbols:
+                            try:
+                                self._processSymbolForMonitoring(symbol, macd_scorer)
+                            except Exception as e:
+                                print(f"  ✗ Error processing {symbol}: {str(e)}")
+                                continue
+                    
+                    print(f"  Next check in 60 seconds...")
+                    print("-" * 40)
+                    
+                    # Wait for 60 seconds (1 minute polling period)
+                    time.sleep(60)
+                    
+                except KeyboardInterrupt:
+                    print("\nReceived Ctrl+C. Stopping position monitoring...")
+                    break
+                except Exception as e:
+                    print(f"  ✗ Error during monitoring cycle: {str(e)}")
+                    print("  Waiting 60 seconds before retry...")
+                    time.sleep(60)
+                    continue
+                    
+        except KeyboardInterrupt:
+            print("\nPosition monitoring stopped by user.")
+        except Exception as e:
+            print(f"✗ Critical error in position monitoring: {str(e)}")
+            
+    def _processSymbolForMonitoring(self, symbol: str, macd_scorer: MACDAlertScorer) -> None:
+        """
+        Process a single symbol for MACD analysis and potential liquidation.
+        
+        Args:
+            symbol: Stock symbol to analyze
+            macd_scorer: MACD scorer instance
+        """
+        print(f"  Processing {symbol}...")
+        
+        # Collect sufficient data for MACD calculation (need at least 26 periods for default MACD)
+        try:
+            # Get market data for the last 50 minutes to ensure we have enough data
+            et_tz = pytz.timezone('America/New_York')
+            end_time = datetime.now(et_tz)
+            start_time = end_time - pd.Timedelta(minutes=50)
+            
+            # Fetch market data using Alpaca API
+            bars = self.api.get_bars(
+                symbol,
+                tradeapi.TimeFrame.Minute,
+                start=start_time.isoformat(),
+                end=end_time.isoformat(),
+                limit=1000,
+                feed='iex'
+            )
+            
+            if not bars or len(bars) < 26:
+                print(f"    ⚠️  Insufficient market data for {symbol} ({len(bars) if bars else 0} bars, need ≥26)")
+                return
+            
+            # Convert bars to DataFrame
+            market_data = []
+            for bar in bars:
+                bar_data = {
+                    'timestamp': bar.t.isoformat(),
+                    'open': float(bar.o),
+                    'high': float(bar.h),
+                    'low': float(bar.l),
+                    'close': float(bar.c),
+                    'volume': int(bar.v),
+                    'symbol': symbol
+                }
+                market_data.append(bar_data)
+            
+            df = pd.DataFrame(market_data)
+            
+            # Calculate MACD
+            macd_success, macd_values = calculate_macd(
+                df,
+                fast_length=12,
+                slow_length=26,
+                signal_length=9,
+                source='close'
+            )
+            
+            if not macd_success:
+                print(f"    ✗ MACD calculation failed for {symbol}")
+                return
+            
+            # Use the most recent timestamp for scoring
+            current_time = datetime.now(et_tz)
+            
+            # Analyze MACD conditions
+            macd_analysis = macd_scorer.calculate_macd_conditions(df, current_time)
+            
+            if not macd_analysis.get('is_valid', False):
+                print(f"    ✗ MACD analysis failed for {symbol}: {macd_analysis.get('error', 'Unknown error')}")
+                return
+            
+            # Score the MACD conditions
+            score_result = macd_scorer.score_alert(macd_analysis)
+            
+            # Get current price and MACD values for display
+            current_price = float(df.iloc[-1]['close'])
+            macd_line = macd_analysis['macd_line']
+            signal_line = macd_analysis['signal_line']
+            histogram = macd_analysis['histogram']
+            
+            # Display analysis results
+            color_emoji = {'green': '🟢', 'yellow': '🟡', 'red': '🔴'}
+            emoji = color_emoji.get(score_result['color'], '❓')
+            
+            print(f"    {emoji} {symbol}: Price=${current_price:.2f}, MACD={macd_line:.3f}, "
+                  f"Signal={signal_line:.3f}, Histogram={histogram:.3f}")
+            print(f"    MACD Score: {score_result['color'].upper()} ({score_result['score']}/4) - "
+                  f"{score_result['confidence']} confidence")
+            
+            # If MACD score is red, liquidate the position
+            if score_result['color'] == 'red':
+                print(f"    🚨 LIQUIDATING {symbol} - MACD score is RED")
+                print(f"    Reason: {score_result['reasoning']}")
+                
+                liquidation_result = self._liquidate_position(
+                    symbol=symbol,
+                    submit_order=True  # Actually execute the liquidation
+                )
+                
+                # Prepare MACD details for notification
+                macd_details = {
+                    'macd_line': macd_line,
+                    'signal_line': signal_line,
+                    'histogram': histogram,
+                    'score': score_result['score'],
+                    'color': score_result['color']
+                }
+                
+                if liquidation_result:
+                    print(f"    ✓ Successfully liquidated position in {symbol}")
+                    
+                    # Send Telegram notification for successful liquidation
+                    self._sendTelegramLiquidationNotification(
+                        symbol=symbol,
+                        reason=score_result['reasoning'],
+                        macd_details=macd_details
+                    )
+                else:
+                    print(f"    ✗ Failed to liquidate position in {symbol}")
+                    
+                    # Send Telegram notification for failed liquidation
+                    self._sendTelegramLiquidationFailureNotification(
+                        symbol=symbol,
+                        reason=score_result['reasoning'],
+                        macd_details=macd_details
+                    )
+            else:
+                print(f"    ✓ Keeping position in {symbol} - "
+                      f"MACD score is {score_result['color'].upper()}")
+
+        except Exception as e:
+            print(f"    ✗ Error analyzing {symbol}: {str(e)}")
+
     def Exec(self) -> int:
         """
         Execute the main trading logic.
@@ -1682,6 +1975,15 @@ class AlpacaPrivate:
                 print(f"Error generating PNL report: {str(e)}")
                 return 1
             return 0  # Exit early for PNL operation
+
+        # Handle position monitoring (standalone operation)
+        if self.args.monitor_positions:
+            try:
+                self._monitorPositions()
+                return 0
+            except Exception as e:
+                print(f"Error during position monitoring: {str(e)}")
+                return 1
 
         # Handle plot generation (standalone operation)
         if self.args.plot:
@@ -1912,6 +2214,7 @@ class AlpacaPrivate:
         return 0
 
 
+
 def execMain(userArgs: Optional[List[str]] = None) -> int:
     """
     Main execution function for the Alpaca trading script.
@@ -1930,14 +2233,15 @@ def execMain(userArgs: Optional[List[str]] = None) -> int:
 
     return exitValue
 
-if __name__ == '__main__':
-   try:
-      retVal = execMain(sys.argv[1:])
-   except KeyboardInterrupt:
-      print('Received <Ctrl+c>')
-      sys.exit(-1)
 
-   sys.exit(retVal)
+if __name__ == '__main__':
+    try:
+        retVal = execMain(sys.argv[1:])
+    except KeyboardInterrupt:
+        print('Received <Ctrl+c>')
+        sys.exit(-1)
+
+    sys.exit(retVal)
 
 """
 python3 -m pdb code/alpaca.py

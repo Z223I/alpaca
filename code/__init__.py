@@ -8,9 +8,13 @@ __version__ = "1.0.0"
 __author__ = "Alpaca Trading System"
 
 # Import main classes for easy access
-from .alpaca import alpaca_private, execMain
+from .alpaca import AlpacaPrivate, execMain
+
+# Create alias for backwards compatibility
+alpaca_private = AlpacaPrivate
 
 __all__ = [
+    'AlpacaPrivate',
     'alpaca_private',
     'execMain'
 ]

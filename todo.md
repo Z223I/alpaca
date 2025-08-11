@@ -71,23 +71,26 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 - [X] Add MACD analysis to superduper alert.  Filter red emojis
 
 
-## PNL Integration
+## Monitor Positions
 
 ### Config
 
-- [ ] claude --dangerously-skip-permissions
-- [ ] /login
-- [ ] /commit
-- [ ] Sync changes
-- [ ] /clear
-- [ ] git switch -c feature/closing-trades
-- [ ] /clear
-- [ ] /read...
+- [X] claude --dangerously-skip-permissions
+- [X] /login
+- [X] /commit
+- [X] Sync changes
+- [X] /clear
+- [X] git switch -c feature/closing-trades
+- [X] /clear
+- [X] /read...
 
 ### Spec File
 
 - [ ] Important. Think hard. Implement the instructions in specs/closing-trades.md
-- [ ] Nudge
+- [ ] If a position is liquidated, use Telegram to notify the account holder.  Use Bruce for Primary.
+- [ ] Also, notify the user if the liquidation failed.
+- [ ] Switch the default account from Primary to Bruce.  Get rid of the mapping.  Get rid of the Primary account in the config file.  All Telegram users will map directly to the account names in the config file.
+
 - [ ] /commit
 - [ ] Publish the branch
 - [ ] git switch master; merge current branch
