@@ -33,14 +33,14 @@
 ### ⚡ **Short-Term Momentum Analysis**
 🚀 **Enhanced Momentum Tracking**
 • Added **short-term momentum** alongside existing momentum
+• **Traffic light indicators** for both momentum measurements
 • Color-coded momentum indicators for quick analysis
 • Better insight into immediate price acceleration
 
-📈 **Example Display:**
-```
-• Momentum: 🟢 **0.0800%/min**
-• Momentum Short: 🔥 **0.1200%/min**
-```
+🚦 **Traffic Light System:**
+• **🟢 Strong**: High momentum (≥0.75%/min)
+• **🟡 Moderate**: Medium momentum (0.3-0.75%/min)
+• **🔴 Weak**: Low momentum (<0.3%/min)
 
 ---
 
@@ -135,8 +135,8 @@
 📈 **Trend Analysis (30m):**
 • Time of Day: 🟢 **MORNING POWER** (10:30 ET)
 • Price Movement: **+2.50%**
-• Momentum: 🟢 **0.0800%/min**
-• Momentum Short: 🔥 **0.1200%/min**
+• Momentum: 🟢 **0.800%/min**
+• Momentum Short: 🟢 **0.1200%/min**
 • Penetration Increase: **+15.0%**
 • Pattern: **Accelerating Breakout** 🚀
 
