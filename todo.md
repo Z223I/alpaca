@@ -71,6 +71,10 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 - [X] Add MACD analysis to superduper alert.  Filter red emojis
 
 
+- [ ] Question only: Is code/orb_alerts_trade_stocks.py is reading the dir that it is monitoring at start up.
+- [ ] Don't do that.  Only watch for current changes because sometimes this script gets restarted during the day.
+
+
 ## Monitor Positions
 
 ### Config
@@ -90,7 +94,7 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 - [X] If a position is liquidated, use Telegram to notify the account holder.  Use Bruce for Primary.
 - [X] Also, notify the user if the liquidation failed.
 - [X] Switch the default account from Primary to Bruce.  Get rid of the mapping.  Get rid of the Primary account in the config file.  All Telegram users will map directly to the account names in the config file.
-- [ ] ???? Automatically start monitor positions when the first trade of the day is made. It will no longer be called from the command line.
+- [ ] ???? Automatically start monitor positions when the first trade of the day is made. Does it need to be async?
 - [ ] /commit
 - [ ] Publish the branch
 - [ ] git switch master; merge current branch

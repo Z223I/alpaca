@@ -6,6 +6,7 @@ import sys
 import os
 import math
 import time
+import subprocess
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date, time as dt_time
 import pytz
@@ -91,6 +92,12 @@ class AlpacaPrivate:
         self.api = init_alpaca_client("alpaca", self.account_name, self.account)
 
         self.active_orders = []
+        
+        # First trade tracking and position monitoring
+        self._first_trade_completed = False
+        self._monitoring_process = None
+        self._monitoring_started_today = False
+        self._today_date = datetime.now(pytz.timezone('America/New_York')).date()
 
 
     def _calculateQuantity(self, price: float, method_name: str = "method") -> int:
@@ -177,6 +184,8 @@ class AlpacaPrivate:
                 print(f"  Symbol: {order_response.symbol}")
                 print(f"  Quantity: {order_response.qty}")
                 print(f"  Market Price: ~${market_price:.2f}")
+                # Trigger position monitoring on successful trade
+                self._onTradeExecuted(order_response, f"Market buy: {symbol}")
                 return order_response
             except Exception as e:
                 print(f"✗ Market buy order submission failed: {str(e)}")
@@ -1378,6 +1387,8 @@ class AlpacaPrivate:
                 print(f"  Symbol: {order_response.symbol}")
                 print(f"  Quantity: {order_response.qty}")
                 print(f"  Order Class: {order_response.order_class}")
+                # Trigger position monitoring on successful trade
+                self._onTradeExecuted(order_response, f"Bracket order: {symbol}")
                 return order_response
             except Exception as e:
                 print(f"✗ Bracket order submission failed: {str(e)}")
@@ -1439,8 +1450,10 @@ class AlpacaPrivate:
                 print(f"  Status: {order_response.status}")
                 print(f"  Symbol: {order_response.symbol}")
                 print(f"  Quantity: {order_response.qty}")
-                print(f"  Limit Price: {limit_price}")
+                print(f"  Limit Price: ${limit_price:.2f}")
                 print(f"  Order Class: {order_response.order_class}")
+                # Trigger position monitoring on successful trade
+                self._onTradeExecuted(order_response, f"Future bracket order: {symbol}")
                 return order_response
             except Exception as e:
                 print(f"✗ Future bracket order submission failed: {str(e)}")
@@ -1657,6 +1670,129 @@ class AlpacaPrivate:
         except Exception as e:
             print(f"✗ Error generating plot: {e}")
             return False
+
+    def _isFirstTradeOfDay(self) -> bool:
+        """
+        Check if position monitoring has already been started today.
+        
+        Returns:
+            True if this is the first trade and monitoring hasn't started today
+        """
+        current_date = datetime.now(pytz.timezone('America/New_York')).date()
+        
+        # Reset tracking if it's a new day
+        if current_date != self._today_date:
+            self._today_date = current_date
+            self._first_trade_completed = False
+            self._monitoring_started_today = False
+            
+        return not self._monitoring_started_today
+
+    def _startPositionMonitoring(self) -> bool:
+        """
+        Start position monitoring as a separate subprocess.
+        
+        Returns:
+            True if monitoring was started successfully, False otherwise
+        """
+        try:
+            # Check if monitoring is already running
+            if self._monitoring_process and self._monitoring_process.poll() is None:
+                print("✓ Position monitoring already running")
+                return True
+                
+            print("🚀 Starting automatic position monitoring...")
+            
+            # Build command to start position monitoring
+            python_path = sys.executable
+            script_path = os.path.abspath(__file__)
+            
+            monitor_cmd = [
+                python_path,
+                script_path,
+                "--monitor-positions",
+                "--account-name", self.account_name,
+                "--account", self.account
+            ]
+            
+            print(f"Command: {' '.join(monitor_cmd)}")
+            
+            # Start monitoring as subprocess
+            self._monitoring_process = subprocess.Popen(
+                monitor_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                start_new_session=True  # Detach from parent process
+            )
+            
+            # Give it a moment to start
+            time.sleep(2)
+            
+            # Check if process started successfully
+            if self._monitoring_process.poll() is None:
+                self._monitoring_started_today = True
+                print(f"✅ Position monitoring started successfully (PID: {self._monitoring_process.pid})")
+                print("📊 Monitoring will liquidate positions when MACD score is RED")
+                print("📱 Telegram notifications will be sent to Bruce for liquidations")
+                return True
+            else:
+                # Process failed to start or exited immediately
+                stdout, stderr = self._monitoring_process.communicate()
+                print(f"✗ Position monitoring failed to start")
+                print(f"STDOUT: {stdout.decode()[:200]}...")
+                print(f"STDERR: {stderr.decode()[:200]}...")
+                self._monitoring_process = None
+                return False
+                
+        except Exception as e:
+            print(f"✗ Error starting position monitoring: {str(e)}")
+            self._monitoring_process = None
+            return False
+
+    def _onTradeExecuted(self, trade_result: Any, operation: str) -> None:
+        """
+        Called after a successful trade execution to trigger monitoring if needed.
+        
+        Args:
+            trade_result: Result from trade execution
+            operation: Description of the operation performed
+        """
+        try:
+            if trade_result and self._isFirstTradeOfDay():
+                print(f"🎯 First trade of the day executed: {operation}")
+                print("🔄 Automatically starting position monitoring...")
+                
+                if self._startPositionMonitoring():
+                    print("✅ Position monitoring is now active")
+                else:
+                    print("⚠️ Failed to start position monitoring - please start manually")
+                    
+        except Exception as e:
+            print(f"⚠️ Error in post-trade monitoring setup: {str(e)}")
+
+    def _cleanup_monitoring_process(self) -> None:
+        """
+        Clean up the monitoring subprocess if it's running.
+        Should be called during graceful shutdown.
+        """
+        try:
+            if self._monitoring_process and self._monitoring_process.poll() is None:
+                print("🛑 Cleaning up position monitoring process...")
+                self._monitoring_process.terminate()
+                
+                # Give it a few seconds to terminate gracefully
+                try:
+                    self._monitoring_process.wait(timeout=5)
+                    print("✅ Position monitoring process terminated gracefully")
+                except subprocess.TimeoutExpired:
+                    print("⚠️ Monitoring process didn't terminate gracefully, killing...")
+                    self._monitoring_process.kill()
+                    self._monitoring_process.wait()
+                    print("✅ Position monitoring process killed")
+                    
+                self._monitoring_process = None
+        except Exception as e:
+            print(f"⚠️ Error cleaning up monitoring process: {str(e)}")
 
     def _sendTelegramLiquidationNotification(self, symbol: str, reason: str, macd_details: Dict[str, Any]) -> None:
         """
@@ -2219,6 +2355,8 @@ The system attempted to liquidate this position due to poor MACD conditions but 
                 print("Failed to submit take profit percent order")
                 return 1
 
+        # Cleanup before exit
+        self._cleanup_monitoring_process()
         return 0
 
 
