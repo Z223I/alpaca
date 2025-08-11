@@ -274,13 +274,34 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
                 print(f"DEBUG: Alert at {alert_time} ({'in' if within_range else 'out of'} range) - {alert_type} {alert_level}")
 
                 # Show ALL alerts regardless of chart timeframe (removed market hours filtering)
-                # Set color based on alert level (green for green alerts, yellow for yellow alerts)
-                if alert_level == 'green':
+                # Set color based on MACD score if available, otherwise fall back to alert level
+                macd_score = alert.get('macd_score', None)
+                if macd_score and isinstance(macd_score, dict):
+                    score_color = macd_score.get('color', '').upper()
+                    if score_color == 'GREEN':
+                        color = 'green'
+                    elif score_color == 'YELLOW':
+                        color = 'gold'  # Use gold for better visibility than pure yellow
+                    elif score_color == 'RED':
+                        color = 'red'
+                    else:
+                        color = 'gray'  # Unknown MACD score
+                elif macd_score and isinstance(macd_score, str):
+                    # Handle legacy string format
+                    if macd_score == 'GREEN':
+                        color = 'green'
+                    elif macd_score == 'YELLOW':
+                        color = 'gold'
+                    elif macd_score == 'RED':
+                        color = 'red'
+                    else:
+                        color = 'gray'
+                elif alert_level == 'green':
                     color = 'green'
                 elif alert_level == 'yellow':
                     color = 'gold'  # Use gold for better visibility than pure yellow
                 else:
-                    # Fallback to old logic if alert_level is not available
+                    # Fallback to old logic if neither macd_score nor alert_level is available
                     color = 'green' if alert_type == 'bullish' else 'red'
                 alpha = 0.3
 
