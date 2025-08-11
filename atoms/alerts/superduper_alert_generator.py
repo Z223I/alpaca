@@ -185,20 +185,21 @@ class SuperduperAlertGenerator:
                 f"• Pattern: **Sustained Strength** 🔄"
             ])
 
-        # Add MACD analysis if available
+        # Always add MACD analysis section (with fallback when data unavailable)
         macd_analysis = trend_analysis.get('macd_analysis', {})
+        
+        # Color emoji mapping
+        color_emoji = {
+            'GREEN': '🟢',
+            'YELLOW': '🟡', 
+            'RED': '🔴'
+        }
+        
         if macd_analysis:
+            # MACD data available - show full analysis
             macd_color = macd_analysis.get('macd_color', 'UNKNOWN').upper()
             macd_value = macd_analysis.get('macd_value', 0)
             signal_value = macd_analysis.get('signal_value', 0)
-            
-            # Color emoji mapping
-            color_emoji = {
-                'GREEN': '🟢',
-                'YELLOW': '🟡', 
-                'RED': '🔴'
-            }
-            
             macd_emoji = color_emoji.get(macd_color, '⚪')
             
             message_parts.extend([
@@ -208,6 +209,16 @@ class SuperduperAlertGenerator:
                 f"• MACD Value: **{macd_value:.4f}**",
                 f"• Signal Line: **{signal_value:.4f}**",
                 f"• Momentum: {'Bullish' if macd_value > signal_value else 'Bearish'}"
+            ])
+        else:
+            # No MACD data - show fallback message
+            message_parts.extend([
+                f"",
+                f"📊 **MACD Technical Analysis:**",
+                f"• MACD Condition: 🔴 **BLIND FLIGHT**",
+                f"• Status: **No live data available**",
+                f"• Reason: Market closed or API error",
+                f"• Action: Monitor manually for MACD confirmation"
             ])
 
         # Add urgency and risk assessment
