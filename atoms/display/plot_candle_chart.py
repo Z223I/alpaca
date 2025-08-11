@@ -447,7 +447,7 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
         os.makedirs(date_specific_output_dir, exist_ok=True)
 
         # Save the chart
-        filename = f"{symbol}_candle_chart.png"
+        filename = f"{symbol}_chart.png"
         filepath = os.path.join(date_specific_output_dir, filename)
         plt.savefig(filepath, dpi=300, bbox_inches='tight')
 

@@ -87,6 +87,12 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
     parser.add_argument('--PNL', action='store_true',
                       help='Display daily profit/loss summary (standalone use only)')
 
+    # Plot arguments
+    parser.add_argument('--plot', action='store_true',
+                      help='Generate candlestick chart with MACD for a symbol (requires --symbol)')
+    parser.add_argument('--date', type=str, required=False,
+                      help='Date for chart data in YYYY-MM-DD format (default: today)')
+
     # Account configuration arguments
     parser.add_argument('--account-name', type=str, default='Primary',
                       help='Account name to use (default: Primary)')
@@ -261,6 +267,21 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
                     parser.error("Display-only arguments (--positions, --cash, --active-order) cannot be combined with other operations")
                 elif arg_value is not None and not isinstance(arg_value, bool):
                     parser.error("Display-only arguments (--positions, --cash, --active-order) cannot be combined with other operations")
+
+    # Validate plot arguments
+    if args.plot:
+        if not args.symbol:
+            parser.error("--plot requires --symbol")
+        # Validate date format if provided
+        if args.date:
+            import re
+            from datetime import datetime
+            if not re.match(r'^\d{4}-\d{2}-\d{2}$', args.date):
+                parser.error("--date must be in YYYY-MM-DD format")
+            try:
+                datetime.strptime(args.date, '%Y-%m-%d')
+            except ValueError:
+                parser.error("--date must be a valid date in YYYY-MM-DD format")
 
     # Normalize symbol to uppercase if provided
     if args.symbol:

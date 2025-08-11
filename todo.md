@@ -61,7 +61,14 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 - [ ] Add time of day signals with green and then yellow for the afternoon
 
 
+## MACD chart to Telegram
 
+- [ ] 
+
+## Alpaca CLI arg --plot
+
+- [ ] Require --symbol
+- [ ] Use atoms/display/generate_chart_from_df.py
 
 ## Test new trade placement
 

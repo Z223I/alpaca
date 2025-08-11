@@ -6,6 +6,11 @@ import sys
 import os
 import math
 from typing import Optional, List, Dict, Any
+from datetime import datetime, date, time
+import pytz
+import pandas as pd
+import json
+import glob
 
 import alpaca_trade_api as tradeapi   # pip3 install alpaca-trade-api -U
 import argparse
@@ -25,6 +30,7 @@ from atoms.display.print_cash import print_cash
 from atoms.display.print_orders import print_active_orders
 from atoms.display.print_positions import print_positions
 from atoms.display.print_quote import print_quote
+from atoms.display.generate_chart_from_df import generate_chart_from_dataframe
 from atoms.utils.delay import delay
 from atoms.api.parse_args import parse_args
 
@@ -1441,6 +1447,196 @@ class AlpacaPrivate:
                 print(f"  Symbol: {symbol}, Quantity: {quantity}, Limit Price: {limit_price}")
                 return None
 
+    def _load_superduper_alerts_for_symbol(self, symbol: str, target_date: date) -> List[Dict[str, Any]]:
+        """
+        Load sent superduper alerts for a specific symbol and date.
+        
+        Args:
+            symbol: Stock symbol to load alerts for
+            target_date: Date to load alerts for
+            
+        Returns:
+            List of alert dictionaries with timestamp_dt, alert_type, and alert_level
+        """
+        alerts = []
+        
+        try:
+            # Format date as YYYY-MM-DD for directory structure
+            date_str = target_date.strftime('%Y-%m-%d')
+            alerts_base_dir = os.path.join('historical_data', date_str, 'superduper_alerts_sent')
+            
+            if not os.path.exists(alerts_base_dir):
+                print(f"No superduper alerts directory found for {target_date}")
+                return alerts
+            
+            # Check both bullish and bearish alert directories
+            for alert_type in ['bullish', 'bearish']:
+                alert_type_dir = os.path.join(alerts_base_dir, alert_type)
+                
+                if not os.path.exists(alert_type_dir):
+                    continue
+                
+                # Check both yellow and green alert levels
+                for alert_level in ['yellow', 'green']:
+                    alert_level_dir = os.path.join(alert_type_dir, alert_level)
+                    
+                    if not os.path.exists(alert_level_dir):
+                        continue
+                    
+                    # Look for superduper alert files matching the symbol
+                    alert_pattern = f"superduper_alert_{symbol}_*.json"
+                    alert_files = glob.glob(os.path.join(alert_level_dir, alert_pattern))
+                    
+                    for alert_file in alert_files:
+                        try:
+                            with open(alert_file, 'r') as f:
+                                alert_data = json.load(f)
+                            
+                            # Add alert type and level
+                            alert_data['alert_type'] = alert_type
+                            alert_data['alert_level'] = alert_level
+                            
+                            # Parse timestamp to datetime object
+                            if 'timestamp' in alert_data:
+                                timestamp_str = alert_data['timestamp']
+                                try:
+                                    # Handle timezone format: convert -0400 to -04:00 for Python compatibility
+                                    if timestamp_str.endswith(('-0400', '-0500')):
+                                        timestamp_str = timestamp_str[:-2] + ':' + timestamp_str[-2:]
+                                    
+                                    # Parse the timestamp - super alerts are in ET timezone with offset
+                                    alert_dt = datetime.fromisoformat(timestamp_str)
+                                    alert_data['timestamp_dt'] = alert_dt
+                                    
+                                except ValueError:
+                                    # Fallback: try parsing without timezone, then localize to ET
+                                    try:
+                                        alert_dt = datetime.fromisoformat(timestamp_str.split('+')[0].split('-0400')[0].split('-0500')[0])
+                                        # If timezone-naive, assume it's in ET timezone
+                                        if alert_dt.tzinfo is None:
+                                            et_tz = pytz.timezone('America/New_York')
+                                            alert_dt = et_tz.localize(alert_dt)
+                                        alert_data['timestamp_dt'] = alert_dt
+                                    except ValueError:
+                                        print(f"Warning: Could not parse timestamp in {alert_file}")
+                                        continue
+                            
+                            alerts.append(alert_data)
+                            
+                        except Exception as e:
+                            print(f"Warning: Error loading superduper alert file {alert_file}: {e}")
+                            continue
+            
+            # Sort alerts by timestamp
+            alerts.sort(key=lambda x: x.get('timestamp_dt', datetime.min.replace(tzinfo=pytz.UTC)))
+            
+            print(f"Loaded {len(alerts)} superduper alerts for {symbol} on {target_date}")
+            
+        except Exception as e:
+            print(f"Error loading superduper alerts for {symbol} on {target_date}: {e}")
+        
+        return alerts
+
+    def _generate_plot(self, symbol: str, plot_date: Optional[str] = None) -> bool:
+        """
+        Generate candlestick chart with MACD for a symbol.
+
+        Args:
+            symbol: Stock symbol to plot
+            plot_date: Date in YYYY-MM-DD format (default: today)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Set up date - use provided date or default to today
+            if plot_date:
+                target_date = datetime.strptime(plot_date, '%Y-%m-%d').date()
+            else:
+                target_date = date.today()
+
+            print(f"Generating chart for {symbol} on {target_date}")
+
+            # Set up time range for market data (Eastern Time)
+            et_tz = pytz.timezone('America/New_York')
+            start_time = datetime.combine(target_date, time(4, 0), tzinfo=et_tz)
+            end_time = datetime.combine(target_date, time(20, 0), tzinfo=et_tz)
+
+            print(f"Fetching market data from {start_time} to {end_time}")
+
+            # Fetch market data using Alpaca API
+            try:
+                bars = self.api.get_bars(
+                    symbol,
+                    tradeapi.TimeFrame.Minute,
+                    start=start_time.isoformat(),
+                    end=end_time.isoformat(),
+                    limit=10000,
+                    feed='iex'  # Use IEX feed for reliability
+                )
+            except Exception as e:
+                print(f"✗ Error fetching market data: {e}")
+                return False
+
+            if not bars:
+                print(f"✗ No market data available for {symbol} on {target_date}")
+                return False
+
+            # Convert bars to DataFrame
+            market_data = []
+            for bar in bars:
+                bar_data = {
+                    'timestamp': bar.t.isoformat(),
+                    'open': float(bar.o),
+                    'high': float(bar.h),
+                    'low': float(bar.l),
+                    'close': float(bar.c),
+                    'volume': int(bar.v),
+                    'symbol': symbol
+                }
+                market_data.append(bar_data)
+
+            # Create DataFrame
+            df = pd.DataFrame(market_data)
+            print(f"Retrieved {len(df)} minutes of data")
+
+            if len(df) < 26:  # Need at least 26 periods for MACD
+                print(f"✗ Insufficient data for MACD calculation: {len(df)} < 26 periods")
+                return False
+
+            # Set up output directory
+            date_str = target_date.strftime('%Y%m%d')
+
+            # Load superduper alerts for this symbol and date
+            alerts = self._load_superduper_alerts_for_symbol(symbol, target_date)
+
+            # Generate chart using the chart generation atom
+            success = generate_chart_from_dataframe(
+                df=df,
+                symbol=symbol,
+                output_dir='plots',  # Base directory - function will create date subdirectory
+                alerts=alerts,  # Include loaded alerts
+                verbose=True
+            )
+
+            if success:
+                chart_path = f'plots/{date_str}/{symbol}_chart.png'
+                print(f"✓ Chart generated successfully: {chart_path}")
+                print(f"  Chart includes:")
+                print(f"    • Price candlesticks with ORB levels, EMA(9), EMA(20), VWAP")
+                print(f"    • MACD indicators (12,26,9) with MACD line, Signal line, Histogram")
+                print(f"    • Volume data")
+                if alerts:
+                    print(f"    • {len(alerts)} superduper alert overlays")
+                return True
+            else:
+                print("✗ Chart generation failed")
+                return False
+
+        except Exception as e:
+            print(f"✗ Error generating plot: {e}")
+            return False
+
     def Exec(self) -> int:
         """
         Execute the main trading logic.
@@ -1468,6 +1664,20 @@ class AlpacaPrivate:
                 print(f"Error generating PNL report: {str(e)}")
                 return 1
             return 0  # Exit early for PNL operation
+
+        # Handle plot generation (standalone operation)
+        if self.args.plot:
+            try:
+                success = self._generate_plot(self.args.symbol, self.args.date)
+                if success:
+                    print("✓ Chart generation completed successfully")
+                    return 0
+                else:
+                    print("✗ Chart generation failed")
+                    return 1
+            except Exception as e:
+                print(f"✗ Error during chart generation: {e}")
+                return 1
 
         # Handle display-only arguments
         display_args = [self.args.positions, self.args.cash, self.args.active_order]

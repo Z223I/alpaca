@@ -125,7 +125,7 @@ class ChartFromDataFrame:
                 # Determine the chart path
                 chart_date = self.df['timestamp'].iloc[0].date()
                 date_subdir = chart_date.strftime('%Y%m%d')
-                chart_path = os.path.join(self.output_dir, date_subdir, f"{self.symbol}_candle_chart.png")
+                chart_path = os.path.join(self.output_dir, date_subdir, f"{self.symbol}_chart.png")
                 
                 if verbose:
                     if os.path.exists(chart_path):
@@ -173,7 +173,7 @@ class ChartFromDataFrame:
         """
         chart_date = self.df['timestamp'].iloc[0].date()
         date_subdir = chart_date.strftime('%Y%m%d')
-        return os.path.join(self.output_dir, date_subdir, f"{self.symbol}_candle_chart.png")
+        return os.path.join(self.output_dir, date_subdir, f"{self.symbol}_chart.png")
 
 
 # Convenience function for quick chart generation
