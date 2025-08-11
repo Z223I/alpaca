@@ -14,6 +14,12 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
 import pytz
 
+# Import MACD calculation utilities
+from ..utils.calculate_macd import calculate_macd
+from ..utils.macd_alert_scorer import MACDAlertScorer
+from ..api.init_alpaca_client import init_alpaca_client
+import alpaca_trade_api as tradeapi
+
 
 class SuperduperAlertData:
     """Data structure for superduper alert analysis with full market data integration."""
@@ -254,7 +260,127 @@ class SuperduperAlertData:
             'time_span_minutes': round(time_span_minutes, 1)
         }
 
+        # Add MACD analysis to the analysis_data
+        macd_analysis = self._calculate_macd_analysis(latest_time)
+        if macd_analysis:
+            analysis_data['macd_analysis'] = macd_analysis
+        
         return trend_type, strength, analysis_data
+
+    def _calculate_macd_analysis(self, alert_timestamp: datetime) -> Optional[Dict[str, Any]]:
+        """
+        Calculate MACD analysis using live Alpaca data for the alert timestamp.
+        
+        Args:
+            alert_timestamp: Timestamp of the current alert
+            
+        Returns:
+            Dictionary with MACD analysis including color score, or None if calculation failed
+        """
+        try:
+            self.logger.debug(f"Calculating MACD analysis for {self.symbol} at {alert_timestamp}")
+            
+            # Initialize Alpaca client for live data
+            api_client = init_alpaca_client()
+            
+            # Calculate timeframe for MACD (need at least 26 + 9 = 35 periods for reliable MACD)
+            # Use 1-minute bars and fetch 60 minutes of data to ensure we have enough
+            end_time = alert_timestamp
+            start_time = end_time - timedelta(minutes=60)
+            
+            # Fetch the data using alpaca_trade_api
+            bars = api_client.get_bars(
+                self.symbol,
+                tradeapi.TimeFrame.Minute,
+                start=start_time.isoformat(),
+                end=end_time.isoformat(),
+                limit=1000,
+                adjustment='raw'
+            )
+            
+            if not bars or len(bars) == 0:
+                self.logger.warning(f"No market data returned for {self.symbol}")
+                return None
+                
+            if len(bars) < 26:  # Need minimum 26 periods for MACD
+                self.logger.warning(f"Insufficient data for MACD calculation: {len(bars)} bars")
+                return None
+            
+            # Convert to DataFrame format expected by MACD calculator
+            df_data = []
+            et_tz = pytz.timezone('America/New_York')
+            
+            for bar in bars:
+                # Convert timestamp to ET and ensure it's timezone-aware
+                timestamp = bar.timestamp
+                if timestamp.tzinfo is None:
+                    timestamp = pytz.UTC.localize(timestamp)
+                timestamp_et = timestamp.astimezone(et_tz)
+                
+                df_data.append({
+                    'timestamp': timestamp_et,
+                    'open': float(bar.open),
+                    'high': float(bar.high),
+                    'low': float(bar.low),
+                    'close': float(bar.close),
+                    'volume': int(bar.volume),
+                    'symbol': self.symbol
+                })
+            
+            # Create DataFrame
+            df = pd.DataFrame(df_data)
+            df = df.sort_values('timestamp').reset_index(drop=True)
+            
+            self.logger.debug(f"Created DataFrame with {len(df)} bars for MACD calculation")
+            
+            # Calculate MACD using existing atom
+            macd_success, macd_values = calculate_macd(df, fast_length=12, slow_length=26, 
+                                                     signal_length=9, source='close')
+            
+            if not macd_success or macd_values is None:
+                self.logger.warning(f"MACD calculation failed for {self.symbol}")
+                return None
+            
+            # Get the latest MACD values (most recent timestamp)
+            latest_idx = len(macd_values['macd']) - 1
+            latest_macd = macd_values['macd'].iloc[latest_idx]
+            latest_signal = macd_values['signal'].iloc[latest_idx] 
+            latest_histogram = macd_values['histogram'].iloc[latest_idx]
+            
+            # Calculate MACD color score using existing scorer
+            scorer = MACDAlertScorer()
+            
+            # Create a dummy alert for scoring (we just need the timestamp)
+            dummy_alert = {
+                'timestamp_dt': alert_timestamp,
+                'alert_type': 'bullish',
+                'alert_level': 'green'
+            }
+            
+            scored_alerts = scorer.score_alerts_batch(df, [dummy_alert])
+            macd_score_info = scored_alerts[0].get('macd_score', {}) if scored_alerts else {}
+            
+            # Compile MACD analysis
+            macd_analysis = {
+                'macd_value': round(float(latest_macd), 6),
+                'signal_value': round(float(latest_signal), 6),
+                'histogram_value': round(float(latest_histogram), 6),
+                'macd_color': macd_score_info.get('color', 'UNKNOWN'),
+                'macd_score': macd_score_info.get('score', 0),
+                'macd_reasoning': macd_score_info.get('reasoning', 'No reasoning available'),
+                'data_points_used': len(df),
+                'timeframe_minutes': 60,
+                'calculated_at': alert_timestamp.isoformat()
+            }
+            
+            self.logger.info(f"MACD analysis for {self.symbol}: {macd_analysis['macd_color']} "
+                           f"(MACD: {macd_analysis['macd_value']}, Signal: {macd_analysis['signal_value']})")
+            
+            return macd_analysis
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating MACD analysis for {self.symbol}: {e}")
+            return None
 
     def _calculate_volatility(self, prices: List[float]) -> float:
         """Calculate price volatility as coefficient of variation."""
@@ -536,6 +662,15 @@ class SuperduperAlertFilter:
 
         if penetration < MIN_PENETRATION:
             return False, f"Penetration too low: {penetration:.1f}% (need {MIN_PENETRATION:.1f}%)"
+
+        # MACD filter - reject 🔴 MACD conditions
+        macd_analysis = analysis_data.get('macd_analysis', {})
+        if macd_analysis:
+            macd_color = macd_analysis.get('macd_color', '').upper()
+            if macd_color == 'RED':
+                macd_reasoning = macd_analysis.get('macd_reasoning', 'Poor MACD conditions')
+                self.logger.info(f"MACD filter: Rejecting {symbol} superduper alert due to 🔴 MACD condition")
+                return False, f"MACD filter: 🔴 condition - {macd_reasoning}"
 
         if strength < MIN_STRENGTH:
             return False, f"Trend strength too weak: {strength:.2f} (need {MIN_STRENGTH:.2f})"

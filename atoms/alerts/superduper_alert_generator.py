@@ -185,6 +185,31 @@ class SuperduperAlertGenerator:
                 f"• Pattern: **Sustained Strength** 🔄"
             ])
 
+        # Add MACD analysis if available
+        macd_analysis = trend_analysis.get('macd_analysis', {})
+        if macd_analysis:
+            macd_color = macd_analysis.get('macd_color', 'UNKNOWN').upper()
+            macd_value = macd_analysis.get('macd_value', 0)
+            signal_value = macd_analysis.get('signal_value', 0)
+            
+            # Color emoji mapping
+            color_emoji = {
+                'GREEN': '🟢',
+                'YELLOW': '🟡', 
+                'RED': '🔴'
+            }
+            
+            macd_emoji = color_emoji.get(macd_color, '⚪')
+            
+            message_parts.extend([
+                f"",
+                f"📊 **MACD Technical Analysis:**",
+                f"• MACD Condition: {macd_emoji} **{macd_color}**", 
+                f"• MACD Value: **{macd_value:.4f}**",
+                f"• Signal Line: **{signal_value:.4f}**",
+                f"• Momentum: {'Bullish' if macd_value > signal_value else 'Bearish'}"
+            ])
+
         # Add urgency and risk assessment
         urgency = self._calculate_urgency_level(trend_type, trend_strength, trend_analysis)
         risk_level = self._assess_risk_level(trend_type, trend_strength, penetration)

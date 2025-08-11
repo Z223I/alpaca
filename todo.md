@@ -63,12 +63,16 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 
 ## MACD chart to Telegram
 
-- [ ] 
+- [ ]
+
+## MACD Analysis
+
+-  [ ] 
 
 ## Alpaca CLI arg --plot
 
-- [ ] Require --symbol
-- [ ] Use atoms/display/generate_chart_from_df.py
+- [X] Require --symbol
+- [X] Use atoms/display/generate_chart_from_df.py
 
 ## Test new trade placement
 
