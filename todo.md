@@ -67,7 +67,7 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 
 ## MACD Analysis
 
--  [ ] 
+-  [X] Add MACD analysis to superduper alert.  Filter red emojis
 
 ## Alpaca CLI arg --plot
 
