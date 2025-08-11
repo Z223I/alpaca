@@ -1895,40 +1895,280 @@ The system attempted to liquidate this position due to poor MACD conditions but 
         except Exception as e:
             print(f"    ⚠️  Error sending Telegram failure notification: {str(e)}")
 
+    def _sendHourlyPositionReport(self, positions, current_time) -> None:
+        """
+        Send hourly position report via Telegram.
+        
+        Args:
+            positions: List of current positions
+            current_time: Current datetime with ET timezone
+        """
+        try:
+            account_holder = self.account_name
+            
+            # Create position summary
+            position_summary = []
+            total_market_value = 0
+            
+            for pos in positions:
+                shares = int(pos.qty)
+                market_value = float(pos.market_value)
+                current_price = float(pos.current_price)
+                unrealized_pnl = float(pos.unrealized_pnl)
+                unrealized_pnl_pct = float(pos.unrealized_plpc) * 100
+                
+                total_market_value += market_value
+                
+                pnl_emoji = "📈" if unrealized_pnl >= 0 else "📉"
+                
+                position_summary.append(
+                    f"• {pos.symbol}: {shares:,} shares @ ${current_price:.2f}\n"
+                    f"  Value: ${market_value:,.2f} {pnl_emoji} ${unrealized_pnl:+.2f} ({unrealized_pnl_pct:+.1f}%)"
+                )
+            
+            # Format the report message
+            time_str = current_time.strftime('%Y-%m-%d %H:%M:%S ET')
+            current_minute = current_time.minute
+            
+            # Determine if this is top of hour or bottom of hour report
+            if current_minute <= 2:
+                report_type = "Top of Hour"
+            elif 28 <= current_minute <= 32:
+                report_type = "Bottom of Hour"
+            elif current_minute >= 58:
+                report_type = "Top of Hour (Next)"
+            else:
+                report_type = "Position"  # fallback
+            
+            message = f"""📊 {report_type} Position Report 📊
+
+Account: {self.account_name}
+Time: {time_str}
+Environment: {self.account}
+
+Current Holdings ({len(positions)} positions):
+
+{chr(10).join(position_summary)}
+
+Total Portfolio Value: ${total_market_value:,.2f}
+
+Monitor Status: ✅ Active
+Next Report: {"Top of hour" if current_minute >= 28 else "Bottom of hour"} ({("00" if current_minute >= 28 else "30")})"""
+            
+            # Send notification
+            telegram_poster = TelegramPoster()
+            result = telegram_poster.send_message_to_user(
+                message=message,
+                username=account_holder,
+                urgent=False
+            )
+            
+            if result['success']:
+                print(f"    ✓ {report_type} position report sent to {account_holder}")
+            else:
+                print(f"    ⚠️  Failed to send position report to {account_holder}: {result['errors']}")
+                
+        except Exception as e:
+            print(f"    ⚠️  Error sending hourly position report: {str(e)}")
+
+    def _closeAllPositions(self) -> None:
+        """
+        Close all open positions and send Telegram notification.
+        """
+        try:
+            positions = get_positions(self.api, self.account_name, self.account)
+            if not positions:
+                return
+            
+            account_holder = self.account_name
+            closed_positions = []
+            failed_positions = []
+            
+            print(f"Attempting to close {len(positions)} positions...")
+            
+            for pos in positions:
+                symbol = pos.symbol
+                shares = int(pos.qty)
+                side = "sell" if shares > 0 else "buy"
+                quantity = abs(shares)
+                
+                try:
+                    # Close the position
+                    result = self._liquidate_position(symbol=symbol, submit_order=True)
+                    if result:
+                        closed_positions.append(f"{symbol} ({shares:,} shares)")
+                        print(f"    ✓ Closed position in {symbol}")
+                    else:
+                        failed_positions.append(f"{symbol} ({shares:,} shares)")
+                        print(f"    ✗ Failed to close position in {symbol}")
+                        
+                except Exception as e:
+                    failed_positions.append(f"{symbol} ({shares:,} shares) - Error: {str(e)}")
+                    print(f"    ✗ Error closing {symbol}: {str(e)}")
+            
+            # Send Telegram notification about position closures
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            success_section = ""
+            if closed_positions:
+                success_section = f"""
+✅ Successfully Closed ({len(closed_positions)}):
+{chr(10).join(f'• {pos}' for pos in closed_positions)}"""
+            
+            failure_section = ""
+            if failed_positions:
+                failure_section = f"""
+❌ Failed to Close ({len(failed_positions)}):
+{chr(10).join(f'• {pos}' for pos in failed_positions)}"""
+            
+            message = f"""🚨 ALL POSITIONS CLOSED - Market Close Time 🚨
+
+Account: {self.account_name}
+Time: {timestamp}
+Environment: {self.account}
+
+Reason: Automatic closure at 15:40 ET{success_section}{failure_section}
+
+Monitor Status: 🔄 Shutting down after position closure"""
+            
+            telegram_poster = TelegramPoster()
+            result = telegram_poster.send_message_to_user(
+                message=message,
+                username=account_holder,
+                urgent=True
+            )
+            
+            if result['success']:
+                print(f"    ✓ Position closure notification sent to {account_holder}")
+            else:
+                print(f"    ⚠️  Failed to send closure notification to {account_holder}: {result['errors']}")
+                
+        except Exception as e:
+            print(f"    ⚠️  Error in _closeAllPositions: {str(e)}")
+
+    def _sendTelegramShutdownNotification(self) -> None:
+        """
+        Send Telegram notification when monitor shuts down due to no positions.
+        """
+        try:
+            account_holder = self.account_name
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            message = f"""🏁 POSITION MONITOR SHUTDOWN 🏁
+
+Account: {self.account_name}
+Time: {timestamp}
+Environment: {self.account}
+
+Reason: All positions closed
+Status: ✅ Monitor stopped automatically
+
+No further position monitoring will occur until restarted."""
+            
+            telegram_poster = TelegramPoster()
+            result = telegram_poster.send_message_to_user(
+                message=message,
+                username=account_holder,
+                urgent=False
+            )
+            
+            if result['success']:
+                print(f"    ✓ Monitor shutdown notification sent to {account_holder}")
+            else:
+                print(f"    ⚠️  Failed to send shutdown notification to {account_holder}: {result['errors']}")
+                
+        except Exception as e:
+            print(f"    ⚠️  Error sending shutdown notification: {str(e)}")
+
     def _monitorPositions(self) -> None:
         """
-        Monitor positions continuously and liquidate when MACD score is red.
+        Monitor positions continuously with enhanced features:
         
-        This method:
         1. Polls positions every minute
-        2. For each unique symbol, collects market data
-        3. Calculates MACD and scores it
+        2. Sends hourly Telegram position reports (top and bottom of hour)
+        3. Calculates MACD and scores it for each position
         4. Liquidates position if MACD score is red
+        5. Closes all positions at 15:40 ET and sends notification
+        6. Shuts down monitor when all positions are closed
         
-        The polling continues until the script instance is stopped.
+        The polling continues until all positions are closed or stopped manually.
         """
-        print("Starting position monitoring...")
-        print("Polling every 60 seconds. Press Ctrl+C to stop.")
-        print("Will liquidate positions when MACD score is RED")
+        print("Starting enhanced position monitoring...")
+        print("Features:")
+        print("- Polling every 60 seconds")
+        print("- Hourly Telegram position reports")
+        print("- MACD-based position liquidation")
+        print("- Auto-close all positions at 15:40 ET")
+        print("- Auto-shutdown when all positions closed")
         print("=" * 60)
         
         macd_scorer = MACDAlertScorer()
+        et_tz = pytz.timezone('America/New_York')
+        last_hour_report = None
         
         try:
             while True:
                 try:
+                    current_et = datetime.now(et_tz)
+                    
+                    # Check if it's time to close all positions (15:40 ET)
+                    if current_et.hour == 15 and current_et.minute >= 40:
+                        positions = get_positions(self.api, self.account_name, self.account)
+                        if positions:
+                            print(f"[{current_et.strftime('%Y-%m-%d %H:%M:%S ET')}] 🚨 Closing all positions - Market close time (15:40 ET)")
+                            self._closeAllPositions()
+                            print("Monitor shutting down - All positions closed at market close time")
+                            break
+                    
                     # Get current positions
                     positions = get_positions(self.api, self.account_name, self.account)
                     
+                    # Check if all positions are closed - shutdown monitor
                     if not positions:
-                        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] No positions found")
+                        print(f"[{current_et.strftime('%Y-%m-%d %H:%M:%S ET')}] No positions found")
+                        
+                        # Send shutdown notification if we had positions before
+                        if hasattr(self, '_had_positions'):
+                            self._sendTelegramShutdownNotification()
+                            print("Monitor shutting down - All positions closed")
+                            break
                     else:
+                        # Mark that we have positions
+                        self._had_positions = True
+                        
                         # Create a list of unique stock symbols
                         unique_symbols = list(set(pos.symbol for pos in positions))
                         
-                        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Monitoring {len(unique_symbols)} symbols: {', '.join(unique_symbols)}")
+                        print(f"[{current_et.strftime('%Y-%m-%d %H:%M:%S ET')}] Monitoring {len(unique_symbols)} symbols: {', '.join(unique_symbols)}")
                         
-                        # Process each unique symbol
+                        # Send position reports twice per hour (top and bottom of hour)
+                        current_hour = current_et.hour
+                        current_minute = current_et.minute
+                        
+                        # Check for reports at top of hour (minute 0 ±2) and bottom of hour (minute 30 ±2)
+                        is_top_of_hour = current_minute <= 2
+                        is_bottom_of_hour = 28 <= current_minute <= 32
+                        is_next_hour_prep = current_minute >= 58
+                        
+                        if is_top_of_hour or is_bottom_of_hour or is_next_hour_prep:
+                            # Create unique identifier for each report time
+                            if is_top_of_hour:
+                                # Top of hour: use hour * 100 (e.g., 14:00 = 1400)
+                                report_id = current_hour * 100
+                            elif is_bottom_of_hour:
+                                # Bottom of hour: use hour * 100 + 30 (e.g., 14:30 = 1430)
+                                report_id = current_hour * 100 + 30
+                            else:  # is_next_hour_prep (minutes 58-59)
+                                # Next hour prep: use (next_hour) * 100 (e.g., 14:58 -> 1500 for 15:00)
+                                next_hour = (current_hour + 1) % 24
+                                report_id = next_hour * 100
+                            
+                            # Only send if we haven't sent this specific report already
+                            if last_hour_report != report_id:
+                                self._sendHourlyPositionReport(positions, current_et)
+                                last_hour_report = report_id
+                        
+                        # Process each unique symbol for MACD analysis
                         for symbol in unique_symbols:
                             try:
                                 self._processSymbolForMonitoring(symbol, macd_scorer)
