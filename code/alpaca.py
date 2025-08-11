@@ -1566,11 +1566,15 @@ class AlpacaPrivate:
 
             # Fetch market data using Alpaca API
             try:
+                # Format as RFC3339 with proper timezone format
+                start_str = start_time.strftime('%Y-%m-%dT%H:%M:%S') + start_time.strftime('%z')[:3] + ':' + start_time.strftime('%z')[3:]
+                end_str = end_time.strftime('%Y-%m-%dT%H:%M:%S') + end_time.strftime('%z')[:3] + ':' + end_time.strftime('%z')[3:]
+                
                 bars = self.api.get_bars(
                     symbol,
                     tradeapi.TimeFrame.Minute,
-                    start=start_time.isoformat(),
-                    end=end_time.isoformat(),
+                    start=start_str,
+                    end=end_str,
                     limit=10000,
                     feed='iex'  # Use IEX feed for reliability
                 )
@@ -1834,11 +1838,15 @@ The system attempted to liquidate this position due to poor MACD conditions but 
             start_time = end_time - pd.Timedelta(minutes=50)
             
             # Fetch market data using Alpaca API
+            # Format as RFC3339 with proper timezone format
+            start_str = start_time.strftime('%Y-%m-%dT%H:%M:%S') + start_time.strftime('%z')[:3] + ':' + start_time.strftime('%z')[3:]
+            end_str = end_time.strftime('%Y-%m-%dT%H:%M:%S') + end_time.strftime('%z')[:3] + ':' + end_time.strftime('%z')[3:]
+            
             bars = self.api.get_bars(
                 symbol,
                 tradeapi.TimeFrame.Minute,
-                start=start_time.isoformat(),
-                end=end_time.isoformat(),
+                start=start_str,
+                end=end_str,
                 limit=1000,
                 feed='iex'
             )
