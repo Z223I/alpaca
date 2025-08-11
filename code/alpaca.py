@@ -31,6 +31,7 @@ from atoms.display.print_orders import print_active_orders
 from atoms.display.print_positions import print_positions
 from atoms.display.print_quote import print_quote
 from atoms.display.generate_chart_from_df import generate_chart_from_dataframe
+from atoms.utils.macd_alert_scorer import score_alerts_with_macd
 from atoms.utils.delay import delay
 from atoms.api.parse_args import parse_args
 
@@ -1609,6 +1610,11 @@ class AlpacaPrivate:
 
             # Load superduper alerts for this symbol and date
             alerts = self._load_superduper_alerts_for_symbol(symbol, target_date)
+            
+            # Score alerts using MACD analysis
+            if alerts:
+                print(f"Scoring {len(alerts)} alerts using MACD analysis...")
+                alerts = score_alerts_with_macd(df, alerts)
 
             # Generate chart using the chart generation atom
             success = generate_chart_from_dataframe(
@@ -1627,7 +1633,19 @@ class AlpacaPrivate:
                 print(f"    • MACD indicators (12,26,9) with MACD line, Signal line, Histogram")
                 print(f"    • Volume data")
                 if alerts:
-                    print(f"    • {len(alerts)} superduper alert overlays")
+                    # Count alerts by MACD score color
+                    colors = [alert.get('macd_score', {}).get('color', 'unknown') for alert in alerts]
+                    green_count = colors.count('green')
+                    yellow_count = colors.count('yellow')
+                    red_count = colors.count('red')
+                    
+                    print(f"    • {len(alerts)} superduper alert overlays with MACD scoring:")
+                    if green_count:
+                        print(f"      🟢 {green_count} GREEN (excellent MACD conditions)")
+                    if yellow_count:
+                        print(f"      🟡 {yellow_count} YELLOW (moderate MACD conditions)")
+                    if red_count:
+                        print(f"      🔴 {red_count} RED (poor MACD conditions)")
                 return True
             else:
                 print("✗ Chart generation failed")
