@@ -76,7 +76,7 @@ class SuperduperAlertGenerator:
             # Create enhanced message
             alert_message = self._create_enhanced_message(
                 symbol, current_price, signal_price, resistance_price, 
-                penetration, trend_type, trend_strength, trend_analysis
+                penetration, trend_type, trend_strength, trend_analysis, superduper_alert_time
             )
 
             # Create superduper alert data structure
@@ -123,7 +123,8 @@ class SuperduperAlertGenerator:
     def _create_enhanced_message(self, symbol: str, current_price: float, 
                                signal_price: float, resistance_price: float,
                                penetration: float, trend_type: str, 
-                               trend_strength: float, trend_analysis: Dict[str, Any]) -> str:
+                               trend_strength: float, trend_analysis: Dict[str, Any], 
+                               alert_timestamp: datetime) -> str:
         """Create enhanced Telegram message for superduper alerts."""
 
         # Trend type emojis and descriptions
@@ -162,6 +163,12 @@ class SuperduperAlertGenerator:
             f"",
             f"📈 **Trend Analysis ({timeframe}m):**"
         ]
+        
+        # Add time of day analysis
+        time_analysis = self._analyze_time_of_day(alert_timestamp)
+        message_parts.append(
+            f"• Time of Day: {time_analysis['color_emoji']} **{time_analysis['period']}** ({time_analysis['display_time']})"
+        )
 
         # Add trend-specific details
         if trend_type == 'rising':
@@ -258,6 +265,63 @@ class SuperduperAlertGenerator:
         momentum_score = (momentum_component + penetration_component + trend_strength) / 3.0
 
         return round(momentum_score, 3)
+
+    def _analyze_time_of_day(self, timestamp: datetime) -> Dict[str, Any]:
+        """
+        Analyze time of day market timing with traffic light periods.
+        
+        Args:
+            timestamp: Alert timestamp (should be in ET timezone)
+            
+        Returns:
+            Dict with time analysis including period, color, and display time
+        """
+        # Ensure timestamp is in Eastern Time
+        et_tz = pytz.timezone('US/Eastern')
+        if timestamp.tzinfo is None:
+            et_timestamp = et_tz.localize(timestamp)
+        else:
+            et_timestamp = timestamp.astimezone(et_tz)
+        
+        # Extract time for comparison
+        current_time = et_timestamp.time()
+        
+        # Define market periods (all times in ET)
+        morning_power_start = et_timestamp.replace(hour=9, minute=30, second=0, microsecond=0).time()
+        morning_power_end = et_timestamp.replace(hour=12, minute=0, second=0, microsecond=0).time()
+        lunch_hour_end = et_timestamp.replace(hour=13, minute=30, second=0, microsecond=0).time()
+        market_close = et_timestamp.replace(hour=16, minute=0, second=0, microsecond=0).time()
+        
+        # Determine period and color
+        if morning_power_start <= current_time < morning_power_end:
+            period = "MORNING POWER"
+            color_emoji = "🟢"
+            description = "Optimal trading period with high volume and momentum"
+        elif morning_power_end <= current_time < lunch_hour_end:
+            period = "LUNCH HOUR"
+            color_emoji = "🟡"
+            description = "Moderate activity period with reduced volume"
+        elif lunch_hour_end <= current_time < market_close:
+            period = "CAUTION PERIOD"
+            color_emoji = "🔴"
+            description = "High volatility period with increased risk"
+        else:
+            # Pre-market, after-hours, or weekend
+            period = "CLOSED HOURS"
+            color_emoji = "⚫"
+            description = "Outside regular trading hours"
+        
+        # Format display time (HH:MM ET)
+        display_time = et_timestamp.strftime("%H:%M ET")
+        
+        return {
+            'period': period,
+            'color_emoji': color_emoji,
+            'description': description,
+            'display_time': display_time,
+            'et_timestamp': et_timestamp,
+            'market_hours': morning_power_start <= current_time < market_close
+        }
 
     def _assess_breakout_quality(self, latest_super_alert: Dict[str, Any], 
                                 trend_analysis: Dict[str, Any]) -> str:
