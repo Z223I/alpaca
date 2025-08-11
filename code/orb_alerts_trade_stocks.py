@@ -139,6 +139,68 @@ class ORBTradeStocksMonitor:
 
         return logger
 
+    def _validate_time_of_day_signal(self, superduper_alert_data: Dict) -> bool:
+        """
+        Validate time of day signal from superduper alert data.
+        
+        Args:
+            superduper_alert_data: Superduper alert JSON data
+            
+        Returns:
+            True if time signal is green/yellow, False if red or missing
+        """
+        try:
+            # Extract alert message to look for time of day signal
+            alert_message = superduper_alert_data.get('alert_message', '')
+            
+            if not alert_message:
+                self.logger.warning(f"No alert message found in superduper alert data")
+                return False
+            
+            # Look for time of day signal in the alert message
+            # Expected format: "• Time of Day: 🟢 **MORNING POWER** (10:30 ET)"
+            if "• Time of Day:" not in alert_message:
+                self.logger.warning(f"No time of day signal found in alert message")
+                return False
+            
+            # Extract the time signal emoji and period
+            lines = alert_message.split('\n')
+            time_line = None
+            for line in lines:
+                if "• Time of Day:" in line:
+                    time_line = line.strip()
+                    break
+            
+            if not time_line:
+                self.logger.warning(f"Could not parse time of day line from alert message")
+                return False
+            
+            # Check for red signal (🔴) which indicates CAUTION PERIOD
+            if "🔴" in time_line:
+                self.logger.info(f"Time of day signal is RED (🔴) - rejecting trade")
+                return False
+            
+            # Check for closed hours (⚫) which should also be rejected
+            if "⚫" in time_line:
+                self.logger.info(f"Time of day signal is CLOSED HOURS (⚫) - rejecting trade")
+                return False
+            
+            # Allow green (🟢) and yellow (🟡) signals
+            if "🟢" in time_line or "🟡" in time_line:
+                emoji = "🟢" if "🟢" in time_line else "🟡"
+                period = "MORNING POWER" if "MORNING POWER" in time_line else \
+                        "LUNCH HOUR" if "LUNCH HOUR" in time_line else "UNKNOWN"
+                self.logger.info(f"Time of day signal is {emoji} {period} - allowing trade")
+                return True
+            
+            # If we get here, the signal format was unexpected
+            self.logger.warning(f"Unexpected time of day signal format: {time_line}")
+            return False
+            
+        except Exception as e:
+            self.logger.error(f"Error validating time of day signal: {e}")
+            return False
+
     def _get_telegram_user_for_account(self, account_name: str) -> Optional[str]:
         """
         Get telegram username that matches the account name directly.
@@ -173,6 +235,12 @@ class ORBTradeStocksMonitor:
                 superduper_alert_data = json.load(f)
 
             symbol = superduper_alert_data.get('symbol', 'UNKNOWN')
+
+            # Check time of day signal filtering before executing trade
+            if not self._validate_time_of_day_signal(superduper_alert_data):
+                self.filtered_superduper_alerts.add(file_path)
+                self.logger.info(f"🔴 Trade rejected for {symbol}: Time of day signal is red or missing")
+                return
 
             # Use TradeGenerator to create and execute trade
             trade_filename = self.trade_generator.create_and_execute_trade(superduper_alert_data)
@@ -233,7 +301,7 @@ class ORBTradeStocksMonitor:
             else:
                 # Alert was filtered out (no green momentum or other reasons)
                 self.filtered_superduper_alerts.add(file_path)
-                self.logger.info(f"🚫 Trade skipped for {symbol}: No green momentum indicator or other filter criteria")
+                self.logger.info(f"🚫 Trade skipped for {symbol}: Failed momentum or time signal filtering criteria")
 
         except Exception as e:
             self.logger.error(f"Error processing superduper alert file {file_path}: {e}")
@@ -383,7 +451,7 @@ class ORBTradeStocksMonitor:
             print(f"📅 Target date: {self.target_date}")
             print(f"📁 Monitoring: {self.superduper_alerts_dir}")
             print(f"💾 Trade results: {self.trades_dir}")
-            print("✅ Filtering: Green momentum indicators (🟢) only")
+            print("✅ Filtering: Green momentum indicators (🟢) AND green/yellow time signals (🟢🟡) only")
             if self.no_telegram:
                 print("📵 Telegram: Notifications disabled")
             else:
