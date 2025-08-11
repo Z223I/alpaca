@@ -86,11 +86,11 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 
 ### Spec File
 
-- [ ] Important. Think hard. Implement the instructions in specs/closing-trades.md
-- [ ] If a position is liquidated, use Telegram to notify the account holder.  Use Bruce for Primary.
-- [ ] Also, notify the user if the liquidation failed.
-- [ ] Switch the default account from Primary to Bruce.  Get rid of the mapping.  Get rid of the Primary account in the config file.  All Telegram users will map directly to the account names in the config file.
-
+- [X] Important. Think hard. Implement the instructions in specs/closing-trades.md
+- [X] If a position is liquidated, use Telegram to notify the account holder.  Use Bruce for Primary.
+- [X] Also, notify the user if the liquidation failed.
+- [X] Switch the default account from Primary to Bruce.  Get rid of the mapping.  Get rid of the Primary account in the config file.  All Telegram users will map directly to the account names in the config file.
+- [ ] ???? Automatically start monitor positions when the first trade of the day is made. It will no longer be called from the command line.
 - [ ] /commit
 - [ ] Publish the branch
 - [ ] git switch master; merge current branch
