@@ -62,17 +62,40 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 
 
 
-## Time of Day
-
-- [ ] Add time of day to trend analysis.
-
 ## MACD chart to Telegram
 
 - [ ]
 
 ## MACD Analysis
 
--  [X] Add MACD analysis to superduper alert.  Filter red emojis
+- [X] Add MACD analysis to superduper alert.  Filter red emojis
+
+
+## PNL Integration
+
+### Config
+
+- [ ] claude --dangerously-skip-permissions
+- [ ] /login
+- [ ] /commit
+- [ ] Sync changes
+- [ ] /clear
+- [ ] git switch -c feature/closing-trades
+- [ ] /clear
+- [ ] /read...
+
+### Spec File
+
+- [ ] Important. Think hard. Implement the instructions in specs/closing-trades.md
+- [ ] Nudge
+- [ ] /commit
+- [ ] Publish the branch
+- [ ] git switch master; merge current branch
+- [ ] Sync changes
+
+## Time of Day
+
+- [X] Add time of day to trend analysis.
 
 ## Alpaca CLI arg --plot
 
