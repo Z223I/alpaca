@@ -61,6 +61,11 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 - [ ] Add time of day signals with green and then yellow for the afternoon
 
 
+
+## Time of Day
+
+- [ ] Add time of day to trend analysis.
+
 ## MACD chart to Telegram
 
 - [ ]
