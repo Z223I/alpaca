@@ -38,6 +38,10 @@ This is an ORB (Opening Range Breakout) trading system built for Alpaca API. Key
 - Running alerts: `source ~/miniconda3/etc/profile.d/conda.sh && conda activate alpaca && python3 code/orb_alerts.py`
 - Linting: `source ~/miniconda3/etc/profile.d/conda.sh && conda activate alpaca && flake8 code/`
 
+## Temporary Files
+
+- When you create files such as scripts that should be deleted, stick them in the ./tmp directory.
+
 ## Test Execution Notes (Claude Code)
 
 **IMPORTANT**: Standard conda activation commands often fail in the Claude Code environment. Use these workarounds:
