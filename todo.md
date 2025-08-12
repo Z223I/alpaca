@@ -47,12 +47,12 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 
 - [ ] Finish Daily_Instructions.md
 
-## EOD
 
-- [ ] No trades after 15:30 ET.
-- [ ] Close all positions
-- [ ] Cancel all orders
-- [ ] Today's PNL
+
+## MACD chart to Telegram
+
+- [ ]
+
 
 ## Major Resistance
 
@@ -62,15 +62,27 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 
 
 
-## MACD chart to Telegram
+## Test new trade placement
 
-- [ ]
+- [ ] ~/miniconda3/envs/alpaca/bin/python execute_aapl_trade.py
+
+
+Filter out stocks below two dollars.
+
+
+
+## EOD
+
+- [ ] No trades after 15:30 ET.
+- [ ] Close all positions
+- [ ] Cancel all orders
+- [ ] Today's PNL
+- [ ] TEST: Close all positions at the end of the day.  Close all orders. Calculate PNL
+
 
 ## MACD Analysis
 
 - [X] Add MACD analysis to superduper alert.  Filter red emojis
-
-
 
 
 ## Monitor Positions
@@ -106,13 +118,6 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 
 - [X] Require --symbol
 - [X] Use atoms/display/generate_chart_from_df.py
-
-
-
-
-## Test new trade placement
-
-- [ ] ~/miniconda3/envs/alpaca/bin/python execute_aapl_trade.py
 
 ## Trailing Sell
 

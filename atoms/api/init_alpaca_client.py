@@ -12,14 +12,14 @@ except ImportError:
     CONFIG_AVAILABLE = False
 
 
-def init_alpaca_client(provider: str = "alpaca", account: str = "Primary", environment: str = "paper") -> tradeapi.REST:
+def init_alpaca_client(provider: str = "alpaca", account: str = "Bruce", environment: str = "paper") -> tradeapi.REST:
     """
     Initialize Alpaca API client with credentials from config file.
     Falls back to environment variables if config is not available.
 
     Args:
         provider: Provider name (default: "alpaca")
-        account: Account name (default: "Primary")
+        account: Account name (default: "Bruce")
         environment: Environment name (default: "paper")
 
     Returns:

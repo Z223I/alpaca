@@ -277,10 +277,7 @@ class ORBSuperduperAlertMonitor:
             current_loop = asyncio.get_running_loop()
             self.file_handler = SuperAlertFileHandler(self, current_loop)
 
-            # Process existing super alerts first
-            await self._scan_existing_super_alerts()
-
-            # Start file system monitoring
+            # Start file system monitoring (real-time alerts only)
             if self.super_alerts_dir.exists():
                 self.observer.schedule(self.file_handler, str(self.super_alerts_dir), recursive=False)
                 self.observer.start()

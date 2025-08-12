@@ -289,11 +289,15 @@ class SuperduperAlertData:
             start_time = end_time - timedelta(minutes=60)
             
             # Fetch the data using alpaca_trade_api
+            # Format timestamps for Alpaca API (YYYY-MM-DD format without time component)
+            start_date = start_time.strftime('%Y-%m-%d')
+            end_date = end_time.strftime('%Y-%m-%d')
+            
             bars = api_client.get_bars(
                 self.symbol,
                 tradeapi.TimeFrame.Minute,
-                start=start_time.isoformat(),
-                end=end_time.isoformat(),
+                start=start_date,
+                end=end_date,
                 limit=1000,
                 adjustment='raw'
             )

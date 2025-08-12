@@ -23,7 +23,7 @@ class UserManager:
             ['# Add your Telegram chat IDs here', '', '', '', ''],
             ['# To get your chat ID, message @userinfobot on Telegram', '', '', '', ''],
             ['# Group chat IDs are negative numbers (start with -)', '', '', '', ''],
-            ['# Example: -1001234567890,my_group,true,2024-01-15,Trading alerts', '', '', '', '']
+            ['# Example: -1001234567890,Bruce,true,2024-01-15,Trading alerts', '', '', '', '']
         ]
 
         with open(self.csv_path, 'w', newline='', encoding='utf-8') as file:
