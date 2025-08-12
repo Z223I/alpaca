@@ -316,7 +316,7 @@ class SuperduperAlertData:
             
             for bar in bars:
                 # Convert timestamp to ET and ensure it's timezone-aware
-                timestamp = bar.timestamp
+                timestamp = bar.t
                 if timestamp.tzinfo is None:
                     timestamp = pytz.UTC.localize(timestamp)
                 timestamp_et = timestamp.astimezone(et_tz)

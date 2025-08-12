@@ -298,8 +298,8 @@ class ORBAlertMonitor:
             current_loop = asyncio.get_running_loop()
             self.file_handler = AlertFileHandler(self, current_loop)
 
-            # Process existing alerts first
-            await self._scan_existing_alerts()
+            # Skip processing existing alerts - only process real-time alerts
+            # await self._scan_existing_alerts()
 
             # Start file system monitoring
             if self.alerts_dir.exists():
@@ -315,6 +315,7 @@ class ORBAlertMonitor:
             print(f"📁 Monitoring: {self.alerts_dir}")
             print(f"💾 Super alerts: {self.super_alerts_dir}")
             print(f"📊 Symbols loaded: {len(self.symbol_data)}")
+            print("⏰ Processing: Real-time alerts only (pre-existing alerts ignored)")
             print("✅ Filtering: Only bullish alerts with candlestick low >= EMA9 will be allowed")
             if self.no_telegram:
                 print("🚫 Telegram: Notifications disabled")

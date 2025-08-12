@@ -1572,8 +1572,8 @@ class AlpacaPrivate:
 
             # Set up time range for market data (Eastern Time)
             et_tz = pytz.timezone('America/New_York')
-            start_time = datetime.combine(target_date, time(4, 0), tzinfo=et_tz)
-            end_time = datetime.combine(target_date, time(20, 0), tzinfo=et_tz)
+            start_time = datetime.combine(target_date, dt_time(4, 0), tzinfo=et_tz)
+            end_time = datetime.combine(target_date, dt_time(20, 0), tzinfo=et_tz)
 
             print(f"Fetching market data from {start_time} to {end_time}")
 
