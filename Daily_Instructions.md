@@ -3,8 +3,10 @@
 Always running
 
 ```bash
-./start_telegram_polling.sh
+~/miniconda3/envs/alpaca/bin/python molecules/telegram_polling_watchdog.py
 ```
+
+The watchdog automatically starts and monitors the telegram polling service. It will restart the service if errors are detected and creates timestamped logs in the logs/ directory.
 
 Morning
 
@@ -16,9 +18,26 @@ Morning
 
 ## Execute Code
 
-### Orb Alerts
+### Automated Alerts Watch (Recommended)
 
-Produces alerts.
+Fully automated system that manages all ORB alert processes during market hours (9:30 AM - 4:00 PM ET, Mon-Fri). Automatically starts all processes at market open, monitors them, and runs post-market analysis.
+
+```bash
+python code/alerts_watch.py
+```
+
+Features:
+- Automatic market hours scheduling (Eastern Time)
+- Starts/stops all 3 alert processes automatically
+- Process monitoring and restart on failures
+- Post-market analysis and Telegram summary to Bruce
+- Comprehensive logging
+
+This replaces the need to manually run the individual commands below.
+
+### Manual ORB Alert Commands (Alternative)
+
+For manual control or testing, use these individual commands:
 
 #### ORB Alerts Watchdog
 
@@ -34,7 +53,7 @@ Features:
 - Graceful shutdown with Ctrl+C
 - Uses conda environment automatically
 
-### ORB Super Alerts
+#### ORB Super Alerts
 
 Produces ORB super alerts.
 
@@ -42,7 +61,7 @@ Produces ORB super alerts.
 python3 code/orb_alerts_monitor.py --no-telegram --verbose
 ```
 
-### ORB Superduper Alerts
+#### ORB Superduper Alerts
 
 Produces superduper alerts.
 
@@ -50,7 +69,7 @@ Produces superduper alerts.
 python code/orb_alerts_monitor_superduper.py --verbose
 ```
 
-### ORB Trades
+#### ORB Trades
 
 Generates trades. Configuration required.
 

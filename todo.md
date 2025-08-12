@@ -70,6 +70,18 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 Filter out stocks below two dollars.
 
 
+🚀 TELEGRAM POLLING SERVICE
+==================================================
+[2025-08-12 09:38:51] INFO: 🔧 Configuration validated successfully
+[2025-08-12 09:38:52] INFO: 🤖 Bot connected: @ORB_Alerts_6100_Bot (Trading Alerts)
+[2025-08-12 09:38:52] INFO: 🚀 Starting Telegram polling service...
+[2025-08-12 09:38:52] INFO: 📊 Poll interval: 5 seconds
+[2025-08-12 09:38:52] INFO: 💡 Send CTRL+C to stop
+[2025-08-12 11:57:40] ERROR: Error polling updates: ('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))
+[2025-08-12 12:48:30] ERROR: Error polling updates: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot7309417772:AAFEgckDnTVt1veTWwtCcFEUeau7XzBlkXU/getUpdates?offset=1&limit=100&timeout=30 (Caused by NewConnectionError('<urllib3.connection.HTTPSConnection object at 0xffffa6f08c10>: Failed to establish a new connection: [Errno -3] Temporary failure in name resolution'))
+[2025-08-12 12:48:35] ERROR: Error polling updates: HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot7309417772:AAFEgckDnTVt1veTWwtCcFEUeau7XzBlkXU/getUpdates?offset=1&limit=100&timeout=30 (Caused by NewConnectionError('<urllib3.connection.HTTPSConnection object at 0xffffa6f08c70>: Failed to establish a new connection: [Errno -3] Temporary failure in name resolution'))
+[2025-08-12 
+
 
 ## EOD
 
