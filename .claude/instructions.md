@@ -78,3 +78,51 @@ This is an ORB (Opening Range Breakout) trading system built for Alpaca API. Key
 - **ORB functionality**: `tests/test_orb.py`
 - **Alert formatting**: `tests/test_alert_formatter.py`
 - **Integration tests**: May be skipped or removed if too complex
+
+## Telegram Integration
+
+### Sending Messages to Bruce
+
+Use the `TelegramPoster` class from `atoms.telegram.telegram_post` to send messages:
+
+```python
+from atoms.telegram.telegram_post import TelegramPoster
+
+# Send message to Bruce specifically
+telegram_poster = TelegramPoster()
+result = telegram_poster.send_message_to_user(message, "bruce", urgent=False)
+
+# Check result
+if result['success']:
+    print("✅ Message sent to Bruce")
+else:
+    print(f"❌ Failed: {result.get('errors', [])}")
+```
+
+### Quick Telegram Patterns:
+
+1. **Send to Bruce only**:
+   ```python
+   from atoms.telegram.telegram_post import TelegramPoster
+   poster = TelegramPoster()
+   poster.send_message_to_user("Your message here", "bruce")
+   ```
+
+2. **Send alert with formatting**:
+   ```python
+   from atoms.telegram.telegram_post import send_alert
+   send_alert("Alert message", level='info')  # levels: info, warning, error, success
+   ```
+
+3. **Send to all users**:
+   ```python
+   from atoms.telegram.telegram_post import send_message
+   send_message("Message for everyone")
+   ```
+
+### Telegram Message Formatting:
+- Messages support markdown formatting
+- Use `**bold**` for bold text
+- Use `*italic*` for italic text
+- Use emojis for visual appeal (📊 🚨 ✅ ❌ ⚠️ 🔧)
+- Keep messages concise and informative

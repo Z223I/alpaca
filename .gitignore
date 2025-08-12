@@ -136,6 +136,9 @@ dmypy.json
 # Temporary files and directories
 tmp/
 
+# Log files and directories
+logs/
+
 # Historical data directory
 historical_data/
 

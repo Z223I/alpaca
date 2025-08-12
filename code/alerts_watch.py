@@ -48,9 +48,13 @@ class AlertsWatchdog:
         # Create logs directory if it doesn't exist
         self.logs_dir.mkdir(exist_ok=True)
         
-        # Setup logging
+        # Create subdirectories for each program
+        self.watchdog_logs_dir = self.logs_dir / "alerts_watchdog"
+        self.watchdog_logs_dir.mkdir(exist_ok=True)
+        
+        # Setup main watchdog logging
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.log_file = self.logs_dir / f"alerts_watch_{timestamp}.log"
+        self.log_file = self.watchdog_logs_dir / f"alerts_watch_{timestamp}.log"
         
         # Market hours configuration (Eastern Time)
         self.et_tz = pytz.timezone('US/Eastern')
@@ -67,33 +71,48 @@ class AlertsWatchdog:
             'orb_monitor': {
                 'script': 'code/orb_alerts_monitor.py',
                 'args': ['--no-telegram', '--verbose'],
-                'python_cmd': 'python3'
+                'python_cmd': 'python3',
+                'log_dir': 'orb_monitor'
             },
             'orb_superduper': {
                 'script': 'code/orb_alerts_monitor_superduper.py', 
                 'args': ['--verbose'],
-                'python_cmd': 'python'
+                'python_cmd': 'python',
+                'log_dir': 'orb_superduper'
             },
             'orb_trades': {
                 'script': 'code/orb_alerts_trade_stocks.py',
                 'args': ['--verbose'],
-                'python_cmd': 'python'
+                'python_cmd': 'python',
+                'log_dir': 'orb_trades'
             }
         }
+        
+        # Create log subdirectories for each process
+        for process_name, config in self.alert_processes.items():
+            process_log_dir = self.logs_dir / config['log_dir']
+            process_log_dir.mkdir(exist_ok=True)
         
         # Post-market analysis scripts
         self.post_market_scripts = [
             {
                 'script': 'code/orb_alerts_summary.py',
                 'python_cmd': 'python',
-                'args': []
+                'args': [],
+                'log_dir': 'orb_alerts_summary'
             },
             {
                 'script': 'code/orb.py',
                 'python_cmd': 'python3',
-                'args': []
+                'args': [],
+                'log_dir': 'orb_analysis'
             }
         ]
+        
+        # Create log subdirectories for post-market scripts
+        for script_config in self.post_market_scripts:
+            script_log_dir = self.logs_dir / script_config['log_dir']
+            script_log_dir.mkdir(exist_ok=True)
         
         # Bruce's chat ID for Telegram notifications
         self.bruce_chat_id = None  # Will be loaded from user manager
@@ -104,7 +123,9 @@ class AlertsWatchdog:
         
         self._log("🔧 Alerts Watchdog initialized")
         self._log(f"📁 Project root: {self.project_root}")
-        self._log(f"📋 Log file: {self.log_file}")
+        self._log(f"📁 Logs directory: {self.logs_dir}")
+        self._log(f"📋 Watchdog log: {self.log_file}")
+        self._log(f"📁 Process logs will be saved to: {self.logs_dir}/[program_name]/")
         self._log(f"🕘 Market hours: {self.market_open_time} - {self.market_close_time} ET")
     
     def _signal_handler(self, signum, frame):
@@ -238,7 +259,7 @@ class AlertsWatchdog:
         self._run_post_market_analysis()
     
     def _start_alert_process(self, process_name: str, config: Dict):
-        """Start a specific alert process."""
+        """Start a specific alert process with dedicated logging."""
         try:
             if process_name in self.processes:
                 # Process already running
@@ -257,25 +278,46 @@ class AlertsWatchdog:
             script_path = self.project_root / config['script']
             cmd = [python_path, str(script_path)] + config['args']
             
+            # Setup process-specific log file
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            process_log_dir = self.logs_dir / config['log_dir']
+            process_log_file = process_log_dir / f"{process_name}_{timestamp}.log"
+            
             self._log(f"🚀 Starting {process_name}: {' '.join(cmd)}")
+            self._log(f"📝 Process logs: {process_log_file}")
             
-            # Start process
-            process = subprocess.Popen(
-                cmd,
-                cwd=str(self.project_root),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1
-            )
+            # Start process with output redirected to log file
+            with open(process_log_file, 'w') as log_file:
+                # Write header to log file
+                log_file.write(f"# {process_name} Log - Started: {datetime.now()}\n")
+                log_file.write(f"# Command: {' '.join(cmd)}\n")
+                log_file.write(f"# Working Directory: {self.project_root}\n")
+                log_file.write("# " + "="*50 + "\n\n")
+                log_file.flush()
+                
+                process = subprocess.Popen(
+                    cmd,
+                    cwd=str(self.project_root),
+                    stdout=log_file,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1
+                )
             
-            self.processes[process_name] = process
+            # Store process info including log file path
+            self.processes[process_name] = {
+                'process': process,
+                'log_file': process_log_file,
+                'config': config
+            }
             
             # Give it a moment to start
             time.sleep(2)
             
             if self._is_process_running(process_name):
                 self._log(f"✅ {process_name} started (PID: {process.pid})")
+                # Start log monitoring thread
+                self._start_log_monitor(process_name)
             else:
                 self._log(f"❌ Failed to start {process_name}", "ERROR")
                 
@@ -293,7 +335,15 @@ class AlertsWatchdog:
             return
         
         try:
-            process = self.processes[process_name]
+            process_info = self.processes[process_name]
+            if isinstance(process_info, dict):
+                process = process_info['process']
+                log_file = process_info['log_file']
+            else:
+                # Legacy format
+                process = process_info
+                log_file = None
+            
             self._log(f"🛑 Stopping {process_name} (PID: {process.pid})")
             
             # Try graceful shutdown
@@ -308,6 +358,14 @@ class AlertsWatchdog:
                 self._log(f"⚠️ Forcibly killing {process_name}", "WARN")
                 process.kill()
                 process.wait()
+            
+            # Add shutdown timestamp to log file
+            if log_file and log_file.exists():
+                try:
+                    with open(log_file, 'a') as f:
+                        f.write(f"\n# Process stopped: {datetime.now()}\n")
+                except Exception:
+                    pass
                 
         except Exception as e:
             self._log(f"❌ Error stopping {process_name}: {e}", "ERROR")
@@ -321,7 +379,12 @@ class AlertsWatchdog:
             return False
         
         try:
-            return self.processes[process_name].poll() is None
+            process_info = self.processes[process_name]
+            if isinstance(process_info, dict):
+                return process_info['process'].poll() is None
+            else:
+                # Legacy format for backward compatibility
+                return process_info.poll() is None
         except Exception:
             return False
     
@@ -335,6 +398,40 @@ class AlertsWatchdog:
                 
                 # Restart the process
                 self._start_alert_process(process_name, config)
+    
+    def _start_log_monitor(self, process_name: str):
+        """Start a thread to monitor process logs and report critical errors."""
+        def monitor_logs():
+            try:
+                process_info = self.processes.get(process_name)
+                if not process_info or not isinstance(process_info, dict):
+                    return
+                
+                log_file = process_info['log_file']
+                if not log_file.exists():
+                    time.sleep(1)  # Wait for log file to be created
+                
+                # Monitor the log file for critical errors
+                error_keywords = ['ERROR', 'CRITICAL', 'FATAL', 'Exception', 'Traceback']
+                
+                with open(log_file, 'r') as f:
+                    f.seek(0, 2)  # Go to end of file
+                    
+                    while self._is_process_running(process_name):
+                        line = f.readline()
+                        if line:
+                            # Check for critical errors
+                            if any(keyword in line for keyword in error_keywords):
+                                self._log(f"⚠️ {process_name} error: {line.strip()}", "WARN")
+                        else:
+                            time.sleep(1)  # No new content, wait
+                            
+            except Exception as e:
+                self._log(f"❌ Error monitoring logs for {process_name}: {e}", "ERROR")
+        
+        # Start monitoring thread
+        monitor_thread = threading.Thread(target=monitor_logs, daemon=True)
+        monitor_thread.start()
     
     def _run_post_market_analysis(self):
         """Run post-market analysis scripts and send summary."""
@@ -368,7 +465,7 @@ class AlertsWatchdog:
         self._send_daily_summary(analysis_results)
     
     def _execute_script(self, script_config: Dict) -> Dict:
-        """Execute a post-market script and return results."""
+        """Execute a post-market script and return results with logging."""
         try:
             python_path = os.path.expanduser('~/miniconda3/envs/alpaca/bin/python')
             if script_config['python_cmd'] == 'python3':
@@ -377,34 +474,84 @@ class AlertsWatchdog:
             script_path = self.project_root / script_config['script']
             cmd = [python_path, str(script_path)] + script_config['args']
             
-            result = subprocess.run(
-                cmd,
-                cwd=str(self.project_root),
-                capture_output=True,
-                text=True,
-                timeout=300  # 5 minute timeout
-            )
+            # Setup script-specific log file
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            script_log_dir = self.logs_dir / script_config['log_dir']
+            script_name = Path(script_config['script']).stem
+            script_log_file = script_log_dir / f"{script_name}_{timestamp}.log"
+            
+            self._log(f"📝 Script logs: {script_log_file}")
+            
+            # Execute with output saved to log file
+            with open(script_log_file, 'w') as log_file:
+                # Write header
+                log_file.write(f"# {script_name} Post-Market Analysis Log\n")
+                log_file.write(f"# Started: {datetime.now()}\n")
+                log_file.write(f"# Command: {' '.join(cmd)}\n")
+                log_file.write(f"# Working Directory: {self.project_root}\n")
+                log_file.write("# " + "="*50 + "\n\n")
+                log_file.flush()
+                
+                result = subprocess.run(
+                    cmd,
+                    cwd=str(self.project_root),
+                    stdout=log_file,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    timeout=300  # 5 minute timeout
+                )
+                
+                # Write completion info
+                log_file.write(f"\n\n# Completed: {datetime.now()}\n")
+                log_file.write(f"# Return code: {result.returncode}\n")
+            
+            # Read the log file to get output for summary
+            try:
+                with open(script_log_file, 'r') as f:
+                    log_content = f.read()
+                    # Extract just the actual output (skip headers)
+                    output_lines = []
+                    in_output = False
+                    for line in log_content.split('\n'):
+                        if line.startswith('# ========'):
+                            in_output = True
+                            continue
+                        elif in_output and not line.startswith('# Completed:') and not line.startswith('# Return code:'):
+                            output_lines.append(line)
+                    output = '\n'.join(output_lines).strip()
+            except Exception:
+                output = "Output saved to log file"
             
             return {
                 'success': result.returncode == 0,
-                'output': result.stdout.strip(),
-                'error': result.stderr.strip() if result.returncode != 0 else None,
-                'returncode': result.returncode
+                'output': output,
+                'error': None if result.returncode == 0 else f"Script failed with return code {result.returncode}",
+                'returncode': result.returncode,
+                'log_file': str(script_log_file)
             }
             
         except subprocess.TimeoutExpired:
+            # Write timeout info to log file if it exists
+            try:
+                with open(script_log_file, 'a') as f:
+                    f.write(f"\n\n# TIMEOUT: Script timed out after 5 minutes - {datetime.now()}\n")
+            except Exception:
+                pass
+                
             return {
                 'success': False,
                 'output': '',
                 'error': 'Script timed out after 5 minutes',
-                'returncode': -1
+                'returncode': -1,
+                'log_file': str(script_log_file) if 'script_log_file' in locals() else None
             }
         except Exception as e:
             return {
                 'success': False,
                 'output': '',
                 'error': str(e),
-                'returncode': -1
+                'returncode': -1,
+                'log_file': None
             }
     
     def _send_daily_summary(self, analysis_results: Dict):
@@ -434,10 +581,13 @@ class AlertsWatchdog:
                 status = "✅" if result['success'] else "❌"
                 summary_lines.append(f"{status} {script_name.replace('_', ' ').title()}")
                 
+                if result.get('log_file'):
+                    summary_lines.append(f"   Log: {result['log_file']}")
+                    
                 if not result['success'] and result['error']:
                     summary_lines.append(f"   Error: {result['error']}")
             
-            # Add interesting notes placeholder
+            # Add log directory information
             summary_lines.extend([
                 "",
                 "🔍 **Key Highlights:**",
@@ -446,7 +596,12 @@ class AlertsWatchdog:
                 "• ORB analysis charts generated",
                 "• Alert summary processed",
                 "",
-                "📋 Full logs available in logs/ directory"
+                "📋 **Log Files Available:**",
+                f"• Watchdog logs: logs/alerts_watchdog/",
+                f"• ORB Monitor: logs/orb_monitor/",
+                f"• Superduper Alerts: logs/orb_superduper/",
+                f"• Trade Execution: logs/orb_trades/",
+                f"• Post-Market Analysis: logs/orb_alerts_summary/ & logs/orb_analysis/"
             ])
             
             summary_message = "\n".join(summary_lines)
@@ -465,7 +620,9 @@ class AlertsWatchdog:
                 
                 if bruce_users:
                     for user in bruce_users:
-                        send_message(user['chat_id'], summary_message)
+                        from atoms.telegram.telegram_post import TelegramPoster
+                        telegram_poster = TelegramPoster()
+                        telegram_poster.send_message_to_user(summary_message, user['username'])
                         self._log(f"✅ Summary sent to Bruce ({user['chat_id']})")
                 else:
                     # Fallback: send to first active user (assuming it's Bruce)

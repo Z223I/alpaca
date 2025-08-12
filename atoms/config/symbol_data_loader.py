@@ -10,6 +10,7 @@ from typing import Dict, Optional
 from pathlib import Path
 
 from ..alerts.super_alert_filter import SuperAlertData
+from ..telegram.telegram_post import TelegramPoster
 
 
 class SymbolDataLoader:
@@ -37,7 +38,7 @@ class SymbolDataLoader:
     def _validate_and_fix_inverted_prices(self, symbol: str, signal_price: float,
                                           resistance_price: float) -> tuple[float, float]:
         """
-        Validate signal/resistance prices and fix if inverted.
+        Validate signal/resistance prices and automatically fix if inverted.
 
         Args:
             symbol: Symbol name
@@ -52,31 +53,7 @@ class SymbolDataLoader:
             warning_msg = (f"⚠️  INVERTED PRICES for {symbol}: Signal=${signal_price:.4f} >= "
                            f"Resistance=${resistance_price:.4f}")
             self.logger.warning(warning_msg)
-            print("\n🚨 INVERTED SIGNAL/RESISTANCE PRICES DETECTED 🚨")
-            print(f"Symbol: {symbol}")
-            print(f"Signal Price: ${signal_price:.4f}")
-            print(f"Resistance Price: ${resistance_price:.4f}")
-            print("For bullish breakouts, Resistance should be HIGHER than Signal price.")
-            print()
-
-            # Prompt user for new resistance value
-            prompt = (f"Enter new Resistance price for {symbol} (or press Enter to auto-fix "
-                      f"to ${signal_price * 1.10:.4f}): ")
-            user_response = input(prompt)
-
-            if user_response is not None and user_response.strip():
-                try:
-                    new_resistance = float(user_response.strip())
-                    if new_resistance > signal_price:
-                        self.logger.info(f"✅ User corrected {symbol} Resistance to ${new_resistance:.4f}")
-                        return signal_price, new_resistance
-                    else:
-                        warning_msg = (f"User-provided resistance ${new_resistance:.4f} still <= "
-                                       f"signal ${signal_price:.4f}, using auto-fix")
-                        self.logger.warning(warning_msg)
-                except ValueError:
-                    self.logger.warning(f"Invalid user input '{user_response}', using auto-fix")
-
+            
             # Auto-fix: set resistance = signal * 1.10
             auto_resistance = signal_price * 1.10
             info_msg = (f"🔧 Auto-fixed {symbol}: Resistance ${resistance_price:.4f} → "
@@ -142,7 +119,40 @@ class SymbolDataLoader:
         info_msg = (f"Loaded {len(symbol_data)} symbols with Signal/Resistance data "
                     f"from {self.symbols_file}")
         self.logger.info(info_msg)
+        
+        # Send symbols list to Bruce via Telegram
+        if symbol_data:
+            self._send_symbols_to_bruce(list(symbol_data.keys()))
+        
         return symbol_data
+
+    def _send_symbols_to_bruce(self, symbols_list: list) -> None:
+        """
+        Send the loaded symbols list to Bruce via Telegram.
+        
+        Args:
+            symbols_list: List of symbol strings
+        """
+        try:
+            telegram_poster = TelegramPoster()
+            
+            # Format the message
+            symbols_str = ", ".join(symbols_list)
+            message = (f"📊 **Symbol Data Loaded**\n\n"
+                      f"**Count:** {len(symbols_list)} symbols\n"
+                      f"**Symbols:** {symbols_str}\n\n"
+                      f"All prices have been validated and auto-corrected if needed.")
+            
+            # Send to Bruce specifically
+            result = telegram_poster.send_message_to_user(message, "bruce", urgent=False)
+            
+            if result['success']:
+                self.logger.info(f"✅ Sent symbols list to Bruce via Telegram ({len(symbols_list)} symbols)")
+            else:
+                self.logger.warning(f"❌ Failed to send symbols to Bruce: {result.get('errors', [])}")
+                
+        except Exception as e:
+            self.logger.error(f"Error sending symbols to Bruce via Telegram: {e}")
 
     def get_symbols_file(self) -> str:
         """Get the symbols file path."""
