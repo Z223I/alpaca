@@ -33,6 +33,7 @@ from atoms.config.symbol_manager import SymbolManager
 from atoms.config.symbol_data_loader import SymbolDataLoader
 from atoms.alerts.super_alert_filter import SuperAlertFilter
 from atoms.alerts.super_alert_generator import SuperAlertGenerator
+from atoms.alerts.config import get_historical_root_dir
 from atoms.telegram.orb_alerts import send_orb_alert
 
 # Alpaca API imports for real-time price checking
@@ -95,11 +96,12 @@ class ORBAlertMonitor:
         self.post_only_urgent = post_only_urgent
         self.no_telegram = no_telegram
 
-        # Alert monitoring setup
+        # Alert monitoring setup using configurable root directory
         et_tz = pytz.timezone('US/Eastern')
         current_date = datetime.now(et_tz).strftime('%Y-%m-%d')
-        self.alerts_dir = Path(f"historical_data/{current_date}/alerts/bullish")
-        self.super_alerts_dir = Path(f"historical_data/{current_date}/super_alerts/bullish")
+        historical_root = get_historical_root_dir()
+        self.alerts_dir = historical_root.get_alerts_dir(current_date)
+        self.super_alerts_dir = historical_root.get_super_alerts_dir(current_date)
 
         # Ensure directories exist
         self.alerts_dir.mkdir(parents=True, exist_ok=True)

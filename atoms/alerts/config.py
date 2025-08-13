@@ -6,6 +6,52 @@ to ensure consistency across alert generation and notification systems.
 """
 
 from dataclasses import dataclass
+from pathlib import Path
+
+
+@dataclass
+class HistoricalRootDir:
+    """
+    Historical data root directory configuration.
+    
+    This allows configuring where the historical_data directory structure
+    should be rooted, making it easier to test or relocate data storage.
+    """
+    
+    # Root directory where historical_data folder will be located
+    root_path: str = "."
+    
+    def get_historical_data_path(self, date: str) -> Path:
+        """
+        Get the full path to historical data for a specific date.
+        
+        Args:
+            date: Date string in YYYY-MM-DD format
+            
+        Returns:
+            Path to historical_data/{date}
+        """
+        return Path(self.root_path) / "historical_data" / date
+    
+    def get_alerts_dir(self, date: str, alert_type: str = "bullish") -> Path:
+        """Get alerts directory for a specific date and type."""
+        return self.get_historical_data_path(date) / "alerts" / alert_type
+    
+    def get_super_alerts_dir(self, date: str, alert_type: str = "bullish") -> Path:
+        """Get super alerts directory for a specific date and type."""
+        return self.get_historical_data_path(date) / "super_alerts" / alert_type
+    
+    def get_superduper_alerts_dir(self, date: str, alert_type: str = "bullish") -> Path:
+        """Get superduper alerts directory for a specific date and type."""
+        return self.get_historical_data_path(date) / "superduper_alerts" / alert_type
+    
+    def get_superduper_alerts_sent_dir(self, date: str, alert_type: str = "bullish", momentum_color: str = "green") -> Path:
+        """Get superduper alerts sent directory for a specific date, type, and momentum color."""
+        return self.get_historical_data_path(date) / "superduper_alerts_sent" / alert_type / momentum_color
+    
+    def get_trades_dir(self, date: str) -> Path:
+        """Get trades directory for a specific date."""
+        return self.get_historical_data_path(date)
 
 
 @dataclass
@@ -103,8 +149,19 @@ class PriceMomentumConfig:
     # e.g., penetration thresholds, strength thresholds, etc.
 
 
-# Default configuration instance
+# Default configuration instances
+DEFAULT_HISTORICAL_ROOT_DIR = HistoricalRootDir()
 DEFAULT_PRICE_MOMENTUM_CONFIG = PriceMomentumConfig()
+
+
+def get_historical_root_dir() -> HistoricalRootDir:
+    """
+    Get the current historical root directory configuration.
+    
+    Returns:
+        HistoricalRootDir instance with current settings
+    """
+    return DEFAULT_HISTORICAL_ROOT_DIR
 
 
 def get_price_momentum_config() -> PriceMomentumConfig:

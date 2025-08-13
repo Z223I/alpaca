@@ -31,7 +31,7 @@ sys.path.append('/home/wilsonb/dl/github.com/z223i/alpaca')
 
 from atoms.alerts.superduper_alert_filter import SuperduperAlertFilter
 from atoms.alerts.superduper_alert_generator import SuperduperAlertGenerator
-from atoms.alerts.config import get_momentum_thresholds, get_price_momentum_config
+from atoms.alerts.config import get_momentum_thresholds, get_price_momentum_config, get_historical_root_dir
 from atoms.telegram.orb_alerts import send_orb_alert
 
 
@@ -99,8 +99,9 @@ class ORBSuperduperAlertMonitor:
             target_date = datetime.now(et_tz).strftime('%Y-%m-%d')
         
         self.target_date = target_date
-        self.super_alerts_dir = Path(f"historical_data/{target_date}/super_alerts/bullish")
-        self.superduper_alerts_dir = Path(f"historical_data/{target_date}/superduper_alerts/bullish")
+        historical_root = get_historical_root_dir()
+        self.super_alerts_dir = historical_root.get_super_alerts_dir(target_date)
+        self.superduper_alerts_dir = historical_root.get_superduper_alerts_dir(target_date)
 
         # Ensure directories exist
         self.super_alerts_dir.mkdir(parents=True, exist_ok=True)

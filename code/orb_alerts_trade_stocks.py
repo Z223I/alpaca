@@ -29,6 +29,7 @@ from watchdog.events import FileSystemEventHandler
 sys.path.append('/home/wilsonb/dl/github.com/z223i/alpaca')
 
 from atoms.alerts.trade_generator import TradeGenerator  # noqa: E402
+from atoms.alerts.config import get_historical_root_dir  # noqa: E402
 from atoms.telegram.orb_alerts import send_orb_alert  # noqa: E402
 from atoms.telegram.telegram_post import TelegramPoster  # noqa: E402
 
@@ -87,9 +88,9 @@ class ORBTradeStocksMonitor:
             target_date = datetime.now(et_tz).strftime('%Y-%m-%d')
 
         self.target_date = target_date
-        self.superduper_alerts_dir = Path(
-            f"historical_data/{target_date}/superduper_alerts_sent/bullish/green")
-        self.trades_dir = Path(f"historical_data/{target_date}")
+        historical_root = get_historical_root_dir()
+        self.superduper_alerts_dir = historical_root.get_superduper_alerts_sent_dir(target_date)
+        self.trades_dir = historical_root.get_trades_dir(target_date)
 
         # Ensure directories exist
         self.superduper_alerts_dir.mkdir(parents=True, exist_ok=True)
