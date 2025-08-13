@@ -7,6 +7,7 @@ import os
 import math
 import time
 import subprocess
+import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date, time as dt_time
 import pytz
@@ -91,6 +92,9 @@ class AlpacaPrivate:
         # Initialize Alpaca API client using account configuration
         self.api = init_alpaca_client("alpaca", self.account_name, self.account)
 
+        # Setup logging for buy-market-trailing-sell-take-profit-percent operations
+        self._setup_logging()
+
         self.active_orders = []
         
         # First trade tracking and position monitoring
@@ -99,6 +103,57 @@ class AlpacaPrivate:
         self._monitoring_started_today = False
         self._today_date = datetime.now(pytz.timezone('America/New_York')).date()
 
+    def _setup_logging(self) -> None:
+        """
+        Setup logging configuration for buy-market-trailing-sell-take-profit-percent operations.
+        Creates timestamped log files in logs/alpaca directory.
+        """
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        log_filename = f"logs/alpaca/trading_operations_{timestamp}.log"
+        
+        # Create logger for this instance
+        self.logger = logging.getLogger(f'alpaca_trading_{timestamp}')
+        self.logger.setLevel(logging.INFO)
+        
+        # Prevent duplicate handlers if logger already exists
+        if not self.logger.handlers:
+            # Create file handler
+            file_handler = logging.FileHandler(log_filename)
+            file_handler.setLevel(logging.INFO)
+            
+            # Create formatter
+            formatter = logging.Formatter(
+                '%(asctime)s - %(levelname)s - %(message)s',
+                datefmt='%Y-%m-%d %H:%M:%S'
+            )
+            file_handler.setFormatter(formatter)
+            
+            # Add handler to logger
+            self.logger.addHandler(file_handler)
+        
+        self.logger.info("=" * 80)
+        self.logger.info("NEW TRADING SESSION STARTED")
+        self.logger.info(f"Account: {getattr(self, 'account_name', 'Unknown')}")
+        self.logger.info(f"Account Type: {getattr(self, 'account', 'Unknown')}")
+        self.logger.info(f"Portfolio Risk: {getattr(self, 'PORTFOLIO_RISK', 'Unknown')}")
+        self.logger.info("=" * 80)
+
+    def _log_and_print(self, message: str, level: str = 'INFO') -> None:
+        """
+        Log message to file and print to console.
+        
+        Args:
+            message: Message to log and print
+            level: Log level (INFO, WARNING, ERROR)
+        """
+        print(message)
+        if hasattr(self, 'logger'):
+            if level == 'WARNING':
+                self.logger.warning(message)
+            elif level == 'ERROR':
+                self.logger.error(message)
+            else:
+                self.logger.info(message)
 
     def _calculateQuantity(self, price: float, method_name: str = "method") -> int:
         """
@@ -324,13 +379,13 @@ class AlpacaPrivate:
         Returns:
             Dictionary with buy, trailing sell, and take profit order responses, or None if error/dry run
         """
-        print(f"Executing market buy with trailing sell and take profit percent for {symbol}...")
+        self._log_and_print(f"🚀 STEP 1: Executing market buy with trailing sell and take profit percent for {symbol}...")
 
         # Step 1: Execute market buy order
         buy_order = self._buy_market(symbol=symbol, amount=amount, submit_order=submit_order)
 
         if not submit_order:
-            print("[DRY RUN] Would poll order status and place trailing sell + take profit percent after fill")
+            self._log_and_print("[DRY RUN] Would poll order status and place trailing sell + take profit percent after fill")
             # In dry run mode, simulate the take profit calculation with estimated quantity
             # Get estimated quantity from the buy order simulation
             market_price = get_latest_quote_avg(self.api, symbol, self.account_name, self.account)
@@ -339,15 +394,15 @@ class AlpacaPrivate:
             else:
                 estimated_qty = self._calculateQuantity(market_price, "_buy_market_trailing_sell_take_profit_percent")
             
-            print(f"\n[DRY RUN] Simulating complete workflow:")
-            print(f"  1. Buy Order: Would fill {estimated_qty} shares @ ${market_price:.2f}")
-            print(f"  2. Trailing Sell: Would place trailing sell order (default {trailing_percent or 7.5}%)")
-            print(f"  3. Trailing Sell Polling: Would monitor for acceptance/rejection")
-            print(f"  4. Take Profit: Would place take profit order at {take_profit_percent}% above fill price")
-            print(f"  5. Take Profit Polling: Would monitor for acceptance/rejection")
+            self._log_and_print(f"\n[DRY RUN] Simulating complete workflow:")
+            self._log_and_print(f"  1. Buy Order: Would fill {estimated_qty} shares @ ${market_price:.2f}")
+            self._log_and_print(f"  2. Trailing Sell: Would place trailing sell order (default {trailing_percent or 7.5}%)")
+            self._log_and_print(f"  3. Trailing Sell Polling: Would monitor for acceptance/rejection")
+            self._log_and_print(f"  4. Take Profit: Would place take profit order at {take_profit_percent}% above fill price")
+            self._log_and_print(f"  5. Take Profit Polling: Would monitor for acceptance/rejection")
             
             # Show what the take profit order would look like
-            print(f"\n[DRY RUN] Take profit order simulation:")
+            self._log_and_print(f"\n[DRY RUN] Take profit order simulation:")
             self._take_profit_percent(
                 symbol=symbol,
                 quantity=estimated_qty,
@@ -358,31 +413,32 @@ class AlpacaPrivate:
             return None
 
         if buy_order is None:
-            print("✗ Market buy order failed, aborting trailing sell and take profit setup")
+            self._log_and_print("✗ Market buy order failed, aborting trailing sell and take profit setup", 'ERROR')
             return None
 
         # Step 2: Poll order status until filled or terminal state
         final_order = self._poll_order_status(buy_order.id)
 
         if final_order is None:
-            print("✗ Order polling failed, cannot proceed with trailing sell and take profit")
+            self._log_and_print("✗ STEP 2: Order polling failed, cannot proceed with trailing sell and take profit", 'ERROR')
             return None
 
         if final_order.status != 'filled':
-            print(f"✗ Order not filled (status: {final_order.status}), cannot place trailing sell and take profit")
+            self._log_and_print(f"✗ STEP 2: Order not filled (status: {final_order.status}), cannot place trailing sell and take profit", 'ERROR')
             return None
 
         # Step 3: Extract filled quantity and average fill price
         filled_qty = int(final_order.filled_qty) if hasattr(final_order, 'filled_qty') else int(final_order.qty)
         filled_avg_price = float(final_order.filled_avg_price) if hasattr(final_order, 'filled_avg_price') and final_order.filled_avg_price else None
         
-        print(f"✓ Buy order filled: {filled_qty} shares")
+        self._log_and_print(f"✅ STEP 2: Buy order filled: {filled_qty} shares")
         if filled_avg_price:
-            print(f"  Average fill price: ${filled_avg_price:.2f}")
+            self._log_and_print(f"  Average fill price: ${filled_avg_price:.2f}")
         else:
-            print("  Warning: No average fill price available, using current market price")
+            self._log_and_print("  Warning: No average fill price available, using current market price", 'WARNING')
 
         # Step 4: Execute trailing sell with the filled quantity
+        self._log_and_print(f"🚀 STEP 3: Executing trailing sell order for {filled_qty} shares...")
         sell_order = self._sell_trailing(
             symbol=symbol, 
             quantity=filled_qty, 
@@ -391,7 +447,7 @@ class AlpacaPrivate:
         )
 
         if sell_order is None:
-            print("✗ Trailing sell order failed")
+            self._log_and_print("✗ STEP 3: Trailing sell order failed", 'ERROR')
             return {
                 'buy_order': final_order,
                 'sell_order': None,
@@ -400,20 +456,21 @@ class AlpacaPrivate:
             }
 
         # Step 5: Poll trailing sell order status
-        print(f"\n--- Polling Trailing Sell Order ---")
+        self._log_and_print(f"\n🔍 STEP 3: Polling Trailing Sell Order Status ---")
         final_sell_order = self._poll_order_status(sell_order.id, timeout_seconds=30)
         
         if final_sell_order is None:
-            print("✗ Trailing sell order polling failed or timeout")
+            self._log_and_print("✗ STEP 3: Trailing sell order polling failed or timeout", 'ERROR')
             sell_status = "polling_failed"
         elif final_sell_order.status in ['canceled', 'rejected', 'expired']:
-            print(f"✗ Trailing sell order failed with status: {final_sell_order.status}")
+            self._log_and_print(f"✗ STEP 3: Trailing sell order failed with status: {final_sell_order.status}", 'ERROR')
             sell_status = "failed"
         else:
-            print(f"✓ Trailing sell order successfully placed with status: {final_sell_order.status}")
+            self._log_and_print(f"✅ STEP 3: Trailing sell order successfully placed with status: {final_sell_order.status}")
             sell_status = "success"
 
         # Step 6: Execute take profit percent order
+        self._log_and_print(f"🚀 STEP 4: Executing take profit order for {filled_qty} shares at {take_profit_percent}% above fill price...")
         take_profit_order = self._take_profit_percent(
             symbol=symbol,
             quantity=filled_qty,
@@ -423,7 +480,7 @@ class AlpacaPrivate:
         )
 
         if take_profit_order is None:
-            print("✗ Take profit percent order failed")
+            self._log_and_print("✗ STEP 4: Take profit percent order failed", 'ERROR')
             return {
                 'buy_order': final_order,
                 'sell_order': final_sell_order or sell_order,
@@ -434,30 +491,30 @@ class AlpacaPrivate:
             }
 
         # Step 7: Poll take profit order status
-        print(f"\n--- Polling Take Profit Order ---")
+        self._log_and_print(f"\n🔍 STEP 4: Polling Take Profit Order Status ---")
         final_take_profit_order = self._poll_order_status(take_profit_order.id, timeout_seconds=30)
         
         if final_take_profit_order is None:
-            print("✗ Take profit order polling failed or timeout")
+            self._log_and_print("✗ STEP 4: Take profit order polling failed or timeout", 'ERROR')
             take_profit_status = "polling_failed"
         elif final_take_profit_order.status in ['canceled', 'rejected', 'expired']:
-            print(f"✗ Take profit order failed with status: {final_take_profit_order.status}")
+            self._log_and_print(f"✗ STEP 4: Take profit order failed with status: {final_take_profit_order.status}", 'ERROR')
             take_profit_status = "failed"
         else:
-            print(f"✓ Take profit order successfully placed with status: {final_take_profit_order.status}")
+            self._log_and_print(f"✅ STEP 4: Take profit order successfully placed with status: {final_take_profit_order.status}")
             take_profit_status = "success"
 
         # Step 8: Summary and results
-        print(f"\n--- Order Execution Summary ---")
-        print(f"✓ Buy Order: FILLED ({filled_qty} shares @ ${filled_avg_price:.2f})")
-        print(f"{'✓' if sell_status == 'success' else '✗'} Trailing Sell: {sell_status.upper()}")
-        print(f"{'✓' if take_profit_status == 'success' else '✗'} Take Profit: {take_profit_status.upper()}")
+        self._log_and_print(f"\n📊 === ORDER EXECUTION SUMMARY ===")
+        self._log_and_print(f"✅ Buy Order: FILLED ({filled_qty} shares @ ${filled_avg_price:.2f})")
+        self._log_and_print(f"{'✅' if sell_status == 'success' else '❌'} Trailing Sell: {sell_status.upper()}")
+        self._log_and_print(f"{'✅' if take_profit_status == 'success' else '❌'} Take Profit: {take_profit_status.upper()}")
         
         overall_success = sell_status == "success" and take_profit_status == "success"
         if overall_success:
-            print("✓ All orders completed successfully")
+            self._log_and_print("✅ ALL ORDERS COMPLETED SUCCESSFULLY!")
         else:
-            print("⚠️  Some orders encountered issues - monitor positions carefully")
+            self._log_and_print("⚠️  Some orders encountered issues - monitor positions carefully", 'WARNING')
 
         return {
             'buy_order': final_order,

@@ -86,6 +86,12 @@ Filter out stocks below two dollars.
 - [ ] Today's PNL - needs to be added to watchdog.
 - [ ] TEST: Close all positions at the end of the day.  Close all orders. Calculate PNL
 
+##
+
+- [ ] VERY IMPORTANT: the buy type for $BSLK was not correct. The trade execution responded with no but without detail.  Reduce the price momentum length. Reduce .75 2.68.
+
+August 13: I need a test driver for orb alerts. Run it for BSLK for August 13. And ATNF for August 12. Hyphen – – telegram. And dry run trades. is it possible to do automatic parameter testing?  Have different directories for different runs. Of course, logged the parameters in every directory.  Make sure all of the parameters are in a config file for easy modification. Need a list of symbols with dates for testing. include the symbol from August 4.  Generate the plots with the alerts. Document number of trades per symbol. Have the run directory include the historical data directory. So, the directory location will need to be in the config file and default to its current location. Restore the default location at the end of the run. Restore all of the configuration at the end of the run.
+
 
 ## MACD Analysis
 
