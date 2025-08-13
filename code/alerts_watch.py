@@ -53,7 +53,8 @@ class AlertsWatchdog:
         self.watchdog_logs_dir.mkdir(exist_ok=True)
         
         # Setup main watchdog logging
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        et_now = datetime.now(pytz.timezone('US/Eastern'))
+        timestamp = et_now.strftime("%Y%m%d_%H%M%S")
         self.log_file = self.watchdog_logs_dir / f"alerts_watch_{timestamp}.log"
         
         # Market hours configuration (Eastern Time)
@@ -136,7 +137,8 @@ class AlertsWatchdog:
     
     def _log(self, message: str, level: str = "INFO"):
         """Log message with timestamp to both console and file."""
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        et_now = datetime.now(self.et_tz)
+        timestamp = et_now.strftime("%Y-%m-%d %H:%M:%S ET")
         log_entry = f"[{timestamp}] {level}: {message}"
         
         # Print to console
@@ -149,6 +151,8 @@ class AlertsWatchdog:
                 f.write(log_entry + "\n")
                 f.flush()
         except Exception as e:
+            et_now = datetime.now(self.et_tz)
+            timestamp = et_now.strftime("%Y-%m-%d %H:%M:%S ET")
             print(f"[{timestamp}] ERROR: Failed to write to log file: {e}")
     
     def start_watchdog(self):
@@ -197,21 +201,68 @@ class AlertsWatchdog:
     
     def _setup_market_schedule(self):
         """Setup scheduled tasks for market open/close."""
-        # Market open - Monday to Friday at 9:30 AM ET
-        schedule.every().monday.at("09:30").do(self._market_open_handler)
-        schedule.every().tuesday.at("09:30").do(self._market_open_handler)
-        schedule.every().wednesday.at("09:30").do(self._market_open_handler)
-        schedule.every().thursday.at("09:30").do(self._market_open_handler)
-        schedule.every().friday.at("09:30").do(self._market_open_handler)
+        # Convert ET market hours to local time for the schedule library
+        # Since schedule library uses local system time, we need to convert ET to local
         
-        # Market close - Monday to Friday at 4:00 PM ET
-        schedule.every().monday.at("16:00").do(self._market_close_handler)
-        schedule.every().tuesday.at("16:00").do(self._market_close_handler)
-        schedule.every().wednesday.at("16:00").do(self._market_close_handler)
-        schedule.every().thursday.at("16:00").do(self._market_close_handler)
-        schedule.every().friday.at("16:00").do(self._market_close_handler)
+        # Create ET datetime objects for today
+        et_now = datetime.now(self.et_tz)
+        et_open = et_now.replace(hour=9, minute=30, second=0, microsecond=0)
+        et_close = et_now.replace(hour=16, minute=0, second=0, microsecond=0)
         
-        self._log("📅 Market schedule configured")
+        # Convert to local timezone
+        local_tz = pytz.timezone('US/Central')  # Assuming system is in Central Time
+        try:
+            # Try to detect system timezone automatically
+            import time
+            local_tz_name = time.tzname[0]
+            if 'CST' in local_tz_name or 'CDT' in local_tz_name:
+                local_tz = pytz.timezone('US/Central')
+            elif 'MST' in local_tz_name or 'MDT' in local_tz_name:
+                local_tz = pytz.timezone('US/Mountain')
+            elif 'PST' in local_tz_name or 'PDT' in local_tz_name:
+                local_tz = pytz.timezone('US/Pacific')
+            else:
+                local_tz = pytz.timezone('US/Eastern')  # Default to ET if system is already ET
+        except:
+            # Fallback to detecting offset
+            local_now = datetime.now()
+            et_equiv = datetime.now(self.et_tz).replace(tzinfo=None)
+            offset_hours = int((local_now - et_equiv).total_seconds() / 3600)
+            
+            if offset_hours == -1:  # 1 hour behind ET = Central
+                local_tz = pytz.timezone('US/Central')
+            elif offset_hours == -2:  # 2 hours behind ET = Mountain  
+                local_tz = pytz.timezone('US/Mountain')
+            elif offset_hours == -3:  # 3 hours behind ET = Pacific
+                local_tz = pytz.timezone('US/Pacific')
+            else:
+                local_tz = self.et_tz  # Same as ET
+        
+        local_open = et_open.astimezone(local_tz)
+        local_close = et_close.astimezone(local_tz)
+        
+        open_time_str = local_open.strftime("%H:%M")
+        close_time_str = local_close.strftime("%H:%M")
+        
+        self._log(f"🕘 Converting ET market hours to local time:")
+        self._log(f"   Market Open: 09:30 ET = {open_time_str} local")
+        self._log(f"   Market Close: 16:00 ET = {close_time_str} local")
+        
+        # Market open - Monday to Friday at converted local time
+        schedule.every().monday.at(open_time_str).do(self._market_open_handler)
+        schedule.every().tuesday.at(open_time_str).do(self._market_open_handler)
+        schedule.every().wednesday.at(open_time_str).do(self._market_open_handler)
+        schedule.every().thursday.at(open_time_str).do(self._market_open_handler)
+        schedule.every().friday.at(open_time_str).do(self._market_open_handler)
+        
+        # Market close - Monday to Friday at converted local time
+        schedule.every().monday.at(close_time_str).do(self._market_close_handler)
+        schedule.every().tuesday.at(close_time_str).do(self._market_close_handler)
+        schedule.every().wednesday.at(close_time_str).do(self._market_close_handler)
+        schedule.every().thursday.at(close_time_str).do(self._market_close_handler)
+        schedule.every().friday.at(close_time_str).do(self._market_close_handler)
+        
+        self._log("📅 Market schedule configured with timezone conversion")
     
     def _check_initial_market_status(self):
         """Check if market is currently open and start processes if needed."""
@@ -279,7 +330,8 @@ class AlertsWatchdog:
             cmd = [python_path, str(script_path)] + config['args']
             
             # Setup process-specific log file
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            et_now = datetime.now(self.et_tz)
+            timestamp = et_now.strftime("%Y%m%d_%H%M%S")
             process_log_dir = self.logs_dir / config['log_dir']
             process_log_file = process_log_dir / f"{process_name}_{timestamp}.log"
             
@@ -289,7 +341,8 @@ class AlertsWatchdog:
             # Start process with output redirected to log file
             with open(process_log_file, 'w') as log_file:
                 # Write header to log file
-                log_file.write(f"# {process_name} Log - Started: {datetime.now()}\n")
+                et_now = datetime.now(self.et_tz)
+                log_file.write(f"# {process_name} Log - Started: {et_now.strftime('%Y-%m-%d %H:%M:%S ET')}\n")
                 log_file.write(f"# Command: {' '.join(cmd)}\n")
                 log_file.write(f"# Working Directory: {self.project_root}\n")
                 log_file.write("# " + "="*50 + "\n\n")
@@ -363,7 +416,8 @@ class AlertsWatchdog:
             if log_file and log_file.exists():
                 try:
                     with open(log_file, 'a') as f:
-                        f.write(f"\n# Process stopped: {datetime.now()}\n")
+                        et_now = datetime.now(self.et_tz)
+                        f.write(f"\n# Process stopped: {et_now.strftime('%Y-%m-%d %H:%M:%S ET')}\n")
                 except Exception:
                     pass
                 
@@ -475,7 +529,8 @@ class AlertsWatchdog:
             cmd = [python_path, str(script_path)] + script_config['args']
             
             # Setup script-specific log file
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            et_now = datetime.now(self.et_tz)
+            timestamp = et_now.strftime("%Y%m%d_%H%M%S")
             script_log_dir = self.logs_dir / script_config['log_dir']
             script_name = Path(script_config['script']).stem
             script_log_file = script_log_dir / f"{script_name}_{timestamp}.log"
@@ -485,8 +540,9 @@ class AlertsWatchdog:
             # Execute with output saved to log file
             with open(script_log_file, 'w') as log_file:
                 # Write header
+                et_now = datetime.now(self.et_tz)
                 log_file.write(f"# {script_name} Post-Market Analysis Log\n")
-                log_file.write(f"# Started: {datetime.now()}\n")
+                log_file.write(f"# Started: {et_now.strftime('%Y-%m-%d %H:%M:%S ET')}\n")
                 log_file.write(f"# Command: {' '.join(cmd)}\n")
                 log_file.write(f"# Working Directory: {self.project_root}\n")
                 log_file.write("# " + "="*50 + "\n\n")
@@ -502,7 +558,8 @@ class AlertsWatchdog:
                 )
                 
                 # Write completion info
-                log_file.write(f"\n\n# Completed: {datetime.now()}\n")
+                et_now = datetime.now(self.et_tz)
+                log_file.write(f"\n\n# Completed: {et_now.strftime('%Y-%m-%d %H:%M:%S ET')}\n")
                 log_file.write(f"# Return code: {result.returncode}\n")
             
             # Read the log file to get output for summary
@@ -534,7 +591,8 @@ class AlertsWatchdog:
             # Write timeout info to log file if it exists
             try:
                 with open(script_log_file, 'a') as f:
-                    f.write(f"\n\n# TIMEOUT: Script timed out after 5 minutes - {datetime.now()}\n")
+                    et_now = datetime.now(self.et_tz)
+                    f.write(f"\n\n# TIMEOUT: Script timed out after 5 minutes - {et_now.strftime('%Y-%m-%d %H:%M:%S ET')}\n")
             except Exception:
                 pass
                 
@@ -557,8 +615,9 @@ class AlertsWatchdog:
     def _send_daily_summary(self, analysis_results: Dict):
         """Send daily summary to Bruce via Telegram."""
         try:
-            # Get today's date
-            today = datetime.now().strftime("%Y-%m-%d")
+            # Get today's date in ET
+            et_now = datetime.now(self.et_tz)
+            today = et_now.strftime("%Y-%m-%d")
             
             # Build summary message
             summary_lines = [
