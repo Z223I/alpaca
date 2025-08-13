@@ -29,7 +29,6 @@ class SuperduperAlertData:
         self.super_alerts = []  # List of super alerts for this symbol
         self.price_progression = []  # Price changes over time (from super alerts)
         self.market_data = []  # Full market data for comprehensive trend analysis
-        self.timeframe_minutes = 30  # Default timeframe
         self.logger = logging.getLogger(__name__)
 
     def add_super_alert(self, super_alert: Dict[str, Any]) -> None:
@@ -148,7 +147,7 @@ class SuperduperAlertData:
             self.logger.error(f"Error loading market data for {self.symbol}: {e}")
             return False
 
-    def analyze_trend(self, timeframe_minutes: int = 30) -> Tuple[str, float, Dict[str, Any]]:
+    def analyze_trend(self, timeframe_minutes: int) -> Tuple[str, float, Dict[str, Any]]:
         """
         Analyze price trend over the specified timeframe using full market data.
 
@@ -464,12 +463,12 @@ class SuperduperAlertData:
 class SuperduperAlertFilter:
     """Filters super alerts for superduper alert generation."""
 
-    def __init__(self, timeframe_minutes: int = 30):
+    def __init__(self, timeframe_minutes: int):
         """
         Initialize the superduper alert filter.
 
         Args:
-            timeframe_minutes: Time window for trend analysis (default 45)
+            timeframe_minutes: Time window for trend analysis (required)
         """
         self.timeframe_minutes = timeframe_minutes
         self.logger = logging.getLogger(__name__)

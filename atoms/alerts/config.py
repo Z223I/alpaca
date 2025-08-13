@@ -88,30 +88,33 @@ class MomentumThresholds:
 
 
 @dataclass
-class AlertConfig:
+class PriceMomentumConfig:
     """
-    Main alert configuration containing all alert-related settings.
+    Price momentum configuration containing momentum thresholds and timeframe settings.
     """
     
     # Momentum thresholds for color coding and filtering
     momentum: MomentumThresholds = MomentumThresholds()
     
-    # Other alert configuration can be added here in the future
+    # Trend analysis timeframe in minutes
+    trend_analysis_timeframe_minutes: int = 20
+    
+    # Other momentum configuration can be added here in the future
     # e.g., penetration thresholds, strength thresholds, etc.
 
 
 # Default configuration instance
-DEFAULT_ALERT_CONFIG = AlertConfig()
+DEFAULT_PRICE_MOMENTUM_CONFIG = PriceMomentumConfig()
 
 
-def get_alert_config() -> AlertConfig:
+def get_price_momentum_config() -> PriceMomentumConfig:
     """
-    Get the current alert configuration.
+    Get the current price momentum configuration.
     
     Returns:
-        AlertConfig instance with current settings
+        PriceMomentumConfig instance with current settings
     """
-    return DEFAULT_ALERT_CONFIG
+    return DEFAULT_PRICE_MOMENTUM_CONFIG
 
 
 def get_momentum_thresholds() -> MomentumThresholds:
@@ -121,4 +124,4 @@ def get_momentum_thresholds() -> MomentumThresholds:
     Returns:
         MomentumThresholds instance with current settings
     """
-    return DEFAULT_ALERT_CONFIG.momentum
+    return DEFAULT_PRICE_MOMENTUM_CONFIG.momentum

@@ -31,7 +31,7 @@ sys.path.append('/home/wilsonb/dl/github.com/z223i/alpaca')
 
 from atoms.alerts.superduper_alert_filter import SuperduperAlertFilter
 from atoms.alerts.superduper_alert_generator import SuperduperAlertGenerator
-from atoms.alerts.config import get_momentum_thresholds
+from atoms.alerts.config import get_momentum_thresholds, get_price_momentum_config
 from atoms.telegram.orb_alerts import send_orb_alert
 
 
@@ -55,12 +55,12 @@ class SuperAlertFileHandler(FileSystemEventHandler):
 class ORBSuperduperAlertMonitor:
     """Main ORB Superduper Alert Monitor that watches for super alerts and creates superduper alerts."""
 
-    def __init__(self, timeframe_minutes: int = 30, test_mode: bool = False, post_only_urgent: bool = False, no_telegram: bool = False, date: Optional[str] = None):
+    def __init__(self, timeframe_minutes: Optional[int] = None, test_mode: bool = False, post_only_urgent: bool = False, no_telegram: bool = False, date: Optional[str] = None):
         """
         Initialize ORB Superduper Alert Monitor.
 
         Args:
-            timeframe_minutes: Time window for trend analysis (default 30)
+            timeframe_minutes: Time window for trend analysis (default from config: 20 minutes)
             test_mode: Run in test mode (no actual alerts)
             post_only_urgent: Only send urgent telegram alerts
             no_telegram: Disable telegram notifications
@@ -69,8 +69,13 @@ class ORBSuperduperAlertMonitor:
         # Setup logging
         self.logger = self._setup_logging()
 
-        # Initialize momentum configuration
-        self.momentum_thresholds = get_momentum_thresholds()
+        # Initialize price momentum configuration
+        price_momentum_config = get_price_momentum_config()
+        self.momentum_thresholds = price_momentum_config.momentum
+        
+        # Set timeframe from config if not provided
+        if timeframe_minutes is None:
+            timeframe_minutes = price_momentum_config.trend_analysis_timeframe_minutes
 
         # Initialize filtering and generation atoms
         self.superduper_alert_filter = SuperduperAlertFilter(timeframe_minutes)
@@ -348,8 +353,8 @@ def parse_arguments():
     parser.add_argument(
         "--timeframe",
         type=int,
-        default=30,
-        help="Time window in minutes for trend analysis (default: 30)"
+        default=None,
+        help="Time window in minutes for trend analysis (default: from config, currently 20)"
     )
 
     parser.add_argument(
