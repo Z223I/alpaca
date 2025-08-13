@@ -13,14 +13,14 @@ class MomentumThresholds:
     """
     Momentum threshold configuration for alert color coding and filtering.
     
-    Momentum is measured as percentage change per minute (e.g., 0.75 = 0.75%/min).
+    Momentum is measured as percentage change per minute (e.g., 0.65 = 0.65%/min).
     """
     
     # Red momentum threshold (below this = red 🔴)
     red_threshold: float = 0.3
     
     # Green momentum threshold (at or above this = green 🟢)  
-    green_threshold: float = 0.75
+    green_threshold: float = 0.65
     
     # Yellow momentum is implicitly between red_threshold and green_threshold (🟡)
     
