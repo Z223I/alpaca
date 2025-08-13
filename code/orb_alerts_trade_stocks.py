@@ -266,9 +266,12 @@ class ORBTradeStocksMonitor:
                             account_type = trade_data.get('account_type', 'Unknown')
                             account = f"{account_name}/{account_type}"
 
-                            # Create trade notification message
+                            # Create trade notification message with trading parameters
+                            trailing_percent = trade_data.get('trailing_percent', 0)
+                            take_profit_percent = trade_data.get('take_profit_percent', 0)
+                            reason = execution_status.get('reason', 'No reason provided')
                             trade_message = self._create_trade_notification_message(
-                                symbol, success, amount, account, execution_status)
+                                symbol, success, amount, account, execution_status, trailing_percent, take_profit_percent, reason)
 
                             # Determine urgency - all executed trades are considered urgent
                             is_urgent = True
@@ -319,7 +322,8 @@ class ORBTradeStocksMonitor:
         return None
 
     def _create_trade_notification_message(self, symbol: str, success: str, amount: int,
-                                           account: str, execution_status: Dict) -> str:
+                                           account: str, execution_status: Dict, 
+                                           trailing_percent: float = 0, take_profit_percent: float = 0, reason: str = "No reason provided") -> str:
         """Create a formatted trade notification message."""
         success_emoji = "✅" if success == "yes" else "🔄"  # ✅ for real success, 🔄 for dry run
         dry_run_text = " (DRY RUN)" if execution_status.get('dry_run_executed', False) else ""
@@ -337,13 +341,42 @@ class ORBTradeStocksMonitor:
             f"📊 **Account:** {account}",
             "",
             "📈 **Trade Details:**",
-            "• Command: Buy Market with Trailing Sell",
+            "• Command: Buy Market + Trailing Sell + Take Profit",
             f"• Amount: ${amount}",
+            f"• Trailing Stop: {trailing_percent}%",
+            f"• Take Profit: {take_profit_percent}%",
             f"• Status: {status_text}",
+            f"• Reason: {reason}",
             "• Trigger: Green Momentum Superduper Alert",
+        ]
+        
+        # Add retry information if available
+        retry_attempts = execution_status.get('retry_attempts', [])
+        successful_attempt = execution_status.get('successful_attempt')
+        max_retries_reached = execution_status.get('max_retries_reached', False)
+        
+        if retry_attempts or successful_attempt:
+            message_parts.append("")
+            message_parts.append("🔄 **Retry Information:**")
+            
+            if successful_attempt and successful_attempt > 1:
+                message_parts.append(f"• Succeeded on attempt {successful_attempt}/3")
+                message_parts.append(f"• Previous failures: {len(retry_attempts)}")
+            elif max_retries_reached:
+                message_parts.append("• Failed after 3 retry attempts")
+                message_parts.append(f"• All attempts exhausted")
+            
+            # Show details of retry attempts if there were any
+            if retry_attempts:
+                for attempt in retry_attempts[:2]:  # Show max 2 retry details to keep message concise
+                    attempt_num = attempt.get('attempt', 'N/A')
+                    attempt_reason = attempt.get('reason', 'Unknown error')[:50] + "..."  # Truncate long reasons
+                    message_parts.append(f"• Attempt {attempt_num}: {attempt_reason}")
+        
+        message_parts.extend([
             "",
             f"⏰ **Executed:** {datetime.now(pytz.timezone('US/Eastern')).strftime('%H:%M:%S ET')}",
-        ]
+        ])
 
         if execution_status.get('dry_run_executed', False):
             message_parts.insert(-1, "🧪 **DRY RUN MODE** - No actual trade placed")

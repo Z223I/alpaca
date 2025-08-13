@@ -12,6 +12,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -209,11 +210,150 @@ class TradeGenerator:
 
     def execute_trade_command(self, trade_record: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Execute the trade command using alpaca.py.
+        Execute the trade command using alpaca.py with retry logic for API timeouts.
 
         Args:
             trade_record: Trade record containing execution parameters
 
+        Returns:
+            Updated trade record with execution results
+        """
+        # Use the retry logic for trade execution
+        return self._execute_trade_command_with_retries(trade_record, max_retries=3, retry_delay=2.0)
+
+    def _is_retryable_error(self, stdout: str, stderr: str) -> bool:
+        """
+        Check if the error is retryable (API timeout/overload conditions).
+        
+        Args:
+            stdout: Standard output from alpaca command
+            stderr: Standard error from alpaca command
+            
+        Returns:
+            True if the error is retryable, False otherwise
+        """
+        try:
+            # Combine stdout and stderr for analysis
+            full_output = f"{stdout}\n{stderr}".lower()
+            
+            # Retryable error patterns - API timeouts and overload conditions
+            retryable_patterns = [
+                r"timeout",
+                r"server.*error",
+                r"server error occurred", 
+                r"connection.*error",
+                r"rate.*limit",
+                r"503",  # Service unavailable
+                r"502",  # Bad gateway
+                r"504",  # Gateway timeout
+            ]
+            
+            # Check if any retryable pattern matches
+            for pattern in retryable_patterns:
+                if re.search(pattern, full_output):
+                    return True
+                    
+            return False
+            
+        except Exception as e:
+            self.logger.error(f"Error checking if error is retryable: {e}")
+            return False
+
+    def _execute_trade_command_with_retries(self, trade_record: Dict[str, Any], max_retries: int = 3, retry_delay: float = 2.0) -> Dict[str, Any]:
+        """
+        Execute trade command with retry logic for API timeouts/overloads.
+        
+        Args:
+            trade_record: Trade record containing execution parameters
+            max_retries: Maximum number of retry attempts (default: 3)
+            retry_delay: Delay in seconds between retries (default: 2.0)
+            
+        Returns:
+            Updated trade record with execution results
+        """
+        symbol = trade_record['symbol']
+        retry_attempts = []
+        
+        for attempt in range(max_retries):
+            try:
+                self.logger.info(f"Trade execution attempt {attempt + 1}/{max_retries} for {symbol}")
+                
+                # Execute the trade command
+                result_record = self._execute_single_trade_attempt(trade_record, attempt + 1)
+                
+                # Check if the execution was successful
+                if result_record['execution_status']['success'] == "yes":
+                    self.logger.info(f"✅ Trade execution succeeded on attempt {attempt + 1} for {symbol}")
+                    # Add retry info to the record
+                    if attempt > 0:
+                        result_record['execution_status']['retry_attempts'] = retry_attempts
+                        result_record['execution_status']['successful_attempt'] = attempt + 1
+                    return result_record
+                
+                # Check if the error is retryable
+                stdout = result_record['execution_status'].get('stdout', '')
+                stderr = result_record['execution_status'].get('stderr', '')
+                
+                if not self._is_retryable_error(stdout, stderr):
+                    self.logger.info(f"❌ Trade execution failed with non-retryable error for {symbol}: {result_record['execution_status']['reason']}")
+                    # Add retry info even for non-retryable failures
+                    if attempt > 0:
+                        result_record['execution_status']['retry_attempts'] = retry_attempts
+                    return result_record
+                
+                # Record this attempt
+                retry_attempts.append({
+                    'attempt': attempt + 1,
+                    'reason': result_record['execution_status']['reason'],
+                    'timestamp': datetime.now(pytz.timezone('US/Eastern')).isoformat()
+                })
+                
+                # If this is not the last attempt, wait before retrying
+                if attempt < max_retries - 1:
+                    self.logger.warning(f"⏱️ Retryable error for {symbol} on attempt {attempt + 1}: {result_record['execution_status']['reason']}")
+                    self.logger.info(f"⏳ Waiting {retry_delay} seconds before retry {attempt + 2}...")
+                    time.sleep(retry_delay)
+                else:
+                    # Final attempt failed
+                    self.logger.error(f"❌ Trade execution failed after {max_retries} attempts for {symbol}: {result_record['execution_status']['reason']}")
+                    result_record['execution_status']['retry_attempts'] = retry_attempts
+                    result_record['execution_status']['max_retries_reached'] = True
+                    return result_record
+                    
+            except Exception as e:
+                error_msg = f"Exception during trade execution attempt {attempt + 1}: {str(e)}"
+                self.logger.error(f"❌ {error_msg} for {symbol}")
+                
+                retry_attempts.append({
+                    'attempt': attempt + 1,
+                    'reason': error_msg,
+                    'timestamp': datetime.now(pytz.timezone('US/Eastern')).isoformat()
+                })
+                
+                # If this is the last attempt or a non-retryable exception
+                if attempt == max_retries - 1:
+                    trade_record['execution_status']['completed'] = True
+                    trade_record['execution_status']['success'] = "no"
+                    trade_record['execution_status']['reason'] = f"Failed after {max_retries} attempts: {error_msg}"
+                    trade_record['execution_status']['retry_attempts'] = retry_attempts
+                    trade_record['execution_status']['max_retries_reached'] = True
+                    trade_record['execution_status']['error'] = str(e)
+                    return trade_record
+                else:
+                    self.logger.info(f"⏳ Waiting {retry_delay} seconds before retry {attempt + 2} after exception...")
+                    time.sleep(retry_delay)
+        
+        # This should never be reached, but just in case
+        return trade_record
+
+    def _execute_single_trade_attempt(self, trade_record: Dict[str, Any], attempt_number: int) -> Dict[str, Any]:
+        """
+        Execute a single trade attempt (extracted from original execute_trade_command).
+        
+        Args:
+            trade_record: Trade record containing execution parameters
+            attempt_number: Current attempt number
+            
         Returns:
             Updated trade record with execution results
         """
@@ -237,7 +377,10 @@ class TradeGenerator:
                 "--submit"  # Added --submit flag for actual trade execution
             ]
 
-            self.logger.info(f"Executing trade command for {symbol}: {' '.join(cmd)}")
+            if attempt_number == 1:
+                self.logger.info(f"Executing trade command for {symbol}: {' '.join(cmd)}")
+            else:
+                self.logger.info(f"Retry {attempt_number}: Executing trade command for {symbol}")
 
             # Update execution status
             et_tz = pytz.timezone('US/Eastern')
@@ -274,17 +417,20 @@ class TradeGenerator:
                 
                 if success:
                     trade_record['execution_status']['reason'] = "Trade executed successfully"
-                    self.logger.info(f"✅ Actual trade executed successfully for {symbol}")
+                    if attempt_number > 1:
+                        self.logger.info(f"✅ Trade executed successfully for {symbol} on retry attempt {attempt_number}")
+                    else:
+                        self.logger.info(f"✅ Actual trade executed successfully for {symbol}")
                 else:
                     # Extract failure reason from alpaca output
                     failure_reason = self._extract_failure_reason(result.stdout, result.stderr)
                     trade_record['execution_status']['reason'] = failure_reason
-                    self.logger.warning(f"❌ Trade execution failed for {symbol}: {failure_reason}")
+                    self.logger.warning(f"❌ Trade execution failed for {symbol} on attempt {attempt_number}: {failure_reason}")
 
             return trade_record
 
         except subprocess.TimeoutExpired:
-            self.logger.error(f"Trade execution timeout for {trade_record['symbol']}")
+            self.logger.error(f"Trade execution timeout for {trade_record['symbol']} on attempt {attempt_number}")
             trade_record['execution_status']['completed'] = True
             trade_record['execution_status']['success'] = "no"
             trade_record['execution_status']['reason'] = "Command execution timed out (60 seconds)"
@@ -293,7 +439,7 @@ class TradeGenerator:
             return trade_record
 
         except Exception as e:
-            self.logger.error(f"Error executing trade for {trade_record['symbol']}: {e}")
+            self.logger.error(f"Error executing trade for {trade_record['symbol']} on attempt {attempt_number}: {e}")
             trade_record['execution_status']['completed'] = True
             trade_record['execution_status']['success'] = "no"
             trade_record['execution_status']['reason'] = f"Execution error: {str(e)}"
