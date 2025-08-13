@@ -281,7 +281,7 @@ class SuperduperAlertData:
             self.logger.debug(f"Calculating MACD analysis for {self.symbol} at {alert_timestamp}")
             
             # Initialize Alpaca client for live data
-            api_client = init_alpaca_client()
+            api_client = init_alpaca_client("alpaca", "Janice", "paper")
             
             # Calculate timeframe for MACD (need at least 26 + 9 = 35 periods for reliable MACD)
             # Use 1-minute bars and fetch 60 minutes of data to ensure we have enough
