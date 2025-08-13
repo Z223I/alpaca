@@ -1,0 +1,34 @@
+{
+  "symbols": [
+    {
+      "symbol": "BSLK",
+      "date": "2025-08-13",
+      "active": "no"
+    },
+    {
+      "symbol": "ATNF",
+      "date": "2025-08-12",
+      "active": "no"
+    },
+    {
+      "symbol": "STAI",
+      "date": "2025-07-29",
+      "active": "no"
+    },
+    {
+      "symbol": "OPEN",
+      "date": "2025-08-04",
+      "active": "no"
+    },
+    {
+      "symbol": "BTAI",
+      "date": "2025-08-04",
+      "active": "no"
+    },
+    {
+      "symbol": "VERB",
+      "date": "2025-08-04",
+      "active": "yes"
+    }
+  ]
+}
