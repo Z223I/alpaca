@@ -27,6 +27,7 @@ from atoms.api.get_latest_quote_avg import get_latest_quote_avg
 from atoms.api.init_alpaca_client import init_alpaca_client
 from atoms.api.config import TradingConfig
 from atoms.api.pnl import AlpacaDailyPnL
+from atoms.alerts.config import get_plots_root_dir
 from atoms.display.print_cash import print_cash
 from atoms.display.print_orders import print_active_orders
 from atoms.display.print_positions import print_positions
@@ -1678,8 +1679,9 @@ class AlpacaPrivate:
                 print(f"✗ Insufficient data for MACD calculation: {len(df)} < 26 periods")
                 return False
 
-            # Set up output directory
-            date_str = target_date.strftime('%Y%m%d')
+            # Set up output directory using centralized plots configuration
+            plots_config = get_plots_root_dir()
+            date_str = target_date.strftime('%Y-%m-%d')  # Keep in YYYY-MM-DD format for config
 
             # Load superduper alerts for this symbol and date
             alerts = self._load_superduper_alerts_for_symbol(symbol, target_date)
@@ -1689,17 +1691,18 @@ class AlpacaPrivate:
                 print(f"Scoring {len(alerts)} alerts using MACD analysis...")
                 alerts = score_alerts_with_macd(df, alerts)
 
-            # Generate chart using the chart generation atom
+            # Generate chart using the chart generation atom with centralized plots directory
+            output_dir = str(plots_config.get_plots_path())
             success = generate_chart_from_dataframe(
                 df=df,
                 symbol=symbol,
-                output_dir='plots',  # Base directory - function will create date subdirectory
+                output_dir=output_dir,  # Use centralized plots directory
                 alerts=alerts,  # Include loaded alerts
                 verbose=True
             )
 
             if success:
-                chart_path = f'plots/{date_str}/{symbol}_chart.png'
+                chart_path = plots_config.get_chart_file_path(date_str, symbol)
                 print(f"✓ Chart generated successfully: {chart_path}")
                 print(f"  Chart includes:")
                 print(f"    • Price candlesticks with ORB levels, EMA(9), EMA(20), VWAP")

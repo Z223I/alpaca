@@ -19,14 +19,10 @@ The polling period is one minute.
 
 One historical run per day.
 Each run will execute:
-
-
-Note to create symbols file
-ok code/orb_alerts.py --date YYYY-MM-DD --symbols-file <SYMBOLS_FILE> --verbose
-ok code/orb_alerts_monitor.py --date YYYY-MM-DD --no-telegram --verbose
-
-ok code/orb_alerts_monitor_superduper.py --no-telegram --date YYYY-MM-DD --verbose
-ok code/orb_alerts_trade_stocks.py --date YYYY-MM-DD --no-telegram --verbose
+??? data pipeline ??? code/orb_alerts.py --date YYYY-MM-DD --symbols-file <SYMBOLS_FILE> --verbose
+code/orb_alerts_monitor.py --date YYYY-MM-DD --no-telegram --verbose
+code/orb_alerts_monitor_superduper.py --no-telegram --date YYYY-MM-DD --verbose
+code/orb_alerts_trade_stocks.py --date YYYY-MM-DD --no-telegram --test --verbose
 
 ### Standards
 Conform to repo standards.
@@ -36,10 +32,21 @@ Test.
 
 ## Low Level Requirements
 
-If there are positions, create a list of unique stock symbols.
+Read data/backtesting/symbols.json and collect symbols by date where active = 'yes'.
 
-For each unique symbol,
-  - Collect sufficient data for calculate_macd
-  - Calculate macd
-  - Score macd
-  - If the MACD score is a red, liquidate the position using the same method as used by the --liquidate arg.
+Each date will be an historical run.
+
+### Individual Runs
+
+For each run:
+1) Create a symbols file for the date.
+  a) copy ./data/YYYYMMDD.csv
+  b) keep only the symbols from symbols.json
+2) Create processes for each script in Background Infomation
+3) Stop when the data pipeline is complete
+4) For each symbol
+  a) python code/alpaca.py --plot --symbol [symbol]
+
+### Summary
+
+Summary the individual runs for superduper alerts sent and test trades.

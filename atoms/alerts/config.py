@@ -10,6 +10,57 @@ from pathlib import Path
 
 
 @dataclass
+class PlotsRootDir:
+    """
+    Plots directory configuration.
+    
+    This allows configuring where the plots directory structure
+    should be rooted, making it easier to test or relocate plots storage.
+    """
+    
+    # Root directory where plots folder will be located
+    root_path: str = "."
+    
+    def get_plots_path(self) -> Path:
+        """
+        Get the full path to plots directory.
+        
+        Returns:
+            Path to plots directory
+        """
+        return Path(self.root_path) / "plots"
+    
+    def get_date_plots_dir(self, date: str) -> Path:
+        """
+        Get plots directory for a specific date.
+        
+        Args:
+            date: Date string in YYYY-MM-DD format
+            
+        Returns:
+            Path to plots/{YYYYMMDD}/
+        """
+        # Convert YYYY-MM-DD to YYYYMMDD format
+        formatted_date = date.replace('-', '')
+        return self.get_plots_path() / formatted_date
+    
+    def get_chart_file_path(self, date: str, symbol: str, chart_type: str = "chart") -> Path:
+        """
+        Get path to chart file for a specific date and symbol.
+        
+        Args:
+            date: Date string in YYYY-MM-DD format
+            symbol: Stock symbol
+            chart_type: Type of chart (default: "chart")
+            
+        Returns:
+            Path to plots/{YYYYMMDD}/{symbol}_{chart_type}.png
+        """
+        date_dir = self.get_date_plots_dir(date)
+        return date_dir / f"{symbol}_{chart_type}.png"
+
+
+@dataclass
 class DataRootDir:
     """
     Data directory configuration.
@@ -212,10 +263,21 @@ class PriceMomentumConfig:
 
 
 # Default configuration instances
+DEFAULT_PLOTS_ROOT_DIR = PlotsRootDir()
 DEFAULT_DATA_ROOT_DIR = DataRootDir()
 DEFAULT_LOGS_ROOT_DIR = LogsRootDir()
 DEFAULT_HISTORICAL_ROOT_DIR = HistoricalRootDir()
 DEFAULT_PRICE_MOMENTUM_CONFIG = PriceMomentumConfig()
+
+
+def get_plots_root_dir() -> PlotsRootDir:
+    """
+    Get the current plots root directory configuration.
+    
+    Returns:
+        PlotsRootDir instance with current settings
+    """
+    return DEFAULT_PLOTS_ROOT_DIR
 
 
 def get_data_root_dir() -> DataRootDir:
