@@ -107,7 +107,8 @@ Filter out stocks below two dollars.
 
 - [X] VERY IMPORTANT. This is only a question.  Leave the code unchanged. How to create a data pipeline for code/orb_alerts.py? Perhaps read all the data for the symbol and date using pre-existing Alpaca scripts in this repo; then pipe in the data iteratively adding a minute (candlestick) at a time to replicate real-time processing.
 - [X] Would you create a new CLI arg for alpaca.py or perhaps create a new script?
-- [ ] Create the new script.
+- [X] Create the new script.
+- [ ] /commit
 - [ ] Fall back commit, 2c28752b4c78e284e9a204d1d3c3f9588b87d0b, to recreate!!!
 
 
