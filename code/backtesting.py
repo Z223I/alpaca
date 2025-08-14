@@ -207,36 +207,74 @@ class BacktestingSystem:
     def _run_orb_pipeline(self, date: str, symbols_file: Path, run_dir: Path) -> bool:
         """Execute the ORB pipeline scripts for a specific run"""
         scripts = [
-            f"python3 code/orb_pipeline_simulator.py --symbols-file {symbols_file} --date {date} "
-            f"--save-alerts --speed 10 --verbose",
-            f"python3 code/orb_alerts_monitor.py --date {date} --no-telegram --verbose",
-            f"python3 code/orb_alerts_monitor_superduper.py --no-telegram --date {date} --verbose",
-            f"python3 code/orb_alerts_trade_stocks.py --date {date} --no-telegram --test --verbose"
+            {
+                'cmd': f"python3 code/orb_pipeline_simulator.py --symbols-file {symbols_file} --date {date} "
+                       f"--save-alerts --speed 20 --verbose",
+                'timeout': 1800  # 30 minutes for data simulation
+            },
+            {
+                'cmd': f"python3 code/orb_alerts_monitor.py --date {date} --no-telegram --verbose",
+                'timeout': 300   # 5 minutes for alert monitoring (should process quickly)
+            },
+            {
+                'cmd': f"python3 code/orb_alerts_monitor_superduper.py --no-telegram --date {date} --verbose",
+                'timeout': 300   # 5 minutes for superduper alerts
+            },
+            {
+                'cmd': f"python3 code/orb_alerts_trade_stocks.py --date {date} --no-telegram --test --verbose",
+                'timeout': 300   # 5 minutes for trade processing
+            }
         ]
 
-        for script in scripts:
+        for script_info in scripts:
+            script = script_info['cmd']
+            timeout = script_info['timeout']
+
             if self.dry_run:
                 self.logger.info(f"Would run: {script}")
                 continue
 
             self.logger.info(f"Running: {script}")
             try:
-                result = subprocess.run(
+                # For monitoring scripts, use timeout and send SIGTERM to allow graceful shutdown
+                process = subprocess.Popen(
                     script.split(),
                     cwd=Path.cwd(),
-                    capture_output=True,
-                    text=True,
-                    timeout=1800  # 30 minute timeout
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
                 )
 
-                if result.returncode != 0:
-                    self.logger.error(f"Script failed: {script}")
-                    self.logger.error(f"Error: {result.stderr}")
-                    return False
+                # Wait for completion with timeout
+                try:
+                    stdout, stderr = process.communicate(timeout=timeout)
 
-            except subprocess.TimeoutExpired:
-                self.logger.error(f"Script timed out: {script}")
-                return False
+                    if process.returncode != 0:
+                        self.logger.error(f"Script failed: {script}")
+                        self.logger.error(f"Error: {stderr}")
+                        return False
+
+                    if stdout and self.verbose:
+                        self.logger.info(f"Script output: {stdout[:500]}...")
+
+                except subprocess.TimeoutExpired:
+                    self.logger.warning(f"Script timeout, terminating: {script}")
+                    process.terminate()
+                    try:
+                        stdout, stderr = process.communicate(timeout=30)
+                        self.logger.info("Script terminated gracefully")
+                    except subprocess.TimeoutExpired:
+                        self.logger.warning(f"Script did not terminate gracefully, killing: {script}")
+                        process.kill()
+                        stdout, stderr = process.communicate()
+
+                    # For monitoring scripts, timeout is expected behavior in backtesting
+                    if 'monitor' in script:
+                        self.logger.info("Monitor script completed (timeout expected for backtesting)")
+                    else:
+                        self.logger.error(f"Script timed out: {script}")
+                        return False
+
             except Exception as e:
                 self.logger.error(f"Script error: {script} - {e}")
                 return False

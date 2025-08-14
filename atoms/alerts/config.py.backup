@@ -263,11 +263,11 @@ class PriceMomentumConfig:
 
 
 # Default configuration instances
-DEFAULT_PLOTS_ROOT_DIR = PlotsRootDir(root_path="/home/wilsonb/dl/github.com/z223i/alpaca/runs/run_2025-08-04_e102a1c7")
-DEFAULT_DATA_ROOT_DIR = DataRootDir(root_path="/home/wilsonb/dl/github.com/z223i/alpaca/runs/run_2025-08-04_e102a1c7")
-DEFAULT_LOGS_ROOT_DIR = LogsRootDir(root_path="/home/wilsonb/dl/github.com/z223i/alpaca/runs/run_2025-08-04_e102a1c7")
-DEFAULT_HISTORICAL_ROOT_DIR = HistoricalRootDir(root_path="/home/wilsonb/dl/github.com/z223i/alpaca/runs/run_2025-08-04_e102a1c7")
-DEFAULT_PRICE_MOMENTUM_CONFIG = PriceMomentumConfig(momentum=MomentumThresholds(green_threshold=0.6), trend_analysis_timeframe_minutes=10)
+DEFAULT_PLOTS_ROOT_DIR = PlotsRootDir()
+DEFAULT_DATA_ROOT_DIR = DataRootDir()
+DEFAULT_LOGS_ROOT_DIR = LogsRootDir()
+DEFAULT_HISTORICAL_ROOT_DIR = HistoricalRootDir()
+DEFAULT_PRICE_MOMENTUM_CONFIG = PriceMomentumConfig()
 
 
 def get_plots_root_dir() -> PlotsRootDir:
