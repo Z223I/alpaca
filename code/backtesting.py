@@ -33,6 +33,7 @@ from atoms.alerts.config import (  # noqa: E402
     DEFAULT_PLOTS_ROOT_DIR, DEFAULT_DATA_ROOT_DIR, DEFAULT_LOGS_ROOT_DIR,
     DEFAULT_HISTORICAL_ROOT_DIR, DEFAULT_PRICE_MOMENTUM_CONFIG
 )
+from atoms.telegram.telegram_post import TelegramPoster  # noqa: E402
 
 
 class BacktestingSystem:
@@ -89,6 +90,36 @@ class BacktestingSystem:
                 symbols_by_date[date].append(symbol)
 
         return symbols_by_date
+
+    def _send_run_notification(self, run_dir: Path, timeframe: int, threshold: float,
+                               date: str, symbols: List[str]):
+        """Send Telegram notification at the start of each backtesting run"""
+        if self.dry_run:
+            self.logger.info(f"Would send Telegram notification for run: {run_dir}")
+            return
+
+        try:
+            telegram_poster = TelegramPoster()
+
+            symbols_str = ", ".join(symbols)
+            message = (f"🧪 **Backtesting Run Started**\n\n"
+                       f"**Run Directory:** `{run_dir.name}`\n"
+                       f"**Date:** {date}\n"
+                       f"**Timeframe:** {timeframe} minutes\n"
+                       f"**Green Threshold:** {threshold}\n"
+                       f"**Symbols:** {symbols_str} ({len(symbols)} total)\n\n"
+                       f"Running ORB pipeline simulation...")
+
+            result = telegram_poster.send_message_to_user(message, "bruce", urgent=False)
+
+            if result['success']:
+                self.logger.info("✅ Sent run notification to Bruce via Telegram")
+            else:
+                self.logger.warning(f"❌ Failed to send run notification: "
+                                    f"{result.get('errors', [])}")
+
+        except Exception as e:
+            self.logger.error(f"Error sending run notification via Telegram: {e}")
 
     def _backup_config(self):
         """Create backup of atoms/alerts/config.py"""
@@ -401,6 +432,9 @@ class BacktestingSystem:
 
                         # Update config for this run
                         self._update_config_for_run(run_dir, timeframe, threshold)
+
+                        # Send run notification
+                        self._send_run_notification(run_dir, timeframe, threshold, date, symbols)
 
                         # Prepare symbols file
                         symbols_file = self._prepare_symbols_file(date, symbols, run_dir)
