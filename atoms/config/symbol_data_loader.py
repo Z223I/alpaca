@@ -34,7 +34,6 @@ class SymbolDataLoader:
             current_date = datetime.now(et_tz).strftime('%Y%m%d')
             self.symbols_file = f"data/{current_date}.csv"
 
-
     def _validate_and_fix_inverted_prices(self, symbol: str, signal_price: float,
                                           resistance_price: float) -> tuple[float, float]:
         """
@@ -53,7 +52,7 @@ class SymbolDataLoader:
             warning_msg = (f"⚠️  INVERTED PRICES for {symbol}: Signal=${signal_price:.4f} >= "
                            f"Resistance=${resistance_price:.4f}")
             self.logger.warning(warning_msg)
-            
+
             # Auto-fix: set resistance = signal * 1.10
             auto_resistance = signal_price * 1.10
             info_msg = (f"🔧 Auto-fixed {symbol}: Resistance ${resistance_price:.4f} → "
@@ -74,6 +73,7 @@ class SymbolDataLoader:
         symbol_data = {}
 
         try:
+            self.logger.info(f"Loading symbol data from: {self.symbols_file}")
             if not Path(self.symbols_file).exists():
                 self.logger.error(f"Symbols file not found: {self.symbols_file}")
                 return symbol_data
@@ -119,38 +119,47 @@ class SymbolDataLoader:
         info_msg = (f"Loaded {len(symbol_data)} symbols with Signal/Resistance data "
                     f"from {self.symbols_file}")
         self.logger.info(info_msg)
-        
+
         # Send symbols list to Bruce via Telegram
         if symbol_data:
             self._send_symbols_to_bruce(list(symbol_data.keys()))
-        
+
         return symbol_data
 
     def _send_symbols_to_bruce(self, symbols_list: list) -> None:
         """
         Send the loaded symbols list to Bruce via Telegram.
-        
+
         Args:
             symbols_list: List of symbol strings
         """
         try:
+            # Skip Telegram notification if this is a backtesting run
+            # (detected by symbols file path containing 'runs/')
+            if 'runs/' in str(self.symbols_file):
+                self.logger.info(f"Backtesting detected - skipping Telegram notification "
+                                 f"for {len(symbols_list)} symbols")
+                return
+
             telegram_poster = TelegramPoster()
-            
+
             # Format the message
             symbols_str = ", ".join(symbols_list)
             message = (f"📊 **Symbol Data Loaded**\n\n"
-                      f"**Count:** {len(symbols_list)} symbols\n"
-                      f"**Symbols:** {symbols_str}\n\n"
-                      f"All prices have been validated and auto-corrected if needed.")
-            
+                       f"**Count:** {len(symbols_list)} symbols\n"
+                       f"**Symbols:** {symbols_str}\n\n"
+                       f"All prices have been validated and auto-corrected if needed.")
+
             # Send to Bruce specifically
             result = telegram_poster.send_message_to_user(message, "bruce", urgent=False)
-            
+
             if result['success']:
-                self.logger.info(f"✅ Sent symbols list to Bruce via Telegram ({len(symbols_list)} symbols)")
+                self.logger.info(f"✅ Sent symbols list to Bruce via Telegram "
+                                 f"({len(symbols_list)} symbols)")
             else:
-                self.logger.warning(f"❌ Failed to send symbols to Bruce: {result.get('errors', [])}")
-                
+                self.logger.warning(f"❌ Failed to send symbols to Bruce: "
+                                    f"{result.get('errors', [])}")
+
         except Exception as e:
             self.logger.error(f"Error sending symbols to Bruce via Telegram: {e}")
 
