@@ -103,7 +103,13 @@ Filter out stocks below two dollars.
 - [X] VERY IMPORTANT. Centralize the starting point for the "data" dir in atoms/alerts/config.py. It should be currently ./data. Mirror historical root in atoms/alerts/config.py. Update code/orb_alerts.py.
 - [X] VERY IMPORTANT. Centralize the starting point for the "plots" dir in atoms/alerts/config.py. It should be currently ./plots. Mirror historical root in atoms/alerts/config.py. Update code/alpaca.py.
 
-- [ ] How to create a data pipeline for code/orb_alerts.py
+
+
+- [X] VERY IMPORTANT. This is only a question.  Leave the code unchanged. How to create a data pipeline for code/orb_alerts.py? Perhaps read all the data for the symbol and date using pre-existing Alpaca scripts in this repo; then pipe in the data iteratively adding a minute (candlestick) at a time to replicate real-time processing.
+- [X] Would you create a new CLI arg for alpaca.py or perhaps create a new script?
+- [ ] Create the new script.
+- [ ] Fall back commit to recreate!!!
+
 
 ALL THE STANDARD COMMANDS FOR SPEC FILES
 Historical test driver for all alert types and . Run it for active symbols in data/backtesting/symbols.json. --no-telegram. And dry run trades. is it possible to do automatic parameter testing?  Have different directories for different runs. Of course, logged the parameters in every directory.  All parameters (lskdjf lskdfj lskjdf) are in atoms/alerts/config.py for easy modification.

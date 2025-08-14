@@ -6,20 +6,25 @@ You are a highly skilled Python developer and software architect.
 
 ## Mid Level Requirements
 
-You will be adding --monitor-positions for code/alpaca.py.
---account-name and --account are optional because they have defaults.  They are important though.
+Make a backup copy of atoms/alerts/config.py
 
-The new method, _monitorPositions(), will poll the Alpaca account for positions using from atoms.api.get_positions import get_positions.
 
-The polling shall continue until the script instance is stopped.
+Where to pass parms to code?  Which script(s)?
 
-The polling period is one minute.
+---Put these values into a config file, say data/backtesting/parameters.json.
+---Use the values in data/backtesting/parameters.json to create a nested loop of values for atoms/alerts/config.py
+
+--- must deal with all the dirs.
+
+Parametric Testing using atoms/alerts/config.py
+- trend_analysis_timeframe_minutes: int = timeframe where timeframe in (10, 15, 20, 25, 30)
+- green_threshold: float = threshold where threshold in (.60, .65, .70, .75)
 
 ### Background Information
 
 One historical run per day.
 Each run will execute:
-??? data pipeline ??? code/orb_alerts.py --date YYYY-MM-DD --symbols-file <SYMBOLS_FILE> --verbose
+code/orb_pipeline_simulator.py --symbols-file [symbols file] --date YYYY-MM-DD --save-alerts --speed 10 --verbose
 code/orb_alerts_monitor.py --date YYYY-MM-DD --no-telegram --verbose
 code/orb_alerts_monitor_superduper.py --no-telegram --date YYYY-MM-DD --verbose
 code/orb_alerts_trade_stocks.py --date YYYY-MM-DD --no-telegram --test --verbose
@@ -49,4 +54,6 @@ For each run:
 
 ### Summary
 
-Summary the individual runs for superduper alerts sent and test trades.
+Summarize the individual runs for superduper alerts sent and test trades.
+Create pie chart for superduper alerts sent by date.
+Create pie chart for trades by date.
