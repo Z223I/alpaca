@@ -137,10 +137,10 @@ Parametric testing on stop lost?
 
 - [X] VERY IMPORTANT. Think hard. Implement the instructions in specs/backtesting.md
 - [O] Nudge (None)
-- [ ] /commit
-- [ ] Publish the branch
-- [ ] git switch master; merge current branch
-- [ ] Sync changes
+- [X] /commit
+- [X] Publish the branch
+- [X] git switch master; merge current branch
+- [X] Sync changes
 
 
 ## MACD Analysis
