@@ -10,6 +10,68 @@ from pathlib import Path
 
 
 @dataclass
+class DataRootDir:
+    """
+    Data directory configuration.
+    
+    This allows configuring where the data directory structure
+    should be rooted, making it easier to test or relocate data storage.
+    """
+    
+    # Root directory where data folder will be located
+    root_path: str = "."
+    
+    def get_data_path(self) -> Path:
+        """
+        Get the full path to data directory.
+        
+        Returns:
+            Path to data directory
+        """
+        return Path(self.root_path) / "data"
+    
+    def get_symbols_file_path(self, date: str) -> Path:
+        """
+        Get path to symbols CSV file for a specific date.
+        
+        Args:
+            date: Date string in YYYY-MM-DD format
+            
+        Returns:
+            Path to data/{YYYYMMDD}.csv
+        """
+        # Convert YYYY-MM-DD to YYYYMMDD format
+        formatted_date = date.replace('-', '')
+        return self.get_data_path() / f"{formatted_date}.csv"
+
+
+@dataclass
+class LogsRootDir:
+    """
+    Logs directory configuration.
+    
+    This allows configuring where the logs directory structure
+    should be rooted, making it easier to test or relocate logs storage.
+    """
+    
+    # Root directory where logs folder will be located
+    root_path: str = "."
+    
+    def get_logs_path(self) -> Path:
+        """
+        Get the full path to logs directory.
+        
+        Returns:
+            Path to logs directory
+        """
+        return Path(self.root_path) / "logs"
+    
+    def get_component_logs_dir(self, component: str) -> Path:
+        """Get logs directory for a specific component."""
+        return self.get_logs_path() / component
+
+
+@dataclass
 class HistoricalRootDir:
     """
     Historical data root directory configuration.
@@ -150,8 +212,30 @@ class PriceMomentumConfig:
 
 
 # Default configuration instances
+DEFAULT_DATA_ROOT_DIR = DataRootDir()
+DEFAULT_LOGS_ROOT_DIR = LogsRootDir()
 DEFAULT_HISTORICAL_ROOT_DIR = HistoricalRootDir()
 DEFAULT_PRICE_MOMENTUM_CONFIG = PriceMomentumConfig()
+
+
+def get_data_root_dir() -> DataRootDir:
+    """
+    Get the current data root directory configuration.
+    
+    Returns:
+        DataRootDir instance with current settings
+    """
+    return DEFAULT_DATA_ROOT_DIR
+
+
+def get_logs_root_dir() -> LogsRootDir:
+    """
+    Get the current logs root directory configuration.
+    
+    Returns:
+        LogsRootDir instance with current settings
+    """
+    return DEFAULT_LOGS_ROOT_DIR
 
 
 def get_historical_root_dir() -> HistoricalRootDir:

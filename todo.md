@@ -96,12 +96,40 @@ Filter out stocks below two dollars.
 - [X] Centralize the starting point for the historical_data dir in config.py. 2025-08-13 17:00
 - [X] Create ./data/backtesting/symbols.json; populate with symbol/date/active='no' combos BSLK,2025-08-13; ATNF,2025-08-12; and STAI,2025-07-29. Then on 2025-08-04 the symbols OPEN, BTAI, and VERB.
 
-August 13: I need a test driver for orb alerts. Run it for active symbols in data/backtesting/symbols.json. --no-telegram. And dry run trades. is it possible to do automatic parameter testing?  Have different directories for different runs. Of course, logged the parameters in every directory.  All parameters (lskdjf lskdfj lskjdf) are in atoms/alerts/config.py for easy modification.
+
+- [X] Add --date arg to code/orb_alerts.py. Default to todays date.
+- [X] Add --date arg to code/orb_alerts_monitor.py. Default to todays date.
+- [X] VERY IMPORTANT. Centralize the starting point for the "logs" dir in atoms/alerts/config.py. It should be currently ./logs. Mirror historical root in atoms/alerts/config.py. Update the four scripts, code/orb_alerts.py, code/orb_alerts_monitor.py, code/orb_alerts_monitor_superduper.py, and code/orb_alerts_trade_stocks.py accordingly. For any script that does not use the logs dir, leave it unchanged.
+- [X] VERY IMPORTANT. Centralize the starting point for the "data" dir in atoms/alerts/config.py. It should be currently ./data. Mirror historical root in atoms/alerts/config.py. Update code/orb_alerts.py.
+
+ALL THE STANDARD COMMANDS FOR SPEC FILES
+Historical test driver for all alert types and . Run it for active symbols in data/backtesting/symbols.json. --no-telegram. And dry run trades. is it possible to do automatic parameter testing?  Have different directories for different runs. Of course, logged the parameters in every directory.  All parameters (lskdjf lskdfj lskjdf) are in atoms/alerts/config.py for easy modification.
 Generate the plots with the alerts. Document number of trades per symbol.
 
 Have the run directory include the historical data directory. The directory location is in atoms/alerts/config.py.
 
 Restore all of the configuration at the end of the run.
+
+### Config
+
+- [ ] claude --dangerously-skip-permissions
+- [ ] /login
+- [ ] /commit
+- [ ] Sync changes
+- [ ] /clear
+- [ ] git switch -c feature/backtesting
+- [ ] /clear
+- [ ] /read...
+
+### Spec File
+
+- [ ] Important. Think hard. Implement the instructions in specs/backtesting.md
+
+- [ ] Nudge
+- [ ] /commit
+- [ ] Publish the branch
+- [ ] git switch master; merge current branch
+- [ ] Sync changes
 
 
 ## MACD Analysis

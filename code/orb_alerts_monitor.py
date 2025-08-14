@@ -6,9 +6,10 @@ when the current price reaches the Signal price from the CSV file. It calculates
 into the Signal-to-Resistance range and range percentage.
 
 Usage:
-    python3 code/orb_alerts_monitor.py                    # Monitor current date alerts
+    python3 code/orb_alerts_monitor.py                              # Monitor current date alerts
     python3 code/orb_alerts_monitor.py --symbols-file data/YYYYMMDD.csv  # Use specific symbols file
-    python3 code/orb_alerts_monitor.py --test             # Run in test mode
+    python3 code/orb_alerts_monitor.py --test                       # Run in test mode
+    python3 code/orb_alerts_monitor.py --date 2025-08-13            # Monitor specific date (default: today)
 """
 
 import asyncio
@@ -33,7 +34,7 @@ from atoms.config.symbol_manager import SymbolManager
 from atoms.config.symbol_data_loader import SymbolDataLoader
 from atoms.alerts.super_alert_filter import SuperAlertFilter
 from atoms.alerts.super_alert_generator import SuperAlertGenerator
-from atoms.alerts.config import get_historical_root_dir
+from atoms.alerts.config import get_historical_root_dir, get_logs_root_dir
 from atoms.telegram.orb_alerts import send_orb_alert
 
 # Alpaca API imports for real-time price checking
@@ -72,7 +73,7 @@ class AlertFileHandler(FileSystemEventHandler):
 class ORBAlertMonitor:
     """Main ORB Alert Monitor that watches for bullish alerts and creates super alerts."""
 
-    def __init__(self, symbols_file: Optional[str] = None, test_mode: bool = False, post_only_urgent: bool = False, no_telegram: bool = False):
+    def __init__(self, symbols_file: Optional[str] = None, test_mode: bool = False, post_only_urgent: bool = False, no_telegram: bool = False, date: Optional[str] = None):
         """
         Initialize ORB Alert Monitor.
 
@@ -81,9 +82,17 @@ class ORBAlertMonitor:
             test_mode: Run in test mode (no actual alerts)
             post_only_urgent: Only send urgent telegram alerts
             no_telegram: Disable all Telegram notifications
+            date: Date to monitor in YYYY-MM-DD format (default: today)
         """
         # Setup logging
         self.logger = self._setup_logging()
+
+        # Store date parameter or default to today
+        if date is None:
+            et_tz = pytz.timezone('US/Eastern')
+            self.target_date = datetime.now(et_tz).strftime('%Y-%m-%d')
+        else:
+            self.target_date = date
 
         # Load symbol data with Signal and Resistance prices using atom
         self.symbol_loader = SymbolDataLoader(symbols_file)
@@ -96,12 +105,10 @@ class ORBAlertMonitor:
         self.post_only_urgent = post_only_urgent
         self.no_telegram = no_telegram
 
-        # Alert monitoring setup using configurable root directory
-        et_tz = pytz.timezone('US/Eastern')
-        current_date = datetime.now(et_tz).strftime('%Y-%m-%d')
+        # Alert monitoring setup using configurable root directory with target date
         historical_root = get_historical_root_dir()
-        self.alerts_dir = historical_root.get_alerts_dir(current_date)
-        self.super_alerts_dir = historical_root.get_super_alerts_dir(current_date)
+        self.alerts_dir = historical_root.get_alerts_dir(self.target_date)
+        self.super_alerts_dir = historical_root.get_super_alerts_dir(self.target_date)
 
         # Ensure directories exist
         self.alerts_dir.mkdir(parents=True, exist_ok=True)
@@ -160,10 +167,30 @@ class ORBAlertMonitor:
 
         logger = logging.getLogger(__name__)
         if not logger.handlers:
-            handler = logging.StreamHandler()
+            # Setup console handler
+            console_handler = logging.StreamHandler()
             formatter = EasternFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            handler.setFormatter(formatter)
-            logger.addHandler(handler)
+            console_handler.setFormatter(formatter)
+            logger.addHandler(console_handler)
+            
+            # Setup file handler using centralized logs config
+            try:
+                logs_config = get_logs_root_dir()
+                log_dir = logs_config.get_component_logs_dir("orb_monitor")
+                log_dir.mkdir(parents=True, exist_ok=True)
+                
+                et_tz = pytz.timezone('US/Eastern')
+                log_filename = f"orb_monitor_{datetime.now(et_tz).strftime('%Y%m%d_%H%M%S')}.log"
+                log_file_path = log_dir / log_filename
+                
+                file_handler = logging.FileHandler(log_file_path)
+                file_handler.setFormatter(formatter)
+                logger.addHandler(file_handler)
+                
+            except Exception as e:
+                # If file logging fails, continue with console logging only
+                logger.warning(f"Could not setup file logging: {e}")
+            
             logger.setLevel(logging.INFO)
 
         return logger
@@ -398,6 +425,13 @@ def parse_arguments():
         help="Disable all Telegram notifications"
     )
 
+    parser.add_argument(
+        "--date",
+        type=str,
+        default=datetime.now(pytz.timezone('US/Eastern')).strftime('%Y-%m-%d'),
+        help="Date to monitor in YYYY-MM-DD format (default: today)"
+    )
+
     return parser.parse_args()
 
 
@@ -415,7 +449,8 @@ async def main():
             symbols_file=args.symbols_file,
             test_mode=args.test,
             post_only_urgent=args.post_only_urgent,
-            no_telegram=args.no_telegram
+            no_telegram=args.no_telegram,
+            date=args.date
         )
 
         if args.test:

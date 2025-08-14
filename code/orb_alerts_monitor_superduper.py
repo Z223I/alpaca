@@ -31,7 +31,7 @@ sys.path.append('/home/wilsonb/dl/github.com/z223i/alpaca')
 
 from atoms.alerts.superduper_alert_filter import SuperduperAlertFilter
 from atoms.alerts.superduper_alert_generator import SuperduperAlertGenerator
-from atoms.alerts.config import get_momentum_thresholds, get_price_momentum_config, get_historical_root_dir
+from atoms.alerts.config import get_momentum_thresholds, get_price_momentum_config, get_historical_root_dir, get_logs_root_dir
 from atoms.telegram.orb_alerts import send_orb_alert
 
 
@@ -141,10 +141,30 @@ class ORBSuperduperAlertMonitor:
 
         logger = logging.getLogger(__name__)
         if not logger.handlers:
-            handler = logging.StreamHandler()
+            # Setup console handler
+            console_handler = logging.StreamHandler()
             formatter = EasternFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            handler.setFormatter(formatter)
-            logger.addHandler(handler)
+            console_handler.setFormatter(formatter)
+            logger.addHandler(console_handler)
+            
+            # Setup file handler using centralized logs config
+            try:
+                logs_config = get_logs_root_dir()
+                log_dir = logs_config.get_component_logs_dir("orb_superduper")
+                log_dir.mkdir(parents=True, exist_ok=True)
+                
+                et_tz = pytz.timezone('US/Eastern')
+                log_filename = f"orb_superduper_{datetime.now(et_tz).strftime('%Y%m%d_%H%M%S')}.log"
+                log_file_path = log_dir / log_filename
+                
+                file_handler = logging.FileHandler(log_file_path)
+                file_handler.setFormatter(formatter)
+                logger.addHandler(file_handler)
+                
+            except Exception as e:
+                # If file logging fails, continue with console logging only
+                logger.warning(f"Could not setup file logging: {e}")
+            
             logger.setLevel(logging.INFO)
 
         return logger

@@ -29,7 +29,7 @@ from watchdog.events import FileSystemEventHandler
 sys.path.append('/home/wilsonb/dl/github.com/z223i/alpaca')
 
 from atoms.alerts.trade_generator import TradeGenerator  # noqa: E402
-from atoms.alerts.config import get_historical_root_dir  # noqa: E402
+from atoms.alerts.config import get_historical_root_dir, get_logs_root_dir  # noqa: E402
 from atoms.telegram.orb_alerts import send_orb_alert  # noqa: E402
 from atoms.telegram.telegram_post import TelegramPoster  # noqa: E402
 
@@ -132,10 +132,30 @@ class ORBTradeStocksMonitor:
 
         logger = logging.getLogger(__name__)
         if not logger.handlers:
-            handler = logging.StreamHandler()
+            # Setup console handler
+            console_handler = logging.StreamHandler()
             formatter = EasternFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            handler.setFormatter(formatter)
-            logger.addHandler(handler)
+            console_handler.setFormatter(formatter)
+            logger.addHandler(console_handler)
+            
+            # Setup file handler using centralized logs config
+            try:
+                logs_config = get_logs_root_dir()
+                log_dir = logs_config.get_component_logs_dir("orb_trades")
+                log_dir.mkdir(parents=True, exist_ok=True)
+                
+                et_tz = pytz.timezone('US/Eastern')
+                log_filename = f"orb_trades_{datetime.now(et_tz).strftime('%Y%m%d_%H%M%S')}.log"
+                log_file_path = log_dir / log_filename
+                
+                file_handler = logging.FileHandler(log_file_path)
+                file_handler.setFormatter(formatter)
+                logger.addHandler(file_handler)
+                
+            except Exception as e:
+                # If file logging fails, continue with console logging only
+                logger.warning(f"Could not setup file logging: {e}")
+            
             logger.setLevel(logging.INFO)
 
         return logger

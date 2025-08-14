@@ -5,10 +5,11 @@ This is the main entry point for the ORB (Opening Range Breakout) trading alerts
 Based on PCA analysis showing 82.31% variance explained by ORB patterns.
 
 Usage:
-    python3 code/orb_alerts.py                    # Start monitoring all symbols (SIP feed)
-    python3 code/orb_alerts.py --symbols AAPL,TSLA # Monitor specific symbols
-    python3 code/orb_alerts.py --test             # Run in test mode
-    python3 code/orb_alerts.py --use-iex          # Use IEX data feed instead of SIP
+    python3 code/orb_alerts.py                      # Start monitoring all symbols (SIP feed)
+    python3 code/orb_alerts.py --symbols AAPL,TSLA  # Monitor specific symbols
+    python3 code/orb_alerts.py --test               # Run in test mode
+    python3 code/orb_alerts.py --use-iex            # Use IEX data feed instead of SIP
+    python3 code/orb_alerts.py --date 2025-08-13    # Process specific date (default: today)
 """
 
 import asyncio
@@ -26,6 +27,7 @@ import pytz
 sys.path.append('/home/wilsonb/dl/github.com/Z223I/alpaca')
 
 from atoms.config.alert_config import config
+from atoms.alerts.config import get_logs_root_dir, get_data_root_dir
 from molecules.orb_alert_engine import ORBAlertEngine
 from atoms.alerts.alert_formatter import ORBAlert
 # Temporarily disabled due to package version mismatch
@@ -48,7 +50,7 @@ except ImportError:
 class ORBAlertSystem:
     """Main ORB Alert System orchestrator."""
 
-    def __init__(self, symbols_file: Optional[str] = None, test_mode: bool = False, use_iex: bool = False):
+    def __init__(self, symbols_file: Optional[str] = None, test_mode: bool = False, use_iex: bool = False, date: Optional[str] = None):
         """
         Initialize ORB Alert System.
 
@@ -56,12 +58,33 @@ class ORBAlertSystem:
             symbols_file: Path to symbols CSV file
             test_mode: Run in test mode (no actual alerts)
             use_iex: Use IEX data feed instead of SIP (default: False, uses SIP)
+            date: Date to process in YYYY-MM-DD format (default: today)
         """
         # Setup logging
         self.logger = self._setup_logging()
 
-        # Initialize alert engine
-        self.alert_engine = ORBAlertEngine(symbols_file) if symbols_file is not None else ORBAlertEngine()
+        # Store date parameter or default to today
+        if date is None:
+            et_tz = pytz.timezone('US/Eastern')
+            self.target_date = datetime.now(et_tz).strftime('%Y-%m-%d')
+        else:
+            self.target_date = date
+
+        # Initialize alert engine with centralized data configuration
+        if symbols_file is not None:
+            # Use provided symbols file path
+            self.alert_engine = ORBAlertEngine(symbols_file)
+        else:
+            # Use centralized data configuration to determine symbols file path
+            data_config = get_data_root_dir()
+            default_symbols_file = data_config.get_symbols_file_path(self.target_date)
+            
+            # Hard failure if expected symbols file doesn't exist
+            if not default_symbols_file.exists():
+                raise FileNotFoundError(f"Required symbols file not found: {default_symbols_file}")
+            
+            self.alert_engine = ORBAlertEngine(str(default_symbols_file))
+            self.logger.info(f"Using default symbols file: {default_symbols_file}")
         self.test_mode = test_mode
         self.use_iex = use_iex
 
@@ -121,20 +144,38 @@ class ORBAlertSystem:
         # Configure logging with Eastern Time
         logger = logging.getLogger(__name__)
         if not logger.handlers:  # Only configure if not already configured
-            handler = logging.StreamHandler()
+            # Setup console handler
+            console_handler = logging.StreamHandler()
             formatter = EasternFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            handler.setFormatter(formatter)
-            logger.addHandler(handler)
+            console_handler.setFormatter(formatter)
+            logger.addHandler(console_handler)
+            
+            # Setup file handler using centralized logs config
+            try:
+                logs_config = get_logs_root_dir()
+                log_dir = logs_config.get_component_logs_dir("orb_alerts")
+                log_dir.mkdir(parents=True, exist_ok=True)
+                
+                et_tz = pytz.timezone('US/Eastern')
+                log_filename = f"orb_alerts_{datetime.now(et_tz).strftime('%Y%m%d_%H%M%S')}.log"
+                log_file_path = log_dir / log_filename
+                
+                file_handler = logging.FileHandler(log_file_path)
+                file_handler.setFormatter(formatter)
+                logger.addHandler(file_handler)
+                
+            except Exception as e:
+                # If file logging fails, continue with console logging only
+                logger.warning(f"Could not setup file logging: {e}")
+            
             logger.setLevel(logging.INFO)
 
         return logger
 
     def _setup_data_storage(self) -> None:
         """Setup historical data storage directories."""
-        # Create subdirectories for organized storage
-        et_tz = pytz.timezone('US/Eastern')
-        today = datetime.now(et_tz).strftime("%Y-%m-%d")
-        self.daily_data_dir = self.historical_data_dir / today
+        # Create subdirectories for organized storage using target date
+        self.daily_data_dir = self.historical_data_dir / self.target_date
         self.daily_data_dir.mkdir(parents=True, exist_ok=True)
 
         # Create subdirectories for different data types
@@ -686,7 +727,7 @@ def parse_arguments():
     parser.add_argument(
         "--symbols-file",
         type=str,
-        help="Path to symbols CSV file (default: data/YYYYMMDD.csv for current date)"
+        help="Path to symbols CSV file (default: auto-detected based on date from centralized data config)"
     )
 
     parser.add_argument(
@@ -713,6 +754,13 @@ def parse_arguments():
         help="Use IEX data feed instead of SIP (default: SIP)"
     )
 
+    parser.add_argument(
+        "--date",
+        type=str,
+        default=datetime.now(pytz.timezone('US/Eastern')).strftime('%Y-%m-%d'),
+        help="Date to process in YYYY-MM-DD format (default: today)"
+    )
+
     return parser.parse_args()
 
 
@@ -729,7 +777,8 @@ async def main():
         system = ORBAlertSystem(
             symbols_file=args.symbols_file,
             test_mode=args.test,
-            use_iex=args.use_iex
+            use_iex=args.use_iex,
+            date=args.date
         )
 
         if args.summary:
