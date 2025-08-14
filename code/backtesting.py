@@ -244,7 +244,8 @@ class BacktestingSystem:
                 'timeout': 1800  # 30 minutes for data simulation
             },
             {
-                'cmd': f"python3 code/orb_alerts_monitor.py --date {date} --no-telegram --verbose",
+                'cmd': f"python3 code/orb_alerts_monitor.py --symbols-file {symbols_file} --date {date} "
+                       f"--no-telegram --verbose",
                 'timeout': 300   # 5 minutes for alert monitoring (should process quickly)
             },
             {
