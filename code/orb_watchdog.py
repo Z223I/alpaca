@@ -11,6 +11,8 @@ import time
 import signal
 import os
 from pathlib import Path
+from datetime import datetime, time as dt_time
+import pytz
 
 
 class ORBWatchdog:
@@ -19,6 +21,8 @@ class ORBWatchdog:
         self.should_run = True
         self.script_path = Path(__file__).parent / "orb_alerts.py"
         self.python_path = "python3"
+        self.market_close_time = dt_time(16, 0)  # 4:00 PM ET
+        self.et_tz = pytz.timezone('US/Eastern')
         
         # Use conda python if available (following project instructions)
         conda_python = Path.home() / "miniconda3/envs/alpaca/bin/python"
@@ -28,6 +32,8 @@ class ORBWatchdog:
         # Setup signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
+        
+        print(f"📅 Market close time: {self.market_close_time.strftime('%H:%M')} ET")
     
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals gracefully"""
@@ -36,6 +42,25 @@ class ORBWatchdog:
         if self.process:
             self._stop_process()
         sys.exit(0)
+    
+    def _is_market_closed(self):
+        """Check if market is closed (after 16:00 ET)"""
+        try:
+            # Get current time in Eastern Time
+            current_et = datetime.now(self.et_tz)
+            current_time = current_et.time()
+            
+            # Check if current time is at or after market close
+            market_closed = current_time >= self.market_close_time
+            
+            if market_closed:
+                print(f"🕐 Market closed at {current_et.strftime('%H:%M:%S')} ET (close time: {self.market_close_time.strftime('%H:%M')} ET)")
+            
+            return market_closed
+            
+        except Exception as e:
+            print(f"⚠️  Error checking market time: {e}")
+            return False
     
     def _start_process(self):
         """Start the orb_alerts.py process"""
@@ -111,6 +136,15 @@ class ORBWatchdog:
         print(f"📁 Monitoring script: {self.script_path}")
         print(f"🐍 Using Python: {self.python_path}")
         
+        # Display current ET time and market status
+        current_et = datetime.now(self.et_tz)
+        print(f"🕐 Current time: {current_et.strftime('%H:%M:%S')} ET")
+        
+        # Check if market is already closed
+        if self._is_market_closed():
+            print("🏁 Market is already closed, watchdog will not start processes")
+            return 0
+        
         # Check if orb_alerts.py exists
         if not self.script_path.exists():
             print(f"❌ ORB Alerts script not found: {self.script_path}")
@@ -124,6 +158,12 @@ class ORBWatchdog:
         
         try:
             while self.should_run:
+                # Check if market is closed
+                if self._is_market_closed():
+                    print("🏁 Market is closed, initiating shutdown...")
+                    self.should_run = False
+                    break
+                
                 # Read and display any new output
                 self._read_output()
                 
@@ -133,13 +173,17 @@ class ORBWatchdog:
                         exit_code = self.process.returncode
                         print(f"⚠️  ORB Alerts process died (exit code: {exit_code})")
                     
-                    if self.should_run:
+                    if self.should_run and not self._is_market_closed():
                         print("🔄 Restarting ORB Alerts in 5 seconds...")
                         time.sleep(5)
                         
                         if not self._start_process():
                             print("❌ Failed to restart ORB Alerts, waiting 30 seconds...")
                             time.sleep(30)
+                    elif self._is_market_closed():
+                        print("🏁 Not restarting - market is closed")
+                        self.should_run = False
+                        break
                 
                 # Brief sleep to prevent excessive CPU usage
                 time.sleep(1)
@@ -149,7 +193,11 @@ class ORBWatchdog:
         
         # Cleanup
         self._stop_process()
-        print("🔍 Watchdog stopped")
+        
+        if self._is_market_closed():
+            print("🏁 Watchdog stopped - Market closed")
+        else:
+            print("🔍 Watchdog stopped")
         return 0
 
 

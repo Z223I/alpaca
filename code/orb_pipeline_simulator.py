@@ -345,8 +345,9 @@ class ORBPipelineSimulator:
             return {'symbol': symbol, 'status': 'no_data', 'alerts': []}
 
         # Initialize ORB alert engine for this symbol
-        # Create a temporary symbols file for this single symbol
-        temp_symbols_file = Path(f"tmp/sim_symbols_{symbol}.csv")
+        # Create a temporary symbols file for this single symbol using centralized config
+        temp_dir = self.logs_config.get_logs_path() / "tmp"
+        temp_symbols_file = temp_dir / f"sim_symbols_{symbol}.csv"
         temp_symbols_file.parent.mkdir(exist_ok=True, parents=True)
         pd.DataFrame({'symbol': [symbol]}).to_csv(temp_symbols_file, index=False)
         

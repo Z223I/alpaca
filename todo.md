@@ -108,17 +108,19 @@ Filter out stocks below two dollars.
 - [X] VERY IMPORTANT. This is only a question.  Leave the code unchanged. How to create a data pipeline for code/orb_alerts.py? Perhaps read all the data for the symbol and date using pre-existing Alpaca scripts in this repo; then pipe in the data iteratively adding a minute (candlestick) at a time to replicate real-time processing.
 - [X] Would you create a new CLI arg for alpaca.py or perhaps create a new script?
 - [X] Create the new script.
-- [ ] /commit
-- [ ] Fall back commit, 2c28752b4c78e284e9a204d1d3c3f9588b87d0b, to recreate!!!
+- [X] /commit
+- [O] Fall back commit, 2c28752b4c78e284e9a204d1d3c3f9588b87d0b, to recreate!!!
 
+- [X] Are there any hardcode directory paths in:
+code/orb_pipeline_simulator.py
+code/orb_alerts_monitor.py
+code/orb_alerts_monitor_superduper.py
+code/orb_alerts_trade_stocks.py
+- [X] Nudge: update the path
 
-ALL THE STANDARD COMMANDS FOR SPEC FILES
-Historical test driver for all alert types and . Run it for active symbols in data/backtesting/symbols.json. --no-telegram. And dry run trades. is it possible to do automatic parameter testing?  Have different directories for different runs. Of course, logged the parameters in every directory.  All parameters (lskdjf lskdfj lskjdf) are in atoms/alerts/config.py for easy modification.
-Generate the plots with the alerts. Document number of trades per symbol.
+--plot --symbol and post to Telegram
+Parametric testing on stop lost?
 
-Have the run directory include the historical data directory. The directory location is in atoms/alerts/config.py.
-
-Restore all of the configuration at the end of the run.
 
 ### Config
 
