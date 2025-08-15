@@ -143,7 +143,7 @@ class BacktestingSystem:
             self.logger.info("Restored original config file")
 
     def _update_config_for_run(self, run_dir: Path, timeframe: int, threshold: float):
-        """Update atoms/alerts/config.py with run-specific settings and force reload"""
+        """Update atoms/alerts/config.py with run-specific settings"""
         config_path = Path("atoms/alerts/config.py")
 
         if self.dry_run:
@@ -157,145 +157,37 @@ class BacktestingSystem:
         # Update default instances to point to run directory
         run_dir_str = str(run_dir.absolute())
 
-        # Replace the default instances - handle both patterns
-        import re
-        
-        # Replace PLOTS_ROOT_DIR line
-        content = re.sub(
-            r'DEFAULT_PLOTS_ROOT_DIR = PlotsRootDir\([^)]*\)',
-            f'DEFAULT_PLOTS_ROOT_DIR = PlotsRootDir(root_path="{run_dir_str}")',
-            content
+        # Replace the default instances
+        content = content.replace(
+            'DEFAULT_PLOTS_ROOT_DIR = PlotsRootDir()',
+            f'DEFAULT_PLOTS_ROOT_DIR = PlotsRootDir(root_path="{run_dir_str}")'
         )
-        
-        # Replace DATA_ROOT_DIR line
-        content = re.sub(
-            r'DEFAULT_DATA_ROOT_DIR = DataRootDir\([^)]*\)',
-            f'DEFAULT_DATA_ROOT_DIR = DataRootDir(root_path="{run_dir_str}")',
-            content
+        content = content.replace(
+            'DEFAULT_DATA_ROOT_DIR = DataRootDir()',
+            f'DEFAULT_DATA_ROOT_DIR = DataRootDir(root_path="{run_dir_str}")'
         )
-        
-        # Replace LOGS_ROOT_DIR line
-        content = re.sub(
-            r'DEFAULT_LOGS_ROOT_DIR = LogsRootDir\([^)]*\)',
-            f'DEFAULT_LOGS_ROOT_DIR = LogsRootDir(root_path="{run_dir_str}")',
-            content
+        content = content.replace(
+            'DEFAULT_LOGS_ROOT_DIR = LogsRootDir()',
+            f'DEFAULT_LOGS_ROOT_DIR = LogsRootDir(root_path="{run_dir_str}")'
         )
-        
-        # Replace HISTORICAL_ROOT_DIR line
-        content = re.sub(
-            r'DEFAULT_HISTORICAL_ROOT_DIR = HistoricalRootDir\([^)]*\)',
-            f'DEFAULT_HISTORICAL_ROOT_DIR = HistoricalRootDir(root_path="{run_dir_str}")',
-            content
+        content = content.replace(
+            'DEFAULT_HISTORICAL_ROOT_DIR = HistoricalRootDir()',
+            f'DEFAULT_HISTORICAL_ROOT_DIR = HistoricalRootDir(root_path="{run_dir_str}")'
         )
 
-        # Update momentum config with parameters - use line-based replacement for robustness
-        lines = content.split('\n')
-        for i, line in enumerate(lines):
-            if line.strip().startswith('DEFAULT_PRICE_MOMENTUM_CONFIG = '):
-                lines[i] = (f'DEFAULT_PRICE_MOMENTUM_CONFIG = PriceMomentumConfig('
-                           f'momentum=MomentumThresholds(green_threshold={threshold}), '
-                           f'trend_analysis_timeframe_minutes={timeframe})')
-                break
-        content = '\n'.join(lines)
+        # Update momentum config with parameters
+        content = content.replace(
+            'DEFAULT_PRICE_MOMENTUM_CONFIG = PriceMomentumConfig()',
+            f'DEFAULT_PRICE_MOMENTUM_CONFIG = PriceMomentumConfig('
+            f'momentum=MomentumThresholds(green_threshold={threshold}), '
+            f'trend_analysis_timeframe_minutes={timeframe})'
+        )
 
         # Write updated config
         with open(config_path, 'w') as f:
             f.write(content)
 
-        # Allow file system to propagate changes
-        import time
-        time.sleep(0.5)
-        
-        # Force Python to reload the config module so all processes see the new values
-        self._reload_config_module()
-        
-        # Verify the update worked
-        self._validate_config_update(run_dir, timeframe, threshold)
-        
-        # Additional delay to ensure subprocesses pick up new config
-        time.sleep(1.0)
-
-        self.logger.info(f"✅ Config updated and validated: timeframe={timeframe}, threshold={threshold}, run_dir={run_dir}")
-    
-    def _reload_config_module(self):
-        """Force reload of config module to pick up file changes"""
-        try:
-            import importlib
-            import sys
-            
-            # Remove config module from cache if it exists
-            if 'atoms.alerts.config' in sys.modules:
-                del sys.modules['atoms.alerts.config']
-            
-            # Clear any cached imports
-            for module_name in list(sys.modules.keys()):
-                if module_name.startswith('atoms.alerts.config'):
-                    del sys.modules[module_name]
-            
-            # Force reimport
-            import atoms.alerts.config
-            importlib.reload(atoms.alerts.config)
-            
-            self.logger.info("🔄 Config module reloaded successfully")
-            
-        except Exception as e:
-            self.logger.warning(f"⚠️ Config reload failed: {e}")
-    
-    def _validate_config_update(self, expected_run_dir: Path, expected_timeframe: int, expected_threshold: float):
-        """Validate that config update worked correctly"""
-        try:
-            # Import fresh config
-            from atoms.alerts.config import (
-                DEFAULT_HISTORICAL_ROOT_DIR, DEFAULT_PRICE_MOMENTUM_CONFIG,
-                DEFAULT_PLOTS_ROOT_DIR, DEFAULT_DATA_ROOT_DIR, DEFAULT_LOGS_ROOT_DIR
-            )
-            
-            # Check directory paths
-            expected_path = str(expected_run_dir.absolute())
-            
-            actual_historical = str(DEFAULT_HISTORICAL_ROOT_DIR.root_path)
-            actual_plots = str(DEFAULT_PLOTS_ROOT_DIR.root_path)
-            actual_data = str(DEFAULT_DATA_ROOT_DIR.root_path)
-            actual_logs = str(DEFAULT_LOGS_ROOT_DIR.root_path)
-            
-            # Check momentum config
-            actual_timeframe = DEFAULT_PRICE_MOMENTUM_CONFIG.trend_analysis_timeframe_minutes
-            actual_threshold = DEFAULT_PRICE_MOMENTUM_CONFIG.momentum.green_threshold
-            
-            # Validate all paths match
-            path_errors = []
-            if actual_historical != expected_path:
-                path_errors.append(f"HISTORICAL: expected {expected_path}, got {actual_historical}")
-            if actual_plots != expected_path:
-                path_errors.append(f"PLOTS: expected {expected_path}, got {actual_plots}")
-            if actual_data != expected_path:
-                path_errors.append(f"DATA: expected {expected_path}, got {actual_data}")
-            if actual_logs != expected_path:
-                path_errors.append(f"LOGS: expected {expected_path}, got {actual_logs}")
-            
-            # Validate momentum config
-            config_errors = []
-            if actual_timeframe != expected_timeframe:
-                config_errors.append(f"TIMEFRAME: expected {expected_timeframe}, got {actual_timeframe}")
-            if actual_threshold != expected_threshold:
-                config_errors.append(f"THRESHOLD: expected {expected_threshold}, got {actual_threshold}")
-            
-            if path_errors or config_errors:
-                error_msg = "❌ Config validation failed!\n"
-                if path_errors:
-                    error_msg += "Path errors:\n" + "\n".join(f"  - {e}" for e in path_errors) + "\n"
-                if config_errors:
-                    error_msg += "Config errors:\n" + "\n".join(f"  - {e}" for e in config_errors)
-                
-                self.logger.error(error_msg)
-                raise RuntimeError(error_msg)
-            
-            self.logger.info("✅ Config validation passed - all paths and parameters correct")
-            
-        except ImportError as e:
-            error_msg = f"❌ Config validation failed - import error: {e}"
-            self.logger.error(error_msg)
-            raise RuntimeError(error_msg)
+        self.logger.info(f"Updated config: timeframe={timeframe}, threshold={threshold}, run_dir={run_dir}")
 
     def _create_run_directory(self, date: str) -> Path:
         """Create run directory with format ./runs/run_YYYY-MM-DD_<UUID>"""
@@ -346,7 +238,6 @@ class BacktestingSystem:
     def _run_orb_pipeline(self, date: str, symbols_file: Path, run_dir: Path) -> bool:
         """Execute the ORB pipeline with concurrent processes using file watchers"""
         # Define all processes that should run concurrently
-        # Testing with live superduper alerts to test trade processor directly
         processes = [
             {
                 'name': 'simulator',
@@ -354,27 +245,21 @@ class BacktestingSystem:
                        f"--save-alerts --speed 1 --verbose",
                 'primary': True  # This drives the pipeline, others watch for its output
             },
-            # Skip regular monitor and superduper monitor since we're copying superduper alerts directly
-            # {
-            #     'name': 'monitor',
-            #     'cmd': f"python3 code/orb_alerts_monitor.py --symbols-file {symbols_file} --date {date} "
-            #            f"--no-telegram --verbose",
-            #     'primary': False  # Watches for simulator alerts
-            # },
+            {
+                'name': 'monitor',
+                'cmd': f"python3 code/orb_alerts_monitor.py --symbols-file {symbols_file} --date {date} "
+                       f"--no-telegram --verbose",
+                'primary': False  # Watches for simulator alerts
+            },
             {
                 'name': 'superduper_monitor',
-                'cmd': f"python3 code/orb_alerts_monitor_superduper.py --date {date} --verbose",
-                'primary': False  # Watches for super_alerts (will be copied)
+                'cmd': f"python3 code/orb_alerts_monitor_superduper.py --no-telegram --date {date} --verbose",
+                'primary': False  # Watches for monitor super_alerts
             },
             {
                 'name': 'trade_processor',
                 'cmd': f"python3 code/orb_alerts_trade_stocks.py --date {date} --no-telegram --test --verbose",
-                'primary': False  # Watches for superduper alerts (will be copied)
-            },
-            {
-                'name': 'super_alert_copier',
-                'cmd': f"python3 code/copy_super_alerts.py {date} {run_dir}",
-                'primary': False  # Copies existing VERB super alerts at 1 per 3 seconds
+                'primary': False  # Watches for superduper alerts
             }
         ]
 
@@ -422,32 +307,10 @@ class BacktestingSystem:
                 simulator_process['process'].kill()
                 return False
 
-            # Give watchers time to process all generated files and monitor progress
+            # Give watchers time to process all generated files
             import time
-            self.logger.info("Monitoring file processing...")
-            print("Monitoring file processing...")
-            
-            for i in range(12):  # Check every 10 seconds for 2 minutes
-                alert_count = len(list((run_dir / "historical_data" / date / "alerts" / "bullish").glob("*.json")))
-                super_count = len(list((run_dir / "historical_data" / date / "super_alerts" / "bullish").glob("*.json")))
-                superduper_count = len(list((run_dir / "historical_data" / date / "superduper_alerts" / "bullish").glob("*.json")))
-                superduper_green_count = len(list((run_dir / "historical_data" / date / "superduper_alerts" / "bullish" / "green").glob("*.json")))
-                trade_count = len(list((run_dir / "historical_data" / date).glob("*trade*.json")))
-                
-                progress_msg = f"Files: {alert_count} alerts → {super_count} super → {superduper_count} superduper → {superduper_green_count} green → {trade_count} trades"
-                self.logger.info(progress_msg)
-                print(progress_msg)
-                
-                if superduper_green_count > 0:
-                    self.logger.info("✅ Superduper green alerts detected!")
-                    print("✅ Superduper green alerts detected!")
-                    if trade_count > 0:
-                        self.logger.info("✅ Trades detected!")
-                        print("✅ Trades detected!")
-                        break
-                
-                if i < 11:  # Don't sleep after the last iteration
-                    time.sleep(10)
+            self.logger.info("Allowing watchers to process generated files...")
+            time.sleep(30)  # Allow watchers to process all files
 
             # Terminate all remaining processes gracefully
             for proc in running_processes:
