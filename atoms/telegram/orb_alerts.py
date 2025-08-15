@@ -222,6 +222,9 @@ def _store_sent_superduper_alert(file_path: str, alert_data: Dict[str, Any]) -> 
         alert_data (dict): The alert data that was sent
     """
     try:
+        # Import here to avoid circular imports
+        from atoms.alerts.config import get_historical_root_dir
+        
         # Extract target date from file path (historical_data/YYYY-MM-DD/...)
         target_date = _extract_date_from_path(file_path)
         
@@ -239,16 +242,16 @@ def _store_sent_superduper_alert(file_path: str, alert_data: Dict[str, Any]) -> 
         if not alert_level:
             return  # Skip if we can't determine alert level
         
-        # Create target directory structure
-        base_dir = f"historical_data/{target_date}/superduper_alerts_sent"
-        target_dir = os.path.join(base_dir, sentiment, alert_level)
+        # Use configurable historical root directory instead of hardcoded path
+        historical_root = get_historical_root_dir()
+        target_dir = historical_root.get_superduper_alerts_sent_dir(target_date, sentiment, alert_level)
         
         # Create directories if they don't exist
-        os.makedirs(target_dir, exist_ok=True)
+        target_dir.mkdir(parents=True, exist_ok=True)
         
         # Generate target filename
         original_filename = os.path.basename(file_path)
-        target_file = os.path.join(target_dir, original_filename)
+        target_file = target_dir / original_filename
         
         # Copy the alert file to the sent directory
         shutil.copy2(file_path, target_file)
