@@ -431,7 +431,7 @@ class BacktestingSystem:
                 alert_count = len(list((run_dir / "historical_data" / date / "alerts" / "bullish").glob("*.json")))
                 super_count = len(list((run_dir / "historical_data" / date / "super_alerts" / "bullish").glob("*.json")))
                 superduper_count = len(list((run_dir / "historical_data" / date / "superduper_alerts" / "bullish").glob("*.json")))
-                superduper_green_count = len(list((run_dir / "historical_data" / date / "superduper_alerts" / "bullish" / "green").glob("*.json")))
+                superduper_green_count = len(list((run_dir / "historical_data" / date / "superduper_alerts_sent" / "bullish" / "green").glob("*.json")))
                 trade_count = len(list((run_dir / "historical_data" / date).glob("*trade*.json")))
                 
                 progress_msg = f"Files: {alert_count} alerts → {super_count} super → {superduper_count} superduper → {superduper_green_count} green → {trade_count} trades"
