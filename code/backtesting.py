@@ -509,17 +509,24 @@ class BacktestingSystem:
         if self.dry_run:
             return results
 
-        # Count superduper alerts
+        # Count superduper alerts from sent directory (these were actually sent via Telegram)
         superduper_dir = run_dir / "historical_data"
         if superduper_dir.exists():
-            for alert_file in superduper_dir.rglob("*superduper_alerts*/*.json"):
+            for alert_file in superduper_dir.rglob("**/superduper_alerts_sent/**/*.json"):
                 try:
                     with open(alert_file, 'r') as f:
                         alert_data = json.load(f)
                         if isinstance(alert_data, list):
                             results['superduper_alerts'] += len(alert_data)
+                            # Track by symbol for each alert in list
+                            for alert in alert_data:
+                                symbol = alert.get('symbol', 'UNKNOWN')
+                                results['alerts_by_symbol'][symbol] = results['alerts_by_symbol'].get(symbol, 0) + 1
                         else:
                             results['superduper_alerts'] += 1
+                            # Track by symbol for single alert
+                            symbol = alert_data.get('symbol', 'UNKNOWN')
+                            results['alerts_by_symbol'][symbol] = results['alerts_by_symbol'].get(symbol, 0) + 1
                 except Exception:
                     pass
 
@@ -540,18 +547,23 @@ class BacktestingSystem:
         return results
 
     def _create_summary_charts(self):
-        """Create summary pie charts for alerts and trades by date"""
+        """Create summary pie charts for alerts and trades by date, and bar chart by symbol"""
         if self.dry_run or not self.run_results:
             return
 
         # Prepare data for charts
         alerts_by_date = {}
         trades_by_date = {}
+        alerts_by_symbol = {}
 
         for result in self.run_results:
             date = result['date']
             alerts_by_date[date] = alerts_by_date.get(date, 0) + result['superduper_alerts']
             trades_by_date[date] = trades_by_date.get(date, 0) + result['trades']
+            
+            # Aggregate symbol data across all runs
+            for symbol, count in result.get('alerts_by_symbol', {}).items():
+                alerts_by_symbol[symbol] = alerts_by_symbol.get(symbol, 0) + count
 
         # Create runs directory if it doesn't exist
         runs_dir = Path("runs")
@@ -560,13 +572,13 @@ class BacktestingSystem:
         # Generate timestamp for filenames
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        # Create alerts by date pie chart
-        if alerts_by_date and sum(alerts_by_date.values()) > 0:
+        # Create alerts by symbol pie chart
+        if alerts_by_symbol and sum(alerts_by_symbol.values()) > 0:
             plt.figure(figsize=(10, 8))
-            plt.pie(alerts_by_date.values(), labels=alerts_by_date.keys(), autopct='%1.1f%%')
-            plt.title('Superduper Alerts by Date')
-            alerts_filename = runs_dir / f"summary_alerts_by_date_{timestamp}.png"
-            plt.savefig(alerts_filename)
+            plt.pie(alerts_by_symbol.values(), labels=alerts_by_symbol.keys(), autopct='%1.1f%%', startangle=90)
+            plt.title('Superduper Alerts by Symbol', fontsize=16, fontweight='bold')
+            alerts_filename = runs_dir / f"summary_alerts_by_symbol_pie_{timestamp}.png"
+            plt.savefig(alerts_filename, dpi=300, bbox_inches='tight')
             plt.close()
             self.logger.info(f"Created {alerts_filename}")
 
@@ -579,6 +591,29 @@ class BacktestingSystem:
             plt.savefig(trades_filename)
             plt.close()
             self.logger.info(f"Created {trades_filename}")
+
+        # Create alerts by symbol bar chart
+        if alerts_by_symbol and sum(alerts_by_symbol.values()) > 0:
+            plt.figure(figsize=(12, 8))
+            symbols = list(alerts_by_symbol.keys())
+            counts = list(alerts_by_symbol.values())
+            
+            bars = plt.bar(symbols, counts, color='steelblue', alpha=0.7)
+            plt.title('Superduper Alerts by Symbol', fontsize=16, fontweight='bold')
+            plt.xlabel('Symbol', fontsize=12)
+            plt.ylabel('Number of Alerts', fontsize=12)
+            plt.xticks(rotation=45)
+            
+            # Add value labels on top of bars
+            for bar, count in zip(bars, counts):
+                plt.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.1,
+                        str(count), ha='center', va='bottom', fontweight='bold')
+            
+            plt.tight_layout()
+            symbols_filename = runs_dir / f"summary_alerts_by_symbol_bar_{timestamp}.png"
+            plt.savefig(symbols_filename, dpi=300, bbox_inches='tight')
+            plt.close()
+            self.logger.info(f"Created {symbols_filename}")
 
     def run_backtesting(self):
         """Execute the full backtesting suite"""

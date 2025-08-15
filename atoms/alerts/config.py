@@ -263,10 +263,10 @@ class PriceMomentumConfig:
 
 
 # Default configuration instances
-DEFAULT_PLOTS_ROOT_DIR = PlotsRootDir(root_path="/home/wilsonb/dl/github.com/z223i/alpaca/runs/run_2025-08-04_522d3e7a")
-DEFAULT_DATA_ROOT_DIR = DataRootDir(root_path="/home/wilsonb/dl/github.com/z223i/alpaca/runs/run_2025-08-04_522d3e7a")
-DEFAULT_LOGS_ROOT_DIR = LogsRootDir(root_path="/home/wilsonb/dl/github.com/z223i/alpaca/runs/run_2025-08-04_522d3e7a")
-DEFAULT_HISTORICAL_ROOT_DIR = HistoricalRootDir(root_path="/home/wilsonb/dl/github.com/z223i/alpaca/runs/run_2025-08-04_522d3e7a")
+DEFAULT_PLOTS_ROOT_DIR = PlotsRootDir(root_path="/home/wilsonb/dl/github.com/z223i/alpaca/runs/run_2025-08-04_8ccda824")
+DEFAULT_DATA_ROOT_DIR = DataRootDir(root_path="/home/wilsonb/dl/github.com/z223i/alpaca/runs/run_2025-08-04_8ccda824")
+DEFAULT_LOGS_ROOT_DIR = LogsRootDir(root_path="/home/wilsonb/dl/github.com/z223i/alpaca/runs/run_2025-08-04_8ccda824")
+DEFAULT_HISTORICAL_ROOT_DIR = HistoricalRootDir(root_path="/home/wilsonb/dl/github.com/z223i/alpaca/runs/run_2025-08-04_8ccda824")
 DEFAULT_PRICE_MOMENTUM_CONFIG = PriceMomentumConfig(momentum=MomentumThresholds(green_threshold=0.65), trend_analysis_timeframe_minutes=30)
 
 
