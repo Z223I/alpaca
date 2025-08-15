@@ -635,6 +635,40 @@ class BacktestingSystem:
             plt.close()
             self.logger.info(f"Created {symbols_filename}")
 
+    def _run_parameter_analysis(self):
+        """Run parameter optimization analysis at the end of backtesting."""
+        if self.dry_run:
+            self.logger.info("Would run parameter optimization analysis")
+            return
+
+        self.logger.info("🚀 Running parameter optimization analysis...")
+        
+        try:
+            # Import and run the analysis tool
+            import subprocess
+            
+            analysis_cmd = "python3 code/analyze_backtesting_results.py"
+            result = subprocess.run(
+                analysis_cmd.split(),
+                capture_output=True,
+                text=True,
+                timeout=300  # 5 minute timeout
+            )
+            
+            if result.returncode == 0:
+                self.logger.info("✅ Parameter optimization analysis completed successfully")
+                # Log the output for visibility
+                for line in result.stdout.strip().split('\n'):
+                    if line.strip():
+                        self.logger.info(f"   {line}")
+            else:
+                self.logger.error(f"❌ Parameter analysis failed: {result.stderr}")
+                
+        except subprocess.TimeoutExpired:
+            self.logger.error("⏰ Parameter analysis timed out")
+        except Exception as e:
+            self.logger.error(f"💥 Parameter analysis error: {e}")
+
     def run_backtesting(self):
         """Execute the full backtesting suite"""
         self.logger.info("Starting backtesting system")
@@ -687,6 +721,9 @@ class BacktestingSystem:
 
             # Create summary reports
             self._create_summary_charts()
+
+            # Run parameter optimization analysis
+            self._run_parameter_analysis()
 
             # Print summary
             total_alerts = sum(r['superduper_alerts'] for r in self.run_results)
