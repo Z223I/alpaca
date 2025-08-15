@@ -302,13 +302,13 @@ class ORBPipelineSimulator:
     def _save_alert(self, alert: ORBAlert) -> None:
         """Save alert to file."""
         try:
-            # Create alerts directory using logs config pattern
-            logs_base = self.logs_config.get_logs_path()
-            alerts_dir = logs_base / self.date / "alerts"
+            # Create alerts directory using historical data config pattern
+            alert_type = "bullish" if alert.current_price > alert.orb_high else "bearish"
+            alerts_dir = self.historical_config.get_alerts_dir(self.date, alert_type)
             alerts_dir.mkdir(parents=True, exist_ok=True)
             
-            # Save alert as JSON
-            alert_filename = f"sim_alert_{alert.symbol}_{alert.timestamp.strftime('%Y%m%d_%H%M%S')}.json"
+            # Save alert as JSON (match format: alert_SYMBOL_YYYYMMDD_HHMMSS.json)
+            alert_filename = f"alert_{alert.symbol}_{alert.timestamp.strftime('%Y%m%d_%H%M%S')}.json"
             alert_filepath = alerts_dir / alert_filename
             
             alert_data = {
@@ -345,11 +345,23 @@ class ORBPipelineSimulator:
             return {'symbol': symbol, 'status': 'no_data', 'alerts': []}
 
         # Initialize ORB alert engine for this symbol
-        # Create a temporary symbols file for this single symbol using centralized config
+        # Create a temporary symbols file for this single symbol with Signal/Resistance from the main symbols file
         temp_dir = self.logs_config.get_logs_path() / "tmp"
         temp_symbols_file = temp_dir / f"sim_symbols_{symbol}.csv"
         temp_symbols_file.parent.mkdir(exist_ok=True, parents=True)
-        pd.DataFrame({'symbol': [symbol]}).to_csv(temp_symbols_file, index=False)
+        
+        # Extract symbol data from main symbols file to preserve Signal/Resistance
+        if self.symbols_file:
+            main_symbols_df = pd.read_csv(self.symbols_file)
+            symbol_data = main_symbols_df[main_symbols_df['Symbol'] == symbol]
+            if not symbol_data.empty:
+                symbol_data.to_csv(temp_symbols_file, index=False)
+            else:
+                # Fallback: create minimal entry
+                pd.DataFrame({'Symbol': [symbol], 'Signal': [0], 'Resistance': [0]}).to_csv(temp_symbols_file, index=False)
+        else:
+            # Fallback: create minimal entry
+            pd.DataFrame({'Symbol': [symbol], 'Signal': [0], 'Resistance': [0]}).to_csv(temp_symbols_file, index=False)
         
         alert_engine = ORBAlertEngine(str(temp_symbols_file))
         alert_engine.add_alert_callback(self._alert_callback)

@@ -236,82 +236,103 @@ class BacktestingSystem:
         return target_csv
 
     def _run_orb_pipeline(self, date: str, symbols_file: Path, run_dir: Path) -> bool:
-        """Execute the ORB pipeline scripts for a specific run"""
-        scripts = [
+        """Execute the ORB pipeline with concurrent processes using file watchers"""
+        # Define all processes that should run concurrently
+        processes = [
             {
+                'name': 'simulator',
                 'cmd': f"python3 code/orb_pipeline_simulator.py --symbols-file {symbols_file} --date {date} "
-                       f"--save-alerts --speed 20 --verbose",
-                'timeout': 1800  # 30 minutes for data simulation
+                       f"--save-alerts --speed 1 --verbose",
+                'primary': True  # This drives the pipeline, others watch for its output
             },
             {
+                'name': 'monitor',
                 'cmd': f"python3 code/orb_alerts_monitor.py --symbols-file {symbols_file} --date {date} "
                        f"--no-telegram --verbose",
-                'timeout': 300   # 5 minutes for alert monitoring (should process quickly)
+                'primary': False  # Watches for simulator alerts
             },
             {
+                'name': 'superduper_monitor',
                 'cmd': f"python3 code/orb_alerts_monitor_superduper.py --no-telegram --date {date} --verbose",
-                'timeout': 300   # 5 minutes for superduper alerts
+                'primary': False  # Watches for monitor super_alerts
             },
             {
+                'name': 'trade_processor',
                 'cmd': f"python3 code/orb_alerts_trade_stocks.py --date {date} --no-telegram --test --verbose",
-                'timeout': 300   # 5 minutes for trade processing
+                'primary': False  # Watches for superduper alerts
             }
         ]
 
-        for script_info in scripts:
-            script = script_info['cmd']
-            timeout = script_info['timeout']
+        if self.dry_run:
+            for proc in processes:
+                self.logger.info(f"Would start {proc['name']}: {proc['cmd']}")
+            return True
 
-            if self.dry_run:
-                self.logger.info(f"Would run: {script}")
-                continue
+        # Start all processes concurrently
+        running_processes = []
 
-            self.logger.info(f"Running: {script}")
-            try:
-                # For monitoring scripts, use timeout and send SIGTERM to allow graceful shutdown
+        try:
+            for proc_info in processes:
+                self.logger.info(f"Starting {proc_info['name']}: {proc_info['cmd']}")
+
                 process = subprocess.Popen(
-                    script.split(),
+                    proc_info['cmd'].split(),
                     cwd=Path.cwd(),
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True
                 )
 
-                # Wait for completion with timeout
-                try:
-                    stdout, stderr = process.communicate(timeout=timeout)
+                running_processes.append({
+                    'process': process,
+                    'info': proc_info
+                })
 
-                    if process.returncode != 0:
-                        self.logger.error(f"Script failed: {script}")
-                        self.logger.error(f"Error: {stderr}")
-                        return False
+            # Wait for the primary process (simulator) to complete first
+            # The others will process files as they're created by the simulator
+            simulator_process = next(p for p in running_processes if p['info']['name'] == 'simulator')
 
-                    if stdout and self.verbose:
-                        self.logger.info(f"Script output: {stdout[:500]}...")
+            self.logger.info("Waiting for pipeline simulator to complete...")
+            try:
+                stdout, stderr = simulator_process['process'].communicate(timeout=1800)  # 30 min timeout
 
-                except subprocess.TimeoutExpired:
-                    self.logger.warning(f"Script timeout, terminating: {script}")
-                    process.terminate()
-                    try:
-                        stdout, stderr = process.communicate(timeout=30)
-                        self.logger.info("Script terminated gracefully")
-                    except subprocess.TimeoutExpired:
-                        self.logger.warning(f"Script did not terminate gracefully, killing: {script}")
-                        process.kill()
-                        stdout, stderr = process.communicate()
+                if simulator_process['process'].returncode != 0:
+                    self.logger.error(f"Pipeline simulator failed: {stderr}")
+                    return False
 
-                    # For monitoring scripts, timeout is expected behavior in backtesting
-                    if 'monitor' in script:
-                        self.logger.info("Monitor script completed (timeout expected for backtesting)")
-                    else:
-                        self.logger.error(f"Script timed out: {script}")
-                        return False
+                self.logger.info("Pipeline simulator completed successfully")
 
-            except Exception as e:
-                self.logger.error(f"Script error: {script} - {e}")
+            except subprocess.TimeoutExpired:
+                self.logger.error("Pipeline simulator timed out")
+                simulator_process['process'].kill()
                 return False
 
-        return True
+            # Give watchers time to process all generated files
+            import time
+            self.logger.info("Allowing watchers to process generated files...")
+            time.sleep(30)  # Allow watchers to process all files
+
+            # Terminate all remaining processes gracefully
+            for proc in running_processes:
+                if proc['process'].poll() is None:  # Still running
+                    self.logger.info(f"Terminating {proc['info']['name']}")
+                    proc['process'].terminate()
+                    try:
+                        proc['process'].communicate(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        proc['process'].kill()
+
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Pipeline execution error: {e}")
+
+            # Clean up any remaining processes
+            for proc in running_processes:
+                if proc['process'].poll() is None:
+                    proc['process'].kill()
+
+            return False
 
     def _generate_symbol_plots(self, date: str, symbols: List[str]) -> bool:
         """Generate plots for each symbol"""
@@ -395,23 +416,32 @@ class BacktestingSystem:
             alerts_by_date[date] = alerts_by_date.get(date, 0) + result['superduper_alerts']
             trades_by_date[date] = trades_by_date.get(date, 0) + result['trades']
 
+        # Create runs directory if it doesn't exist
+        runs_dir = Path("runs")
+        runs_dir.mkdir(exist_ok=True)
+
+        # Generate timestamp for filenames
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
         # Create alerts by date pie chart
         if alerts_by_date and sum(alerts_by_date.values()) > 0:
             plt.figure(figsize=(10, 8))
             plt.pie(alerts_by_date.values(), labels=alerts_by_date.keys(), autopct='%1.1f%%')
             plt.title('Superduper Alerts by Date')
-            plt.savefig('summary_alerts_by_date.png')
+            alerts_filename = runs_dir / f"summary_alerts_by_date_{timestamp}.png"
+            plt.savefig(alerts_filename)
             plt.close()
-            self.logger.info("Created summary_alerts_by_date.png")
+            self.logger.info(f"Created {alerts_filename}")
 
         # Create trades by date pie chart
         if trades_by_date and sum(trades_by_date.values()) > 0:
             plt.figure(figsize=(10, 8))
             plt.pie(trades_by_date.values(), labels=trades_by_date.keys(), autopct='%1.1f%%')
             plt.title('Trades by Date')
-            plt.savefig('summary_trades_by_date.png')
+            trades_filename = runs_dir / f"summary_trades_by_date_{timestamp}.png"
+            plt.savefig(trades_filename)
             plt.close()
-            self.logger.info("Created summary_trades_by_date.png")
+            self.logger.info(f"Created {trades_filename}")
 
     def run_backtesting(self):
         """Execute the full backtesting suite"""

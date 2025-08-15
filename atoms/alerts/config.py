@@ -5,7 +5,7 @@ This module provides centralized configuration for all alert momentum thresholds
 to ensure consistency across alert generation and notification systems.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -253,7 +253,7 @@ class PriceMomentumConfig:
     """
     
     # Momentum thresholds for color coding and filtering
-    momentum: MomentumThresholds = MomentumThresholds()
+    momentum: MomentumThresholds = field(default_factory=MomentumThresholds)
     
     # Trend analysis timeframe in minutes
     trend_analysis_timeframe_minutes: int = 20
@@ -263,11 +263,11 @@ class PriceMomentumConfig:
 
 
 # Default configuration instances
-DEFAULT_PLOTS_ROOT_DIR = PlotsRootDir(root_path="/home/wilsonb/dl/github.com/z223i/alpaca/runs/run_2025-08-04_e102a1c7")
-DEFAULT_DATA_ROOT_DIR = DataRootDir(root_path="/home/wilsonb/dl/github.com/z223i/alpaca/runs/run_2025-08-04_e102a1c7")
-DEFAULT_LOGS_ROOT_DIR = LogsRootDir(root_path="/home/wilsonb/dl/github.com/z223i/alpaca/runs/run_2025-08-04_e102a1c7")
-DEFAULT_HISTORICAL_ROOT_DIR = HistoricalRootDir(root_path="/home/wilsonb/dl/github.com/z223i/alpaca/runs/run_2025-08-04_e102a1c7")
-DEFAULT_PRICE_MOMENTUM_CONFIG = PriceMomentumConfig(momentum=MomentumThresholds(green_threshold=0.6), trend_analysis_timeframe_minutes=10)
+DEFAULT_PLOTS_ROOT_DIR = PlotsRootDir()
+DEFAULT_DATA_ROOT_DIR = DataRootDir()
+DEFAULT_LOGS_ROOT_DIR = LogsRootDir()
+DEFAULT_HISTORICAL_ROOT_DIR = HistoricalRootDir()
+DEFAULT_PRICE_MOMENTUM_CONFIG = PriceMomentumConfig()
 
 
 def get_plots_root_dir() -> PlotsRootDir:
