@@ -368,7 +368,7 @@ class BacktestingSystem:
             },
             {
                 'name': 'trade_processor',
-                'cmd': f"python3 code/orb_alerts_trade_stocks.py --date {date} --no-telegram --test --verbose",
+                'cmd': f"python3 code/orb_alerts_trade_stocks.py --date {date} --no-telegram --verbose",
                 'primary': False  # Watches for superduper alerts (will be copied)
             },
             {
