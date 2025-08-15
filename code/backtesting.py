@@ -427,16 +427,36 @@ class BacktestingSystem:
             self.logger.info("Monitoring file processing...")
             print("Monitoring file processing...")
             
-            for i in range(12):  # Check every 10 seconds for 2 minutes
+            # Track last three count sets to detect when processing is complete
+            previous_counts = []
+            consecutive_identical = 0
+            max_iterations = 12  # Maximum 2 minutes as fallback
+            
+            for i in range(max_iterations):
                 alert_count = len(list((run_dir / "historical_data" / date / "alerts" / "bullish").glob("*.json")))
                 super_count = len(list((run_dir / "historical_data" / date / "super_alerts" / "bullish").glob("*.json")))
                 superduper_count = len(list((run_dir / "historical_data" / date / "superduper_alerts" / "bullish").glob("*.json")))
                 superduper_green_count = len(list((run_dir / "historical_data" / date / "superduper_alerts_sent" / "bullish" / "green").glob("*.json")))
                 trade_count = len(list((run_dir / "historical_data" / date).glob("*trade*.json")))
                 
+                current_counts = (alert_count, super_count, superduper_count, superduper_green_count, trade_count)
                 progress_msg = f"Files: {alert_count} alerts → {super_count} super → {superduper_count} superduper → {superduper_green_count} green → {trade_count} trades"
                 self.logger.info(progress_msg)
                 print(progress_msg)
+                
+                # Check for consecutive identical counts
+                if previous_counts and current_counts == previous_counts[-1]:
+                    consecutive_identical += 1
+                    if consecutive_identical >= 2:  # Three consecutive identical (current + 2 previous)
+                        self.logger.info("✅ File processing complete - counts stabilized")
+                        print("✅ File processing complete - counts stabilized")
+                        break
+                else:
+                    consecutive_identical = 0
+                
+                previous_counts.append(current_counts)
+                if len(previous_counts) > 2:  # Keep only last 2 for comparison
+                    previous_counts.pop(0)
                 
                 if superduper_green_count > 0:
                     self.logger.info("✅ Superduper green alerts detected!")
@@ -444,9 +464,9 @@ class BacktestingSystem:
                     if trade_count > 0:
                         self.logger.info("✅ Trades detected!")
                         print("✅ Trades detected!")
-                        break
+                        # Don't break here - let it stabilize with identical counts
                 
-                if i < 11:  # Don't sleep after the last iteration
+                if i < max_iterations - 1:  # Don't sleep after the last iteration
                     time.sleep(10)
 
             # Terminate all remaining processes gracefully

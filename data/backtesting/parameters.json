@@ -1,4 +1,4 @@
 {
-  "trend_analysis_timeframe_minutes": [30],
-  "green_threshold": [0.65]
+  "trend_analysis_timeframe_minutes": [10, 15, 20, 25, 30],
+  "green_threshold": [0.60, 0.65, 0.70, 0.75]
 }
