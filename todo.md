@@ -91,6 +91,12 @@ Filter out stocks below two dollars.
 - [X] VERY IMPORTANT: the buy type for $BSLK was not correct. The trade execution responded with no but without detail.
 - [X] Reduce the price momentum length. Reduce from 0.75 to 0.65 in atoms/alerts/config.py. Centralize the location of the price momentum in atoms/alerts/config.py to 20.
 
+## Backtesting Update
+
+- [ ] VERY IMPORTANT. THINK HARD. We have been having difficults getting the processes in code/backtesting.py coordinated as to which directories to output their data. So, we are just going to keep them the same but with a twist.
+Update code/backtesting.py to copy atoms/alerts/config_current_run.py to atoms/alerts/config.py at startup.  It is to copy atoms/alerts/config_orig.py to atoms/alerts/config.py at shutdown to include responding to a <CTRL+C>.
+Every run will write to the same output directory.  At the end of the run use a Bash mv command to move the dir in the now updated config file to a dynamically named dir which is already in the code.
+
 ## Backtesting
 
 - [X] Centralize the starting point for the historical_data dir in config.py. 2025-08-13 17:00

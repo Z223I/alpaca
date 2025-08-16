@@ -21,6 +21,7 @@ import uuid
 import argparse
 import logging
 import pandas as pd
+import signal
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
@@ -44,8 +45,8 @@ class BacktestingSystem:
     def __init__(self, dry_run: bool = False, verbose: bool = False):
         self.dry_run = dry_run
         self.verbose = verbose
-        self.config_backup_path = None
         self.run_results = []
+        self.config_restored = False
 
         # Set up logging
         logging.basicConfig(
@@ -53,6 +54,10 @@ class BacktestingSystem:
             format='%(asctime)s - %(levelname)s - %(message)s'
         )
         self.logger = logging.getLogger(__name__)
+
+        # Setup signal handlers for clean shutdown
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
 
         # Load parameters and symbols
         self.parameters = self._load_parameters()
@@ -91,11 +96,11 @@ class BacktestingSystem:
 
         return symbols_by_date
 
-    def _send_run_notification(self, run_dir: Path, timeframe: int, threshold: float,
+    def _send_run_notification(self, target_run_dir: Path, timeframe: int, threshold: float,
                                date: str, symbols: List[str]):
         """Send Telegram notification at the start of each backtesting run"""
         if self.dry_run:
-            self.logger.info(f"Would send Telegram notification for run: {run_dir}")
+            self.logger.info(f"Would send Telegram notification for run: {target_run_dir}")
             return
 
         try:
@@ -103,7 +108,7 @@ class BacktestingSystem:
 
             symbols_str = ", ".join(symbols)
             message = (f"🧪 **Backtesting Run Started**\n\n"
-                       f"**Run Directory:** `{run_dir.name}`\n"
+                       f"**Target Directory:** `{target_run_dir.name}`\n"
                        f"**Date:** {date}\n"
                        f"**Timeframe:** {timeframe} minutes\n"
                        f"**Green Threshold:** {threshold}\n"
@@ -121,74 +126,59 @@ class BacktestingSystem:
         except Exception as e:
             self.logger.error(f"Error sending run notification via Telegram: {e}")
 
-    def _backup_config(self):
-        """Create backup of atoms/alerts/config.py"""
-        config_path = Path("atoms/alerts/config.py")
-        if not config_path.exists():
-            raise FileNotFoundError(f"Config file not found: {config_path}")
+    def _signal_handler(self, signum, _frame):
+        """Handle CTRL+C and other termination signals"""
+        self.logger.info(f"Received signal {signum}, initiating clean shutdown...")
+        self._restore_original_config()
+        sys.exit(0)
 
-        self.config_backup_path = config_path.with_suffix('.py.backup')
+    def _setup_current_run_config(self):
+        """Copy config_current_run.py to config.py at startup"""
+        config_current_run = Path("atoms/alerts/config_current_run.py")
+        config_active = Path("atoms/alerts/config.py")
+        
+        if not config_current_run.exists():
+            raise FileNotFoundError(f"Current run config not found: {config_current_run}")
+            
         if not self.dry_run:
-            shutil.copy2(config_path, self.config_backup_path)
+            shutil.copy2(config_current_run, config_active)
+            # Ensure the runs/current directory exists
+            current_run_dir = Path("./runs/current")
+            current_run_dir.mkdir(parents=True, exist_ok=True)
+            
+        self.logger.info("✅ Configured all processes to use ./runs/current directory")
 
-        self.logger.info(f"Backed up config to: {self.config_backup_path}")
+    def _restore_original_config(self):
+        """Copy config_orig.py to config.py at shutdown"""
+        if self.config_restored:
+            return  # Already restored
+            
+        config_orig = Path("atoms/alerts/config_orig.py")
+        config_active = Path("atoms/alerts/config.py")
+        
+        if not config_orig.exists():
+            self.logger.error(f"Original config not found: {config_orig}")
+            return
+            
+        if not self.dry_run:
+            shutil.copy2(config_orig, config_active)
+            
+        self.config_restored = True
+        self.logger.info("✅ Restored original config file")
 
-    def _restore_config(self):
-        """Restore backup of atoms/alerts/config.py"""
-        if self.config_backup_path and self.config_backup_path.exists():
-            config_path = Path("atoms/alerts/config.py")
-            if not self.dry_run:
-                shutil.copy2(self.config_backup_path, config_path)
-                self.config_backup_path.unlink()  # Remove backup file
-            self.logger.info("Restored original config file")
-
-    def _update_config_for_run(self, run_dir: Path, timeframe: int, threshold: float):
-        """Update atoms/alerts/config.py with run-specific settings and force reload"""
-        config_path = Path("atoms/alerts/config.py")
-
+    def _update_config_for_run(self, timeframe: int, threshold: float):
+        """Update the current run config file with run-specific parameters"""
+        config_current_run = Path("atoms/alerts/config_current_run.py")
+        
         if self.dry_run:
-            self.logger.info(f"Would update config for run: {run_dir}")
+            self.logger.info(f"Would update config with timeframe={timeframe}, threshold={threshold}")
             return
 
-        # Read current config
-        with open(config_path, 'r') as f:
+        # Read the template config
+        with open(config_current_run, 'r') as f:
             content = f.read()
 
-        # Update default instances to point to run directory
-        run_dir_str = str(run_dir.absolute())
-
-        # Replace the default instances - handle both patterns
-        import re
-        
-        # Replace PLOTS_ROOT_DIR line
-        content = re.sub(
-            r'DEFAULT_PLOTS_ROOT_DIR = PlotsRootDir\([^)]*\)',
-            f'DEFAULT_PLOTS_ROOT_DIR = PlotsRootDir(root_path="{run_dir_str}")',
-            content
-        )
-        
-        # Replace DATA_ROOT_DIR line
-        content = re.sub(
-            r'DEFAULT_DATA_ROOT_DIR = DataRootDir\([^)]*\)',
-            f'DEFAULT_DATA_ROOT_DIR = DataRootDir(root_path="{run_dir_str}")',
-            content
-        )
-        
-        # Replace LOGS_ROOT_DIR line
-        content = re.sub(
-            r'DEFAULT_LOGS_ROOT_DIR = LogsRootDir\([^)]*\)',
-            f'DEFAULT_LOGS_ROOT_DIR = LogsRootDir(root_path="{run_dir_str}")',
-            content
-        )
-        
-        # Replace HISTORICAL_ROOT_DIR line
-        content = re.sub(
-            r'DEFAULT_HISTORICAL_ROOT_DIR = HistoricalRootDir\([^)]*\)',
-            f'DEFAULT_HISTORICAL_ROOT_DIR = HistoricalRootDir(root_path="{run_dir_str}")',
-            content
-        )
-
-        # Update momentum config with parameters - use line-based replacement for robustness
+        # Update momentum config parameters using line-based replacement
         lines = content.split('\n')
         for i, line in enumerate(lines):
             if line.strip().startswith('DEFAULT_PRICE_MOMENTUM_CONFIG = '):
@@ -196,129 +186,69 @@ class BacktestingSystem:
                            f'momentum=MomentumThresholds(green_threshold={threshold}), '
                            f'trend_analysis_timeframe_minutes={timeframe})')
                 break
-        content = '\n'.join(lines)
-
-        # Write updated config
-        with open(config_path, 'w') as f:
-            f.write(content)
-
+        
+        # Write back to both current_run config and active config
+        updated_content = '\n'.join(lines)
+        
+        # Update current_run config (template for next startup)
+        with open(config_current_run, 'w') as f:
+            f.write(updated_content)
+            
+        # Update active config (what processes will use)
+        config_active = Path("atoms/alerts/config.py")
+        with open(config_active, 'w') as f:
+            f.write(updated_content)
+        
         # Allow file system to propagate changes
         import time
         time.sleep(0.5)
         
-        # Force Python to reload the config module so all processes see the new values
-        self._reload_config_module()
-        
-        # Verify the update worked
-        self._validate_config_update(run_dir, timeframe, threshold)
-        
-        # Additional delay to ensure subprocesses pick up new config
-        time.sleep(1.0)
+        self.logger.info(f"✅ Config updated: timeframe={timeframe}, threshold={threshold}")
 
-        self.logger.info(f"✅ Config updated and validated: timeframe={timeframe}, threshold={threshold}, run_dir={run_dir}")
+    def _get_target_run_directory(self, date: str, timeframe: int, threshold: float) -> Path:
+        """Get target run directory name for this combination of parameters"""
+        run_id = str(uuid.uuid4())[:8]  # Short UUID
+        return Path(f"runs/run_{date}_tf{timeframe}_th{threshold}_{run_id}")
     
-    def _reload_config_module(self):
-        """Force reload of config module to pick up file changes"""
+    def _move_current_to_target(self, target_dir: Path) -> bool:
+        """Move ./runs/current to target directory using bash mv command"""
+        current_dir = Path("./runs/current")
+        
+        if self.dry_run:
+            self.logger.info(f"Would move {current_dir} to {target_dir}")
+            return True
+            
+        if not current_dir.exists():
+            self.logger.warning(f"Current run directory does not exist: {current_dir}")
+            return False
+        
         try:
-            import importlib
-            import sys
-            
-            # Remove config module from cache if it exists
-            if 'atoms.alerts.config' in sys.modules:
-                del sys.modules['atoms.alerts.config']
-            
-            # Clear any cached imports
-            for module_name in list(sys.modules.keys()):
-                if module_name.startswith('atoms.alerts.config'):
-                    del sys.modules[module_name]
-            
-            # Force reimport
-            import atoms.alerts.config
-            importlib.reload(atoms.alerts.config)
-            
-            self.logger.info("🔄 Config module reloaded successfully")
-            
-        except Exception as e:
-            self.logger.warning(f"⚠️ Config reload failed: {e}")
-    
-    def _validate_config_update(self, expected_run_dir: Path, expected_timeframe: int, expected_threshold: float):
-        """Validate that config update worked correctly"""
-        try:
-            # Import fresh config
-            from atoms.alerts.config import (
-                DEFAULT_HISTORICAL_ROOT_DIR, DEFAULT_PRICE_MOMENTUM_CONFIG,
-                DEFAULT_PLOTS_ROOT_DIR, DEFAULT_DATA_ROOT_DIR, DEFAULT_LOGS_ROOT_DIR
+            # Use bash mv command to move the directory
+            result = subprocess.run(
+                ["mv", str(current_dir), str(target_dir)],
+                capture_output=True,
+                text=True,
+                timeout=30
             )
             
-            # Check directory paths
-            expected_path = str(expected_run_dir.absolute())
-            
-            actual_historical = str(DEFAULT_HISTORICAL_ROOT_DIR.root_path)
-            actual_plots = str(DEFAULT_PLOTS_ROOT_DIR.root_path)
-            actual_data = str(DEFAULT_DATA_ROOT_DIR.root_path)
-            actual_logs = str(DEFAULT_LOGS_ROOT_DIR.root_path)
-            
-            # Check momentum config
-            actual_timeframe = DEFAULT_PRICE_MOMENTUM_CONFIG.trend_analysis_timeframe_minutes
-            actual_threshold = DEFAULT_PRICE_MOMENTUM_CONFIG.momentum.green_threshold
-            
-            # Validate all paths match
-            path_errors = []
-            if actual_historical != expected_path:
-                path_errors.append(f"HISTORICAL: expected {expected_path}, got {actual_historical}")
-            if actual_plots != expected_path:
-                path_errors.append(f"PLOTS: expected {expected_path}, got {actual_plots}")
-            if actual_data != expected_path:
-                path_errors.append(f"DATA: expected {expected_path}, got {actual_data}")
-            if actual_logs != expected_path:
-                path_errors.append(f"LOGS: expected {expected_path}, got {actual_logs}")
-            
-            # Validate momentum config
-            config_errors = []
-            if actual_timeframe != expected_timeframe:
-                config_errors.append(f"TIMEFRAME: expected {expected_timeframe}, got {actual_timeframe}")
-            if actual_threshold != expected_threshold:
-                config_errors.append(f"THRESHOLD: expected {expected_threshold}, got {actual_threshold}")
-            
-            if path_errors or config_errors:
-                error_msg = "❌ Config validation failed!\n"
-                if path_errors:
-                    error_msg += "Path errors:\n" + "\n".join(f"  - {e}" for e in path_errors) + "\n"
-                if config_errors:
-                    error_msg += "Config errors:\n" + "\n".join(f"  - {e}" for e in config_errors)
+            if result.returncode == 0:
+                self.logger.info(f"✅ Moved {current_dir} to {target_dir}")
+                return True
+            else:
+                self.logger.error(f"❌ Failed to move directory: {result.stderr}")
+                return False
                 
-                self.logger.error(error_msg)
-                raise RuntimeError(error_msg)
-            
-            self.logger.info("✅ Config validation passed - all paths and parameters correct")
-            
-        except ImportError as e:
-            error_msg = f"❌ Config validation failed - import error: {e}"
-            self.logger.error(error_msg)
-            raise RuntimeError(error_msg)
+        except Exception as e:
+            self.logger.error(f"❌ Error moving directory: {e}")
+            return False
 
-    def _create_run_directory(self, date: str) -> Path:
-        """Create run directory with format ./runs/run_YYYY-MM-DD_<UUID>"""
-        run_id = str(uuid.uuid4())[:8]  # Short UUID
-        run_dir = Path(f"runs/run_{date}_{run_id}")
-
-        if not self.dry_run:
-            run_dir.mkdir(parents=True, exist_ok=True)
-            # Create required subdirectories
-            (run_dir / "data").mkdir(exist_ok=True)
-            (run_dir / "plots").mkdir(exist_ok=True)
-            (run_dir / "logs").mkdir(exist_ok=True)
-            (run_dir / "historical_data").mkdir(exist_ok=True)
-
-        self.logger.info(f"Created run directory: {run_dir}")
-        return run_dir
-
-    def _prepare_symbols_file(self, date: str, symbols: List[str], run_dir: Path) -> Path:
-        """Prepare symbols CSV file for the specific date and symbols"""
+    def _prepare_symbols_file(self, date: str, symbols: List[str]) -> Path:
+        """Prepare symbols CSV file for the specific date and symbols in current run directory"""
         # Convert date format from YYYY-MM-DD to YYYYMMDD for CSV filename
         csv_date = date.replace('-', '')
         source_csv = Path(f"data/{csv_date}.csv")
-        target_csv = run_dir / "data" / f"{csv_date}.csv"
+        current_run_dir = Path("./runs/current")
+        target_csv = current_run_dir / "data" / f"{csv_date}.csv"
 
         if not source_csv.exists():
             self.logger.warning(f"Source CSV not found: {source_csv}")
@@ -327,6 +257,9 @@ class BacktestingSystem:
         if self.dry_run:
             self.logger.info(f"Would copy and filter {source_csv} to {target_csv}")
             return target_csv
+
+        # Ensure target directory exists
+        target_csv.parent.mkdir(parents=True, exist_ok=True)
 
         # Read source CSV and filter by symbols
         df = pd.read_csv(source_csv)
@@ -343,7 +276,7 @@ class BacktestingSystem:
         self.logger.info(f"Created filtered symbols file: {target_csv} ({len(filtered_df)} symbols)")
         return target_csv
 
-    def _run_orb_pipeline(self, date: str, symbols_file: Path, run_dir: Path) -> bool:
+    def _run_orb_pipeline(self, date: str, symbols_file: Path) -> bool:
         """Execute the ORB pipeline with concurrent processes using file watchers"""
         # Define all processes that should run concurrently
         # Testing with live superduper alerts to test trade processor directly
@@ -373,7 +306,7 @@ class BacktestingSystem:
             },
             {
                 'name': 'super_alert_copier',
-                'cmd': f"python3 code/copy_super_alerts.py {date} {run_dir}",
+                'cmd': f"python3 code/copy_super_alerts.py {date} ./runs/current",
                 'primary': False  # Copies existing VERB super alerts at 1 per 3 seconds
             }
         ]
@@ -409,7 +342,7 @@ class BacktestingSystem:
 
             self.logger.info("Waiting for pipeline simulator to complete...")
             try:
-                stdout, stderr = simulator_process['process'].communicate(timeout=1800)  # 30 min timeout
+                _stdout, stderr = simulator_process['process'].communicate(timeout=1800)  # 30 min timeout
 
                 if simulator_process['process'].returncode != 0:
                     self.logger.error(f"Pipeline simulator failed: {stderr}")
@@ -431,13 +364,14 @@ class BacktestingSystem:
             previous_counts = []
             consecutive_identical = 0
             max_iterations = 12  # Maximum 2 minutes as fallback
+            current_run_dir = Path("./runs/current")
             
             for i in range(max_iterations):
-                alert_count = len(list((run_dir / "historical_data" / date / "alerts" / "bullish").glob("*.json")))
-                super_count = len(list((run_dir / "historical_data" / date / "super_alerts" / "bullish").glob("*.json")))
-                superduper_count = len(list((run_dir / "historical_data" / date / "superduper_alerts" / "bullish").glob("*.json")))
-                superduper_green_count = len(list((run_dir / "historical_data" / date / "superduper_alerts_sent" / "bullish" / "green").glob("*.json")))
-                trade_count = len(list((run_dir / "historical_data" / date).glob("*trade*.json")))
+                alert_count = len(list((current_run_dir / "historical_data" / date / "alerts" / "bullish").glob("*.json")))
+                super_count = len(list((current_run_dir / "historical_data" / date / "super_alerts" / "bullish").glob("*.json")))
+                superduper_count = len(list((current_run_dir / "historical_data" / date / "superduper_alerts" / "bullish").glob("*.json")))
+                superduper_green_count = len(list((current_run_dir / "historical_data" / date / "superduper_alerts_sent" / "bullish" / "green").glob("*.json")))
+                trade_count = len(list((current_run_dir / "historical_data" / date).glob("*trade*.json")))
                 
                 current_counts = (alert_count, super_count, superduper_count, superduper_green_count, trade_count)
                 progress_msg = f"Files: {alert_count} alerts → {super_count} super → {superduper_count} superduper → {superduper_green_count} green → {trade_count} trades"
@@ -674,8 +608,8 @@ class BacktestingSystem:
         self.logger.info("Starting backtesting system")
 
         try:
-            # Backup config
-            self._backup_config()
+            # Setup current run config at startup
+            self._setup_current_run_config()
 
             # Nested loops for parametric testing
             for timeframe in self.parameters['trend_analysis_timeframe_minutes']:
@@ -684,38 +618,44 @@ class BacktestingSystem:
 
                         self.logger.info(f"Processing: timeframe={timeframe}, threshold={threshold}, date={date}")
 
-                        # Create run directory
-                        run_dir = self._create_run_directory(date)
+                        # Get target directory name for this run
+                        target_run_dir = self._get_target_run_directory(date, timeframe, threshold)
 
-                        # Update config for this run
-                        self._update_config_for_run(run_dir, timeframe, threshold)
+                        # Update config for this run (parameters only)
+                        self._update_config_for_run(timeframe, threshold)
 
                         # Send run notification
-                        self._send_run_notification(run_dir, timeframe, threshold, date, symbols)
+                        self._send_run_notification(target_run_dir, timeframe, threshold, date, symbols)
 
-                        # Prepare symbols file
-                        symbols_file = self._prepare_symbols_file(date, symbols, run_dir)
+                        # Prepare symbols file in current directory
+                        symbols_file = self._prepare_symbols_file(date, symbols)
 
-                        # Run ORB pipeline
-                        success = self._run_orb_pipeline(date, symbols_file, run_dir)
+                        # Run ORB pipeline (writes to ./runs/current)
+                        success = self._run_orb_pipeline(date, symbols_file)
 
                         if success:
                             # Generate plots
                             self._generate_symbol_plots(date, symbols)
 
-                            # Analyze results
-                            results = self._analyze_run_results(run_dir)
-                            results.update({
-                                'date': date,
-                                'timeframe': timeframe,
-                                'threshold': threshold,
-                                'run_dir': str(run_dir),
-                                'symbols': symbols
-                            })
-                            self.run_results.append(results)
+                            # Move current directory to target
+                            move_success = self._move_current_to_target(target_run_dir)
+                            
+                            if move_success:
+                                # Analyze results from moved directory
+                                results = self._analyze_run_results(target_run_dir)
+                                results.update({
+                                    'date': date,
+                                    'timeframe': timeframe,
+                                    'threshold': threshold,
+                                    'run_dir': str(target_run_dir),
+                                    'symbols': symbols
+                                })
+                                self.run_results.append(results)
 
-                            self.logger.info(f"Run completed: {results['superduper_alerts']} alerts, "
-                                             f"{results['trades']} trades")
+                                self.logger.info(f"Run completed: {results['superduper_alerts']} alerts, "
+                                                 f"{results['trades']} trades")
+                            else:
+                                self.logger.error(f"Failed to move run directory for {date}")
                         else:
                             self.logger.error(f"Run failed for {date}")
 
@@ -732,8 +672,8 @@ class BacktestingSystem:
                              f"{total_alerts} total alerts, {total_trades} total trades")
 
         finally:
-            # Always restore config
-            self._restore_config()
+            # Always restore original config
+            self._restore_original_config()
 
 
 def main():
