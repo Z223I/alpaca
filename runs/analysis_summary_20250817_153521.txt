@@ -1,0 +1,45 @@
+
+BACKTESTING PARAMETER OPTIMIZATION SUMMARY
+==========================================
+Generated: 2025-08-17 15:35:29
+
+BEST PERFORMING COMBINATION:
+- Timeframe: 10 minutes
+- Threshold: 0.60
+- Alerts Sent: 59
+
+WORST PERFORMING COMBINATION:
+- Timeframe: 30 minutes  
+- Threshold: 0.75
+- Alerts Sent: 17
+
+TIMEFRAME ANALYSIS:
+            mean       std  max
+timeframe                      
+10         56.75  2.217356   59
+15         41.25  9.215024   51
+20         36.75  6.701990   44
+25         31.00  4.163332   36
+30         20.25  4.573474   27
+
+THRESHOLD ANALYSIS:
+           mean        std  max
+threshold                      
+0.60       43.4  12.502000   59
+0.65       38.8  14.652645   58
+0.70       35.6  13.813037   56
+0.75       31.0  13.784049   54
+
+OPTIMIZATION INSIGHTS:
+- Total parameter combinations tested: 20
+- Average alerts per combination: 37.2
+- Standard deviation: 13.4
+- Best timeframe (by avg): 10 minutes
+- Best threshold (by avg): 0.60
+
+CHARTS GENERATED:
+- analysis_heatmap_20250817_153521.png
+- analysis_timeframe_20250817_153521.png  
+- analysis_threshold_20250817_153521.png
+- analysis_combinations_20250817_153521.png
+- analysis_3d_surface_20250817_153521.png

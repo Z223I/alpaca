@@ -19,7 +19,7 @@ class PlotsRootDir:
     """
 
     # Root directory where plots folder will be located
-    root_path: str = "./runs/current"
+    root_path: str = "."
 
     def get_plots_path(self) -> Path:
         """
@@ -70,7 +70,7 @@ class DataRootDir:
     """
 
     # Root directory where data folder will be located
-    root_path: str = "./runs/current"
+    root_path: str = "."
 
     def get_data_path(self) -> Path:
         """
@@ -106,7 +106,7 @@ class LogsRootDir:
     """
 
     # Root directory where logs folder will be located
-    root_path: str = "./runs/current"
+    root_path: str = "."
 
     def get_logs_path(self) -> Path:
         """
@@ -132,7 +132,7 @@ class HistoricalRootDir:
     """
 
     # Root directory where historical_data folder will be located
-    root_path: str = "./runs/current"
+    root_path: str = "."
 
     def get_historical_data_path(self, date: str) -> Path:
         """
@@ -263,11 +263,11 @@ class PriceMomentumConfig:
 
 
 # Default configuration instances
-DEFAULT_PLOTS_ROOT_DIR = PlotsRootDir(root_path="./runs/current")
-DEFAULT_DATA_ROOT_DIR = DataRootDir(root_path="./runs/current")
-DEFAULT_LOGS_ROOT_DIR = LogsRootDir(root_path="./runs/current")
-DEFAULT_HISTORICAL_ROOT_DIR = HistoricalRootDir(root_path="./runs/current")
-DEFAULT_PRICE_MOMENTUM_CONFIG = PriceMomentumConfig(momentum=MomentumThresholds(green_threshold=0.65), trend_analysis_timeframe_minutes=25)
+DEFAULT_PLOTS_ROOT_DIR = PlotsRootDir(root_path=".")
+DEFAULT_DATA_ROOT_DIR = DataRootDir(root_path=".")
+DEFAULT_LOGS_ROOT_DIR = LogsRootDir(root_path=".")
+DEFAULT_HISTORICAL_ROOT_DIR = HistoricalRootDir(root_path=".")
+DEFAULT_PRICE_MOMENTUM_CONFIG = PriceMomentumConfig(momentum=MomentumThresholds(green_threshold=0.65), trend_analysis_timeframe_minutes=30)
 
 
 def get_plots_root_dir() -> PlotsRootDir:
