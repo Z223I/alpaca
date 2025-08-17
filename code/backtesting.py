@@ -659,7 +659,7 @@ class BacktestingSystem:
 
                             if success:
                                 # Generate plots for this symbol
-                                self._generate_symbol_plots(date, symbol)
+                                # self._generate_symbol_plots(date, symbol)  # Temporarily commented out
 
                                 # Move current directory to target with symbol isolation
                                 move_success = self._move_current_to_target(target_run_dir)

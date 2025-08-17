@@ -210,9 +210,9 @@ class BacktestingAnalyzer:
         print("🎯 Creating parameter combination analysis from REAL data...")
         
         if not self.results_data:
-            print("❌ No real results data found - cannot create parameter analysis")
-            print("⚠️  Falling back to synthetic data generation for demonstration")
-            self._create_synthetic_fallback()
+            print("❌ FATAL ERROR: No real results data found!")
+            print("❌ CANNOT GENERATE CHARTS: Only real data is permitted")
+            print("❌ Please run actual backtesting first to generate real data")
             return
         
         # Convert real results data to DataFrame
@@ -238,39 +238,6 @@ class BacktestingAnalyzer:
         max_alerts = self.param_data['superduper_alerts_sent'].max()
         print(f"📊 Alert summary: {total_alerts} total, {max_alerts} max per run")
         
-    def _create_synthetic_fallback(self):
-        """Create synthetic data as fallback when no real data is available."""
-        print("⚠️  GENERATING SYNTHETIC DATA - This should only be used for testing!")
-        
-        # Load parameters
-        try:
-            with open("data/backtesting/parameters.json", 'r') as f:
-                params = json.load(f)
-                
-            timeframes = params['trend_analysis_timeframe_minutes']
-            thresholds = params['green_threshold']
-        except FileNotFoundError:
-            print("⚠️  parameters.json not found, using defaults")
-            timeframes = [10, 15, 20, 25, 30]
-            thresholds = [0.6, 0.65, 0.7, 0.75]
-        
-        # Create synthetic results
-        synthetic_data = []
-        
-        for timeframe in timeframes:
-            for threshold in thresholds:
-                # All synthetic data shows 0 alerts to match actual results
-                alerts_sent = 0  # Match actual simulation results
-                
-                synthetic_data.append({
-                    'timeframe': timeframe,
-                    'threshold': threshold,
-                    'superduper_alerts_sent': alerts_sent,
-                    'parameter_combo': f"{timeframe}min_{threshold:.2f}th"
-                })
-        
-        self.param_data = pd.DataFrame(synthetic_data)
-        print(f"🤖 Generated {len(synthetic_data)} synthetic parameter combinations (all showing 0 alerts)")
         
     def create_heatmap(self):
         """Create heatmap showing alerts by timeframe vs threshold."""
@@ -280,8 +247,8 @@ class BacktestingAnalyzer:
             print("❌ No parameter data available - cannot create heatmap")
             return
             
-        # Add data source indicator to title
-        data_source = "REAL Backtesting Data" if self.results_data else "SYNTHETIC Data (Fallback)"
+        # Data source is always real - no synthetic option exists
+        data_source = "REAL Backtesting Data"
         
         # Pivot data for heatmap
         heatmap_data = self.param_data.pivot(index='threshold', columns='timeframe', values='superduper_alerts_sent')
@@ -289,9 +256,11 @@ class BacktestingAnalyzer:
         plt.figure(figsize=(12, 8))
         sns.heatmap(heatmap_data, annot=True, fmt='d', cmap='YlOrRd', 
                    cbar_kws={'label': 'Superduper Alerts Sent'})
-        plt.title(f'Superduper Alerts by Timeframe and Threshold\n({data_source})', fontsize=16, fontweight='bold')
+        plt.title('Superduper Alerts by Timeframe and Threshold', fontsize=16, fontweight='bold')
+        plt.suptitle(f'Data Source: {data_source} - Actual superduper_alerts_sent Files', fontsize=12, y=0.02, color='darkgreen', weight='bold')
         plt.xlabel('Timeframe (minutes)', fontsize=12)
         plt.ylabel('Green Threshold', fontsize=12)
+        plt.gca().invert_yaxis()  # Fix inverted Y-axis
         plt.tight_layout()
         
         filename = f"runs/analysis_heatmap_{self.chart_timestamp}.png"
@@ -313,6 +282,7 @@ class BacktestingAnalyzer:
                     marker='o', linewidth=2, label=f'Threshold {threshold:.2f}')
         
         plt.title('Superduper Alerts by Timeframe', fontsize=16, fontweight='bold')
+        plt.suptitle('Data Source: REAL Backtesting Data - Actual superduper_alerts_sent Files', fontsize=12, y=0.02, color='darkgreen', weight='bold')
         plt.xlabel('Timeframe (minutes)', fontsize=12)
         plt.ylabel('Superduper Alerts Sent', fontsize=12)
         plt.legend(title='Green Threshold', bbox_to_anchor=(1.05, 1), loc='upper left')
@@ -338,6 +308,7 @@ class BacktestingAnalyzer:
                     marker='s', linewidth=2, label=f'{timeframe} min')
         
         plt.title('Superduper Alerts by Green Threshold', fontsize=16, fontweight='bold')
+        plt.suptitle('Data Source: REAL Backtesting Data - Actual superduper_alerts_sent Files', fontsize=12, y=0.02, color='darkgreen', weight='bold')
         plt.xlabel('Green Threshold', fontsize=12)
         plt.ylabel('Superduper Alerts Sent', fontsize=12)
         plt.legend(title='Timeframe', bbox_to_anchor=(1.05, 1), loc='upper left')
@@ -366,6 +337,7 @@ class BacktestingAnalyzer:
                     str(alerts), ha='center', va='bottom', fontweight='bold')
         
         plt.title('Superduper Alerts by Parameter Combination', fontsize=16, fontweight='bold')
+        plt.suptitle('Data Source: REAL Backtesting Data - Actual superduper_alerts_sent Files', fontsize=12, y=0.02, color='darkgreen', weight='bold')
         plt.xlabel('Parameter Combination (Timeframe_Threshold)', fontsize=12)
         plt.ylabel('Superduper Alerts Sent', fontsize=12)
         plt.xticks(range(len(sorted_data)), sorted_data['parameter_combo'], rotation=45, ha='right')
@@ -405,6 +377,7 @@ class BacktestingAnalyzer:
         contours = ax.contour(X, Y, Z, zdir='z', offset=np.min(Z)-2, cmap='viridis', alpha=0.6)
         
         ax.set_title('3D Parameter Optimization Surface', fontsize=16, fontweight='bold')
+        fig.suptitle('Data Source: REAL Backtesting Data - Actual superduper_alerts_sent Files', fontsize=12, y=0.02, color='darkgreen', weight='bold')
         ax.set_xlabel('Timeframe (minutes)', fontsize=12)
         ax.set_ylabel('Green Threshold', fontsize=12)
         ax.set_zlabel('Superduper Alerts Sent', fontsize=12)
@@ -478,10 +451,10 @@ CHARTS GENERATED:
         print(f"Charts saved with timestamp: {self.chart_timestamp}")
         
     def validate_data_source(self):
-        """Validate that we're using real data, not synthetic."""
+        """Validate that we have real data - no synthetic option exists."""
         if not self.results_data:
-            print("⚠️  WARNING: No real backtesting data found!")
-            print("⚠️  Charts will show synthetic/fallback data only")
+            print("❌ FATAL ERROR: No real backtesting data found!")
+            print("❌ CHARTS CANNOT BE GENERATED: Only real data is permitted")
             self.using_real_data = False
             return False
         else:
@@ -504,15 +477,13 @@ CHARTS GENERATED:
         # Create parameter analysis data
         self.create_parameter_combinations()
         
-        # Final validation
-        if self.param_data is not None and len(self.param_data) > 0:
+        # Final validation - only real data is allowed
+        if self.param_data is not None and len(self.param_data) > 0 and self.using_real_data:
             print(f"✅ VALIDATION: Chart data ready - {len(self.param_data)} data points")
-            if self.using_real_data:
-                print("✅ VALIDATION: Charts will show REAL backtesting results")
-            else:
-                print("⚠️  VALIDATION: Charts will show SYNTHETIC data (fallback)")
+            print("✅ VALIDATION: Charts will show REAL backtesting results ONLY")
         else:
-            print("❌ VALIDATION FAILED: No data available for charts")
+            print("❌ VALIDATION FAILED: No real data available for charts")
+            print("❌ CHARTS WILL NOT BE GENERATED: Only real data is permitted")
             return
         
         # Generate all charts
@@ -526,12 +497,7 @@ CHARTS GENERATED:
         self.create_optimization_summary()
         
         print("\n🎉 Analysis complete! Check the runs/ directory for generated charts.")
-        
-        # Final reminder about data source
-        if self.using_real_data:
-            print("✅ Charts generated from REAL backtesting data")
-        else:
-            print("⚠️  Charts generated from SYNTHETIC data - run actual backtests first!")
+        print("✅ ALL CHARTS GENERATED FROM REAL BACKTESTING DATA ONLY")
 
 
 def main():

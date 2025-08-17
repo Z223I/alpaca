@@ -140,6 +140,7 @@ def create_summary_charts(run_results):
         
         bars = plt.bar(symbols, alert_counts, color='steelblue', alpha=0.8)
         plt.title('Superduper Alerts by Symbol', fontsize=16, fontweight='bold')
+        plt.suptitle('Data Source: REAL Backtesting Data - Actual superduper_alerts_sent Files', fontsize=12, y=0.02, color='darkgreen', weight='bold')
         plt.xlabel('Symbol', fontsize=12)
         plt.ylabel('Number of Alerts', fontsize=12)
         plt.xticks(rotation=45)
@@ -165,6 +166,7 @@ def create_summary_charts(run_results):
         
         plt.pie(alert_counts, labels=symbols, autopct='%1.1f%%', startangle=90)
         plt.title('Distribution of Superduper Alerts by Symbol', fontsize=16, fontweight='bold')
+        plt.suptitle('Data Source: REAL Backtesting Data - Actual superduper_alerts_sent Files', fontsize=12, y=0.02, color='darkgreen', weight='bold')
         
         filename = f"runs/summary_alerts_by_symbol_pie_{timestamp}.png"
         plt.savefig(filename, dpi=300, bbox_inches='tight')
