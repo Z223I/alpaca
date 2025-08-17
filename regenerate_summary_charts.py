@@ -72,40 +72,44 @@ def collect_run_data():
     run_results = []
     runs_dir = Path("runs")
     
-    # Scan for run directories
-    for symbol_dir in runs_dir.glob("*"):
-        if not symbol_dir.is_dir() or symbol_dir.name.startswith("analysis") or symbol_dir.name.startswith("summary"):
+    # Scan nested directory structure: runs/{date}/{symbol}/run_*  
+    for date_dir in runs_dir.glob("2025-*"):  # Date directories
+        if not date_dir.is_dir():
             continue
             
-        for run_dir in symbol_dir.glob("run_*"):
-            if not run_dir.is_dir():
+        for symbol_dir in date_dir.glob("*"):  # Symbol directories  
+            if not symbol_dir.is_dir():
                 continue
                 
-            run_name = run_dir.name
-            print(f"📊 Analyzing {symbol_dir.name}/{run_name}...")
-            
-            # Extract parameters
-            params = extract_parameters_from_run_name(run_name)
-            if not params:
-                print(f"   ⚠️ Could not extract parameters from {run_name}")
-                continue
-            
-            # Analyze results
-            try:
-                results = analyze_run_results(run_dir)
-                results.update({
-                    'date': params['date'],
-                    'timeframe': params['timeframe'],
-                    'threshold': params['threshold'],
-                    'symbol': symbol_dir.name,
-                    'run_dir': str(run_dir)
-                })
-                run_results.append(results)
-                print(f"   ✅ Found {results['superduper_alerts']} alerts, {results['trades']} trades")
+            for run_dir in symbol_dir.glob("run_*"):  # Individual runs
+                if not run_dir.is_dir():
+                    continue
+                    
+                run_name = run_dir.name
+                print(f"📊 Analyzing {date_dir.name}/{symbol_dir.name}/{run_name}...")
                 
-            except Exception as e:
-                print(f"   ⚠️ Error analyzing {run_name}: {e}")
-                continue
+                # Extract parameters
+                params = extract_parameters_from_run_name(run_name)
+                if not params:
+                    print(f"   ⚠️ Could not extract parameters from {run_name}")
+                    continue
+                
+                # Analyze results
+                try:
+                    results = analyze_run_results(run_dir)
+                    results.update({
+                        'date': params['date'],
+                        'timeframe': params['timeframe'],
+                        'threshold': params['threshold'],
+                        'symbol': symbol_dir.name,
+                        'run_dir': str(run_dir)
+                    })
+                    run_results.append(results)
+                    print(f"   ✅ Found {results['superduper_alerts']} alerts, {results['trades']} trades")
+                    
+                except Exception as e:
+                    print(f"   ⚠️ Error analyzing {run_name}: {e}")
+                    continue
     
     return run_results
 

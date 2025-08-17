@@ -103,53 +103,7 @@ class BacktestingAnalyzer:
             print("❌ No runs directory found")
             return
             
-        # Scan both old and new directory structures
-        # OLD structure: runs/{symbol}/run_*
-        for symbol_dir in runs_dir.glob("*"):
-            if not symbol_dir.is_dir() or symbol_dir.name.startswith("analysis") or symbol_dir.name.startswith("summary"):
-                continue
-                
-            for run_dir in symbol_dir.glob("run_*"):  # Individual runs
-                if not run_dir.is_dir():
-                    continue
-                    
-                run_name = run_dir.name
-                print(f"📊 Analyzing {symbol_dir.name}/{run_name}...")
-                
-                # Extract parameters from run directory name
-                params = self.extract_parameters_from_run_name(run_name)
-                if not params:
-                    print(f"   ⚠️ Could not extract parameters from {run_name}")
-                    continue
-                
-                # Read actual alert results
-                try:
-                    results = self.read_simulation_results(run_dir)
-                    
-                    # Add the results with extracted parameters
-                    run_data = {
-                        'run_id': run_name,
-                        'symbol': symbol_dir.name,
-                        'date': params['date'],
-                        'timeframe': params['timeframe'],
-                        'threshold': params['threshold'],
-                        'uuid': params['uuid'],
-                        'total_alerts': results['total_alerts'],
-                        'alerts_generated': results['alerts_generated'],
-                        'symbol_results': results['symbol_results'],
-                        'alerts_by_symbol': results['alerts_by_symbol'],
-                        'superduper_alerts_sent': results['total_alerts'],  # Use actual alert count
-                        'parameter_combo': f"{params['timeframe']}min_{params['threshold']:.2f}th"
-                    }
-                    
-                    self.results_data.append(run_data)
-                    print(f"   ✅ Found {results['total_alerts']} total alerts generated")
-                    
-                except Exception as e:
-                    print(f"   ⚠️ Error analyzing {run_name}: {e}")
-                    continue
-        
-        # NEW structure: runs/{date}/{symbol}/run_*  
+        # Scan nested directory structure: runs/{date}/{symbol}/run_*  
         for date_dir in runs_dir.glob("2025-*"):  # Date directories
             if not date_dir.is_dir():
                 continue
