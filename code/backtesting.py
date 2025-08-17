@@ -278,7 +278,7 @@ class BacktestingSystem:
         self.logger.info(f"Created filtered symbols file: {target_csv} (1 symbol: {symbol})")
         return target_csv
 
-    def _run_orb_pipeline(self, date: str, symbols_file: Path) -> bool:
+    def _run_orb_pipeline(self, date: str, symbols_file: Path, symbol: str) -> bool:
         """Execute the ORB pipeline with concurrent processes using file watchers"""
         # Define all processes that should run concurrently
         # Testing with live superduper alerts to test trade processor directly
@@ -308,8 +308,8 @@ class BacktestingSystem:
             },
             {
                 'name': 'super_alert_copier',
-                'cmd': f"python3 code/copy_super_alerts.py {date} ./runs/current",
-                'primary': False  # Copies existing VERB super alerts at 1 per 3 seconds
+                'cmd': f"python3 code/copy_super_alerts.py {date} ./runs/current {symbol}",
+                'primary': False  # Copies existing super alerts for the current symbol at 1 per 3 seconds
             }
         ]
 
@@ -639,7 +639,7 @@ class BacktestingSystem:
                             symbols_file = self._prepare_symbols_file(date, symbol)
 
                             # Run ORB pipeline (writes to ./runs/current)
-                            success = self._run_orb_pipeline(date, symbols_file)
+                            success = self._run_orb_pipeline(date, symbols_file, symbol)
 
                             if success:
                                 # Generate plots for this symbol
