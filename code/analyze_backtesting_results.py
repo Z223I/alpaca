@@ -60,26 +60,39 @@ class BacktestingAnalyzer:
         return None
     
     def read_simulation_results(self, run_dir):
-        """Read simulation results from logs directory."""
-        logs_dir = run_dir / "logs"
+        """Read ACTUAL alert results from superduper_alerts_sent directory (not simulation logs)."""
         
-        if not logs_dir.exists():
-            return {'total_alerts': 0, 'alerts_generated': 0, 'symbol_results': []}
-            
-        for date_dir in logs_dir.glob("2025-*"):
-            for results_file in date_dir.glob("simulation_results_*.json"):
+        # Count actual alerts that were sent (like backtesting system does)
+        total_alerts = 0
+        alerts_by_symbol = {}
+        
+        # Look for superduper_alerts_sent files in historical_data
+        historical_data_dir = run_dir / "historical_data"
+        if historical_data_dir.exists():
+            for alert_file in historical_data_dir.rglob("**/superduper_alerts_sent/**/*.json"):
                 try:
-                    with open(results_file, 'r') as f:
-                        data = json.load(f)
-                        return {
-                            'total_alerts': data.get('total_alerts', 0),
-                            'alerts_generated': len(data.get('generated_alerts', [])),
-                            'symbol_results': data.get('symbol_results', [])
-                        }
+                    with open(alert_file, 'r') as f:
+                        alert_data = json.load(f)
+                        if isinstance(alert_data, list):
+                            total_alerts += len(alert_data)
+                            # Track by symbol for each alert in list
+                            for alert in alert_data:
+                                symbol = alert.get('symbol', 'UNKNOWN')
+                                alerts_by_symbol[symbol] = alerts_by_symbol.get(symbol, 0) + 1
+                        else:
+                            total_alerts += 1
+                            # Track by symbol for single alert
+                            symbol = alert_data.get('symbol', 'UNKNOWN')
+                            alerts_by_symbol[symbol] = alerts_by_symbol.get(symbol, 0) + 1
                 except Exception as e:
-                    print(f"   ⚠️ Error reading {results_file}: {e}")
-                    
-        return {'total_alerts': 0, 'alerts_generated': 0, 'symbol_results': []}
+                    print(f"   ⚠️ Error reading {alert_file}: {e}")
+        
+        return {
+            'total_alerts': total_alerts,
+            'alerts_generated': total_alerts,  # Use actual count  
+            'symbol_results': [],  # Not needed
+            'alerts_by_symbol': alerts_by_symbol
+        }
 
     def collect_run_data(self):
         """Collect data from all completed backtesting runs."""
@@ -90,7 +103,53 @@ class BacktestingAnalyzer:
             print("❌ No runs directory found")
             return
             
-        # Scan new nested structure: runs/{date}/{symbol}/run_*
+        # Scan both old and new directory structures
+        # OLD structure: runs/{symbol}/run_*
+        for symbol_dir in runs_dir.glob("*"):
+            if not symbol_dir.is_dir() or symbol_dir.name.startswith("analysis") or symbol_dir.name.startswith("summary"):
+                continue
+                
+            for run_dir in symbol_dir.glob("run_*"):  # Individual runs
+                if not run_dir.is_dir():
+                    continue
+                    
+                run_name = run_dir.name
+                print(f"📊 Analyzing {symbol_dir.name}/{run_name}...")
+                
+                # Extract parameters from run directory name
+                params = self.extract_parameters_from_run_name(run_name)
+                if not params:
+                    print(f"   ⚠️ Could not extract parameters from {run_name}")
+                    continue
+                
+                # Read actual alert results
+                try:
+                    results = self.read_simulation_results(run_dir)
+                    
+                    # Add the results with extracted parameters
+                    run_data = {
+                        'run_id': run_name,
+                        'symbol': symbol_dir.name,
+                        'date': params['date'],
+                        'timeframe': params['timeframe'],
+                        'threshold': params['threshold'],
+                        'uuid': params['uuid'],
+                        'total_alerts': results['total_alerts'],
+                        'alerts_generated': results['alerts_generated'],
+                        'symbol_results': results['symbol_results'],
+                        'alerts_by_symbol': results['alerts_by_symbol'],
+                        'superduper_alerts_sent': results['total_alerts'],  # Use actual alert count
+                        'parameter_combo': f"{params['timeframe']}min_{params['threshold']:.2f}th"
+                    }
+                    
+                    self.results_data.append(run_data)
+                    print(f"   ✅ Found {results['total_alerts']} total alerts generated")
+                    
+                except Exception as e:
+                    print(f"   ⚠️ Error analyzing {run_name}: {e}")
+                    continue
+        
+        # NEW structure: runs/{date}/{symbol}/run_*  
         for date_dir in runs_dir.glob("2025-*"):  # Date directories
             if not date_dir.is_dir():
                 continue
@@ -127,7 +186,8 @@ class BacktestingAnalyzer:
                             'total_alerts': results['total_alerts'],
                             'alerts_generated': results['alerts_generated'],
                             'symbol_results': results['symbol_results'],
-                            'superduper_alerts_sent': results['total_alerts'],  # Use total_alerts for compatibility
+                            'alerts_by_symbol': results['alerts_by_symbol'],
+                            'superduper_alerts_sent': results['total_alerts'],  # Use actual alert count
                             'parameter_combo': f"{params['timeframe']}min_{params['threshold']:.2f}th"
                         }
                         
@@ -247,6 +307,8 @@ class BacktestingAnalyzer:
         
         for threshold in sorted(self.param_data['threshold'].unique()):
             threshold_data = self.param_data[self.param_data['threshold'] == threshold]
+            # Sort by timeframe for smooth lines
+            threshold_data = threshold_data.sort_values('timeframe')
             plt.plot(threshold_data['timeframe'], threshold_data['superduper_alerts_sent'], 
                     marker='o', linewidth=2, label=f'Threshold {threshold:.2f}')
         
@@ -270,6 +332,8 @@ class BacktestingAnalyzer:
         
         for timeframe in sorted(self.param_data['timeframe'].unique()):
             timeframe_data = self.param_data[self.param_data['timeframe'] == timeframe]
+            # Sort by threshold for smooth lines
+            timeframe_data = timeframe_data.sort_values('threshold')
             plt.plot(timeframe_data['threshold'], timeframe_data['superduper_alerts_sent'], 
                     marker='s', linewidth=2, label=f'{timeframe} min')
         
