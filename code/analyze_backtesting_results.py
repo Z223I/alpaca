@@ -22,6 +22,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
+import re
 from pathlib import Path
 from datetime import datetime
 from mpl_toolkits.mplot3d import Axes3D
@@ -37,8 +38,49 @@ class BacktestingAnalyzer:
     
     def __init__(self):
         self.results_data = []
+        self.param_data = None
         self.chart_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.using_real_data = False
         
+    def extract_parameters_from_run_name(self, run_name):
+        """Extract timeframe and threshold from run directory name.
+        
+        Example: run_2025-08-04_tf10_th0.65_e101f2f1
+        Returns: {'timeframe': 10, 'threshold': 0.65, 'date': '2025-08-04'}
+        """
+        pattern = r'run_(\d{4}-\d{2}-\d{2})_tf(\d+)_th([\d.]+)_([a-f0-9]+)'
+        match = re.match(pattern, run_name)
+        if match:
+            return {
+                'date': match.group(1),
+                'timeframe': int(match.group(2)),
+                'threshold': float(match.group(3)),
+                'uuid': match.group(4)
+            }
+        return None
+    
+    def read_simulation_results(self, run_dir):
+        """Read simulation results from logs directory."""
+        logs_dir = run_dir / "logs"
+        
+        if not logs_dir.exists():
+            return {'total_alerts': 0, 'alerts_generated': 0, 'symbol_results': []}
+            
+        for date_dir in logs_dir.glob("2025-*"):
+            for results_file in date_dir.glob("simulation_results_*.json"):
+                try:
+                    with open(results_file, 'r') as f:
+                        data = json.load(f)
+                        return {
+                            'total_alerts': data.get('total_alerts', 0),
+                            'alerts_generated': len(data.get('generated_alerts', [])),
+                            'symbol_results': data.get('symbol_results', [])
+                        }
+                except Exception as e:
+                    print(f"   ⚠️ Error reading {results_file}: {e}")
+                    
+        return {'total_alerts': 0, 'alerts_generated': 0, 'symbol_results': []}
+
     def collect_run_data(self):
         """Collect data from all completed backtesting runs."""
         print("🔍 Analyzing backtesting runs...")
@@ -48,83 +90,117 @@ class BacktestingAnalyzer:
             print("❌ No runs directory found")
             return
             
-        # Create a backtesting instance for analysis
-        bs = BacktestingSystem()
-        
-        for run_dir in runs_dir.glob("run_*"):
-            if not run_dir.is_dir():
+        # Scan new nested structure: runs/{date}/{symbol}/run_*
+        for date_dir in runs_dir.glob("2025-*"):  # Date directories
+            if not date_dir.is_dir():
                 continue
                 
-            # Extract date from run directory name
-            run_name = run_dir.name
-            if not run_name.startswith("run_2025-08-04_"):
-                continue
-                
-            print(f"📊 Analyzing {run_name}...")
-            
-            # Analyze this run
-            try:
-                results = bs._analyze_run_results(run_dir)
-                
-                # Try to extract parameters from run logs or use defaults
-                # For now, we'll need to map runs to parameters based on timing
-                # This is a simplified approach - in production you'd store params with each run
-                
-                # Add the results with default parameters (will be enhanced later)
-                run_data = {
-                    'run_id': run_name,
-                    'superduper_alerts_sent': results['superduper_alerts'],
-                    'trades': results['trades'],
-                    'alerts_by_symbol': results['alerts_by_symbol'],
-                    'timeframe': 30,  # Default for now
-                    'threshold': 0.65,  # Default for now  
-                    'date': '2025-08-04'
-                }
-                
-                self.results_data.append(run_data)
-                print(f"   ✅ Found {results['superduper_alerts']} superduper alerts sent")
-                
-            except Exception as e:
-                print(f"   ⚠️ Error analyzing {run_name}: {e}")
-                continue
+            for symbol_dir in date_dir.glob("*"):  # Symbol directories  
+                if not symbol_dir.is_dir():
+                    continue
+                    
+                for run_dir in symbol_dir.glob("run_*"):  # Individual runs
+                    if not run_dir.is_dir():
+                        continue
+                        
+                    run_name = run_dir.name
+                    print(f"📊 Analyzing {date_dir.name}/{symbol_dir.name}/{run_name}...")
+                    
+                    # Extract parameters from run directory name
+                    params = self.extract_parameters_from_run_name(run_name)
+                    if not params:
+                        print(f"   ⚠️ Could not extract parameters from {run_name}")
+                        continue
+                    
+                    # Read actual simulation results
+                    try:
+                        results = self.read_simulation_results(run_dir)
+                        
+                        # Add the results with extracted parameters
+                        run_data = {
+                            'run_id': run_name,
+                            'symbol': symbol_dir.name,
+                            'date': params['date'],
+                            'timeframe': params['timeframe'],
+                            'threshold': params['threshold'],
+                            'uuid': params['uuid'],
+                            'total_alerts': results['total_alerts'],
+                            'alerts_generated': results['alerts_generated'],
+                            'symbol_results': results['symbol_results'],
+                            'superduper_alerts_sent': results['total_alerts'],  # Use total_alerts for compatibility
+                            'parameter_combo': f"{params['timeframe']}min_{params['threshold']:.2f}th"
+                        }
+                        
+                        self.results_data.append(run_data)
+                        print(f"   ✅ Found {results['total_alerts']} total alerts generated")
+                        
+                    except Exception as e:
+                        print(f"   ⚠️ Error analyzing {run_name}: {e}")
+                        continue
         
         print(f"📈 Collected data from {len(self.results_data)} runs")
         
+        if len(self.results_data) == 0:
+            print("❌ No valid run data found - cannot create charts from real data")
+        else:
+            print("✅ Using REAL backtesting data (not synthetic)")
+        
     def create_parameter_combinations(self):
-        """Create synthetic data based on parameters.json for demonstration."""
-        print("🎯 Creating parameter combination analysis...")
+        """Convert real run data to parameter analysis format."""
+        print("🎯 Creating parameter combination analysis from REAL data...")
+        
+        if not self.results_data:
+            print("❌ No real results data found - cannot create parameter analysis")
+            print("⚠️  Falling back to synthetic data generation for demonstration")
+            self._create_synthetic_fallback()
+            return
+        
+        # Convert real results data to DataFrame
+        real_data = []
+        
+        for run_data in self.results_data:
+            real_data.append({
+                'timeframe': run_data['timeframe'],
+                'threshold': run_data['threshold'],
+                'superduper_alerts_sent': run_data['total_alerts'],
+                'parameter_combo': run_data['parameter_combo'],
+                'symbol': run_data['symbol'],
+                'date': run_data['date'],
+                'run_id': run_data['run_id']
+            })
+        
+        self.param_data = pd.DataFrame(real_data)
+        print(f"✅ Using REAL data from {len(real_data)} backtesting runs")
+        print(f"📊 Parameter combinations: {len(self.param_data.groupby(['timeframe', 'threshold']))} unique")
+        
+        # Show alert count summary
+        total_alerts = self.param_data['superduper_alerts_sent'].sum()
+        max_alerts = self.param_data['superduper_alerts_sent'].max()
+        print(f"📊 Alert summary: {total_alerts} total, {max_alerts} max per run")
+        
+    def _create_synthetic_fallback(self):
+        """Create synthetic data as fallback when no real data is available."""
+        print("⚠️  GENERATING SYNTHETIC DATA - This should only be used for testing!")
         
         # Load parameters
-        with open("data/backtesting/parameters.json", 'r') as f:
-            params = json.load(f)
-            
-        timeframes = params['trend_analysis_timeframe_minutes']
-        thresholds = params['green_threshold']
+        try:
+            with open("data/backtesting/parameters.json", 'r') as f:
+                params = json.load(f)
+                
+            timeframes = params['trend_analysis_timeframe_minutes']
+            thresholds = params['green_threshold']
+        except FileNotFoundError:
+            print("⚠️  parameters.json not found, using defaults")
+            timeframes = [10, 15, 20, 25, 30]
+            thresholds = [0.6, 0.65, 0.7, 0.75]
         
-        # Create synthetic results based on realistic patterns
-        # In practice, this would come from actual run data with stored parameters
+        # Create synthetic results
         synthetic_data = []
         
         for timeframe in timeframes:
             for threshold in thresholds:
-                # Simulate realistic alert patterns:
-                # - Higher thresholds = fewer alerts (more selective)
-                # - Different timeframes affect alert timing/count
-                base_alerts = 20
-                
-                # Threshold effect: higher threshold = fewer alerts
-                threshold_factor = max(0.1, 1.5 - threshold)
-                
-                # Timeframe effect: moderate timeframes perform better
-                if timeframe in [20, 25, 30]:
-                    timeframe_factor = 1.2
-                else:
-                    timeframe_factor = 0.8
-                    
-                # Add some randomness for realism
-                noise = np.random.normal(0, 2)
-                
-                alerts_sent = max(0, int(base_alerts * threshold_factor * timeframe_factor + noise))
+                # All synthetic data shows 0 alerts to match actual results
+                alerts_sent = 0  # Match actual simulation results
                 
                 synthetic_data.append({
                     'timeframe': timeframe,
@@ -134,11 +210,18 @@ class BacktestingAnalyzer:
                 })
         
         self.param_data = pd.DataFrame(synthetic_data)
-        print(f"📊 Generated {len(synthetic_data)} parameter combinations")
+        print(f"🤖 Generated {len(synthetic_data)} synthetic parameter combinations (all showing 0 alerts)")
         
     def create_heatmap(self):
         """Create heatmap showing alerts by timeframe vs threshold."""
         print("🎨 Creating parameter heatmap...")
+        
+        if self.param_data is None or len(self.param_data) == 0:
+            print("❌ No parameter data available - cannot create heatmap")
+            return
+            
+        # Add data source indicator to title
+        data_source = "REAL Backtesting Data" if self.results_data else "SYNTHETIC Data (Fallback)"
         
         # Pivot data for heatmap
         heatmap_data = self.param_data.pivot(index='threshold', columns='timeframe', values='superduper_alerts_sent')
@@ -146,7 +229,7 @@ class BacktestingAnalyzer:
         plt.figure(figsize=(12, 8))
         sns.heatmap(heatmap_data, annot=True, fmt='d', cmap='YlOrRd', 
                    cbar_kws={'label': 'Superduper Alerts Sent'})
-        plt.title('Superduper Alerts by Timeframe and Threshold', fontsize=16, fontweight='bold')
+        plt.title(f'Superduper Alerts by Timeframe and Threshold\n({data_source})', fontsize=16, fontweight='bold')
         plt.xlabel('Timeframe (minutes)', fontsize=12)
         plt.ylabel('Green Threshold', fontsize=12)
         plt.tight_layout()
@@ -330,6 +413,20 @@ CHARTS GENERATED:
         print(f"Best performance: {best_combo['superduper_alerts_sent']} alerts sent")
         print(f"Charts saved with timestamp: {self.chart_timestamp}")
         
+    def validate_data_source(self):
+        """Validate that we're using real data, not synthetic."""
+        if not self.results_data:
+            print("⚠️  WARNING: No real backtesting data found!")
+            print("⚠️  Charts will show synthetic/fallback data only")
+            self.using_real_data = False
+            return False
+        else:
+            print(f"✅ VALIDATION: Using real data from {len(self.results_data)} actual runs")
+            print(f"✅ VALIDATION: Data sources - {set(run['symbol'] for run in self.results_data)}")
+            print(f"✅ VALIDATION: Date range - {set(run['date'] for run in self.results_data)}")
+            self.using_real_data = True
+            return True
+    
     def run_analysis(self):
         """Run complete backtesting analysis and generate all charts."""
         print("🚀 Starting backtesting parameter analysis...")
@@ -337,8 +434,22 @@ CHARTS GENERATED:
         # Collect actual run data (if available)
         self.collect_run_data()
         
+        # Validate data source
+        self.validate_data_source()
+        
         # Create parameter analysis data
         self.create_parameter_combinations()
+        
+        # Final validation
+        if self.param_data is not None and len(self.param_data) > 0:
+            print(f"✅ VALIDATION: Chart data ready - {len(self.param_data)} data points")
+            if self.using_real_data:
+                print("✅ VALIDATION: Charts will show REAL backtesting results")
+            else:
+                print("⚠️  VALIDATION: Charts will show SYNTHETIC data (fallback)")
+        else:
+            print("❌ VALIDATION FAILED: No data available for charts")
+            return
         
         # Generate all charts
         self.create_heatmap()
@@ -351,6 +462,12 @@ CHARTS GENERATED:
         self.create_optimization_summary()
         
         print("\n🎉 Analysis complete! Check the runs/ directory for generated charts.")
+        
+        # Final reminder about data source
+        if self.using_real_data:
+            print("✅ Charts generated from REAL backtesting data")
+        else:
+            print("⚠️  Charts generated from SYNTHETIC data - run actual backtests first!")
 
 
 def main():
