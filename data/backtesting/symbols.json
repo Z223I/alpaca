@@ -13,17 +13,17 @@
     {
       "symbol": "STAI",
       "date": "2025-07-29",
-      "active": "no"
+      "active": "yes"
     },
     {
       "symbol": "BTAI",
       "date": "2025-08-04",
-      "active": "no"
+      "active": "yes"
     },
     {
       "symbol": "VERB",
       "date": "2025-08-04",
-      "active": "yes"
+      "active": "no"
     }
   ]
 }

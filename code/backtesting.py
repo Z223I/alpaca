@@ -640,6 +640,7 @@ class BacktestingSystem:
                         for symbol in symbols:  # Process each symbol separately
                             current_run += 1
 
+
                             self.logger.info(f"🏃 Run {current_run} of {total_runs} - Processing: timeframe={timeframe}, threshold={threshold}, date={date}, symbol={symbol}")
 
                             # Get target directory name for this run

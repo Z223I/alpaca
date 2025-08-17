@@ -183,14 +183,24 @@ class BacktestingAnalyzer:
                 'run_id': run_data['run_id']
             })
         
-        self.param_data = pd.DataFrame(real_data)
+        df = pd.DataFrame(real_data)
+        
+        # Aggregate data by parameter combination (sum alerts across all symbols/dates)
+        self.param_data = df.groupby(['timeframe', 'threshold']).agg({
+            'superduper_alerts_sent': 'sum',
+            'parameter_combo': 'first',  # Take first since they're all the same for a combination
+            'symbol': lambda x: ','.join(sorted(set(x))),  # List all symbols tested
+            'date': lambda x: ','.join(sorted(set(x))),    # List all dates tested
+            'run_id': 'count'  # Count how many runs per combination
+        }).rename(columns={'run_id': 'total_runs'}).reset_index()
+        
         print(f"✅ Using REAL data from {len(real_data)} backtesting runs")
-        print(f"📊 Parameter combinations: {len(self.param_data.groupby(['timeframe', 'threshold']))} unique")
+        print(f"📊 Parameter combinations: {len(self.param_data)} unique (aggregated across symbols)")
         
         # Show alert count summary
         total_alerts = self.param_data['superduper_alerts_sent'].sum()
         max_alerts = self.param_data['superduper_alerts_sent'].max()
-        print(f"📊 Alert summary: {total_alerts} total, {max_alerts} max per run")
+        print(f"📊 Alert summary: {total_alerts} total, {max_alerts} max per combination")
         
         
     def create_heatmap(self):
