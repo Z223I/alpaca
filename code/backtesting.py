@@ -97,7 +97,7 @@ class BacktestingSystem:
         return symbols_by_date
 
     def _send_run_notification(self, target_run_dir: Path, timeframe: int, threshold: float,
-                               date: str, symbols: List[str]):
+                               date: str, symbol: str):
         """Send Telegram notification at the start of each backtesting run"""
         if self.dry_run:
             self.logger.info(f"Would send Telegram notification for run: {target_run_dir}")
@@ -106,13 +106,12 @@ class BacktestingSystem:
         try:
             telegram_poster = TelegramPoster()
 
-            symbols_str = ", ".join(symbols)
             message = (f"🧪 **Backtesting Run Started**\n\n"
                        f"**Target Directory:** `{target_run_dir.name}`\n"
                        f"**Date:** {date}\n"
                        f"**Timeframe:** {timeframe} minutes\n"
                        f"**Green Threshold:** {threshold}\n"
-                       f"**Symbols:** {symbols_str} ({len(symbols)} total)\n\n"
+                       f"**Symbol:** {symbol}\n\n"
                        f"Running ORB pipeline simulation...")
 
             result = telegram_poster.send_message_to_user(message, "bruce", urgent=False)
@@ -205,10 +204,10 @@ class BacktestingSystem:
         
         self.logger.info(f"✅ Config updated: timeframe={timeframe}, threshold={threshold}")
 
-    def _get_target_run_directory(self, date: str, timeframe: int, threshold: float) -> Path:
+    def _get_target_run_directory(self, symbol: str, date: str, timeframe: int, threshold: float) -> Path:
         """Get target run directory name for this combination of parameters"""
         run_id = str(uuid.uuid4())[:8]  # Short UUID
-        return Path(f"runs/run_{date}_tf{timeframe}_th{threshold}_{run_id}")
+        return Path(f"runs/{symbol}/run_{date}_tf{timeframe}_th{threshold}_{run_id}")
     
     def _move_current_to_target(self, target_dir: Path) -> bool:
         """Move ./runs/current to target directory using bash mv command"""
@@ -223,6 +222,9 @@ class BacktestingSystem:
             return False
         
         try:
+            # Ensure parent directory exists
+            target_dir.parent.mkdir(parents=True, exist_ok=True)
+            
             # Use bash mv command to move the directory
             result = subprocess.run(
                 ["mv", str(current_dir), str(target_dir)],
@@ -242,8 +244,8 @@ class BacktestingSystem:
             self.logger.error(f"❌ Error moving directory: {e}")
             return False
 
-    def _prepare_symbols_file(self, date: str, symbols: List[str]) -> Path:
-        """Prepare symbols CSV file for the specific date and symbols in current run directory"""
+    def _prepare_symbols_file(self, date: str, symbol: str) -> Path:
+        """Prepare symbols CSV file for the specific date and single symbol in current run directory"""
         # Convert date format from YYYY-MM-DD to YYYYMMDD for CSV filename
         csv_date = date.replace('-', '')
         source_csv = Path(f"data/{csv_date}.csv")
@@ -255,25 +257,25 @@ class BacktestingSystem:
             return target_csv
 
         if self.dry_run:
-            self.logger.info(f"Would copy and filter {source_csv} to {target_csv}")
+            self.logger.info(f"Would copy and filter {source_csv} to {target_csv} for symbol {symbol}")
             return target_csv
 
         # Ensure target directory exists
         target_csv.parent.mkdir(parents=True, exist_ok=True)
 
-        # Read source CSV and filter by symbols
+        # Read source CSV and filter by single symbol
         df = pd.read_csv(source_csv)
         if 'Symbol' in df.columns:
-            filtered_df = df[df['Symbol'].isin(symbols)]
+            filtered_df = df[df['Symbol'] == symbol]
         elif 'symbol' in df.columns:
-            filtered_df = df[df['symbol'].isin(symbols)]
+            filtered_df = df[df['symbol'] == symbol]
         else:
             self.logger.warning(f"No Symbol/symbol column found in {source_csv}")
             filtered_df = df
 
         # Save filtered CSV
         filtered_df.to_csv(target_csv, index=False)
-        self.logger.info(f"Created filtered symbols file: {target_csv} ({len(filtered_df)} symbols)")
+        self.logger.info(f"Created filtered symbols file: {target_csv} (1 symbol: {symbol})")
         return target_csv
 
     def _run_orb_pipeline(self, date: str, symbols_file: Path) -> bool:
@@ -425,28 +427,29 @@ class BacktestingSystem:
 
             return False
 
-    def _generate_symbol_plots(self, date: str, symbols: List[str]) -> bool:
-        """Generate plots for each symbol"""
-        for symbol in symbols:
-            plot_cmd = f"python3 code/alpaca.py --plot --symbol {symbol} --date {date}"
+    def _generate_symbol_plots(self, date: str, symbol: str) -> bool:
+        """Generate plots for the symbol"""
+        plot_cmd = f"python3 code/alpaca.py --plot --symbol {symbol} --date {date}"
 
-            if self.dry_run:
-                self.logger.info(f"Would run: {plot_cmd}")
-                continue
+        if self.dry_run:
+            self.logger.info(f"Would run: {plot_cmd}")
+            return True
 
-            try:
-                result = subprocess.run(
-                    plot_cmd.split(),
-                    capture_output=True,
-                    text=True,
-                    timeout=300  # 5 minute timeout per plot
-                )
+        try:
+            result = subprocess.run(
+                plot_cmd.split(),
+                capture_output=True,
+                text=True,
+                timeout=300  # 5 minute timeout per plot
+            )
 
-                if result.returncode != 0:
-                    self.logger.warning(f"Plot generation failed for {symbol}: {result.stderr}")
+            if result.returncode != 0:
+                self.logger.warning(f"Plot generation failed for {symbol}: {result.stderr}")
+                return False
 
-            except Exception as e:
-                self.logger.warning(f"Plot error for {symbol}: {e}")
+        except Exception as e:
+            self.logger.warning(f"Plot error for {symbol}: {e}")
+            return False
 
         return True
 
@@ -505,19 +508,23 @@ class BacktestingSystem:
         if self.dry_run or not self.run_results:
             return
 
-        # Prepare data for charts
+        # Prepare data for charts - now scanning symbol subdirectories
         alerts_by_date = {}
         trades_by_date = {}
         alerts_by_symbol = {}
 
         for result in self.run_results:
             date = result['date']
+            symbol = result.get('symbol', 'UNKNOWN')
             alerts_by_date[date] = alerts_by_date.get(date, 0) + result['superduper_alerts']
             trades_by_date[date] = trades_by_date.get(date, 0) + result['trades']
             
-            # Aggregate symbol data across all runs
-            for symbol, count in result.get('alerts_by_symbol', {}).items():
-                alerts_by_symbol[symbol] = alerts_by_symbol.get(symbol, 0) + count
+            # Aggregate symbol data from individual symbol runs
+            alerts_by_symbol[symbol] = alerts_by_symbol.get(symbol, 0) + result['superduper_alerts']
+            
+            # Also include any detailed symbol breakdown from results
+            for sym, count in result.get('alerts_by_symbol', {}).items():
+                alerts_by_symbol[sym] = alerts_by_symbol.get(sym, 0) + count
 
         # Create runs directory if it doesn't exist
         runs_dir = Path("runs")
@@ -611,53 +618,54 @@ class BacktestingSystem:
             # Setup current run config at startup
             self._setup_current_run_config()
 
-            # Nested loops for parametric testing
+            # Nested loops for parametric testing - now with symbol isolation
             for timeframe in self.parameters['trend_analysis_timeframe_minutes']:
                 for threshold in self.parameters['green_threshold']:
                     for date, symbols in self.symbols_by_date.items():
+                        for symbol in symbols:  # Process each symbol separately
 
-                        self.logger.info(f"Processing: timeframe={timeframe}, threshold={threshold}, date={date}")
+                            self.logger.info(f"Processing: timeframe={timeframe}, threshold={threshold}, date={date}, symbol={symbol}")
 
-                        # Get target directory name for this run
-                        target_run_dir = self._get_target_run_directory(date, timeframe, threshold)
+                            # Get target directory name for this run
+                            target_run_dir = self._get_target_run_directory(symbol, date, timeframe, threshold)
 
-                        # Update config for this run (parameters only)
-                        self._update_config_for_run(timeframe, threshold)
+                            # Update config for this run (parameters only)
+                            self._update_config_for_run(timeframe, threshold)
 
-                        # Send run notification
-                        self._send_run_notification(target_run_dir, timeframe, threshold, date, symbols)
+                            # Send run notification
+                            self._send_run_notification(target_run_dir, timeframe, threshold, date, symbol)
 
-                        # Prepare symbols file in current directory
-                        symbols_file = self._prepare_symbols_file(date, symbols)
+                            # Prepare symbols file for single symbol in current directory
+                            symbols_file = self._prepare_symbols_file(date, symbol)
 
-                        # Run ORB pipeline (writes to ./runs/current)
-                        success = self._run_orb_pipeline(date, symbols_file)
+                            # Run ORB pipeline (writes to ./runs/current)
+                            success = self._run_orb_pipeline(date, symbols_file)
 
-                        if success:
-                            # Generate plots
-                            self._generate_symbol_plots(date, symbols)
+                            if success:
+                                # Generate plots for this symbol
+                                self._generate_symbol_plots(date, symbol)
 
-                            # Move current directory to target
-                            move_success = self._move_current_to_target(target_run_dir)
-                            
-                            if move_success:
-                                # Analyze results from moved directory
-                                results = self._analyze_run_results(target_run_dir)
-                                results.update({
-                                    'date': date,
-                                    'timeframe': timeframe,
-                                    'threshold': threshold,
-                                    'run_dir': str(target_run_dir),
-                                    'symbols': symbols
-                                })
-                                self.run_results.append(results)
+                                # Move current directory to target with symbol isolation
+                                move_success = self._move_current_to_target(target_run_dir)
+                                
+                                if move_success:
+                                    # Analyze results from moved directory
+                                    results = self._analyze_run_results(target_run_dir)
+                                    results.update({
+                                        'date': date,
+                                        'timeframe': timeframe,
+                                        'threshold': threshold,
+                                        'symbol': symbol,
+                                        'run_dir': str(target_run_dir)
+                                    })
+                                    self.run_results.append(results)
 
-                                self.logger.info(f"Run completed: {results['superduper_alerts']} alerts, "
-                                                 f"{results['trades']} trades")
+                                    self.logger.info(f"Run completed for {symbol}: {results['superduper_alerts']} alerts, "
+                                                     f"{results['trades']} trades")
+                                else:
+                                    self.logger.error(f"Failed to move run directory for {date}/{symbol}")
                             else:
-                                self.logger.error(f"Failed to move run directory for {date}")
-                        else:
-                            self.logger.error(f"Run failed for {date}")
+                                self.logger.error(f"Run failed for {date}/{symbol}")
 
             # Create summary reports
             self._create_summary_charts()
