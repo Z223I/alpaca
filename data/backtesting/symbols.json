@@ -16,11 +16,6 @@
       "active": "no"
     },
     {
-      "symbol": "OPEN",
-      "date": "2025-08-04",
-      "active": "yes"
-    },
-    {
       "symbol": "BTAI",
       "date": "2025-08-04",
       "active": "yes"
@@ -28,7 +23,7 @@
     {
       "symbol": "VERB",
       "date": "2025-08-04",
-      "active": "yes"
+      "active": "no"
     }
   ]
 }
