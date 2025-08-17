@@ -75,7 +75,13 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 Filter out stocks below two dollars.
 
 
+## Trades
 
+- [ ] Try to get trades into the analysis.
+
+## Plots
+
+- [ ] Send plots on Telegram.
 
 
 ## EOD

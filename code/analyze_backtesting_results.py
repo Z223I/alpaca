@@ -218,7 +218,7 @@ class BacktestingAnalyzer:
         heatmap_data = self.param_data.pivot(index='threshold', columns='timeframe', values='superduper_alerts_sent')
         
         plt.figure(figsize=(12, 8))
-        sns.heatmap(heatmap_data, annot=True, fmt='d', cmap='YlOrRd', 
+        sns.heatmap(heatmap_data, annot=True, fmt='.0f', cmap='YlOrRd', 
                    cbar_kws={'label': 'Superduper Alerts Sent'})
         plt.title('Superduper Alerts by Timeframe and Threshold', fontsize=16, fontweight='bold')
         plt.suptitle(f'Data Source: {data_source} - Actual superduper_alerts_sent Files', fontsize=12, y=0.02, color='darkgreen', weight='bold')
@@ -321,24 +321,35 @@ class BacktestingAnalyzer:
         timeframes = sorted(self.param_data['timeframe'].unique())
         thresholds = sorted(self.param_data['threshold'].unique())
         
+        # Check if we have enough data points for 3D surface plot
+        if len(timeframes) < 2 or len(thresholds) < 2:
+            print(f"   ⚠️ Insufficient data for 3D surface plot: {len(timeframes)} timeframes, {len(thresholds)} thresholds")
+            print(f"   ⚠️ Need at least 2x2 grid. Skipping 3D surface plot.")
+            return
+        
         X, Y = np.meshgrid(timeframes, thresholds)
         Z = np.zeros_like(X)
         
         for i, threshold in enumerate(thresholds):
             for j, timeframe in enumerate(timeframes):
-                alerts = self.param_data[
+                matching_data = self.param_data[
                     (self.param_data['timeframe'] == timeframe) & 
                     (self.param_data['threshold'] == threshold)
-                ]['superduper_alerts_sent'].iloc[0]
-                Z[i, j] = alerts
+                ]['superduper_alerts_sent']
+                
+                if len(matching_data) > 0:
+                    Z[i, j] = matching_data.iloc[0]
+                else:
+                    Z[i, j] = 0  # Use 0 for missing combinations
         
         fig = plt.figure(figsize=(14, 10))
         ax = fig.add_subplot(111, projection='3d')
         
         surface = ax.plot_surface(X, Y, Z, cmap='viridis', alpha=0.8, edgecolor='none')
         
-        # Add contour lines
-        contours = ax.contour(X, Y, Z, zdir='z', offset=np.min(Z)-2, cmap='viridis', alpha=0.6)
+        # Add contour lines only if we have sufficient data
+        if Z.shape[0] >= 2 and Z.shape[1] >= 2:
+            contours = ax.contour(X, Y, Z, zdir='z', offset=np.min(Z)-2, cmap='viridis', alpha=0.6)
         
         ax.set_title('3D Parameter Optimization Surface', fontsize=16, fontweight='bold')
         fig.suptitle('Data Source: REAL Backtesting Data - Actual superduper_alerts_sent Files', fontsize=12, y=0.02, color='darkgreen', weight='bold')

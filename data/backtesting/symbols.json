@@ -3,12 +3,12 @@
     {
       "symbol": "BSLK",
       "date": "2025-08-13",
-      "active": "no"
+      "active": "yes"
     },
     {
       "symbol": "ATNF",
       "date": "2025-08-12",
-      "active": "no"
+      "active": "yes"
     },
     {
       "symbol": "STAI",
@@ -23,7 +23,7 @@
     {
       "symbol": "VERB",
       "date": "2025-08-04",
-      "active": "no"
+      "active": "yes"
     }
   ]
 }
