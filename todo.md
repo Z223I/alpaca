@@ -83,24 +83,21 @@ Filter out stocks below two dollars.
 - [ ] Today's PNL - needs to be added to watchdog.
 - [ ] TEST: Close all positions at the end of the day.  Close all orders. Calculate PNL
 
-## Plots
-
-- [ ] Send plots on Telegram.
-
 
 
 
 PCA analysis on exit strategy
 
 
+## Plots
+
+- [X] Send plots on Telegram.
+
 ## Oops
 
 - [X] Shut off trades in the back testing. IT placed a bunch of orders during the middle of the night.  I was up and testing in the middle of the night.
 - [X] Review ./atoms/alerts. Find the code that executes trades using alpaca.py.
 - [X] Investigate why those trades happened. Use real time of day for executing trades.
-
-
-
 
 
 ## Plots
@@ -118,17 +115,15 @@ PCA analysis on exit strategy
 
 ### Spec File
 
-- [ ] VERY IMPORTANT. Think hard. Implement the instructions in specs/telegram-plots.md
-- [ ] Nudge
-- [ ] /commit
-
-Update molecules/telegram_polling.py: When it receives a trigger word, "plot", and then -plot -symbol <symbol>, extract the plot location    │
+- [X] VERY IMPORTANT. Think hard. Implement the instructions in specs/telegram-plots.md
+- [X] Nudge
+- [X] /commit
+- [X] Update molecules/telegram_polling.py: When it receives a trigger word, "plot", and then -plot -symbol <symbol>, extract the plot location    │
 │   from the output of the alpaca.py call. Here is an example "Chart generated successfully: plots/20250818/SNGX_chart.png". Then send the       │
 │   image to the user using atoms/telegram/send_image.py. This command can be used by any Telegram user.
-
-- [ ] Publish the branch
-- [ ] git switch master; merge current branch
-- [ ] Sync changes
+- [X] Publish the branch
+- [X] git switch master; merge current branch
+- [X] Sync changes
 
 
 ## Trades
