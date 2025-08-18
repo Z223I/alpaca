@@ -91,9 +91,12 @@ Filter out stocks below two dollars.
 
 
 PCA analysis on exit strategy
-Temporarily shut off the plots (candlesticks)
 
-Shut off trades in the back testing. IT placed a bunch of orders during the middle of the night.  I was up and testing in the middle of the night.
+
+## Oops
+
+- [X] Shut off trades in the back testing. IT placed a bunch of orders during the middle of the night.  I was up and testing in the middle of the night.
+- [ ] Review ./atoms/alerts. Find the code that executes trades using alpaca.py.
 Investigate why those trades happened. Use real time of day for executing trades.
 
 

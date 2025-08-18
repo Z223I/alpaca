@@ -1,0 +1,33 @@
+{
+  "symbol": "TEST",
+  "timestamp": "2025-08-18T15:55:32-0400",
+  "record_type": "trade_record",
+  "account_name": "Bruce",
+  "account_type": "paper",
+  "auto_amount": 1000,
+  "trailing_percent": 7.5,
+  "take_profit_percent": 15.0,
+  "trigger_alert": {
+    "symbol": "TEST",
+    "alert_message": "Sample alert with \ud83d\udfe2 green momentum"
+  },
+  "trade_parameters": {
+    "command_type": "buy_market_trailing_sell_take_profit_percent",
+    "quantity": 1000,
+    "trailing_percent": 7.5,
+    "take_profit_percent": 15.0,
+    "dry_run": true
+  },
+  "execution_status": {
+    "initiated": true,
+    "completed": true,
+    "success": "no",
+    "reason": "Market data unavailable (symbol may not exist or market closed)",
+    "execution_time": "2025-08-18T15:55:32.228623-04:00",
+    "results": "positions: No open positions\ncash: 88685.87\nNo current orders\n\ud83d\ude80 STEP 1: Executing market buy with trailing sell and take profit percent for TEST...\n",
+    "return_code": 1,
+    "stdout": "positions: No open positions\ncash: 88685.87\nNo current orders\n\ud83d\ude80 STEP 1: Executing market buy with trailing sell and take profit percent for TEST...\n",
+    "stderr": "Traceback (most recent call last):\n  File \"/home/wilsonb/dl/github.com/z223i/alpaca/code/alpaca.py\", line 2685, in <module>\n    retVal = execMain(sys.argv[1:])\n  File \"/home/wilsonb/dl/github.com/z223i/alpaca/code/alpaca.py\", line 2678, in execMain\n    exitValue = alpacaObj.Exec()\n  File \"/home/wilsonb/dl/github.com/z223i/alpaca/code/alpaca.py\", line 2557, in Exec\n    order_result = self._buy_market_trailing_sell_take_profit_percent(\n  File \"/home/wilsonb/dl/github.com/z223i/alpaca/code/alpaca.py\", line 386, in _buy_market_trailing_sell_take_profit_percent\n    buy_order = self._buy_market(symbol=symbol, amount=amount, submit_order=submit_order)\n  File \"/home/wilsonb/dl/github.com/z223i/alpaca/code/alpaca.py\", line 205, in _buy_market\n    market_price = get_latest_quote_avg(self.api, symbol, self.account_name, self.account)\n  File \"/home/wilsonb/dl/github.com/z223i/alpaca/atoms/api/get_latest_quote_avg.py\", line 18, in get_latest_quote_avg\n    quote = get_latest_quote(api_client, symbol, account_name, environment)\n  File \"/home/wilsonb/dl/github.com/z223i/alpaca/atoms/api/get_latest_quote.py\", line 18, in get_latest_quote\n    result = handle_alpaca_api_error(\n  File \"/home/wilsonb/dl/github.com/z223i/alpaca/atoms/api/api_error_handler.py\", line 72, in handle_alpaca_api_error\n    return func(*args, **kwargs)\n  File \"/home/wilsonb/miniconda3/envs/alpaca/lib/python3.10/site-packages/alpaca_trade_api/rest.py\", line 780, in get_latest_quote\n    resp = self.data_get(\n  File \"/home/wilsonb/miniconda3/envs/alpaca/lib/python3.10/site-packages/alpaca_trade_api/rest.py\", line 274, in data_get\n    return self._request(\n  File \"/home/wilsonb/miniconda3/envs/alpaca/lib/python3.10/site-packages/alpaca_trade_api/rest.py\", line 222, in _request\n    return self._one_request(method, url, opts, retry)\n  File \"/home/wilsonb/miniconda3/envs/alpaca/lib/python3.10/site-packages/alpaca_trade_api/rest.py\", line 248, in _one_request\n    raise_api_error(resp, http_error)\n  File \"/home/wilsonb/miniconda3/envs/alpaca/lib/python3.10/site-packages/alpaca_trade_api/rest.py\", line 83, in raise_api_error\n    raise APIError(error, http_error) from None\nalpaca_trade_api.rest.APIError: no quote found for TEST\n",
+    "dry_run_executed": false
+  }
+}

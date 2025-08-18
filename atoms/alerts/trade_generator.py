@@ -66,6 +66,48 @@ class TradeGenerator:
         self.trades_executed_count = 0
         self.logger.info(f"Trade counter reset: {old_count} → 0")
 
+    def is_market_hours(self) -> bool:
+        """
+        Check if current ET time is within market trading hours.
+        
+        Market hours: Monday-Friday 9:30 AM - 4:00 PM ET
+        
+        Returns:
+            True if within trading hours, False otherwise
+        """
+        try:
+            et_tz = pytz.timezone('US/Eastern')
+            current_et = datetime.now(et_tz)
+            
+            # Check if it's a weekday (Monday=0, Sunday=6)
+            if current_et.weekday() > 4:  # Saturday=5, Sunday=6
+                self.logger.info(f"Market closed: Weekend (day {current_et.weekday()})")
+                return False
+            
+            # Get current time as hour and minute
+            current_time = current_et.time()
+            
+            # Market open: 9:30 AM ET
+            market_open = current_et.replace(hour=9, minute=30, second=0, microsecond=0).time()
+            
+            # Market close: 4:00 PM ET
+            market_close = current_et.replace(hour=16, minute=0, second=0, microsecond=0).time()
+            
+            # Check if current time is within market hours
+            is_open = market_open <= current_time <= market_close
+            
+            if is_open:
+                self.logger.debug(f"Market is OPEN: {current_et.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+            else:
+                self.logger.info(f"Market is CLOSED: {current_et.strftime('%Y-%m-%d %H:%M:%S %Z')} (Hours: 9:30-16:00 ET)")
+                
+            return is_open
+            
+        except Exception as e:
+            self.logger.error(f"Error checking market hours: {e}")
+            # Fail safe: don't trade if we can't determine market hours
+            return False
+
     def extract_symbol_from_filename(self, filename: str) -> Optional[str]:
         """
         Extract stock symbol from superduper alert filename.
@@ -639,6 +681,12 @@ class TradeGenerator:
             if not self.has_green_momentum_indicator(superduper_alert):
                 symbol = superduper_alert.get('symbol', 'UNKNOWN')
                 self.logger.info(f"Skipping trade for {symbol} - no green momentum indicator")
+                return None
+
+            # Check market hours before executing trade
+            if not self.is_market_hours():
+                symbol = superduper_alert.get('symbol', 'UNKNOWN')
+                self.logger.info(f"🚫 Trade rejected for {symbol} - market is closed (outside trading hours)")
                 return None
 
             # Load account configuration

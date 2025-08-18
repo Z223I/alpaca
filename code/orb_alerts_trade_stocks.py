@@ -162,16 +162,20 @@ class ORBTradeStocksMonitor:
 
     def _validate_time_of_day_signal(self, superduper_alert_data: Dict) -> bool:
         """
-        Validate time of day signal from superduper alert data.
+        Validate both time of day emoji signal AND current ET market hours.
+        
+        Requires BOTH conditions:
+        1. Alert message contains green (🟢) or yellow (🟡) time signal
+        2. Current ET time is within market hours (M-F 9:30-16:00 ET)
         
         Args:
             superduper_alert_data: Superduper alert JSON data
             
         Returns:
-            True if time signal is green/yellow, False if red or missing
+            True if both emoji signal is green/yellow AND market is open, False otherwise
         """
         try:
-            # Extract alert message to look for time of day signal
+            # FIRST: Check emoji-based time signal from alert message
             alert_message = superduper_alert_data.get('alert_message', '')
             
             if not alert_message:
@@ -198,28 +202,56 @@ class ORBTradeStocksMonitor:
             
             # Check for red signal (🔴) which indicates CAUTION PERIOD
             if "🔴" in time_line:
-                self.logger.info(f"Time of day signal is RED (🔴) - rejecting trade")
+                self.logger.info(f"Time of day emoji signal is RED (🔴) - rejecting trade")
                 return False
             
             # Check for closed hours (⚫) which should also be rejected
             if "⚫" in time_line:
-                self.logger.info(f"Time of day signal is CLOSED HOURS (⚫) - rejecting trade")
+                self.logger.info(f"Time of day emoji signal is CLOSED HOURS (⚫) - rejecting trade")
                 return False
             
-            # Allow green (🟢) and yellow (🟡) signals
-            if "🟢" in time_line or "🟡" in time_line:
-                emoji = "🟢" if "🟢" in time_line else "🟡"
-                period = "MORNING POWER" if "MORNING POWER" in time_line else \
-                        "LUNCH HOUR" if "LUNCH HOUR" in time_line else "UNKNOWN"
-                self.logger.info(f"Time of day signal is {emoji} {period} - allowing trade")
+            # Require green (🟢) or yellow (🟡) signals
+            if not ("🟢" in time_line or "🟡" in time_line):
+                self.logger.info(f"Time of day emoji signal is not green/yellow - rejecting trade: {time_line}")
+                return False
+            
+            # Emoji signal is valid, log it
+            emoji = "🟢" if "🟢" in time_line else "🟡"
+            period = "MORNING POWER" if "MORNING POWER" in time_line else \
+                    "LUNCH HOUR" if "LUNCH HOUR" in time_line else "UNKNOWN"
+            self.logger.info(f"Time of day emoji signal is {emoji} {period} - checking actual market hours...")
+            
+            # SECOND: Check actual current ET market hours
+            et_tz = pytz.timezone('US/Eastern')
+            current_et = datetime.now(et_tz)
+            
+            # Check if it's a weekday (Monday=0, Sunday=6)
+            if current_et.weekday() > 4:  # Saturday=5, Sunday=6
+                self.logger.info(f"Market closed: Weekend (day {current_et.weekday()}) - rejecting trade despite good emoji signal")
+                return False
+            
+            # Get current time as hour and minute
+            current_time = current_et.time()
+            
+            # Market open: 9:30 AM ET
+            market_open = current_et.replace(hour=9, minute=30, second=0, microsecond=0).time()
+            
+            # Market close: 4:00 PM ET
+            market_close = current_et.replace(hour=16, minute=0, second=0, microsecond=0).time()
+            
+            # Check if current time is within market hours
+            is_open = market_open <= current_time <= market_close
+            
+            if is_open:
+                self.logger.info(f"✅ BOTH conditions met: Good emoji signal ({emoji}) AND market is OPEN ({current_et.strftime('%Y-%m-%d %H:%M:%S %Z')}) - allowing trade")
                 return True
-            
-            # If we get here, the signal format was unexpected
-            self.logger.warning(f"Unexpected time of day signal format: {time_line}")
-            return False
-            
+            else:
+                self.logger.info(f"❌ Market is CLOSED: {current_et.strftime('%Y-%m-%d %H:%M:%S %Z')} (Hours: 9:30-16:00 ET) - rejecting trade despite good emoji signal")
+                return False
+                
         except Exception as e:
             self.logger.error(f"Error validating time of day signal: {e}")
+            # Fail safe: don't trade if we can't determine both conditions
             return False
 
     def _get_telegram_user_for_account(self, account_name: str) -> Optional[str]:
@@ -260,7 +292,7 @@ class ORBTradeStocksMonitor:
             # Check time of day signal filtering before executing trade
             if not self._validate_time_of_day_signal(superduper_alert_data):
                 self.filtered_superduper_alerts.add(file_path)
-                self.logger.info(f"🔴 Trade rejected for {symbol}: Time of day signal is red or missing")
+                self.logger.info(f"🔴 Trade rejected for {symbol}: Market is closed (outside trading hours)")
                 return
 
             # Use TradeGenerator to create and execute trade
@@ -505,7 +537,7 @@ class ORBTradeStocksMonitor:
             print(f"📅 Target date: {self.target_date}")
             print(f"📁 Monitoring: {self.superduper_alerts_dir}")
             print(f"💾 Trade results: {self.trades_dir}")
-            print("✅ Filtering: Green momentum indicators (🟢) AND green/yellow time signals (🟢🟡) only")
+            print("✅ Filtering: Green momentum (🟢) AND green/yellow time signals (🟢🟡) AND actual market hours (M-F 9:30-16:00 ET)")
             if self.no_telegram:
                 print("📵 Telegram: Notifications disabled")
             else:
