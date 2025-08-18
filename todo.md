@@ -78,9 +78,9 @@ Filter out stocks below two dollars.
 ## EOD
 
 - [ ] No trades after 15:30 ET.
-- [HEY DO THIS] Close all positions
-- [DO THIS] Cancel all orders
-- [ ] Today's PNL - needs to be added to watchdog.
+- [X] Close all positions
+- [X] Cancel all orders
+- [X] Today's PNL - needs to be added to watchdog.
 - [ ] TEST: Close all positions at the end of the day.  Close all orders. Calculate PNL
 
 

@@ -2068,6 +2068,46 @@ Next Report: {"Top of hour" if current_minute >= 28 else "Bottom of hour"} ({("0
                     failed_positions.append(f"{symbol} ({shares:,} shares) - Error: {str(e)}")
                     print(f"    ✗ Error closing {symbol}: {str(e)}")
             
+            # Calculate daily PNL after position closures
+            pnl_section = ""
+            try:
+                print("📊 Calculating daily PNL...")
+                # Import and use the same credentials as the main API
+                if CONFIG_AVAILABLE:
+                    api_key, secret_key, base_url = get_api_credentials(self.account)
+                else:
+                    # Fallback to environment variables
+                    import os
+                    api_key = os.getenv('ALPACA_API_KEY')
+                    secret_key = os.getenv('ALPACA_SECRET_KEY')
+                    base_url = os.getenv('ALPACA_BASE_URL', 'https://paper-api.alpaca.markets')
+                
+                pnl_client = AlpacaDailyPnL(api_key, secret_key, base_url, self.account_name, self.account)
+                pnl_result = pnl_client.calculate_daily_pnl()
+                
+                if pnl_result:
+                    # Extract PNL information for Telegram message
+                    daily_pnl = pnl_result.get('daily_pnl', 0)
+                    daily_pnl_pct = pnl_result.get('daily_pnl_percentage', 0)
+                    current_equity = pnl_result.get('current_equity', 0)
+                    starting_equity = pnl_result.get('starting_equity', 0)
+                    
+                    pnl_emoji = "📈" if daily_pnl >= 0 else "📉"
+                    
+                    pnl_section = f"""
+📊 Daily PNL Summary:
+• Daily P&L: {pnl_emoji} ${daily_pnl:+,.2f} ({daily_pnl_pct:+.2f}%)
+• Starting Equity: ${starting_equity:,.2f}
+• Current Equity: ${current_equity:,.2f}"""
+                    print(f"✅ Daily PNL calculated: {pnl_emoji} ${daily_pnl:+,.2f} ({daily_pnl_pct:+.2f}%)")
+                else:
+                    pnl_section = "\n⚠️ PNL calculation unavailable"
+                    print("⚠️ PNL calculation returned no data")
+                    
+            except Exception as e:
+                pnl_section = f"\n❌ PNL calculation failed: {str(e)}"
+                print(f"❌ Error calculating PNL: {str(e)}")
+            
             # Send Telegram notification about position closures
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             
@@ -2089,7 +2129,7 @@ Account: {self.account_name}
 Time: {timestamp}
 Environment: {self.account}
 
-Reason: Automatic closure at 15:40 ET{success_section}{failure_section}
+Reason: Automatic closure at 15:40 ET{success_section}{failure_section}{pnl_section}
 
 Monitor Status: 🔄 Shutting down after position closure"""
             
