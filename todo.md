@@ -77,6 +77,7 @@ Filter out stocks below two dollars.
 
 ## Trades
 
+- [ ] Is VERB doubled again?
 - [ ] Try to get trades into the analysis.
 
 ## Plots

@@ -519,10 +519,7 @@ class BacktestingSystem:
             alerts_by_date[date] = alerts_by_date.get(date, 0) + result['superduper_alerts']
             trades_by_date[date] = trades_by_date.get(date, 0) + result['trades']
             
-            # Aggregate symbol data from individual symbol runs
-            alerts_by_symbol[symbol] = alerts_by_symbol.get(symbol, 0) + result['superduper_alerts']
-            
-            # Also include any detailed symbol breakdown from results
+            # Use detailed symbol breakdown to avoid double counting
             for sym, count in result.get('alerts_by_symbol', {}).items():
                 alerts_by_symbol[sym] = alerts_by_symbol.get(sym, 0) + count
 
@@ -536,7 +533,11 @@ class BacktestingSystem:
         # Create alerts by symbol pie chart
         if alerts_by_symbol and sum(alerts_by_symbol.values()) > 0:
             plt.figure(figsize=(10, 8))
-            plt.pie(alerts_by_symbol.values(), labels=alerts_by_symbol.keys(), autopct='%1.1f%%', startangle=90)
+            # Sort symbols alphabetically
+            sorted_symbols = sorted(alerts_by_symbol.items())
+            symbols = [item[0] for item in sorted_symbols]
+            counts = [item[1] for item in sorted_symbols]
+            plt.pie(counts, labels=symbols, autopct='%1.1f%%', startangle=90)
             plt.title('Superduper Alerts by Symbol', fontsize=16, fontweight='bold')
             alerts_filename = runs_dir / f"summary_alerts_by_symbol_pie_{timestamp}.png"
             plt.savefig(alerts_filename, dpi=300, bbox_inches='tight')
@@ -556,8 +557,10 @@ class BacktestingSystem:
         # Create alerts by symbol bar chart
         if alerts_by_symbol and sum(alerts_by_symbol.values()) > 0:
             plt.figure(figsize=(12, 8))
-            symbols = list(alerts_by_symbol.keys())
-            counts = list(alerts_by_symbol.values())
+            # Sort symbols alphabetically
+            sorted_symbols = sorted(alerts_by_symbol.items())
+            symbols = [item[0] for item in sorted_symbols]
+            counts = [item[1] for item in sorted_symbols]
             
             bars = plt.bar(symbols, counts, color='steelblue', alpha=0.7)
             plt.title('Superduper Alerts by Symbol', fontsize=16, fontweight='bold')
