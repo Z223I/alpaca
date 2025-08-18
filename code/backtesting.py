@@ -281,7 +281,6 @@ class BacktestingSystem:
     def _run_orb_pipeline(self, date: str, symbols_file: Path, symbol: str) -> bool:
         """Execute the ORB pipeline with concurrent processes using file watchers"""
         # Define all processes that should run concurrently
-        # Testing with live superduper alerts to test trade processor directly
         processes = [
             {
                 'name': 'simulator',
@@ -300,11 +299,6 @@ class BacktestingSystem:
                 'name': 'superduper_monitor',
                 'cmd': f"python3 code/orb_alerts_monitor_superduper.py --date {date} --verbose",
                 'primary': False  # Watches for super_alerts (will be copied)
-            },
-            {
-                'name': 'trade_processor',
-                'cmd': f"python3 code/orb_alerts_trade_stocks.py --date {date} --no-telegram --verbose",
-                'primary': False  # Watches for superduper alerts (will be copied)
             },
             {
                 'name': 'super_alert_copier',
@@ -373,10 +367,9 @@ class BacktestingSystem:
                 super_count = len(list((current_run_dir / "historical_data" / date / "super_alerts" / "bullish").glob("*.json")))
                 superduper_count = len(list((current_run_dir / "historical_data" / date / "superduper_alerts" / "bullish").glob("*.json")))
                 superduper_green_count = len(list((current_run_dir / "historical_data" / date / "superduper_alerts_sent" / "bullish" / "green").glob("*.json")))
-                trade_count = len(list((current_run_dir / "historical_data" / date).glob("*trade*.json")))
                 
-                current_counts = (alert_count, super_count, superduper_count, superduper_green_count, trade_count)
-                progress_msg = f"Files: {alert_count} alerts → {super_count} super → {superduper_count} superduper → {superduper_green_count} green → {trade_count} trades"
+                current_counts = (alert_count, super_count, superduper_count, superduper_green_count)
+                progress_msg = f"Files: {alert_count} alerts → {super_count} super → {superduper_count} superduper → {superduper_green_count} green"
                 self.logger.info(progress_msg)
                 print(progress_msg)
                 
@@ -397,10 +390,7 @@ class BacktestingSystem:
                 if superduper_green_count > 0:
                     self.logger.info("✅ Superduper green alerts detected!")
                     print("✅ Superduper green alerts detected!")
-                    if trade_count > 0:
-                        self.logger.info("✅ Trades detected!")
-                        print("✅ Trades detected!")
-                        # Don't break here - let it stabilize with identical counts
+                    # Don't break here - let it stabilize with identical counts
                 
                 if i < max_iterations - 1:  # Don't sleep after the last iteration
                     time.sleep(10)
@@ -457,10 +447,8 @@ class BacktestingSystem:
         """Analyze results from a completed run"""
         results = {
             'superduper_alerts': 0,
-            'trades': 0,
             'symbols_processed': 0,
-            'alerts_by_symbol': {},
-            'trades_by_symbol': {}
+            'alerts_by_symbol': {}
         }
 
         if self.dry_run:
@@ -487,20 +475,6 @@ class BacktestingSystem:
                 except Exception:
                     pass
 
-        # Count trades (placeholder - would need actual trade files)
-        trades_dir = run_dir / "historical_data"
-        if trades_dir.exists():
-            for trade_file in trades_dir.rglob("*trades*.json"):
-                try:
-                    with open(trade_file, 'r') as f:
-                        trade_data = json.load(f)
-                        if isinstance(trade_data, list):
-                            results['trades'] += len(trade_data)
-                        else:
-                            results['trades'] += 1
-                except Exception:
-                    pass
-
         return results
 
     def _create_summary_charts(self):
@@ -510,14 +484,11 @@ class BacktestingSystem:
 
         # Prepare data for charts - now scanning symbol subdirectories
         alerts_by_date = {}
-        trades_by_date = {}
         alerts_by_symbol = {}
 
         for result in self.run_results:
             date = result['date']
-            symbol = result.get('symbol', 'UNKNOWN')
             alerts_by_date[date] = alerts_by_date.get(date, 0) + result['superduper_alerts']
-            trades_by_date[date] = trades_by_date.get(date, 0) + result['trades']
             
             # Use detailed symbol breakdown to avoid double counting
             for sym, count in result.get('alerts_by_symbol', {}).items():
@@ -544,15 +515,7 @@ class BacktestingSystem:
             plt.close()
             self.logger.info(f"Created {alerts_filename}")
 
-        # Create trades by date pie chart
-        if trades_by_date and sum(trades_by_date.values()) > 0:
-            plt.figure(figsize=(10, 8))
-            plt.pie(trades_by_date.values(), labels=trades_by_date.keys(), autopct='%1.1f%%')
-            plt.title('Trades by Date')
-            trades_filename = runs_dir / f"summary_trades_by_date_{timestamp}.png"
-            plt.savefig(trades_filename)
-            plt.close()
-            self.logger.info(f"Created {trades_filename}")
+        # Trades pie chart removed - no longer tracking trades
 
         # Create alerts by symbol bar chart
         if alerts_by_symbol and sum(alerts_by_symbol.values()) > 0:
@@ -682,8 +645,7 @@ class BacktestingSystem:
                                     })
                                     self.run_results.append(results)
 
-                                    self.logger.info(f"✅ Run {current_run} of {total_runs} completed for {symbol}: {results['superduper_alerts']} alerts, "
-                                                     f"{results['trades']} trades")
+                                    self.logger.info(f"✅ Run {current_run} of {total_runs} completed for {symbol}: {results['superduper_alerts']} alerts")
                                 else:
                                     self.logger.error(f"❌ Run {current_run} of {total_runs} failed to move run directory for {date}/{symbol}")
                             else:
@@ -697,9 +659,8 @@ class BacktestingSystem:
 
             # Print summary
             total_alerts = sum(r['superduper_alerts'] for r in self.run_results)
-            total_trades = sum(r['trades'] for r in self.run_results)
             self.logger.info(f"Backtesting complete: {len(self.run_results)} runs, "
-                             f"{total_alerts} total alerts, {total_trades} total trades")
+                             f"{total_alerts} total alerts")
 
         finally:
             # Always restore original config

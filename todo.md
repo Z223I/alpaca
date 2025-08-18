@@ -75,23 +75,58 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 Filter out stocks below two dollars.
 
 
-## Trades
+## EOD
 
-- [ ] Is VERB doubled again?
-- [ ] Try to get trades into the analysis.
+- [ ] No trades after 15:30 ET.
+- [HEY DO THIS] Close all positions
+- [DO THIS] Cancel all orders
+- [ ] Today's PNL - needs to be added to watchdog.
+- [ ] TEST: Close all positions at the end of the day.  Close all orders. Calculate PNL
 
 ## Plots
 
 - [ ] Send plots on Telegram.
 
 
-## EOD
 
-- [ ] No trades after 15:30 ET.
-- [X] Close all positions
-- [ ] Cancel all orders
-- [ ] Today's PNL - needs to be added to watchdog.
-- [ ] TEST: Close all positions at the end of the day.  Close all orders. Calculate PNL
+
+PCA analysis on exit strategy
+Temporarily shut off the plots (candlesticks)
+
+Shut off trades in the back testing. IT placed a bunch of orders during the middle of the night.  I was up and testing in the middle of the night.
+Investigate why those trades happened. Use real time of day for executing trades.
+
+
+
+
+
+## Plots
+
+### Config
+
+- [ ] claude --dangerously-skip-permissions
+- [ ] /login
+- [ ] /commit
+- [ ] Sync changes
+- [ ] /clear
+- [ ] git switch -c feature/telegram-plots
+- [ ] /clear
+- [ ] /read...
+
+### Spec File
+
+- [ ] VERY IMPORTANT. Think hard. Implement the instructions in specs/telegram-plots.md
+- [ ] Nudge
+- [ ] /commit
+- [ ] Publish the branch
+- [ ] git switch master; merge current branch
+- [ ] Sync changes
+
+
+## Trades
+
+- [X] Is VERB doubled again? Fix it.
+- [O] Try to get trades into the analysis. No. Have PCA figure out what filters to apply.  Specifically TOD, Time of Day.
 
 ## errata
 
@@ -618,6 +653,10 @@ This stock rocketed.
 
 
         python code/orb_alerts.py --test --verbose
+
+        python code/alpaca.py --buy-market-trailing-sell-take-profit-percent --symbol VTAK --take-profit-percent 5 --submit
+        57chevy --buy-market-trailing-sell-take-profit-percent --symbol AAPL --take-profit-percent 10
+
         ```
 
 ## MCP
