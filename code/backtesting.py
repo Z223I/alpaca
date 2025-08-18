@@ -369,7 +369,7 @@ class BacktestingSystem:
                 superduper_green_count = len(list((current_run_dir / "historical_data" / date / "superduper_alerts_sent" / "bullish" / "green").glob("*.json")))
                 
                 current_counts = (alert_count, super_count, superduper_count, superduper_green_count)
-                progress_msg = f"Files: {alert_count} alerts → {super_count} super → {superduper_count} superduper → {superduper_green_count} green"
+                progress_msg = f"Files: {alert_count} alerts → {super_count} super → {superduper_count} superduper → {superduper_green_count} sent"
                 self.logger.info(progress_msg)
                 print(progress_msg)
                 
@@ -388,8 +388,8 @@ class BacktestingSystem:
                     previous_counts.pop(0)
                 
                 if superduper_green_count > 0:
-                    self.logger.info("✅ Superduper green alerts detected!")
-                    print("✅ Superduper green alerts detected!")
+                    self.logger.info("✅ Superduper alerts sent detected!")
+                    print("✅ Superduper alerts sent detected!")
                     # Don't break here - let it stabilize with identical counts
                 
                 if i < max_iterations - 1:  # Don't sleep after the last iteration
