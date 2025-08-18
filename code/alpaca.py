@@ -601,6 +601,8 @@ class AlpacaPrivate:
                 print(f"  Symbol: {order_response.symbol}")
                 print(f"  Quantity: {order_response.qty}")
                 print(f"  Order Class: {order_response.order_class}")
+                # Trigger position monitoring on successful trade
+                self._onTradeExecuted(order_response, f"Bracket buy: {symbol}")
                 return order_response
             except Exception as e:
                 print(f"✗ Order submission failed: {str(e)}")
