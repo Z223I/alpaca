@@ -121,6 +121,11 @@ PCA analysis on exit strategy
 - [ ] VERY IMPORTANT. Think hard. Implement the instructions in specs/telegram-plots.md
 - [ ] Nudge
 - [ ] /commit
+
+Update molecules/telegram_polling.py: When it receives a trigger word, "plot", and then -plot -symbol <symbol>, extract the plot location    │
+│   from the output of the alpaca.py call. Here is an example "Chart generated successfully: plots/20250818/SNGX_chart.png". Then send the       │
+│   image to the user using atoms/telegram/send_image.py. This command can be used by any Telegram user.
+
 - [ ] Publish the branch
 - [ ] git switch master; merge current branch
 - [ ] Sync changes

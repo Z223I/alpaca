@@ -21,7 +21,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from atoms.telegram.telegram_post import send_message, send_alert
 from atoms.telegram.user_manager import UserManager
 from atoms.telegram.config import TelegramConfig
+from atoms.telegram.send_image import TelegramImageSender
 import requests
+import re
 
 class TelegramPollingService:
     """Service for polling Telegram messages and managing user subscriptions."""
@@ -29,6 +31,7 @@ class TelegramPollingService:
     def __init__(self):
         self.user_manager = UserManager()
         self.config = TelegramConfig()
+        self.image_sender = TelegramImageSender()
         self.running = False
         self.last_update_id = 0
         self.poll_interval = 5  # seconds
@@ -42,7 +45,8 @@ class TelegramPollingService:
             '/unsubscribe': self._handle_unsubscribe,
             '/status': self._handle_status,
             '/help': self._handle_help,
-            '57chevy': self._handle_alpaca_command
+            '57chevy': self._handle_alpaca_command,
+            'plot': self._handle_plot_command
         }
         
         # Authorized users for Alpaca commands
@@ -180,8 +184,11 @@ class TelegramPollingService:
                 else:
                     self._handle_unknown_command(chat_id, text)
             elif text.lower().startswith('57chevy'):
-                # Handle alpaca trigger word
+                # Handle alpaca trigger word (authorized users only)
                 self._handle_alpaca_command(chat_id, username, first_name, last_name, text)
+            elif text.lower().startswith('plot'):
+                # Handle plot trigger word (any user)
+                self._handle_plot_command(chat_id, username, first_name, last_name, text)
             else:
                 # Handle non-command messages
                 self._handle_regular_message(chat_id, username, first_name, text)
@@ -291,6 +298,15 @@ Available Commands:
 /status - Check your subscription status
 /help - Show this help message
 
+📊 Chart Generation:
+plot -plot -symbol [TICKER] - Generate and send chart for any stock symbol
+Examples: 
+  • plot -plot -symbol AAPL
+  • plot -plot -symbol TSLA
+  • plot -plot -symbol MSFT
+
+Note: Use regular hyphens (-) in the command
+
 You'll receive:
 🚀 ORB breakout signals
 📊 Trade notifications  
@@ -318,6 +334,47 @@ Questions? Contact the bot administrator."""
         else:
             self._send_response(chat_id, "👋 Hello! Send /help to see available commands.")
     
+    def _handle_plot_command(self, chat_id: str, username: str, first_name: str, last_name: str, text: str):
+        """Handle plot trigger for generating and sending charts."""
+        try:
+            display_name = f"{first_name} {last_name}".strip() or username or f"User_{chat_id[-4:]}"
+            self._log(f"📊 Plot command from {display_name}: {text}")
+            
+            # Parse plot arguments from message
+            args = self._parse_plot_args(text)
+            if not args:
+                self._send_response(chat_id, "❌ Invalid plot command. Use: plot -plot -symbol [TICKER]\nExample: plot -plot -symbol AAPL")
+                return
+            
+            # Execute alpaca command to generate plot
+            self._send_response(chat_id, f"📊 Generating chart for {args.get('symbol', 'symbol')}...")
+            
+            alpaca_output = self._execute_alpaca_command(args['alpaca_args'])
+            
+            # Extract plot path from output
+            plot_path = self._extract_plot_path(alpaca_output)
+            
+            if plot_path:
+                # Send the image using TelegramImageSender
+                result = self.image_sender._send_image_to_chat(
+                    chat_id=chat_id,
+                    image_path=plot_path,
+                    caption=f"📊 Chart for {args.get('symbol', 'symbol')} - Generated for {display_name}",
+                    urgent=False
+                )
+                
+                if result:
+                    self._log(f"✅ Chart sent successfully to {display_name}")
+                else:
+                    self._send_response(chat_id, f"❌ Failed to send chart image. Plot generated at: {plot_path}")
+            else:
+                # No plot path found, send the text output
+                self._send_response(chat_id, f"❌ No chart generated. Output:\n```\n{alpaca_output}\n```")
+                
+        except Exception as e:
+            self._log(f"Error handling plot command: {e}", "ERROR")
+            self._send_response(chat_id, f"❌ Error generating plot: {str(e)}")
+
     def _handle_alpaca_command(self, chat_id: str, username: str, first_name: str, last_name: str, text: str):
         """Handle 57chevy trigger for Alpaca trading commands."""
         
@@ -369,6 +426,65 @@ Questions? Contact the bot administrator."""
                 converted_parts.append(part)
         
         return converted_parts
+    
+    def _parse_plot_args(self, text: str) -> Optional[Dict]:
+        """Parse plot arguments from Telegram message."""
+        try:
+            # Expected format: "plot -plot -symbol [TICKER]" where TICKER is any stock symbol
+            # Note: Telegram may convert hyphens to em dashes (—) or en dashes (–)
+            
+            # Normalize different dash characters to regular hyphens
+            normalized_text = text.replace('—', '-').replace('–', '-').replace('‐', '-')
+            parts = normalized_text.strip().split()
+            
+            if len(parts) < 4:
+                return None
+            
+            # Check for required format
+            if parts[0].lower() != 'plot' or parts[1] != '-plot' or parts[2] != '-symbol':
+                return None
+            
+            symbol = parts[3].upper()
+            
+            # Build alpaca arguments: ['--plot', '--symbol', 'SYMBOL']
+            alpaca_args = ['--plot', '--symbol', symbol]
+            
+            return {
+                'symbol': symbol,
+                'alpaca_args': alpaca_args
+            }
+            
+        except Exception as e:
+            self._log(f"Error parsing plot args: {e}", "ERROR")
+            return None
+    
+    def _extract_plot_path(self, alpaca_output: str) -> Optional[str]:
+        """Extract plot file path from alpaca.py output."""
+        try:
+            # Look for pattern: "Chart generated successfully: plots/20250818/SYMBOL_chart.png"
+            pattern = r'Chart generated successfully:\s*([^\s]+\.png)'
+            match = re.search(pattern, alpaca_output, re.IGNORECASE)
+            
+            if match:
+                plot_path = match.group(1).strip()
+                self._log(f"📊 Extracted plot path: {plot_path}")
+                
+                # Verify file exists
+                project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                full_path = os.path.join(project_root, plot_path)
+                
+                if os.path.isfile(full_path):
+                    return full_path
+                else:
+                    self._log(f"❌ Plot file not found: {full_path}", "ERROR")
+                    return None
+            else:
+                self._log("❌ No chart generation message found in output", "ERROR")
+                return None
+                
+        except Exception as e:
+            self._log(f"Error extracting plot path: {e}", "ERROR")
+            return None
     
     def _execute_alpaca_command(self, args: List[str]) -> str:
         """Execute Alpaca command and return output."""
