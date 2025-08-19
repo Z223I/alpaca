@@ -19,5 +19,3 @@ Performance Metrics:
   Winning Trades: 54
   Average Win: 15.14%
   Average Loss: 11.75%
-
-Results saved to optimization_results.json
