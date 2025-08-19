@@ -1358,23 +1358,41 @@ def create_profitability_visualizations(results: Dict[str, Any], output_dir: str
         
         print(f"\n📊 Generating profitability visualizations in {output_dir}/")
         
-        # Chart 1: Parameter Heatmap
-        _create_parameter_heatmap(results, output_path)
-        
-        # Chart 2: Take Profit vs Stop Loss Surface
-        _create_take_profit_stop_loss_surface(results, output_path)
-        
-        # Chart 3: Risk-Return Scatter Plot
-        _create_risk_return_scatter(results, output_path)
-        
-        # Chart 4: Win Rate Analysis
-        _create_win_rate_analysis(results, output_path)
-        
-        # Chart 5: Parameter Distribution Charts
-        _create_parameter_distributions(results, output_path)
-        
-        # Chart 6: Performance Comparison Bar Chart
-        _create_performance_comparison(results, output_path)
+        try:
+            # Chart 1: Parameter Heatmap
+            _create_parameter_heatmap(results, output_path)
+        except Exception as e:
+            print(f"Error in parameter heatmap: {e}")
+            
+        try:
+            # Chart 2: Take Profit vs Stop Loss Surface
+            _create_take_profit_stop_loss_surface(results, output_path)
+        except Exception as e:
+            print(f"Error in 3D surface: {e}")
+            
+        try:
+            # Chart 3: Risk-Return Scatter Plot
+            _create_risk_return_scatter(results, output_path)
+        except Exception as e:
+            print(f"Error in risk-return scatter: {e}")
+            
+        try:
+            # Chart 4: Win Rate Analysis
+            _create_win_rate_analysis(results, output_path)
+        except Exception as e:
+            print(f"Error in win rate analysis: {e}")
+            
+        try:
+            # Chart 5: Parameter Distribution Charts
+            _create_parameter_distributions(results, output_path)
+        except Exception as e:
+            print(f"Error in parameter distributions: {e}")
+            
+        try:
+            # Chart 6: Performance Comparison Bar Chart
+            _create_performance_comparison(results, output_path)
+        except Exception as e:
+            print(f"Error in performance comparison: {e}")
         
         print(f"✅ Created 6 profitability visualization charts in {output_dir}/")
         return True
@@ -1389,7 +1407,7 @@ def create_profitability_visualizations(results: Dict[str, Any], output_dir: str
 
 
 def _create_parameter_heatmap(results: Dict[str, Any], output_path: Path):
-    """Create heatmap showing performance across take profit and stop loss parameters."""
+    """Create heatmap showing performance across take profit and trailing stop parameters."""
     import matplotlib.pyplot as plt
     import seaborn as sns
     import pandas as pd
@@ -1406,7 +1424,7 @@ def _create_parameter_heatmap(results: Dict[str, Any], output_path: Path):
     
     # Create matrix data
     take_profits = []
-    stop_losses = []
+    trailing_stops = []
     sharpe_ratios = []
     
     for result in exit_results:
@@ -1414,7 +1432,7 @@ def _create_parameter_heatmap(results: Dict[str, Any], output_path: Path):
         metrics = result['metrics']
         
         take_profits.append(params.get('take_profit_pct', 0))
-        # stop_losses.append(params.get('stop_loss_pct', 0))  # Removed - using trailing stops
+        trailing_stops.append(params.get('trailing_stop_pct', 0))
         sharpe_ratios.append(metrics.get('sharpe_ratio', 0))
     
     if not take_profits:
@@ -1423,20 +1441,20 @@ def _create_parameter_heatmap(results: Dict[str, Any], output_path: Path):
     # Create DataFrame
     df = pd.DataFrame({
         'take_profit': take_profits,
-        'stop_loss': stop_losses,
+        'trailing_stop': trailing_stops,
         'sharpe_ratio': sharpe_ratios
     })
     
     # Create pivot table for heatmap
-    pivot_df = df.pivot_table(values='sharpe_ratio', index='stop_loss', columns='take_profit', aggfunc='mean')
+    pivot_df = df.pivot_table(values='sharpe_ratio', index='trailing_stop', columns='take_profit', aggfunc='mean')
     
     # Create heatmap
     plt.figure(figsize=(12, 8))
     sns.heatmap(pivot_df, annot=True, fmt='.2f', cmap='RdYlGn', 
                 cbar_kws={'label': 'Sharpe Ratio'})
-    plt.title('🔥 Profitability Heatmap: Take Profit vs Stop Loss\n(Sharpe Ratio)', fontsize=16, fontweight='bold')
+    plt.title('🔥 Profitability Heatmap: Take Profit vs Trailing Stop\n(Sharpe Ratio)', fontsize=16, fontweight='bold')
     plt.xlabel('Take Profit (%)', fontsize=12)
-    plt.ylabel('Stop Loss (%)', fontsize=12)
+    plt.ylabel('Trailing Stop (%)', fontsize=12)
     plt.tight_layout()
     plt.savefig(output_path / '1_parameter_heatmap.png', dpi=300, bbox_inches='tight')
     plt.close()
@@ -1459,7 +1477,7 @@ def _create_take_profit_stop_loss_surface(results: Dict[str, Any], output_path: 
         return
     
     take_profits = []
-    stop_losses = []
+    trailing_stops = []
     total_returns = []
     
     for result in exit_results:
@@ -1467,7 +1485,7 @@ def _create_take_profit_stop_loss_surface(results: Dict[str, Any], output_path: 
         metrics = result['metrics']
         
         take_profits.append(params.get('take_profit_pct', 0))
-        # stop_losses.append(params.get('stop_loss_pct', 0))  # Removed - using trailing stops
+        trailing_stops.append(params.get('trailing_stop_pct', 0))
         total_returns.append(metrics.get('total_return', 0))
     
     if not take_profits:
@@ -1478,13 +1496,13 @@ def _create_take_profit_stop_loss_surface(results: Dict[str, Any], output_path: 
     ax = fig.add_subplot(111, projection='3d')
     
     # Create scatter plot with color mapping
-    scatter = ax.scatter(take_profits, stop_losses, total_returns, 
+    scatter = ax.scatter(take_profits, trailing_stops, total_returns, 
                         c=total_returns, cmap='viridis', s=60, alpha=0.7)
     
     ax.set_xlabel('Take Profit (%)', fontsize=12)
-    ax.set_ylabel('Stop Loss (%)', fontsize=12)
+    ax.set_ylabel('Trailing Stop (%)', fontsize=12)
     ax.set_zlabel('Total Return (%)', fontsize=12)
-    ax.set_title('🚀 3D Profitability Surface\nTake Profit vs Stop Loss vs Total Return', 
+    ax.set_title('🚀 3D Profitability Surface\nTake Profit vs Trailing Stop vs Total Return', 
                  fontsize=16, fontweight='bold')
     
     # Add colorbar
@@ -1737,53 +1755,58 @@ def _create_parameter_distributions(results: Dict[str, Any], output_path: Path):
     axes[0,0].set_ylabel('Average Sharpe Ratio')
     axes[0,0].grid(True, alpha=0.3)
     
-    # Stop Loss Distribution
-    # sl_perf = df.groupby('stop_loss_pct')['sharpe_ratios'].mean().sort_index()  # Removed
+    # Trailing Stop Distribution (moved to position [0,1])
+    ts_perf = df.groupby('trailing_stop_pct')['sharpe_ratios'].mean().sort_index()
     
-    axes[0,1].bar(sl_perf.index, sl_perf.values, color='crimson', alpha=0.8)
-    axes[0,1].set_title('🛡️ Stop Loss Performance', fontweight='bold')
-    axes[0,1].set_xlabel('Stop Loss (%)')
+    axes[0,1].bar(ts_perf.index, ts_perf.values, color='forestgreen', alpha=0.8)
+    axes[0,1].set_title('🎯 Trailing Stop Performance', fontweight='bold')
+    axes[0,1].set_xlabel('Trailing Stop (%)')
     axes[0,1].set_ylabel('Average Sharpe Ratio')
     axes[0,1].grid(True, alpha=0.3)
     
-    # Trailing Stop Distribution
-    ts_perf = df.groupby('trailing_stop_pct')['sharpe_ratios'].mean().sort_index()
+    # MACD Enabled vs Disabled (moved to position [0,2])
+    macd_perf = df.groupby('macd_enabled')['sharpe_ratios'].mean()
     
-    axes[0,2].bar(ts_perf.index, ts_perf.values, color='forestgreen', alpha=0.8)
-    axes[0,2].set_title('🎯 Trailing Stop Performance', fontweight='bold')
-    axes[0,2].set_xlabel('Trailing Stop (%)')
+    colors = ['lightcoral', 'lightblue'] 
+    macd_labels = ['MACD Disabled', 'MACD Enabled']
+    bars = axes[0,2].bar(macd_labels, macd_perf.values, color=colors, alpha=0.8)
+    axes[0,2].set_title('🔄 MACD Usage Performance', fontweight='bold')
     axes[0,2].set_ylabel('Average Sharpe Ratio')
     axes[0,2].grid(True, alpha=0.3)
     
-    # MACD Enabled vs Disabled
-    macd_perf = df.groupby('macd_enabled')['sharpe_ratios'].mean()
-    
-    colors = ['lightcoral', 'lightblue']
-    bars = axes[1,0].bar(['MACD Disabled', 'MACD Enabled'], macd_perf.values, color=colors, alpha=0.8)
-    axes[1,0].set_title('🔄 MACD Usage Performance', fontweight='bold')
-    axes[1,0].set_ylabel('Average Sharpe Ratio')
-    axes[1,0].grid(True, alpha=0.3)
-    
     # Add value labels
     for bar, value in zip(bars, macd_perf.values):
-        axes[1,0].text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.1, 
+        axes[0,2].text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.1, 
                       f'{value:.2f}', ha='center', va='bottom', fontweight='bold')
     
-    # Parameter Correlation Matrix
+    # Parameter Correlation Matrix (moved to position [1,0])
     corr_data = df[['take_profit_pct', 'trailing_stop_pct', 'sharpe_ratios']].corr()
     
-    im = axes[1,1].imshow(corr_data.values, cmap='coolwarm', aspect='auto', vmin=-1, vmax=1)
-    axes[1,1].set_xticks(range(len(corr_data.columns)))
-    axes[1,1].set_yticks(range(len(corr_data.columns)))
-    axes[1,1].set_xticklabels(['Take Profit', 'Stop Loss', 'Trailing Stop', 'Sharpe Ratio'], rotation=45)
-    axes[1,1].set_yticklabels(['Take Profit', 'Stop Loss', 'Trailing Stop', 'Sharpe Ratio'])
-    axes[1,1].set_title('🔗 Parameter Correlation Matrix', fontweight='bold')
+    im = axes[1,0].imshow(corr_data.values, cmap='coolwarm', aspect='auto', vmin=-1, vmax=1)
+    axes[1,0].set_xticks(range(len(corr_data.columns)))
+    axes[1,0].set_yticks(range(len(corr_data.columns)))
+    axes[1,0].set_xticklabels(['Take Profit', 'Trailing Stop', 'Sharpe Ratio'], rotation=45)
+    axes[1,0].set_yticklabels(['Take Profit', 'Trailing Stop', 'Sharpe Ratio'])
+    axes[1,0].set_title('🔗 Parameter Correlation Matrix', fontweight='bold')
     
     # Add correlation values
     for i in range(len(corr_data.columns)):
         for j in range(len(corr_data.columns)):
-            text = axes[1,1].text(j, i, f'{corr_data.iloc[i, j]:.2f}',
+            text = axes[1,0].text(j, i, f'{corr_data.iloc[i, j]:.2f}',
                                  ha="center", va="center", color="black", fontweight='bold')
+    
+    # Performance distribution histogram
+    axes[1,1].hist(param_data['sharpe_ratios'], bins=20, color='skyblue', alpha=0.7, edgecolor='black')
+    axes[1,1].set_title('📊 Sharpe Ratio Distribution', fontweight='bold')
+    axes[1,1].set_xlabel('Sharpe Ratio')
+    axes[1,1].set_ylabel('Frequency')
+    axes[1,1].grid(True, alpha=0.3)
+    
+    # Add statistics text
+    mean_sharpe = np.mean(param_data['sharpe_ratios'])
+    std_sharpe = np.std(param_data['sharpe_ratios'])
+    axes[1,1].axvline(mean_sharpe, color='red', linestyle='--', linewidth=2, label=f'Mean: {mean_sharpe:.2f}')
+    axes[1,1].legend()
     
     # Top 10 Parameter Combinations
     top_results = sorted(exit_results, key=lambda x: x['metrics'].get('sharpe_ratio', 0), reverse=True)[:10]
@@ -1798,12 +1821,12 @@ def _create_parameter_distributions(results: Dict[str, Any], output_path: Path):
         table_data.append([
             f"#{i+1}",
             f"{params.get('take_profit_pct', 0)}%",
-            # f"{params.get('stop_loss_pct', 0)}%",  # Removed
+            f"{params.get('trailing_stop_pct', 0)}%",
             f"{metrics.get('sharpe_ratio', 0):.2f}"
         ])
     
     table = axes[1,2].table(cellText=table_data,
-                           colLabels=['Rank', 'Take Profit', 'Stop Loss', 'Sharpe'],
+                           colLabels=['Rank', 'Take Profit', 'Trailing Stop', 'Sharpe'],
                            cellLoc='center',
                            loc='center')
     
