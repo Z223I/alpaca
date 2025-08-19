@@ -64,14 +64,14 @@ ALERT_PARAMETERS = {
 EXIT_PARAMETERS = {
     'take_profit_pct': [5, 7.5, 10, 12.5, 15],              # 5 values (5-15% in 2.5% increments)
     'trailing_stop_pct': [5, 7.5, 10, 12.5, 15],            # 5 values
-    'stop_loss_pct': [5, 7.5, 10, 12.5, 15, 17.5, 20],     # 7 values
+    # 'stop_loss_pct': removed - using trailing stops instead
     'macd_sensitivity': ['conservative', 'normal', 'aggressive'],  # 3 values
     'macd_enabled': [True, False]                            # 2 values
 }
 
 # Total combinations (FOCUSED): 1 × 4 = 4 alert combinations
-# 5 × 5 × 7 × 3 × 2 = 1,050 exit combinations per alert set
-# Total parameter sets: 4 × 1,050 = 4,200 (50% reduction from original 8,400)
+# 5 × 5 × 3 × 2 = 150 exit combinations per alert set  
+# Total parameter sets: 4 × 150 = 600 (significant reduction, focused on trailing stops)
 
 # Orin Nano optimized configuration
 ORIN_NANO_CONFIG = {
@@ -88,13 +88,13 @@ ORIN_NANO_CONFIG = {
 # JIT-compiled standalone function for exit calculations
 @jit(nopython=True) if NUMBA_AVAILABLE else lambda x: x
 def calculate_exit_points_jit(price_series: np.ndarray, entry_price: float, 
-                             stop_loss_pct: float, take_profit_pct: float, 
+                             take_profit_pct: float, 
                              trailing_stop_pct: float) -> Tuple[float, int, str]:
     """
     Numba JIT-compiled exit calculation optimized for ARM architecture.
+    Uses only trailing stops and take profit (no fixed stop loss).
     Returns: (exit_price, exit_index, exit_reason)
     """
-    stop_loss_price = entry_price * (1 - stop_loss_pct / 100)
     take_profit_price = entry_price * (1 + take_profit_pct / 100)
     
     highest_price = entry_price
@@ -109,9 +109,7 @@ def calculate_exit_points_jit(price_series: np.ndarray, entry_price: float,
         trailing_stop_price = highest_price * (1 - trailing_stop_pct / 100)
         
         # Check exit conditions (order matters for first trigger)
-        if current_price <= stop_loss_price:
-            return current_price, i, 'stop_loss'
-        elif current_price >= take_profit_price:
+        if current_price >= take_profit_price:
             return current_price, i, 'take_profit'
         elif current_price <= trailing_stop_price and highest_price > entry_price:
             return current_price, i, 'trailing_stop'
@@ -645,14 +643,13 @@ class ExitStrategySimulator:
         Returns: (exit_price, exit_index, exit_reason)
         """
         # Extract parameters for JIT function
-        stop_loss_pct = exit_params['stop_loss_pct']
         take_profit_pct = exit_params['take_profit_pct']
         trailing_stop_pct = exit_params['trailing_stop_pct']
         
         # Use JIT-compiled function for the actual calculation
         return calculate_exit_points_jit(
             price_series, entry_price, 
-            stop_loss_pct, take_profit_pct, trailing_stop_pct
+            take_profit_pct, trailing_stop_pct
         )
     
     def simulate_exit(self, alert: Dict[str, Any], exit_params: Dict[str, Union[float, bool]]) -> Dict[str, Any]:
@@ -1083,23 +1080,21 @@ class ExitStrategyOptimizer:
                 # Generate all exit parameter combinations for each alert set
                 for take_profit in EXIT_PARAMETERS['take_profit_pct']:
                     for trailing_stop in EXIT_PARAMETERS['trailing_stop_pct']:
-                        for stop_loss in EXIT_PARAMETERS['stop_loss_pct']:
-                            for macd_sensitivity in EXIT_PARAMETERS['macd_sensitivity']:
-                                for macd_enabled in EXIT_PARAMETERS['macd_enabled']:
+                        for macd_sensitivity in EXIT_PARAMETERS['macd_sensitivity']:
+                            for macd_enabled in EXIT_PARAMETERS['macd_enabled']:
+                                
+                                combination = {
+                                    # Alert parameters
+                                    'alert_timeframe_minutes': timeframe,
+                                    'alert_green_threshold': threshold,
                                     
-                                    combination = {
-                                        # Alert parameters
-                                        'alert_timeframe_minutes': timeframe,
-                                        'alert_green_threshold': threshold,
-                                        
-                                        # Exit parameters
-                                        'take_profit_pct': take_profit,
-                                        'trailing_stop_pct': trailing_stop,
-                                        'stop_loss_pct': stop_loss,
-                                        'macd_sensitivity': macd_sensitivity,
-                                        'macd_enabled': macd_enabled
-                                    }
-                                    combinations.append(combination)
+                                    # Exit parameters
+                                    'take_profit_pct': take_profit,
+                                    'trailing_stop_pct': trailing_stop,
+                                    'macd_sensitivity': macd_sensitivity,
+                                    'macd_enabled': macd_enabled
+                                }
+                                combinations.append(combination)
         
         return combinations
     
@@ -1114,7 +1109,6 @@ class ExitStrategyOptimizer:
         # Step 1: Find optimal alert parameters using simple exit strategy
         print("\nStep 1: Optimizing alert parameters with simple exits...")
         simple_exit_params = {
-            'stop_loss_pct': 10,
             'take_profit_pct': 10,  # Updated to be within new range (5-15%)
             'trailing_stop_pct': 12.5,
             'macd_enabled': False,
@@ -1182,18 +1176,16 @@ class ExitStrategyOptimizer:
         exit_combinations = []
         for take_profit in EXIT_PARAMETERS['take_profit_pct']:
             for trailing_stop in EXIT_PARAMETERS['trailing_stop_pct']:
-                for stop_loss in EXIT_PARAMETERS['stop_loss_pct']:
-                    for macd_sensitivity in EXIT_PARAMETERS['macd_sensitivity']:
-                        for macd_enabled in EXIT_PARAMETERS['macd_enabled']:
-                            
-                            exit_params = {
-                                'take_profit_pct': take_profit,
-                                'trailing_stop_pct': trailing_stop,
-                                'stop_loss_pct': stop_loss,
-                                'macd_sensitivity': macd_sensitivity,
-                                'macd_enabled': macd_enabled
-                            }
-                            exit_combinations.append(exit_params)
+                for macd_sensitivity in EXIT_PARAMETERS['macd_sensitivity']:
+                    for macd_enabled in EXIT_PARAMETERS['macd_enabled']:
+                        
+                        exit_params = {
+                            'take_profit_pct': take_profit,
+                            'trailing_stop_pct': trailing_stop,
+                            'macd_sensitivity': macd_sensitivity,
+                            'macd_enabled': macd_enabled
+                        }
+                        exit_combinations.append(exit_params)
         
         # Limit combinations if requested
         if max_combinations and len(exit_combinations) > max_combinations:
@@ -1422,7 +1414,7 @@ def _create_parameter_heatmap(results: Dict[str, Any], output_path: Path):
         metrics = result['metrics']
         
         take_profits.append(params.get('take_profit_pct', 0))
-        stop_losses.append(params.get('stop_loss_pct', 0))
+        # stop_losses.append(params.get('stop_loss_pct', 0))  # Removed - using trailing stops
         sharpe_ratios.append(metrics.get('sharpe_ratio', 0))
     
     if not take_profits:
@@ -1475,7 +1467,7 @@ def _create_take_profit_stop_loss_surface(results: Dict[str, Any], output_path: 
         metrics = result['metrics']
         
         take_profits.append(params.get('take_profit_pct', 0))
-        stop_losses.append(params.get('stop_loss_pct', 0))
+        # stop_losses.append(params.get('stop_loss_pct', 0))  # Removed - using trailing stops
         total_returns.append(metrics.get('total_return', 0))
     
     if not take_profits:
@@ -1713,7 +1705,7 @@ def _create_parameter_distributions(results: Dict[str, Any], output_path: Path):
     # Collect parameter data
     param_data = {
         'take_profit_pct': [],
-        'stop_loss_pct': [],
+        # 'stop_loss_pct': [],  # Removed - using trailing stops
         'trailing_stop_pct': [],
         'macd_enabled': [],
         'sharpe_ratios': []
@@ -1724,7 +1716,7 @@ def _create_parameter_distributions(results: Dict[str, Any], output_path: Path):
         metrics = result['metrics']
         
         param_data['take_profit_pct'].append(params.get('take_profit_pct', 0))
-        param_data['stop_loss_pct'].append(params.get('stop_loss_pct', 0))
+        # param_data['stop_loss_pct'].append(params.get('stop_loss_pct', 0))  # Removed
         param_data['trailing_stop_pct'].append(params.get('trailing_stop_pct', 0))
         param_data['macd_enabled'].append(params.get('macd_enabled', False))
         param_data['sharpe_ratios'].append(metrics.get('sharpe_ratio', 0))
@@ -1746,7 +1738,7 @@ def _create_parameter_distributions(results: Dict[str, Any], output_path: Path):
     axes[0,0].grid(True, alpha=0.3)
     
     # Stop Loss Distribution
-    sl_perf = df.groupby('stop_loss_pct')['sharpe_ratios'].mean().sort_index()
+    # sl_perf = df.groupby('stop_loss_pct')['sharpe_ratios'].mean().sort_index()  # Removed
     
     axes[0,1].bar(sl_perf.index, sl_perf.values, color='crimson', alpha=0.8)
     axes[0,1].set_title('🛡️ Stop Loss Performance', fontweight='bold')
@@ -1778,7 +1770,7 @@ def _create_parameter_distributions(results: Dict[str, Any], output_path: Path):
                       f'{value:.2f}', ha='center', va='bottom', fontweight='bold')
     
     # Parameter Correlation Matrix
-    corr_data = df[['take_profit_pct', 'stop_loss_pct', 'trailing_stop_pct', 'sharpe_ratios']].corr()
+    corr_data = df[['take_profit_pct', 'trailing_stop_pct', 'sharpe_ratios']].corr()
     
     im = axes[1,1].imshow(corr_data.values, cmap='coolwarm', aspect='auto', vmin=-1, vmax=1)
     axes[1,1].set_xticks(range(len(corr_data.columns)))
@@ -1806,7 +1798,7 @@ def _create_parameter_distributions(results: Dict[str, Any], output_path: Path):
         table_data.append([
             f"#{i+1}",
             f"{params.get('take_profit_pct', 0)}%",
-            f"{params.get('stop_loss_pct', 0)}%",
+            # f"{params.get('stop_loss_pct', 0)}%",  # Removed
             f"{metrics.get('sharpe_ratio', 0):.2f}"
         ])
     
@@ -2078,7 +2070,7 @@ def main():
         print("\nBest Exit Parameters:")
         exit_params = results['best_exit_parameters']
         print(f"  Take Profit: {exit_params['take_profit_pct']}%")
-        print(f"  Stop Loss: {exit_params['stop_loss_pct']}%")
+        # print(f"  Stop Loss: {exit_params['stop_loss_pct']}%")  # Removed
         print(f"  Trailing Stop: {exit_params['trailing_stop_pct']}%")
         print(f"  MACD Enabled: {exit_params['macd_enabled']}")
         print(f"  MACD Sensitivity: {exit_params['macd_sensitivity']}")
@@ -2088,7 +2080,7 @@ def main():
         print(f"  Alert Timeframe: {best_params['alert_timeframe_minutes']} minutes")
         print(f"  Alert Green Threshold: {best_params['alert_green_threshold']:.2f}")
         print(f"  Take Profit: {best_params['take_profit_pct']}%")
-        print(f"  Stop Loss: {best_params['stop_loss_pct']}%")
+        # print(f"  Stop Loss: {best_params['stop_loss_pct']}%")  # Removed
         print(f"  Trailing Stop: {best_params['trailing_stop_pct']}%")
         print(f"  MACD Enabled: {best_params['macd_enabled']}")
         print(f"  MACD Sensitivity: {best_params['macd_sensitivity']}")

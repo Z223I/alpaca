@@ -77,9 +77,12 @@ Filter out stocks below two dollars. ???
 
 
 
-
+Send alert to Bruce the first time a symbol is at 20, 30, etc. percent above orb high in the 30 minutes.
 
 Review README_MACD.md and also why am I getting Blind Flight in my alerts?
+*** Update   Alert Timeframe: 20 minutes
+  Alert Green Threshold: 0.70
+
 
 
 

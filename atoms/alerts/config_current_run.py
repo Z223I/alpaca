@@ -179,7 +179,7 @@ class MomentumThresholds:
     red_threshold: float = 0.3
 
     # Green momentum threshold (at or above this = green 🟢)
-    green_threshold: float = 0.65
+    green_threshold: float = 0.70
 
     # Yellow momentum is implicitly between red_threshold and green_threshold (🟡)
 
@@ -267,7 +267,7 @@ DEFAULT_PLOTS_ROOT_DIR = PlotsRootDir(root_path="./runs/current")
 DEFAULT_DATA_ROOT_DIR = DataRootDir(root_path="./runs/current")
 DEFAULT_LOGS_ROOT_DIR = LogsRootDir(root_path="./runs/current")
 DEFAULT_HISTORICAL_ROOT_DIR = HistoricalRootDir(root_path="./runs/current")
-DEFAULT_PRICE_MOMENTUM_CONFIG = PriceMomentumConfig(momentum=MomentumThresholds(green_threshold=0.75), trend_analysis_timeframe_minutes=30)
+DEFAULT_PRICE_MOMENTUM_CONFIG = PriceMomentumConfig(momentum=MomentumThresholds(green_threshold=0.70), trend_analysis_timeframe_minutes=20)
 
 
 def get_plots_root_dir() -> PlotsRootDir:
