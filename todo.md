@@ -79,16 +79,45 @@ Filter out stocks below two dollars. ???
 
 Send alert to Bruce the first time a symbol is at 20, 30, etc. percent above orb high in the 30 minutes.
 
-Review README_MACD.md and also why am I getting Blind Flight in my alerts?
-*** Update   Alert Timeframe: 20 minutes
-  Alert Green Threshold: 0.70
+
+
+
+## Exit with MACD
+
+### Config
+
+- [ ] claude --dangerously-skip-permissions
+- [ ] /login
+- [ ] /commit
+- [ ] Sync changes
+- [ ] /clear
+- [ ] git switch -c feature/maximize-with-macd
+- [ ] /clear
+- [ ] /read...
+
+### Spec File
+
+- [ ] VERY IMPORTANT. Think hard. Review README_MACD.md but ignore but ignore the Historical Analysis Tool. Update code/maximize_profit.py. Add the MACD scoring as an exit strategy.  It can be used by itself or with the other exit strategies.
+- [ ] Nudge
+- [ ] /commit
+- [ ]
+- [ ] Publish the branch
+- [ ] git switch master; merge current branch
+- [ ] Sync changes
+
+
+## MISC
+
+- [X] Review README_MACD.md and also why am I getting Blind Flight in my alerts?
+- [X] Update   Alert Timeframe: 20 minutes
+- [X] Alert Green Threshold: 0.70
 
 
 
 
 ## Exit Strategy
 
-- [ ] VERY IMPORTANT. THINK HARD. I am collecting historical data on sent superduper alerts.  I plan to backtest my alerts under different         │
+- [X] VERY IMPORTANT. THINK HARD. I am collecting historical data on sent superduper alerts.  I plan to backtest my alerts under different         │
 │   selling parameters. The ultimate goal is to maximize profit. My entrance strategy is based on the alerts.  I need to determine the optimal   │
 │   exit strategy. When buying, I usually set a stop loss. I can set a take profit percent. I can set a trailing loss percent. I can let a MACD  │
 │   criteria trigger the sell.  If the stock position does not sell by 15:40 ET, it is automatically closed.  The question is how to conduct     │
@@ -98,34 +127,25 @@ Review README_MACD.md and also why am I getting Blind Flight in my alerts?
 ╰───────────────────────────
 
 
-
-
-...
-- [ ] ksdjffksdjf specs/exit-strategy-testing.md
-...
-
-## Plots
-
 ### Config
 
-- [ ] claude --dangerously-skip-permissions
-- [ ] /login
-- [ ] /commit
-- [ ] Sync changes
-- [ ] /clear
-- [ ] git switch -c feature/max-profits
-- [ ] /clear
-- [ ] /read...
+- [X] claude --dangerously-skip-permissions
+- [X] /login
+- [X] /commit
+- [X] Sync changes
+- [X] /clear
+- [X] git switch -c feature/max-profits
+- [X] /clear
+- [X] /read...
 
 ### Spec File
 
-- [ ] VERY IMPORTANT. Think hard. Implement the instructions in specs/exit-strategy-testing.md to create code/maximize_profit.py.
-- [ ] Nudge
-- [ ] /commit
-- [ ]
-- [ ] Publish the branch
-- [ ] git switch master; merge current branch
-- [ ] Sync changes
+- [X] VERY IMPORTANT. Think hard. Implement the instructions in specs/exit-strategy-testing.md to create code/maximize_profit.py.
+- [X] Nudge
+- [X] /commit
+- [X] Publish the branch
+- [X] git switch master; merge current branch
+- [X] Sync changes
 
 
 ## EOD
