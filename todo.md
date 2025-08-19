@@ -74,6 +74,26 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 
 Filter out stocks below two dollars.
 
+## Exit Strategy
+
+- [ ] VERY IMPORTANT. THINK HARD. I am collecting historical data on sent superduper alerts.  I plan to backtest my alerts under different         │
+│   selling parameters. The ultimate goal is to maximize profit. My entrance strategy is based on the alerts.  I need to determine the optimal   │
+│   exit strategy. When buying, I usually set a stop loss. I can set a take profit percent. I can set a trailing loss percent. I can let a MACD  │
+│   criteria trigger the sell.  If the stock position does not sell by 15:40 ET, it is automatically closed.  The question is how to conduct     │
+│   the statistic analysis to maximize profit while considering that some of the exit strategies overlap.  That is a take profit percent may or  │
+│   may not prevent a MACD criteria from even being tested.  I am not concerned about when to liquidate at the end of the day.  And, what type   │
+│   of statistical testing.                                                                                                                      │
+╰───────────────────────────
+
+
+
+
+...
+- [ ] ksdjffksdjf specs/exit-strategy-testing.md
+...
+
+
+
 
 ## EOD
 
