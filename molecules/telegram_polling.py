@@ -299,10 +299,10 @@ Available Commands:
 /help - Show this help message
 
 📊 Chart Generation:
-plot -plot -symbol [TICKER] - Generate and send chart for any stock symbol
+plot -plot -symbol [TICKER] [-date YYYY-MM-DD] - Generate and send chart for any stock symbol
 Examples: 
   • plot -plot -symbol AAPL
-  • plot -plot -symbol TSLA
+  • plot -plot -symbol TSLA -date 2025-08-15
   • plot -plot -symbol MSFT
 
 Note: Use regular hyphens (-) in the command
@@ -343,7 +343,7 @@ Questions? Contact the bot administrator."""
             # Parse plot arguments from message
             args = self._parse_plot_args(text)
             if not args:
-                self._send_response(chat_id, "❌ Invalid plot command. Use: plot -plot -symbol [TICKER]\nExample: plot -plot -symbol AAPL")
+                self._send_response(chat_id, "❌ Invalid plot command. Use: plot -plot -symbol [TICKER] [-date YYYY-MM-DD]\nExamples:\n  • plot -plot -symbol AAPL\n  • plot -plot -symbol AAPL -date 2025-08-15")
                 return
             
             # Execute alpaca command to generate plot
@@ -430,7 +430,7 @@ Questions? Contact the bot administrator."""
     def _parse_plot_args(self, text: str) -> Optional[Dict]:
         """Parse plot arguments from Telegram message."""
         try:
-            # Expected format: "plot -plot -symbol [TICKER]" where TICKER is any stock symbol
+            # Expected format: "plot -plot -symbol [TICKER] [-date YYYY-MM-DD]" where TICKER is any stock symbol
             # Note: Telegram may convert hyphens to em dashes (—) or en dashes (–)
             
             # Normalize different dash characters to regular hyphens
@@ -449,10 +449,33 @@ Questions? Contact the bot administrator."""
             # Build alpaca arguments: ['--plot', '--symbol', 'SYMBOL']
             alpaca_args = ['--plot', '--symbol', symbol]
             
-            return {
+            # Check for optional date parameter
+            date_value = None
+            if len(parts) >= 6 and parts[4] == '-date':
+                date_value = parts[5]
+                # Validate date format (basic check for YYYY-MM-DD)
+                if len(date_value) == 10 and date_value.count('-') == 2:
+                    try:
+                        # Verify it's a valid date
+                        from datetime import datetime
+                        datetime.strptime(date_value, '%Y-%m-%d')
+                        alpaca_args.extend(['--date', date_value])
+                    except ValueError:
+                        self._log(f"Invalid date format: {date_value}", "ERROR")
+                        return None
+                else:
+                    self._log(f"Invalid date format: {date_value}", "ERROR")
+                    return None
+            
+            result = {
                 'symbol': symbol,
                 'alpaca_args': alpaca_args
             }
+            
+            if date_value:
+                result['date'] = date_value
+            
+            return result
             
         except Exception as e:
             self._log(f"Error parsing plot args: {e}", "ERROR")
