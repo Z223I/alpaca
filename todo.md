@@ -72,7 +72,16 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 - [ ] ~/miniconda3/envs/alpaca/bin/python execute_aapl_trade.py
 
 
-Filter out stocks below two dollars.
+Filter out stocks below two dollars. ???
+
+
+
+
+
+
+Review README_MACD.md and also why am I getting Blind Flight in my alerts?
+
+
 
 ## Exit Strategy
 
@@ -110,7 +119,7 @@ Filter out stocks below two dollars.
 - [ ] VERY IMPORTANT. Think hard. Implement the instructions in specs/exit-strategy-testing.md to create code/maximize_profit.py.
 - [ ] Nudge
 - [ ] /commit
-- [ ] 
+- [ ]
 - [ ] Publish the branch
 - [ ] git switch master; merge current branch
 - [ ] Sync changes

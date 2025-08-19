@@ -14,10 +14,16 @@ from collections import defaultdict, Counter
 from datetime import datetime
 import pytz
 
-# Add current directory to Python path for imports
-sys.path.insert(0, '.')
+# Add project root to Python path for imports
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
-from atoms.utils.macd_alert_scorer import score_alerts_with_macd
+# Import with fallback for direct execution vs module import
+try:
+    from .macd_alert_scorer import score_alerts_with_macd
+except ImportError:
+    # Fallback for direct script execution - use absolute import from project root
+    from atoms.utils.macd_alert_scorer import score_alerts_with_macd
 
 
 def analyze_all_historical_alerts():
@@ -30,7 +36,7 @@ def analyze_all_historical_alerts():
     def load_alerts_for_symbol_date(symbol, date):
         """Load superduper alerts for a specific symbol and date."""
         # Build path pattern: historical_data/date/superduper_alerts_sent/**/*symbol*.json
-        historical_data_dir = Path("historical_data")
+        historical_data_dir = project_root / "historical_data"
         alert_pattern = historical_data_dir / date / "superduper_alerts_sent" / "**" / f"*{symbol}*.json"
         alert_files = list(historical_data_dir.rglob(f"*/superduper_alerts_sent/**/*{symbol}*.json"))
         
@@ -71,7 +77,7 @@ def analyze_all_historical_alerts():
         return alerts
     
     # Find all unique symbol/date combinations
-    historical_data_dir = Path("historical_data")
+    historical_data_dir = project_root / "historical_data"
     alert_files = list(historical_data_dir.rglob("superduper_alerts_sent/**/*.json"))
     
     print(f"Found {len(alert_files)} alert files")
