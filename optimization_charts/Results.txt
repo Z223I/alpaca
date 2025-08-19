@@ -1,0 +1,21 @@
+Optimization Results (full_grid_search):
+==================================================
+Best Combined Parameters:
+  Alert Timeframe: 20 minutes
+  Alert Green Threshold: 0.65
+  Take Profit: 12.5%
+  Stop Loss: 12.5%
+  Trailing Stop: 15%
+  MACD Enabled: True
+  MACD Sensitivity: conservative
+
+Performance Metrics:
+  Total Return: 30016.86%
+  Win Rate: 74.4%
+  Sharpe Ratio: 11.107
+  Profit Factor: 3.86
+  Max Drawdown: 35.51%
+  Total Trades: 78
+  Winning Trades: 58
+  Average Win: 15.04%
+  Average Loss: 11.30%
