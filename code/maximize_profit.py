@@ -34,6 +34,11 @@ try:
 except ImportError:
     STATSMODELS_AVAILABLE = False
 
+# Trade visualization and tracking
+import random
+import matplotlib.pyplot as plt
+from pathlib import Path
+
 # GPU acceleration imports (optional)
 try:
     import cupy as cp
@@ -1210,6 +1215,279 @@ class ExitStrategyOptimizer:
         return results
 
 
+class BestParametersTradeTracker:
+    """
+    Track and visualize trades using the best combined parameters.
+    Saves trade data to CSV and generates candlestick charts with entry/exit points.
+    """
+    
+    def __init__(self, data_loader: HistoricalDataLoader, simulator: ExitStrategySimulator):
+        self.data_loader = data_loader
+        self.simulator = simulator
+        self.trades = []
+        
+    def track_best_parameter_trades(self, alerts: List[Dict[str, Any]], best_params: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Track all trades using the best combined parameters.
+        
+        Args:
+            alerts: All alerts to filter
+            best_params: Best parameters dict with alert and exit parameters
+            
+        Returns:
+            List of detailed trade results
+        """
+        print(f"\n🎯 Tracking trades with BEST PARAMETERS:")
+        print(f"   Alert Timeframe: {best_params.get('alert_timeframe_minutes', 'N/A')} minutes")
+        print(f"   Alert Green Threshold: {best_params.get('alert_green_threshold', 'N/A'):.2f}")
+        print(f"   Take Profit: {best_params.get('take_profit_pct', 'N/A')}%")
+        print(f"   Trailing Stop: {best_params.get('trailing_stop_pct', 'N/A')}%")
+        
+        # Filter alerts matching best alert parameters
+        matching_alerts = []
+        for alert in alerts:
+            if (alert.get('timeframe_minutes') == best_params.get('alert_timeframe_minutes') and
+                alert.get('green_threshold') == best_params.get('alert_green_threshold')):
+                matching_alerts.append(alert)
+        
+        print(f"📊 Found {len(matching_alerts)} alerts matching best parameters")
+        
+        # Create exit parameters dict
+        exit_params = {
+            'take_profit_pct': best_params.get('take_profit_pct'),
+            'trailing_stop_pct': best_params.get('trailing_stop_pct')
+        }
+        
+        # Track each trade
+        detailed_trades = []
+        for i, alert in enumerate(matching_alerts):
+            trade_result = self.simulator.simulate_exit(alert, exit_params)
+            
+            # Add alert info to trade result
+            detailed_trade = {
+                'trade_id': i + 1,
+                'symbol': alert.get('symbol', 'UNKNOWN'),
+                'date': alert.get('date', 'UNKNOWN'),
+                'entry_time': alert.get('alert_timestamp'),
+                'entry_price': alert.get('entry_price'),
+                'exit_time': trade_result.get('exit_time'),
+                'exit_price': trade_result.get('exit_price'),
+                'exit_reason': trade_result.get('exit_reason'),
+                'profit_pct': trade_result.get('profit_pct', 0.0),
+                'profit_abs': trade_result.get('profit_abs', 0.0),
+                'hold_time_minutes': trade_result.get('hold_time_minutes', 0),
+                'timeframe_minutes': alert.get('timeframe_minutes'),
+                'green_threshold': alert.get('green_threshold'),
+                'take_profit_pct': best_params.get('take_profit_pct'),
+                'trailing_stop_pct': best_params.get('trailing_stop_pct'),
+                'json_file': alert.get('json_file', False)
+            }
+            
+            detailed_trades.append(detailed_trade)
+            
+            if (i + 1) % 10 == 0:
+                print(f"   Processed {i + 1}/{len(matching_alerts)} trades...")
+        
+        self.trades = detailed_trades
+        print(f"✅ Tracked {len(detailed_trades)} detailed trades")
+        
+        return detailed_trades
+    
+    def save_trades_to_csv(self, filename: str = "best_parameter_trades.csv") -> str:
+        """Save tracked trades to CSV file."""
+        if not self.trades:
+            print("❌ No trades to save!")
+            return ""
+            
+        df = pd.DataFrame(self.trades)
+        filepath = Path(filename)
+        df.to_csv(filepath, index=False)
+        
+        print(f"💾 Saved {len(self.trades)} trades to: {filepath}")
+        print(f"📊 Columns: {list(df.columns)}")
+        
+        # Show summary stats
+        profitable_trades = len([t for t in self.trades if t['profit_pct'] > 0])
+        avg_profit = np.mean([t['profit_pct'] for t in self.trades])
+        
+        print(f"📈 Trade Summary:")
+        print(f"   Total Trades: {len(self.trades)}")
+        print(f"   Profitable: {profitable_trades} ({profitable_trades/len(self.trades)*100:.1f}%)")
+        print(f"   Average Profit: {avg_profit:.2f}%")
+        
+        return str(filepath)
+    
+    def generate_random_trade_charts(self, num_charts: int = 5, output_dir: str = "optimization_charts") -> List[str]:
+        """
+        Generate candlestick charts for random trades showing entry/exit points.
+        
+        Args:
+            num_charts: Number of random trade charts to generate
+            output_dir: Directory to save charts
+            
+        Returns:
+            List of generated chart filenames
+        """
+        if not self.trades:
+            print("❌ No trades available for charting!")
+            return []
+            
+        # Create output directory
+        charts_dir = Path(output_dir)
+        charts_dir.mkdir(exist_ok=True)
+        
+        # Filter valid trades (with valid exit data)
+        valid_trades = [t for t in self.trades if t['exit_time'] and t['exit_price']]
+        if not valid_trades:
+            print("❌ No valid trades with exit data for charting!")
+            return []
+            
+        print(f"📊 Generating {min(num_charts, len(valid_trades))} random trade charts...")
+        
+        # Select random trades
+        selected_trades = random.sample(valid_trades, min(num_charts, len(valid_trades)))
+        chart_files = []
+        
+        for i, trade in enumerate(selected_trades):
+            try:
+                chart_file = self._create_trade_chart(trade, i + 1, charts_dir)
+                if chart_file:
+                    chart_files.append(chart_file)
+            except Exception as e:
+                print(f"⚠️ Error creating chart for trade {trade['trade_id']}: {e}")
+                continue
+                
+        print(f"✅ Generated {len(chart_files)} trade charts in {charts_dir}/")
+        return chart_files
+    
+    def _create_trade_chart(self, trade: Dict[str, Any], chart_num: int, output_dir: Path) -> Optional[str]:
+        """Create a candlestick chart for a specific trade."""
+        symbol = trade['symbol']
+        date = trade['date']
+        
+        # Get price data from cache
+        price_data = self.data_loader.get_symbol_data(symbol, date)
+        if price_data is None or len(price_data) == 0:
+            print(f"⚠️ No price data for {symbol} on {date}")
+            return None
+            
+        # Validate required columns
+        required_cols = ['timestamp', 'close', 'high', 'low']
+        if not all(col in price_data.columns for col in required_cols):
+            print(f"⚠️ Missing required columns in price data for {symbol} on {date}")
+            return None
+            
+        # Reset index to ensure positional indexing works correctly
+        price_data = price_data.reset_index(drop=True)
+        
+        # Create the chart
+        fig, ax = plt.subplots(figsize=(14, 8))
+        
+        # Plot candlesticks (simplified as OHLC line chart)
+        ax.plot(price_data['timestamp'], price_data['close'], 'k-', alpha=0.7, linewidth=1)
+        ax.fill_between(price_data['timestamp'], price_data['low'], price_data['high'], 
+                       alpha=0.2, color='gray', label='High-Low Range')
+        
+        # Mark entry point
+        if trade['entry_time']:
+            entry_time = pd.to_datetime(trade['entry_time'])
+            
+            # Handle timezone consistency with price data
+            if entry_time.tz is None and hasattr(price_data['timestamp'].iloc[0], 'tz') and price_data['timestamp'].iloc[0].tz is not None:
+                # Entry time is naive, price data has timezone - localize entry time
+                entry_time = entry_time.tz_localize('US/Eastern')
+            elif entry_time.tz is not None and (not hasattr(price_data['timestamp'].iloc[0], 'tz') or price_data['timestamp'].iloc[0].tz is None):
+                # Entry time has timezone, price data is naive - convert entry time to naive
+                entry_time = entry_time.tz_convert(None) if entry_time.tz else entry_time.replace(tzinfo=None)
+            
+            # Find the closest timestamp in price data to entry time
+            try:
+                time_diffs = (price_data['timestamp'] - entry_time).abs()
+                closest_pos = time_diffs.argmin()  # Use argmin() for positional index
+                
+                # Validate the position is within bounds
+                if 0 <= closest_pos < len(price_data):
+                    actual_entry_time = price_data['timestamp'].iloc[closest_pos]
+                    actual_entry_price = price_data['close'].iloc[closest_pos]
+                else:
+                    # Fallback to original values if position is invalid
+                    actual_entry_time = entry_time
+                    actual_entry_price = trade['entry_price']
+                    print(f"⚠️ Invalid entry position {closest_pos} for {symbol} on {date}")
+                    
+            except Exception as e:
+                # Fallback to original values if any error occurs
+                actual_entry_time = entry_time
+                actual_entry_price = trade['entry_price']
+                print(f"⚠️ Error finding entry time for {symbol} on {date}: {e}")
+            
+            
+            ax.axvline(actual_entry_time, color='green', linestyle='--', linewidth=2, alpha=0.8, label='Entry')
+            ax.scatter(actual_entry_time, actual_entry_price, color='green', s=100, zorder=5, marker='^')
+            ax.text(actual_entry_time, actual_entry_price + (actual_entry_price * 0.01), 
+                   f"ENTRY\n${actual_entry_price:.2f}", ha='center', va='bottom', 
+                   fontweight='bold', color='green')
+        
+        # Mark exit point
+        if trade['exit_time']:
+            exit_time = pd.to_datetime(trade['exit_time'])
+            
+            # Handle timezone consistency with price data (same as entry)
+            if exit_time.tz is None and hasattr(price_data['timestamp'].iloc[0], 'tz') and price_data['timestamp'].iloc[0].tz is not None:
+                exit_time = exit_time.tz_localize('US/Eastern')
+            elif exit_time.tz is not None and (not hasattr(price_data['timestamp'].iloc[0], 'tz') or price_data['timestamp'].iloc[0].tz is None):
+                exit_time = exit_time.tz_convert(None) if exit_time.tz else exit_time.replace(tzinfo=None)
+            
+            # Find the closest timestamp in price data to exit time
+            try:
+                time_diffs = (price_data['timestamp'] - exit_time).abs()
+                closest_pos = time_diffs.argmin()  # Use argmin() for positional index
+                
+                # Validate the position is within bounds
+                if 0 <= closest_pos < len(price_data):
+                    actual_exit_time = price_data['timestamp'].iloc[closest_pos]
+                else:
+                    # Fallback to original values if position is invalid
+                    actual_exit_time = exit_time
+                    print(f"⚠️ Invalid exit position {closest_pos} for {symbol} on {date}")
+                    
+            except Exception as e:
+                # Fallback to original values if any error occurs
+                actual_exit_time = exit_time
+                print(f"⚠️ Error finding exit time for {symbol} on {date}: {e}")
+            actual_exit_price = trade['exit_price']  # Keep the calculated exit price from simulation
+            
+            exit_color = 'red' if trade['profit_pct'] < 0 else 'blue'
+            ax.axvline(actual_exit_time, color=exit_color, linestyle='--', linewidth=2, alpha=0.8, label='Exit')
+            ax.scatter(actual_exit_time, actual_exit_price, color=exit_color, s=100, zorder=5, marker='v')
+            ax.text(actual_exit_time, actual_exit_price + (actual_exit_price * 0.01), 
+                   f"EXIT ({trade['exit_reason']})\n${actual_exit_price:.2f}", 
+                   ha='center', va='bottom', fontweight='bold', color=exit_color)
+        
+        # Chart formatting
+        ax.set_title(f"Trade #{trade['trade_id']}: {symbol} on {date}\n"
+                    f"Profit: {trade['profit_pct']:+.2f}% | Hold: {trade['hold_time_minutes']:.0f}min | "
+                    f"TP: {trade['take_profit_pct']}% | TS: {trade['trailing_stop_pct']}%", 
+                    fontsize=12, fontweight='bold')
+        ax.set_xlabel('Time')
+        ax.set_ylabel('Price ($)')
+        ax.grid(True, alpha=0.3)
+        ax.legend()
+        
+        # Rotate x-axis labels
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        
+        # Save chart
+        filename = f"trade_{chart_num:02d}_{symbol}_{date}_{trade['profit_pct']:+.1f}pct.png"
+        filepath = output_dir / filename
+        plt.savefig(filepath, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print(f"   📊 Chart {chart_num}: {filename}")
+        return str(filepath)
+
+
 def create_profitability_visualizations(results: Dict[str, Any], output_dir: str = "optimization_charts"):
     """
     Create comprehensive profitability charts to visualize optimization results.
@@ -1852,6 +2130,178 @@ def apply_multiple_testing_correction(p_values: List[float], method: str = 'holm
     return rejected.tolist(), p_corrected.tolist()
 
 
+def create_trade_distribution_analysis(csv_file: str = "best_parameter_trades.csv", 
+                                      output_dir: str = "optimization_charts") -> bool:
+    """
+    Create comprehensive trade distribution analysis from CSV data.
+    Shows profit distribution, cumulative performance, exit reasons, and timing analysis.
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+    
+    # Load the CSV data
+    csv_path = Path(csv_file)
+    if not csv_path.exists():
+        print(f"⚠️ Trade CSV file not found: {csv_path}")
+        return False
+    
+    print(f"\n📊 CREATING TRADE DISTRIBUTION ANALYSIS")
+    print("=" * 50)
+    print(f"📊 Loading trade data from {csv_path}...")
+    
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception as e:
+        print(f"❌ Error loading CSV: {e}")
+        return False
+    
+    if len(df) == 0:
+        print(f"❌ No trade data found in CSV")
+        return False
+        
+    print(f"✅ Loaded {len(df)} trades")
+    
+    # Basic statistics
+    profitable_trades = len(df[df['profit_pct'] > 0])
+    loss_trades = len(df[df['profit_pct'] < 0])
+    
+    print(f"📈 TRADE STATISTICS:")
+    print(f"   Total trades: {len(df)}")
+    print(f"   Profitable: {profitable_trades} ({profitable_trades/len(df)*100:.1f}%)")
+    print(f"   Losses: {loss_trades} ({loss_trades/len(df)*100:.1f}%)")
+    print(f"   Average profit: {df['profit_pct'].mean():.2f}%")
+    print(f"   Median profit: {df['profit_pct'].median():.2f}%")
+    print(f"   Max profit: {df['profit_pct'].max():.2f}%")
+    print(f"   Max loss: {df['profit_pct'].min():.2f}%")
+    
+    # Create the plot
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
+    
+    # Plot 1: Histogram of profit percentage distribution
+    profits = df['profit_pct']
+    
+    # Create bins for profit percentage
+    bins = np.arange(profits.min() - 1, profits.max() + 2, 2.5)  # 2.5% bins
+    n, bins, patches = ax1.hist(profits, bins=bins, alpha=0.7, edgecolor='black')
+    
+    # Color bars: red for losses, green for profits
+    for i, (patch, bin_val) in enumerate(zip(patches, bins[:-1])):
+        if bin_val < 0:
+            patch.set_facecolor('red')
+            patch.set_alpha(0.7)
+        else:
+            patch.set_facecolor('green')
+            patch.set_alpha(0.7)
+    
+    ax1.axvline(x=0, color='black', linestyle='--', alpha=0.8, label='Breakeven')
+    ax1.set_xlabel('Profit Percentage (%)')
+    ax1.set_ylabel('Number of Trades')
+    ax1.set_title('Trade Profit Distribution\n(Best Parameters Analysis)', fontweight='bold')
+    ax1.grid(True, alpha=0.3)
+    ax1.legend()
+    
+    # Add statistics text
+    ax1.text(0.02, 0.95, f'Total: {len(df)} trades\nWin Rate: {profitable_trades/len(df)*100:.1f}%\nAvg: {profits.mean():.2f}%', 
+             transform=ax1.transAxes, va='top', ha='left', 
+             bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
+    
+    # Plot 2: Cumulative profit over time
+    df_sorted = df.sort_values('trade_id')
+    cumulative_profit = df_sorted['profit_abs'].cumsum()
+    
+    ax2.plot(df_sorted['trade_id'], cumulative_profit, 'b-', linewidth=2)
+    ax2.axhline(y=0, color='black', linestyle='--', alpha=0.5)
+    ax2.fill_between(df_sorted['trade_id'], cumulative_profit, 0, 
+                     where=(cumulative_profit >= 0), color='green', alpha=0.3, label='Profit')
+    ax2.fill_between(df_sorted['trade_id'], cumulative_profit, 0, 
+                     where=(cumulative_profit < 0), color='red', alpha=0.3, label='Loss')
+    
+    ax2.set_xlabel('Trade Sequence')
+    ax2.set_ylabel('Cumulative Profit ($)')
+    ax2.set_title('Cumulative Profit Over Trade Sequence', fontweight='bold')
+    ax2.grid(True, alpha=0.3)
+    ax2.legend()
+    
+    # Plot 3: Exit reason distribution
+    if 'exit_reason' in df.columns:
+        exit_reasons = df['exit_reason'].value_counts()
+        colors = ['skyblue', 'orange', 'lightgreen', 'pink', 'yellow'][:len(exit_reasons)]
+        
+        wedges, texts, autotexts = ax3.pie(exit_reasons.values, labels=exit_reasons.index, 
+                                          colors=colors, autopct='%1.1f%%', startangle=90)
+        ax3.set_title('Exit Reason Distribution', fontweight='bold')
+    else:
+        ax3.text(0.5, 0.5, 'Exit reason\ndata not available', ha='center', va='center', 
+                transform=ax3.transAxes, fontsize=12)
+        ax3.set_title('Exit Reason Distribution', fontweight='bold')
+    
+    # Plot 4: Profit vs Hold Time scatter
+    if 'hold_time_minutes' in df.columns:
+        valid_times = df[df['hold_time_minutes'] > 0]
+        
+        if len(valid_times) > 0:
+            # Color points by profit/loss
+            colors = ['red' if p < 0 else 'green' for p in valid_times['profit_pct']]
+            scatter = ax4.scatter(valid_times['hold_time_minutes'], valid_times['profit_pct'], 
+                                 c=colors, alpha=0.6, s=50)
+            
+            ax4.axhline(y=0, color='black', linestyle='--', alpha=0.5)
+            ax4.set_xlabel('Hold Time (minutes)')
+            ax4.set_ylabel('Profit Percentage (%)')
+            ax4.set_title('Profit vs Hold Time', fontweight='bold')
+            ax4.grid(True, alpha=0.3)
+            
+            # Add trendline
+            if len(valid_times) > 1:
+                try:
+                    z = np.polyfit(valid_times['hold_time_minutes'], valid_times['profit_pct'], 1)
+                    p = np.poly1d(z)
+                    ax4.plot(valid_times['hold_time_minutes'], p(valid_times['hold_time_minutes']), 
+                            "r--", alpha=0.8, linewidth=1, label=f'Trend: {z[0]:.3f}x + {z[1]:.2f}')
+                    ax4.legend()
+                except:
+                    pass  # Skip trendline if polyfit fails
+        else:
+            ax4.text(0.5, 0.5, 'No valid hold time data', ha='center', va='center', 
+                    transform=ax4.transAxes, fontsize=12)
+            ax4.set_title('Profit vs Hold Time', fontweight='bold')
+    else:
+        ax4.text(0.5, 0.5, 'Hold time data\nnot available', ha='center', va='center', 
+                transform=ax4.transAxes, fontsize=12)
+        ax4.set_title('Profit vs Hold Time', fontweight='bold')
+    
+    plt.tight_layout()
+    
+    # Save the plot
+    output_path = Path(output_dir)
+    output_path.mkdir(exist_ok=True)
+    output_file = output_path / 'trade_distribution_analysis.png'
+    plt.savefig(output_file, dpi=300)
+    plt.close()
+    
+    print(f"✅ Trade distribution analysis saved: {output_file}")
+    
+    # Print detailed analysis
+    print(f"\n🔍 DETAILED PERFORMANCE BREAKDOWN:")
+    
+    # Profit ranges
+    profit_ranges = [
+        ('Big Loss', profits < -10),
+        ('Small Loss', (profits >= -10) & (profits < 0)),
+        ('Small Profit', (profits >= 0) & (profits < 10)),
+        ('Good Profit', (profits >= 10) & (profits < 20)),
+        ('Excellent Profit', profits >= 20)
+    ]
+    
+    for range_name, condition in profit_ranges:
+        count = len(df[condition])
+        pct = count / len(df) * 100 if len(df) > 0 else 0
+        avg_profit = df[condition]['profit_pct'].mean() if count > 0 else 0
+        print(f"   {range_name}: {count} trades ({pct:.1f}%) | Avg: {avg_profit:.2f}%")
+    
+    return True
+
+
 def main():
     """Main execution function with CLI interface."""
     parser = argparse.ArgumentParser(description='Exit Strategy Optimization System')
@@ -1999,6 +2449,46 @@ def main():
 
     print(f"\nResults saved to {args.output}")
 
+    # Track and visualize trades with best parameters
+    print(f"\n🎯 TRADE TRACKING AND VISUALIZATION")
+    print("=" * 50)
+    
+    # Create trade tracker
+    data_loader = HistoricalDataLoader()
+    simulator = ExitStrategySimulator()
+    trade_tracker = BestParametersTradeTracker(data_loader, simulator)
+    
+    # Get the best parameters for tracking
+    if args.method == 'hierarchical':
+        # Combine best alert and exit parameters
+        best_combined_params = {
+            'alert_timeframe_minutes': results['best_alert_parameters']['timeframe_minutes'],
+            'alert_green_threshold': results['best_alert_parameters']['green_threshold'],
+            'take_profit_pct': results['best_exit_parameters']['take_profit_pct'],
+            'trailing_stop_pct': results['best_exit_parameters']['trailing_stop_pct']
+        }
+    else:
+        best_combined_params = results['best_parameters']
+    
+    # Track trades with best parameters
+    detailed_trades = trade_tracker.track_best_parameter_trades(alerts, best_combined_params)
+    
+    # Save trades to CSV
+    csv_file = trade_tracker.save_trades_to_csv("best_parameter_trades.csv")
+    
+    # Generate random trade charts
+    if detailed_trades:
+        print(f"\n📊 GENERATING TRADE VISUALIZATION CHARTS (20 random trades)")
+        chart_files = trade_tracker.generate_random_trade_charts(num_charts=20, output_dir="optimization_charts")
+        
+        if chart_files:
+            print(f"📁 Trade charts saved in optimization_charts/ directory:")
+            for chart_file in chart_files:
+                print(f"   📊 {Path(chart_file).name}")
+        
+        # Generate trade distribution analysis
+        create_trade_distribution_analysis("best_parameter_trades.csv", "optimization_charts")
+
     # Generate profitability visualization charts
     charts_created = create_profitability_visualizations(results)
 
@@ -2010,6 +2500,8 @@ def main():
         print("  🎯 4_win_rate_analysis.png - Comprehensive win rate analysis")
         print("  📈 5_parameter_distributions.png - Parameter performance distributions")
         print("  🏆 6_performance_comparison.png - Best strategy performance summary")
+        print("  📊 trade_distribution_analysis.png - Trade profit distribution and performance analysis")
+        print("  📊 trade_01-20_*.png - Individual trade charts with entry/exit visualization")
         print(f"\n📁 All charts saved in optimization_charts/ directory")
 
     return 0
