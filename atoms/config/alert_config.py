@@ -20,7 +20,7 @@ class ORBAlertConfig:
     # Primary ORB Settings
     orb_period_minutes: int = 15          # Opening range period
     breakout_threshold: float = 0.002     # 0.2% above ORB high
-    volume_multiplier: float = 1.5        # 1.5x average volume required
+    volume_multiplier: float = 0.8        # 0.8x average volume required (reduced to catch early massive breakouts)
 
     # Statistical Confidence (based on PCA analysis)
     pc1_weight: float = 0.8231           # PC1 variance weight

@@ -404,8 +404,21 @@ class ORBPipelineSimulator:
                 # Add to data buffer
                 alert_engine.data_buffer.add_market_data(market_data_obj)
                 
+                # DEBUG: Log for key times in simulator
+                current_time = timestamp.strftime('%H:%M')
+                if current_time in ['09:30', '09:45', '11:00', '11:01', '11:02', '11:03', '11:04', '11:05', '11:10', '11:15', '11:20', '11:25', '11:28', '11:29', '11:30', '15:48']:
+                    print(f"[SIMULATOR DEBUG] {symbol} {current_time} - About to process market data, price: ${row['close']:.4f}")
+                
                 # Process through ORB engine (this may generate alerts)
-                alert_engine._process_market_data_optimized(market_data_obj)
+                # CRITICAL FIX: Force synchronous execution to ensure ALL data is processed
+                try:
+                    # Call async method and WAIT for completion
+                    await alert_engine._process_potential_alert_optimized(market_data_obj)
+                    # Force a small delay to ensure async tasks complete
+                    await asyncio.sleep(0.001)
+                except Exception as e:
+                    self.logger.error(f"Error in alert processing for {symbol} at {current_time}: {e}")
+                    # Continue processing other records
                 
                 processed_records += 1
                 
@@ -524,6 +537,26 @@ class ORBPipelineSimulator:
             
             # Convert ORBAlert objects to serializable format
             serializable_results = self.simulation_results.copy()
+            
+            # Handle alerts in individual symbol results
+            if 'symbol_results' in serializable_results:
+                for result in serializable_results['symbol_results']:
+                    if 'alerts' in result:
+                        result['alerts'] = [
+                            {
+                                'symbol': alert.symbol,
+                                'timestamp': alert.timestamp.isoformat(),
+                                'current_price': float(alert.current_price),
+                                'orb_high': float(alert.orb_high),
+                                'orb_low': float(alert.orb_low),
+                                'breakout_type': alert.breakout_type.value,
+                                'confidence_score': float(alert.confidence_score),
+                                'alert_message': alert.alert_message
+                            }
+                            for alert in result['alerts']
+                        ]
+            
+            # Handle global generated alerts
             serializable_results['generated_alerts'] = [
                 {
                     'symbol': alert.symbol,

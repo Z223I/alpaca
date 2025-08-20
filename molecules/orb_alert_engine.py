@@ -220,7 +220,7 @@ class ORBAlertEngine:
                     return
             
             # Check if we're in alert window
-            if not self.breakout_detector.is_within_alert_window():
+            if not self.breakout_detector.is_within_alert_window(market_data.timestamp):
                 return
             
             # Calculate volume ratio
@@ -510,12 +510,28 @@ class ORBAlertEngine:
         # TEMPORARILY BYPASS performance tracking
         # op_id = performance_tracker.start_operation(f"process_market_data_{market_data.symbol}")
         
+        # DEBUG: Log entry for key times
+        current_time = market_data.timestamp.strftime('%H:%M')
+        if current_time in ['09:30', '09:45', '11:28', '11:29', '11:30', '11:31', '11:32', '11:33', '15:48']:
+            self.logger.info(f"[DEBUG SYNC] {market_data.symbol} {current_time} - Processing market data, price: ${market_data.price:.4f}")
+        
         try:
             # Add to data buffer
             self.data_buffer.add_market_data(market_data)
             
-            # Process potential alert with async task
-            asyncio.create_task(self._process_potential_alert_optimized(market_data))
+            # For simulation, we need to await the async task properly
+            # Create task and run it immediately in the current event loop
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # If event loop is running, create task (fire-and-forget)
+                    asyncio.create_task(self._process_potential_alert_optimized(market_data))
+                else:
+                    # If no event loop, run sync version
+                    loop.run_until_complete(self._process_potential_alert_optimized(market_data))
+            except RuntimeError:
+                # No event loop available, run synchronously
+                asyncio.run(self._process_potential_alert_optimized(market_data))
             
             # TEMPORARILY BYPASS performance tracking
             # performance_tracker.end_operation(op_id, success=True)
@@ -533,10 +549,17 @@ class ORBAlertEngine:
         # alert_start_time = time.time()
         # op_id = performance_tracker.start_operation(f"alert_processing_{symbol}")
         
+        # DEBUG: Log every call for key times - FORCE LOGGING FOR CRITICAL TIMEFRAME
+        current_time = market_data.timestamp.strftime('%H:%M')
+        if current_time in ['11:00', '11:01', '11:02', '11:03', '11:04', '11:05', '11:10', '11:15', '11:20', '11:25', '11:28', '11:29', '11:30', '15:48', '15:49']:
+            print(f"[ORB ENGINE ENTRY] {symbol} {current_time} - PROCESSING ALERT, price: ${market_data.price:.4f}")
+            self.logger.info(f"[DEBUG ENTRY] {symbol} {current_time} - Processing potential alert, price: ${market_data.price:.4f}")
+        
         try:
             # Get historical data for ORB calculation
             historical_data = self.data_buffer.get_symbol_data(symbol)
             if historical_data.empty:
+                self.logger.debug(f"[DEBUG] {symbol} - No historical data available")
                 return
             
             # Calculate ORB levels if not already cached
@@ -544,14 +567,42 @@ class ORBAlertEngine:
             if orb_level is None:
                 orb_level = self.orb_calculator.calculate_orb_levels(symbol, historical_data)
                 if orb_level is None:
+                    if current_time in ['11:00', '11:01', '11:02', '11:03', '11:04', '11:05', '11:10', '11:15', '11:20', '11:25', '11:28', '11:29', '11:30']:
+                        print(f"[ORB CALC FAILED] {symbol} {current_time} - Could not calculate ORB levels")
+                    self.logger.debug(f"[DEBUG] {symbol} - Could not calculate ORB levels")
                     return
+                else:
+                    if current_time in ['11:00', '11:01', '11:02', '11:03', '11:04', '11:05', '11:10', '11:15', '11:20', '11:25', '11:28', '11:29', '11:30']:
+                        print(f"[ORB CALC SUCCESS] {symbol} {current_time} - ORB levels: high=${orb_level.orb_high:.4f}, low=${orb_level.orb_low:.4f}")
+                    self.logger.debug(f"[DEBUG] {symbol} - Calculated ORB levels: high={orb_level.orb_high:.4f}, low={orb_level.orb_low:.4f}")
+            
+            # DEBUG: Log current price vs ORB levels for significant moves
+            current_time = market_data.timestamp.strftime('%H:%M')
+            if (market_data.price > orb_level.orb_high * 1.5 or 
+                market_data.price < orb_level.orb_low * 0.8 or
+                current_time in ['11:00', '11:01', '11:02', '11:03', '11:04', '11:05', '11:10', '11:15', '11:20', '11:25', '11:28', '11:29', '11:30']):
+                breakout_pct = (market_data.price/orb_level.orb_high-1)*100
+                print(f"[PRICE CHECK] {symbol} {current_time} - Price: ${market_data.price:.4f} vs ORB High: ${orb_level.orb_high:.4f} ({breakout_pct:+.1f}%)")
+                self.logger.info(f"[DEBUG] {symbol} {current_time} - Price: ${market_data.price:.4f} vs ORB High: ${orb_level.orb_high:.4f} ({(market_data.price/orb_level.orb_high-1)*100:+.1f}%)")
             
             # Check if we're in alert window
-            if not self.breakout_detector.is_within_alert_window():
+            in_window = self.breakout_detector.is_within_alert_window(market_data.timestamp)
+            if not in_window:
+                if current_time in ['11:00', '11:01', '11:02', '11:03', '11:04', '11:05', '11:10', '11:15', '11:20', '11:25', '11:28', '11:29', '11:30']:
+                    print(f"🚨 [ALERT WINDOW BLOCKED] {symbol} {current_time} - Outside alert window (9:45-20:00)")
+                    self.logger.info(f"[DEBUG] {symbol} {current_time} - Outside alert window (9:45-20:00)")
                 return
+            else:
+                if current_time in ['11:00', '11:01', '11:02', '11:03', '11:04', '11:05', '11:10', '11:15', '11:20', '11:25', '11:28', '11:29', '11:30']:
+                    print(f"✅ [ALERT WINDOW OK] {symbol} {current_time} - Inside alert window")
             
             # Calculate volume ratio
             volume_ratio = self._calculate_volume_ratio(symbol, market_data)
+            
+            # DEBUG: Log volume analysis for key times
+            if current_time in ['11:00', '11:01', '11:02', '11:03', '11:04', '11:05', '11:10', '11:15', '11:20', '11:25', '11:28', '11:29', '11:30']:
+                print(f"📊 [VOLUME CHECK] {symbol} {current_time} - Volume ratio: {volume_ratio:.2f}x")
+                self.logger.info(f"[DEBUG] {symbol} {current_time} - Volume ratio: {volume_ratio:.2f}x")
             
             # Detect breakout
             breakout_signal = self.breakout_detector.detect_breakout(
@@ -562,7 +613,16 @@ class ORBAlertEngine:
             )
             
             if breakout_signal is None:
+                if (market_data.price > orb_level.orb_high * 1.1 and 
+                    current_time in ['11:00', '11:01', '11:02', '11:03', '11:04', '11:05', '11:10', '11:15', '11:20', '11:25', '11:28', '11:29', '11:30']):
+                    print(f"🚨 [BREAKOUT BLOCKED] {symbol} {current_time} - No breakout signal despite price ${market_data.price:.2f} being {((market_data.price/orb_level.orb_high-1)*100):+.1f}% above ORB high")
+                    self.logger.info(f"[DEBUG] {symbol} {current_time} - No breakout signal despite price above ORB high")
                 return
+            
+            # DEBUG: Log successful breakout detection
+            if current_time in ['11:00', '11:01', '11:02', '11:03', '11:04', '11:05', '11:10', '11:15', '11:20', '11:25', '11:28', '11:29', '11:30']:
+                print(f"✅ [BREAKOUT DETECTED] {symbol} {current_time} - Breakout type: {breakout_signal.breakout_type.value}")
+                self.logger.info(f"[DEBUG] {symbol} {current_time} - Breakout detected: {breakout_signal.breakout_type.value}")
             
             # Calculate technical indicators
             technical_indicators = self.breakout_detector.calculate_technical_indicators(historical_data)
@@ -572,9 +632,21 @@ class ORBAlertEngine:
                 breakout_signal, technical_indicators
             )
             
+            # DEBUG: Log confidence scoring
+            if current_time in ['11:00', '11:01', '11:02', '11:03', '11:04', '11:05', '11:10', '11:15', '11:20', '11:25', '11:28', '11:29', '11:30']:
+                print(f"🎯 [CONFIDENCE CHECK] {symbol} {current_time} - Score: {confidence.score:.3f} vs Threshold: {confidence.threshold:.3f}")
+                self.logger.info(f"[DEBUG] {symbol} {current_time} - Confidence score: {confidence.score:.3f} (threshold: {confidence.threshold:.3f})")
+            
             # Check if alert should be generated
-            if not self.confidence_scorer.should_generate_alert(confidence):
+            should_alert = self.confidence_scorer.should_generate_alert(confidence)
+            if not should_alert:
+                if current_time in ['11:00', '11:01', '11:02', '11:03', '11:04', '11:05', '11:10', '11:15', '11:20', '11:25', '11:28', '11:29', '11:30']:
+                    print(f"🚨 [CONFIDENCE BLOCKED] {symbol} {current_time} - Alert blocked! Score {confidence.score:.3f} < Threshold {confidence.threshold:.3f}")
+                    self.logger.info(f"[DEBUG] {symbol} {current_time} - Alert blocked by confidence threshold")
                 return
+            else:
+                if current_time in ['11:00', '11:01', '11:02', '11:03', '11:04', '11:05', '11:10', '11:15', '11:20', '11:25', '11:28', '11:29', '11:30']:
+                    print(f"✅ [CONFIDENCE PASSED] {symbol} {current_time} - Alert approved! Score {confidence.score:.3f} >= Threshold {confidence.threshold:.3f}")
             
             # Create and process alert
             alert = self.alert_formatter.create_alert(breakout_signal, confidence, technical_indicators)
