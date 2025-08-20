@@ -80,8 +80,9 @@ Filter out stocks below two dollars. ???
 Send alert to Bruce the first time a symbol is at 20, 30, etc. percent above orb high in the 30 minutes.
 
 
+## Stuff
 
-
+- [X] Change this back.  open -> o, etc.  How did this even get back into the code??
                df_data.append({
                     'timestamp': timestamp_et,
                     'open': float(bar.open),
@@ -91,34 +92,9 @@ Send alert to Bruce the first time a symbol is at 20, 30, etc. percent above orb
                     'volume': int(bar.volume),
                     'symbol': self.symbol
                 })
-
-Remove changes to maximize profit
-
-remove all log file usage from maximize_profit.py - JSON files only
-Remove fake MACD
-
-## Exit with MACD
-
-### Config
-
-- [X] claude --dangerously-skip-permissions
-- [X] /login
-- [X] /commit
-- [X] Sync changes
-- [X] /clear
-- [X] git switch -c feature/maximize-with-macd
-- [X] /clear
-- [X] /read...
-
-### Spec File
-
-- [ ] VERY IMPORTANT. Think hard. Review README_MACD.md but ignore the Historical Analysis Tool. Update code/maximize_profit.py. Add the MACD scoring as an exit strategy.  It can be used by itself or with the other exit strategies. Test with Conda alpaca environment.
-- [ ] IMPORTANT. NEVER use log files to find alerts.
-- [ ] /commit
-- [ ]
-- [ ] Publish the branch
-- [ ] git switch master; merge current branch
-- [ ] Sync changes
+- [X] Remove changes to maximize profit
+- [X] remove all log file usage from maximize_profit.py - JSON files only
+- [X] Remove fake MACD
 
 
 ## MISC

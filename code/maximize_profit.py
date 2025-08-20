@@ -65,13 +65,11 @@ EXIT_PARAMETERS = {
     'take_profit_pct': [5, 7.5, 10, 12.5, 15],              # 5 values (5-15% in 2.5% increments)
     'trailing_stop_pct': [5, 7.5, 10, 12.5, 15],            # 5 values
     # 'stop_loss_pct': removed - using trailing stops instead
-    'macd_sensitivity': ['conservative', 'normal', 'aggressive'],  # 3 values
-    'macd_enabled': [True, False]                            # 2 values
 }
 
 # Total combinations (FOCUSED): 1 × 4 = 4 alert combinations
-# 5 × 5 × 3 × 2 = 150 exit combinations per alert set
-# Total parameter sets: 4 × 150 = 600 (significant reduction, focused on trailing stops)
+# 5 × 5 = 25 exit combinations per alert set
+# Total parameter sets: 4 × 25 = 100 (significant reduction, trailing stops only)
 
 # Orin Nano optimized configuration
 ORIN_NANO_CONFIG = {
@@ -966,21 +964,16 @@ class ExitStrategyOptimizer:
                 # Generate all exit parameter combinations for each alert set
                 for take_profit in EXIT_PARAMETERS['take_profit_pct']:
                     for trailing_stop in EXIT_PARAMETERS['trailing_stop_pct']:
-                        for macd_sensitivity in EXIT_PARAMETERS['macd_sensitivity']:
-                            for macd_enabled in EXIT_PARAMETERS['macd_enabled']:
+                        combination = {
+                            # Alert parameters
+                            'alert_timeframe_minutes': timeframe,
+                            'alert_green_threshold': threshold,
 
-                                combination = {
-                                    # Alert parameters
-                                    'alert_timeframe_minutes': timeframe,
-                                    'alert_green_threshold': threshold,
-
-                                    # Exit parameters
-                                    'take_profit_pct': take_profit,
-                                    'trailing_stop_pct': trailing_stop,
-                                    'macd_sensitivity': macd_sensitivity,
-                                    'macd_enabled': macd_enabled
-                                }
-                                combinations.append(combination)
+                            # Exit parameters
+                            'take_profit_pct': take_profit,
+                            'trailing_stop_pct': trailing_stop
+                        }
+                        combinations.append(combination)
 
         return combinations
 
@@ -996,9 +989,7 @@ class ExitStrategyOptimizer:
         print("\nStep 1: Optimizing alert parameters with simple exits...")
         simple_exit_params = {
             'take_profit_pct': 10,  # Updated to be within new range (5-15%)
-            'trailing_stop_pct': 12.5,
-            'macd_enabled': False,
-            'macd_sensitivity': 'normal'
+            'trailing_stop_pct': 12.5
         }
 
         alert_results = []
@@ -1062,16 +1053,11 @@ class ExitStrategyOptimizer:
         exit_combinations = []
         for take_profit in EXIT_PARAMETERS['take_profit_pct']:
             for trailing_stop in EXIT_PARAMETERS['trailing_stop_pct']:
-                for macd_sensitivity in EXIT_PARAMETERS['macd_sensitivity']:
-                    for macd_enabled in EXIT_PARAMETERS['macd_enabled']:
-
-                        exit_params = {
-                            'take_profit_pct': take_profit,
-                            'trailing_stop_pct': trailing_stop,
-                            'macd_sensitivity': macd_sensitivity,
-                            'macd_enabled': macd_enabled
-                        }
-                        exit_combinations.append(exit_params)
+                exit_params = {
+                    'take_profit_pct': take_profit,
+                    'trailing_stop_pct': trailing_stop
+                }
+                exit_combinations.append(exit_params)
 
         # Limit combinations if requested
         if max_combinations and len(exit_combinations) > max_combinations:
@@ -1609,9 +1595,7 @@ def _create_parameter_distributions(results: Dict[str, Any], output_path: Path):
     # Collect parameter data
     param_data = {
         'take_profit_pct': [],
-        # 'stop_loss_pct': [],  # Removed - using trailing stops
         'trailing_stop_pct': [],
-        'macd_enabled': [],
         'sharpe_ratios': []
     }
 
@@ -1620,9 +1604,7 @@ def _create_parameter_distributions(results: Dict[str, Any], output_path: Path):
         metrics = result['metrics']
 
         param_data['take_profit_pct'].append(params.get('take_profit_pct', 0))
-        # param_data['stop_loss_pct'].append(params.get('stop_loss_pct', 0))  # Removed
         param_data['trailing_stop_pct'].append(params.get('trailing_stop_pct', 0))
-        param_data['macd_enabled'].append(params.get('macd_enabled', False))
         param_data['sharpe_ratios'].append(metrics.get('sharpe_ratio', 0))
 
     if not param_data['take_profit_pct']:
@@ -1650,20 +1632,17 @@ def _create_parameter_distributions(results: Dict[str, Any], output_path: Path):
     axes[0,1].set_ylabel('Average Sharpe Ratio')
     axes[0,1].grid(True, alpha=0.3)
 
-    # MACD Enabled vs Disabled (moved to position [0,2])
-    macd_perf = df.groupby('macd_enabled')['sharpe_ratios'].mean()
-
-    colors = ['lightcoral', 'lightblue']
-    macd_labels = ['MACD Disabled', 'MACD Enabled']
-    bars = axes[0,2].bar(macd_labels, macd_perf.values, color=colors, alpha=0.8)
-    axes[0,2].set_title('🔄 MACD Usage Performance', fontweight='bold')
-    axes[0,2].set_ylabel('Average Sharpe Ratio')
+    # Parameter Scatter Plot (Take Profit vs Trailing Stop)
+    scatter = axes[0,2].scatter(param_data['take_profit_pct'], param_data['trailing_stop_pct'], 
+                               c=param_data['sharpe_ratios'], s=100, alpha=0.7, cmap='viridis')
+    axes[0,2].set_xlabel('Take Profit (%)')
+    axes[0,2].set_ylabel('Trailing Stop (%)')
+    axes[0,2].set_title('🎯 Parameter Scatter Plot', fontweight='bold')
     axes[0,2].grid(True, alpha=0.3)
-
-    # Add value labels
-    for bar, value in zip(bars, macd_perf.values):
-        axes[0,2].text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.1,
-                      f'{value:.2f}', ha='center', va='bottom', fontweight='bold')
+    
+    # Add colorbar for this subplot
+    cbar = plt.colorbar(scatter, ax=axes[0,2])
+    cbar.set_label('Sharpe Ratio')
 
     # Parameter Correlation Matrix (moved to position [1,0])
     corr_data = df[['take_profit_pct', 'trailing_stop_pct', 'sharpe_ratios']].corr()
@@ -1977,20 +1956,14 @@ def main():
         print("\nBest Exit Parameters:")
         exit_params = results['best_exit_parameters']
         print(f"  Take Profit: {exit_params['take_profit_pct']}%")
-        # print(f"  Stop Loss: {exit_params['stop_loss_pct']}%")  # Removed
         print(f"  Trailing Stop: {exit_params['trailing_stop_pct']}%")
-        print(f"  MACD Enabled: {exit_params['macd_enabled']}")
-        print(f"  MACD Sensitivity: {exit_params['macd_sensitivity']}")
     else:
         print("Best Combined Parameters:")
         best_params = results['best_parameters']
         print(f"  Alert Timeframe: {best_params['alert_timeframe_minutes']} minutes")
         print(f"  Alert Green Threshold: {best_params['alert_green_threshold']:.2f}")
         print(f"  Take Profit: {best_params['take_profit_pct']}%")
-        # print(f"  Stop Loss: {best_params['stop_loss_pct']}%")  # Removed
         print(f"  Trailing Stop: {best_params['trailing_stop_pct']}%")
-        print(f"  MACD Enabled: {best_params['macd_enabled']}")
-        print(f"  MACD Sensitivity: {best_params['macd_sensitivity']}")
 
     # Performance metrics
     if args.method == 'hierarchical':
@@ -2031,7 +2004,7 @@ def main():
 
     if charts_created:
         print("\n🎨 PROFITABILITY CHARTS CREATED:")
-        print("  📊 1_parameter_heatmap.png - Take Profit vs Stop Loss heatmap")
+        print("  📊 1_parameter_heatmap.png - Take Profit vs Trailing Stop heatmap")
         print("  🚀 2_3d_profitability_surface.png - 3D profitability surface")
         print("  💎 3_risk_return_scatter.png - Risk vs return analysis")
         print("  🎯 4_win_rate_analysis.png - Comprehensive win rate analysis")
