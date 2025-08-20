@@ -27,6 +27,10 @@ import pandas as pd
 from scipy import stats
 from scipy.stats import ttest_rel
 
+# MACD imports for exit strategy
+from atoms.utils.calculate_macd import calculate_macd
+from atoms.utils.macd_alert_scorer import MACDAlertScorer
+
 # Optional statistical packages
 try:
     from statsmodels.stats.multitest import multipletests
@@ -65,13 +69,15 @@ EXIT_PARAMETERS = {
     'take_profit_pct': [5, 7.5, 10, 12.5, 15],              # 5 values (5-15% in 2.5% increments)
     'trailing_stop_pct': [5, 7.5, 10, 12.5, 15],            # 5 values
     # 'stop_loss_pct': removed - using trailing stops instead
-    'macd_sensitivity': ['conservative', 'normal', 'aggressive'],  # 3 values
-    'macd_enabled': [True, False]                            # 2 values
+    'macd_enabled': [True, False],                           # 2 values - enable MACD exit strategy
+    'macd_exit_threshold': [1, 2],                           # 2 values - exit when MACD score drops to this level or below
+    'macd_lookback_minutes': [5, 10, 15],                    # 3 values - minutes to look back for MACD deterioration
+    'macd_only': [True, False]                               # 2 values - MACD-only mode (prioritizes MACD exits)
 }
 
 # Total combinations (FOCUSED): 1 × 4 = 4 alert combinations
-# 5 × 5 × 3 × 2 = 150 exit combinations per alert set  
-# Total parameter sets: 4 × 150 = 600 (significant reduction, focused on trailing stops)
+# 5 × 5 × 2 × 2 × 3 × 2 = 600 exit combinations per alert set  
+# Total parameter sets: 4 × 600 = 2400 (includes MACD exit strategy options)
 
 # Orin Nano optimized configuration
 ORIN_NANO_CONFIG = {
@@ -113,6 +119,56 @@ def calculate_exit_points_jit(price_series: np.ndarray, entry_price: float,
             return current_price, i, 'take_profit'
         elif current_price <= trailing_stop_price and highest_price > entry_price:
             return current_price, i, 'trailing_stop'
+    
+    # No exit triggered - end of day liquidation
+    return price_series[-1], len(price_series)-1, 'eod_liquidation'
+
+
+@jit(nopython=True) if NUMBA_AVAILABLE else lambda x: x
+def calculate_exit_points_with_macd_jit(price_series: np.ndarray, entry_price: float, 
+                                       take_profit_pct: float, trailing_stop_pct: float,
+                                       macd_exit_signals: np.ndarray, macd_only: bool = False) -> Tuple[float, int, str]:
+    """
+    Numba JIT-compiled exit calculation with MACD exit signals.
+    
+    Args:
+        price_series: Array of prices
+        entry_price: Entry price for the position
+        take_profit_pct: Take profit percentage (set to high value for MACD-only mode)
+        trailing_stop_pct: Trailing stop percentage (set to high value for MACD-only mode)
+        macd_exit_signals: Boolean array where True indicates MACD exit condition met
+        macd_only: If True, prioritize MACD exits and use very permissive other exits
+        
+    Returns: (exit_price, exit_index, exit_reason)
+    """
+    # For MACD-only mode, use very permissive take profit and trailing stop
+    if macd_only:
+        take_profit_price = entry_price * 1.50  # 50% gain required
+        trailing_stop_limit = 0.25  # 25% trailing stop
+    else:
+        take_profit_price = entry_price * (1 + take_profit_pct / 100)
+        trailing_stop_limit = trailing_stop_pct / 100
+    
+    highest_price = entry_price
+    
+    for i in range(len(price_series)):
+        current_price = price_series[i]
+        
+        # Update trailing stop
+        if current_price > highest_price:
+            highest_price = current_price
+        
+        trailing_stop_price = highest_price * (1 - trailing_stop_limit)
+        
+        # Check exit conditions - prioritize MACD if in MACD-only mode
+        if macd_only and i < len(macd_exit_signals) and macd_exit_signals[i]:
+            return current_price, i, 'macd_exit'
+        elif current_price >= take_profit_price:
+            return current_price, i, 'take_profit'
+        elif current_price <= trailing_stop_price and highest_price > entry_price:
+            return current_price, i, 'trailing_stop'
+        elif not macd_only and i < len(macd_exit_signals) and macd_exit_signals[i]:
+            return current_price, i, 'macd_exit'
     
     # No exit triggered - end of day liquidation
     return price_series[-1], len(price_series)-1, 'eod_liquidation'
@@ -637,7 +693,9 @@ class ExitStrategySimulator:
         self.data_loader = HistoricalDataLoader()
     
     def _calculate_exit_points(self, price_series: np.ndarray, entry_price: float, 
-                              exit_params: Dict[str, Union[float, bool]]) -> Tuple[float, int, str]:
+                              exit_params: Dict[str, Union[float, bool]], 
+                              price_data: Optional[pd.DataFrame] = None,
+                              entry_time: Optional[pd.Timestamp] = None) -> Tuple[float, int, str]:
         """
         Exit calculation using JIT-compiled function for performance.
         Returns: (exit_price, exit_index, exit_reason)
@@ -645,12 +703,121 @@ class ExitStrategySimulator:
         # Extract parameters for JIT function
         take_profit_pct = exit_params['take_profit_pct']
         trailing_stop_pct = exit_params['trailing_stop_pct']
+        macd_enabled = exit_params.get('macd_enabled', False)
         
-        # Use JIT-compiled function for the actual calculation
-        return calculate_exit_points_jit(
-            price_series, entry_price, 
-            take_profit_pct, trailing_stop_pct
-        )
+        # Use MACD-enhanced exit calculation if enabled and data available
+        if macd_enabled and price_data is not None and entry_time is not None:
+            macd_exit_signals = self._calculate_macd_exit_signals(
+                price_data, entry_time, exit_params
+            )
+            
+            # Ensure signal array matches price series length with safe bounds checking
+            target_length = len(price_series)
+            if len(macd_exit_signals) != target_length:
+                if len(macd_exit_signals) < target_length:
+                    # Pad with False values
+                    padding_length = target_length - len(macd_exit_signals)
+                    padding = np.zeros(padding_length, dtype=bool)
+                    macd_exit_signals = np.concatenate([macd_exit_signals, padding])
+                else:
+                    # Truncate to fit
+                    macd_exit_signals = macd_exit_signals[:target_length]
+            
+            # Additional safety check
+            if len(macd_exit_signals) != target_length:
+                print(f"Warning: MACD signal length mismatch. Expected {target_length}, got {len(macd_exit_signals)}")
+                macd_exit_signals = np.zeros(target_length, dtype=bool)
+            
+            macd_only = exit_params.get('macd_only', False)
+            return calculate_exit_points_with_macd_jit(
+                price_series, entry_price, 
+                take_profit_pct, trailing_stop_pct, macd_exit_signals, macd_only
+            )
+        else:
+            # Use standard exit calculation without MACD
+            return calculate_exit_points_jit(
+                price_series, entry_price, 
+                take_profit_pct, trailing_stop_pct
+            )
+    
+    def _calculate_macd_exit_signals(self, price_data: pd.DataFrame, entry_time: pd.Timestamp, 
+                                   exit_params: Dict[str, Union[float, bool]]) -> np.ndarray:
+        """
+        Calculate MACD exit signals based on momentum deterioration.
+        
+        Args:
+            price_data: DataFrame with price and timestamp data
+            entry_time: Entry timestamp 
+            exit_params: Exit parameters including MACD settings
+            
+        Returns:
+            Boolean array indicating when MACD exit conditions are met
+        """
+        try:
+            # Get MACD parameters
+            exit_threshold = exit_params.get('macd_exit_threshold', 1)
+            lookback_minutes = exit_params.get('macd_lookback_minutes', 10)
+            
+            # Calculate MACD for the entire price dataset
+            macd_success, macd_values = calculate_macd(price_data, source='close')
+            
+            if not macd_success:
+                # Return all False if MACD calculation fails
+                return np.zeros(len(price_data), dtype=bool)
+            
+            # Initialize MACD scorer
+            scorer = MACDAlertScorer()
+            
+            # Get price data after entry time
+            future_data = price_data[price_data['timestamp'] >= entry_time].copy()
+            
+            if len(future_data) == 0:
+                return np.zeros(len(price_data), dtype=bool)
+            
+            exit_signals = np.zeros(len(future_data), dtype=bool)
+            
+            # Check MACD conditions at regular intervals
+            for i in range(len(future_data)):
+                current_time = future_data.iloc[i]['timestamp']
+                
+                # Calculate MACD conditions at current time
+                macd_analysis = scorer.calculate_macd_conditions(price_data, current_time)
+                
+                if macd_analysis.get('is_valid', False):
+                    bullish_score = macd_analysis.get('bullish_score', 4)
+                    
+                    # Exit if MACD score drops to threshold or below
+                    # Only trigger after some time has passed (avoid immediate exits)
+                    if i > 0 and bullish_score <= exit_threshold:
+                        exit_signals[i] = True
+            
+            # Create full-length array aligned with original price_data
+            full_exit_signals = np.zeros(len(price_data), dtype=bool)
+            
+            # Find the starting position in the original data
+            try:
+                future_start_mask = price_data['timestamp'] >= entry_time
+                if future_start_mask.any():
+                    future_start_idx = future_start_mask.idxmax()
+                    
+                    # Calculate safe end index to avoid bounds errors
+                    end_idx = min(future_start_idx + len(exit_signals), len(price_data))
+                    actual_length = end_idx - future_start_idx
+                    
+                    if actual_length > 0:
+                        # Only copy the signals that fit within bounds
+                        full_exit_signals[future_start_idx:end_idx] = exit_signals[:actual_length]
+                        
+            except Exception as e:
+                print(f"Warning: Error mapping MACD signals to price data: {e}")
+                # Return all False on mapping error
+            
+            return full_exit_signals
+            
+        except Exception as e:
+            print(f"Error calculating MACD exit signals: {e}")
+            # Return all False on error
+            return np.zeros(len(price_data), dtype=bool)
     
     def simulate_exit(self, alert: Dict[str, Any], exit_params: Dict[str, Union[float, bool]]) -> Dict[str, Any]:
         """
@@ -726,7 +893,7 @@ class ExitStrategySimulator:
         
         # Calculate exit using optimized function
         exit_price, exit_index, exit_reason = self._calculate_exit_points(
-            price_array, entry_price, exit_params
+            price_array, entry_price, exit_params, price_data, entry_time
         )
         
         # Calculate metrics
@@ -1080,20 +1247,24 @@ class ExitStrategyOptimizer:
                 # Generate all exit parameter combinations for each alert set
                 for take_profit in EXIT_PARAMETERS['take_profit_pct']:
                     for trailing_stop in EXIT_PARAMETERS['trailing_stop_pct']:
-                        for macd_sensitivity in EXIT_PARAMETERS['macd_sensitivity']:
-                            for macd_enabled in EXIT_PARAMETERS['macd_enabled']:
-                                
-                                combination = {
-                                    # Alert parameters
-                                    'alert_timeframe_minutes': timeframe,
-                                    'alert_green_threshold': threshold,
-                                    
-                                    # Exit parameters
-                                    'take_profit_pct': take_profit,
-                                    'trailing_stop_pct': trailing_stop,
-                                    'macd_sensitivity': macd_sensitivity,
-                                    'macd_enabled': macd_enabled
-                                }
+                        for macd_enabled in EXIT_PARAMETERS['macd_enabled']:
+                            for macd_exit_threshold in EXIT_PARAMETERS['macd_exit_threshold']:
+                                for macd_lookback_minutes in EXIT_PARAMETERS['macd_lookback_minutes']:
+                                    for macd_only in EXIT_PARAMETERS['macd_only']:
+                                        
+                                        combination = {
+                                            # Alert parameters
+                                            'alert_timeframe_minutes': timeframe,
+                                            'alert_green_threshold': threshold,
+                                            
+                                            # Exit parameters
+                                            'take_profit_pct': take_profit,
+                                            'trailing_stop_pct': trailing_stop,
+                                            'macd_enabled': macd_enabled,
+                                            'macd_exit_threshold': macd_exit_threshold,
+                                            'macd_lookback_minutes': macd_lookback_minutes,
+                                            'macd_only': macd_only
+                                        }
                                 combinations.append(combination)
         
         return combinations
@@ -1112,7 +1283,9 @@ class ExitStrategyOptimizer:
             'take_profit_pct': 10,  # Updated to be within new range (5-15%)
             'trailing_stop_pct': 12.5,
             'macd_enabled': False,
-            'macd_sensitivity': 'normal'
+            'macd_exit_threshold': 1,
+            'macd_lookback_minutes': 10,
+            'macd_only': False
         }
         
         alert_results = []
@@ -1176,16 +1349,20 @@ class ExitStrategyOptimizer:
         exit_combinations = []
         for take_profit in EXIT_PARAMETERS['take_profit_pct']:
             for trailing_stop in EXIT_PARAMETERS['trailing_stop_pct']:
-                for macd_sensitivity in EXIT_PARAMETERS['macd_sensitivity']:
-                    for macd_enabled in EXIT_PARAMETERS['macd_enabled']:
-                        
-                        exit_params = {
-                            'take_profit_pct': take_profit,
-                            'trailing_stop_pct': trailing_stop,
-                            'macd_sensitivity': macd_sensitivity,
-                            'macd_enabled': macd_enabled
-                        }
-                        exit_combinations.append(exit_params)
+                for macd_enabled in EXIT_PARAMETERS['macd_enabled']:
+                    for macd_exit_threshold in EXIT_PARAMETERS['macd_exit_threshold']:
+                        for macd_lookback_minutes in EXIT_PARAMETERS['macd_lookback_minutes']:
+                            for macd_only in EXIT_PARAMETERS['macd_only']:
+                                
+                                exit_params = {
+                                    'take_profit_pct': take_profit,
+                                    'trailing_stop_pct': trailing_stop,
+                                    'macd_enabled': macd_enabled,
+                                    'macd_exit_threshold': macd_exit_threshold,
+                                    'macd_lookback_minutes': macd_lookback_minutes,
+                                    'macd_only': macd_only
+                                }
+                                exit_combinations.append(exit_params)
         
         # Limit combinations if requested
         if max_combinations and len(exit_combinations) > max_combinations:
@@ -2096,7 +2273,9 @@ def main():
         # print(f"  Stop Loss: {exit_params['stop_loss_pct']}%")  # Removed
         print(f"  Trailing Stop: {exit_params['trailing_stop_pct']}%")
         print(f"  MACD Enabled: {exit_params['macd_enabled']}")
-        print(f"  MACD Sensitivity: {exit_params['macd_sensitivity']}")
+        print(f"  MACD Exit Threshold: {exit_params['macd_exit_threshold']}")
+        print(f"  MACD Lookback Minutes: {exit_params['macd_lookback_minutes']}")
+        print(f"  MACD Only Mode: {exit_params['macd_only']}")
     else:
         print("Best Combined Parameters:")
         best_params = results['best_parameters']
@@ -2106,7 +2285,9 @@ def main():
         # print(f"  Stop Loss: {best_params['stop_loss_pct']}%")  # Removed
         print(f"  Trailing Stop: {best_params['trailing_stop_pct']}%")
         print(f"  MACD Enabled: {best_params['macd_enabled']}")
-        print(f"  MACD Sensitivity: {best_params['macd_sensitivity']}")
+        print(f"  MACD Exit Threshold: {best_params['macd_exit_threshold']}")
+        print(f"  MACD Lookback Minutes: {best_params['macd_lookback_minutes']}")
+        print(f"  MACD Only Mode: {best_params['macd_only']}")
     
     # Performance metrics
     if args.method == 'hierarchical':

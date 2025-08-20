@@ -86,19 +86,19 @@ Send alert to Bruce the first time a symbol is at 20, 30, etc. percent above orb
 
 ### Config
 
-- [ ] claude --dangerously-skip-permissions
-- [ ] /login
-- [ ] /commit
-- [ ] Sync changes
-- [ ] /clear
-- [ ] git switch -c feature/maximize-with-macd
-- [ ] /clear
-- [ ] /read...
+- [X] claude --dangerously-skip-permissions
+- [X] /login
+- [X] /commit
+- [X] Sync changes
+- [X] /clear
+- [X] git switch -c feature/maximize-with-macd
+- [X] /clear
+- [X] /read...
 
 ### Spec File
 
-- [ ] VERY IMPORTANT. Think hard. Review README_MACD.md but ignore but ignore the Historical Analysis Tool. Update code/maximize_profit.py. Add the MACD scoring as an exit strategy.  It can be used by itself or with the other exit strategies.
-- [ ] Nudge
+- [ ] VERY IMPORTANT. Think hard. Review README_MACD.md but ignore the Historical Analysis Tool. Update code/maximize_profit.py. Add the MACD scoring as an exit strategy.  It can be used by itself or with the other exit strategies. Test with Conda alpaca environment.
+- [ ] IMPORTANT. NEVER use log files to find alerts.
 - [ ] /commit
 - [ ]
 - [ ] Publish the branch
