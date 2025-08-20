@@ -290,115 +290,17 @@ def find_alert_files(run_dir: Path) -> List[Path]:
                 alert_files.extend(location.glob('*superduper_alert*.json'))
                 alert_files.extend(location.glob('*alert*.json'))
     
-    # Fallback: Check log files if no JSON files found
-    if not alert_files:
-        log_locations = [
-            run_dir / 'logs' / 'orb_superduper',      # orb_superduper_*.log
-            run_dir / 'logs' / 'orb_trades',          # orb_trades_*.log  
-            run_dir / 'logs',                         # Direct in logs
-        ]
-        
-        for location in log_locations:
-            if location.exists():
-                # Look for superduper alert files
-                alert_files.extend(location.glob('*superduper*.log'))
-                alert_files.extend(location.glob('*alert*.log'))
-                alert_files.extend(location.glob('*trades*.log'))
+    # Only use JSON files - NEVER use log files
     
     return alert_files
 
 
 def parse_alert_line(line: str) -> Optional[Dict[str, Any]]:
     """
-    Parse individual alert line from log file.
-    Extract timestamp, symbol, price, and other alert data.
-    
-    NOTE: Current implementation detects that logs contain initialization messages
-    rather than actual trading alerts. Returns None to indicate no valid alerts found.
+    DEPRECATED: Never parse log files for alerts. Use JSON files only.
+    IMPORTANT: This function must always return None as per requirements.
     """
-    
-    # Check if this is an initialization/setup line (not an actual alert)
-    initialization_patterns = [
-        'initialized in',
-        'INFO - Target date:',
-        'INFO - Monitoring',
-        'notifications disabled',
-        'will be saved to:'
-    ]
-    
-    for pattern in initialization_patterns:
-        if pattern in line:
-            return None  # Skip initialization messages
-    
-    # Look for actual alert patterns
-    # Real alert patterns would be like:
-    # "2025-07-29 10:30:00 - SUPERDUPER ALERT: AAPL at $150.25"
-    # "ALERT: BUY signal for TSLA at 245.67"
-    
-    alert_patterns = [
-        r'SUPERDUPER ALERT',
-        r'BUY signal',
-        r'SELL signal', 
-        r'Entry.*price',
-        r'Alert triggered'
-    ]
-    
-    has_alert_pattern = any(re.search(pattern, line, re.IGNORECASE) for pattern in alert_patterns)
-    
-    if not has_alert_pattern:
-        return None  # Not an actual alert line
-    
-    try:
-        alert_data = {
-            'alert_timestamp': None,
-            'entry_price': None,
-            'entry_time': None,
-            'alert_details': line.strip()
-        }
-        
-        # Extract timestamp patterns
-        timestamp_patterns = [
-            r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})',
-            r'(\d{2}:\d{2}:\d{2})',
-            r'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})'
-        ]
-        
-        for pattern in timestamp_patterns:
-            match = re.search(pattern, line)
-            if match:
-                try:
-                    alert_data['alert_timestamp'] = pd.to_datetime(match.group(1))
-                    alert_data['entry_time'] = alert_data['alert_timestamp']
-                    break
-                except:
-                    continue
-        
-        # Extract price patterns (avoid parsing years as prices)
-        price_patterns = [
-            r'at \$?(\d{1,3}\.\d{2})',  # More specific price pattern
-            r'price[:\s]+\$?(\d{1,3}\.\d{2})',
-            r'\$(\d{1,3}\.\d{2})\b'  # Dollar amounts with word boundary
-        ]
-        
-        for pattern in price_patterns:
-            match = re.search(pattern, line, re.IGNORECASE)
-            if match:
-                try:
-                    price = float(match.group(1))
-                    # Sanity check: reasonable stock price range
-                    if 0.01 <= price <= 1000:
-                        alert_data['entry_price'] = price
-                        break
-                except:
-                    continue
-        
-        # Only return if we got minimum required data
-        if alert_data['alert_timestamp'] is not None and alert_data['entry_price'] is not None:
-            return alert_data
-            
-    except Exception as e:
-        print(f"Error parsing alert line: {e}")
-    
+    # NEVER use log files for alerts - always return None
     return None
 
 
@@ -469,27 +371,20 @@ def parse_json_alert_file(json_file: Path) -> Optional[Dict[str, Any]]:
 
 def parse_superduper_alerts(alert_file: Path) -> List[Dict[str, Any]]:
     """
-    Parse superduper alerts from JSON or log files.
-    Extract entry timestamp, price, and alert details.
+    Parse superduper alerts from JSON files only.
+    IMPORTANT: Never parse log files - only JSON files are allowed.
     """
     alerts = []
     
     try:
-        # Handle JSON files
+        # Only handle JSON files - NEVER use log files
         if alert_file.suffix.lower() == '.json':
             alert = parse_json_alert_file(alert_file)
             if alert:
                 alerts.append(alert)
-        
-        # Handle log files (fallback)
         else:
-            with open(alert_file, 'r') as f:
-                for line in f:
-                    # Look for alert patterns in logs
-                    if 'superduper' in line.lower() or 'alert' in line.lower():
-                        alert = parse_alert_line(line)
-                        if alert:
-                            alerts.append(alert)
+            # Skip non-JSON files entirely (no log file parsing)
+            pass
                         
     except Exception as e:
         print(f"Error parsing {alert_file}: {e}")
@@ -539,7 +434,7 @@ def collect_superduper_alerts_from_runs() -> List[Dict[str, Any]]:
                 alert_files = find_alert_files(run_dir)
                 
                 for alert_file in alert_files:
-                    # Parse alerts from log files
+                    # Parse alerts from JSON files only
                     file_alerts = parse_superduper_alerts(alert_file)
                     
                     for alert in file_alerts:
@@ -2204,7 +2099,6 @@ def main():
         print("No valid alerts found in alert files")
         print("This could be due to:")
         print("  - No JSON alert files in historical_data directories")
-        print("  - Only log files with initialization messages")
         print("  - Missing required data fields in alert files")
         print("\nGenerating synthetic test data for optimization testing...")
         alerts = generate_synthetic_alerts_for_testing()
@@ -2214,10 +2108,9 @@ def main():
             return 1
     else:
         alerts = valid_alerts
-        # Count JSON vs log files
+        # Count only JSON files (no log files used)
         json_alerts = len([a for a in alerts if a.get('json_file')])
-        log_alerts = len(alerts) - json_alerts
-        print(f"Found {len(alerts)} valid alerts ({json_alerts} from JSON files, {log_alerts} from log files)")
+        print(f"Found {len(alerts)} valid alerts ({json_alerts} from JSON files, 0 from log files)")
     
     print(f"Found {len(alerts)} alerts")
     
