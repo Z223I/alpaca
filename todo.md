@@ -94,6 +94,8 @@ Send alert to Bruce the first time a symbol is at 20, 30, etc. percent above orb
 
 Remove changes to maximize profit
 
+remove all log file usage from maximize_profit.py - JSON files only
+Remove fake MACD
 
 ## Exit with MACD
 
