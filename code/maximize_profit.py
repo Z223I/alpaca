@@ -1508,7 +1508,7 @@ def _create_win_rate_analysis(results: Dict[str, Any], output_path: Path):
 
     # Chart 2: Return Distribution by Take Profit
     return_data = [take_profit_groups[tp]['total_returns'] for tp in tp_levels]
-    bp1 = ax2.boxplot(return_data, labels=[f'{tp}%' for tp in tp_levels], patch_artist=True)
+    bp1 = ax2.boxplot(return_data, tick_labels=[f'{tp}%' for tp in tp_levels], patch_artist=True)
 
     # Color the boxes
     colors = plt.cm.viridis(np.linspace(0, 1, len(bp1['boxes'])))
@@ -1823,8 +1823,8 @@ def _create_performance_comparison(results: Dict[str, Any], output_path: Path):
                 bbox=dict(boxstyle="round,pad=0.3", facecolor="yellow", alpha=0.7))
 
     plt.suptitle('🏆 Comprehensive Performance Analysis', fontsize=18, fontweight='bold')
-    plt.tight_layout()
-    plt.savefig(output_path / '6_performance_comparison.png', dpi=300, bbox_inches='tight')
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Leave space for suptitle  
+    plt.savefig(output_path / '6_performance_comparison.png', dpi=300)
     plt.close()
 
 
