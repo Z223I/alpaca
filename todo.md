@@ -82,6 +82,19 @@ Send alert to Bruce the first time a symbol is at 20, 30, etc. percent above orb
 
 
 
+               df_data.append({
+                    'timestamp': timestamp_et,
+                    'open': float(bar.open),
+                    'high': float(bar.high),
+                    'low': float(bar.low),
+                    'close': float(bar.close),
+                    'volume': int(bar.volume),
+                    'symbol': self.symbol
+                })
+
+Remove changes to maximize profit
+
+
 ## Exit with MACD
 
 ### Config

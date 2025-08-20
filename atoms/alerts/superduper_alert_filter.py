@@ -322,11 +322,11 @@ class SuperduperAlertData:
                 
                 df_data.append({
                     'timestamp': timestamp_et,
-                    'open': float(bar.open),
-                    'high': float(bar.high),
-                    'low': float(bar.low),
-                    'close': float(bar.close),
-                    'volume': int(bar.volume),
+                    'open': float(bar.o),
+                    'high': float(bar.h),
+                    'low': float(bar.l),
+                    'close': float(bar.c),
+                    'volume': int(bar.v),
                     'symbol': self.symbol
                 })
             
