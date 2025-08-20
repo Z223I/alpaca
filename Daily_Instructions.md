@@ -28,30 +28,28 @@ python code/alerts_watch.py
 
 Features:
 - Automatic market hours scheduling (Eastern Time)
-- Starts/stops all 3 alert processes automatically
+- Starts/stops all 4 alert processes automatically (including orb_alerts.py)
 - Process monitoring and restart on failures
 - Post-market analysis and Telegram summary to Bruce
 - Comprehensive logging
 
-This replaces the need to manually run the individual commands below.
+This replaces the need to manually run orb_watchdog.py and individual commands below.
 
 ### Manual ORB Alert Commands (Alternative)
 
 For manual control or testing, use these individual commands:
 
-#### ORB Alerts Watchdog
+#### ORB Basic Alerts (DEPRECATED - Use alerts_watch.py instead)
 
-Monitors and manages the orb_alerts.py process automatically. Launches orb_alerts on startup, displays output to console, and restarts if the process dies.
+**⚠️ DEPRECATED**: orb_watchdog.py is no longer recommended. Use `alerts_watch.py` which manages orb_alerts.py along with all other processes.
+
+For manual testing only:
 
 ```bash
-python3 code/orb_watchdog.py
+python3 code/orb_alerts.py --verbose
 ```
 
-Features:
-- Automatic startup and restart of orb_alerts.py
-- Live output display with [ORB] prefix
-- Graceful shutdown with Ctrl+C
-- Uses conda environment automatically
+Note: alerts_watch.py now handles orb_alerts.py management automatically.
 
 #### ORB Super Alerts
 

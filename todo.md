@@ -80,6 +80,8 @@ Filter out stocks below two dollars. ???
 Send alert to Bruce the first time a symbol is at 20, 30, etc. percent above orb high in the 30 minutes.
 
 
+Why didn't I get alerts for THAR on 8/20????
+
 ## Stuff
 
 - [X] Change this back.  open -> o, etc.  How did this even get back into the code??

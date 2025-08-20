@@ -3,13 +3,14 @@
 Alerts Watch - Automated Market Hours Alert System
 
 This system manages ORB alert processes during market hours (9:30 AM - 4:00 PM ET, Mon-Fri):
-1. Starts 3 alert processes at market open
+1. Starts 4 alert processes at market open
 2. Monitors and restarts them if they fail
 3. Stops them at market close
 4. Runs post-market analysis and summary
 5. Sends daily summary to Bruce via Telegram
 
 Managed Processes:
+- ORB Alerts (Basic alert generation)
 - ORB Alerts Monitor (Super alerts)
 - ORB Superduper Alerts
 - ORB Trade Execution
@@ -69,6 +70,12 @@ class AlertsWatchdog:
         
         # Alert process configurations
         self.alert_processes = {
+            'orb_alerts': {
+                'script': 'code/orb_alerts.py',
+                'args': ['--verbose'],
+                'python_cmd': 'python3',
+                'log_dir': 'orb_alerts'
+            },
             'orb_monitor': {
                 'script': 'code/orb_alerts_monitor.py',
                 'args': ['--no-telegram', '--verbose'],
