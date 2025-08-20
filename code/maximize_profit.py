@@ -580,9 +580,9 @@ class ExitStrategySimulator:
         else:
             entry_time = price_data['timestamp'].iloc[0]
 
-        # Get price series after entry time
+        # Get price series after entry time (excluding entry timeframe)
         try:
-            future_prices = price_data[price_data['timestamp'] >= entry_time]
+            future_prices = price_data[price_data['timestamp'] > entry_time]
         except TypeError:
             # Handle timezone mismatch by converting to naive timestamps
             if price_data['timestamp'].dt.tz is not None:
@@ -593,7 +593,7 @@ class ExitStrategySimulator:
             if hasattr(entry_time, 'tz') and entry_time.tz is not None:
                 entry_time = entry_time.tz_convert(None) if entry_time.tz else entry_time.replace(tzinfo=None)
 
-            future_prices = price_data[price_timestamps >= entry_time]
+            future_prices = price_data[price_timestamps > entry_time]
         if len(future_prices) == 0:
             return {
                 'exit_time': entry_time,
