@@ -2130,6 +2130,178 @@ def apply_multiple_testing_correction(p_values: List[float], method: str = 'holm
     return rejected.tolist(), p_corrected.tolist()
 
 
+def create_trade_distribution_analysis(csv_file: str = "best_parameter_trades.csv", 
+                                      output_dir: str = "optimization_charts") -> bool:
+    """
+    Create comprehensive trade distribution analysis from CSV data.
+    Shows profit distribution, cumulative performance, exit reasons, and timing analysis.
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+    
+    # Load the CSV data
+    csv_path = Path(csv_file)
+    if not csv_path.exists():
+        print(f"⚠️ Trade CSV file not found: {csv_path}")
+        return False
+    
+    print(f"\n📊 CREATING TRADE DISTRIBUTION ANALYSIS")
+    print("=" * 50)
+    print(f"📊 Loading trade data from {csv_path}...")
+    
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception as e:
+        print(f"❌ Error loading CSV: {e}")
+        return False
+    
+    if len(df) == 0:
+        print(f"❌ No trade data found in CSV")
+        return False
+        
+    print(f"✅ Loaded {len(df)} trades")
+    
+    # Basic statistics
+    profitable_trades = len(df[df['profit_pct'] > 0])
+    loss_trades = len(df[df['profit_pct'] < 0])
+    
+    print(f"📈 TRADE STATISTICS:")
+    print(f"   Total trades: {len(df)}")
+    print(f"   Profitable: {profitable_trades} ({profitable_trades/len(df)*100:.1f}%)")
+    print(f"   Losses: {loss_trades} ({loss_trades/len(df)*100:.1f}%)")
+    print(f"   Average profit: {df['profit_pct'].mean():.2f}%")
+    print(f"   Median profit: {df['profit_pct'].median():.2f}%")
+    print(f"   Max profit: {df['profit_pct'].max():.2f}%")
+    print(f"   Max loss: {df['profit_pct'].min():.2f}%")
+    
+    # Create the plot
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
+    
+    # Plot 1: Histogram of profit percentage distribution
+    profits = df['profit_pct']
+    
+    # Create bins for profit percentage
+    bins = np.arange(profits.min() - 1, profits.max() + 2, 2.5)  # 2.5% bins
+    n, bins, patches = ax1.hist(profits, bins=bins, alpha=0.7, edgecolor='black')
+    
+    # Color bars: red for losses, green for profits
+    for i, (patch, bin_val) in enumerate(zip(patches, bins[:-1])):
+        if bin_val < 0:
+            patch.set_facecolor('red')
+            patch.set_alpha(0.7)
+        else:
+            patch.set_facecolor('green')
+            patch.set_alpha(0.7)
+    
+    ax1.axvline(x=0, color='black', linestyle='--', alpha=0.8, label='Breakeven')
+    ax1.set_xlabel('Profit Percentage (%)')
+    ax1.set_ylabel('Number of Trades')
+    ax1.set_title('Trade Profit Distribution\n(Best Parameters Analysis)', fontweight='bold')
+    ax1.grid(True, alpha=0.3)
+    ax1.legend()
+    
+    # Add statistics text
+    ax1.text(0.02, 0.95, f'Total: {len(df)} trades\nWin Rate: {profitable_trades/len(df)*100:.1f}%\nAvg: {profits.mean():.2f}%', 
+             transform=ax1.transAxes, va='top', ha='left', 
+             bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
+    
+    # Plot 2: Cumulative profit over time
+    df_sorted = df.sort_values('trade_id')
+    cumulative_profit = df_sorted['profit_abs'].cumsum()
+    
+    ax2.plot(df_sorted['trade_id'], cumulative_profit, 'b-', linewidth=2)
+    ax2.axhline(y=0, color='black', linestyle='--', alpha=0.5)
+    ax2.fill_between(df_sorted['trade_id'], cumulative_profit, 0, 
+                     where=(cumulative_profit >= 0), color='green', alpha=0.3, label='Profit')
+    ax2.fill_between(df_sorted['trade_id'], cumulative_profit, 0, 
+                     where=(cumulative_profit < 0), color='red', alpha=0.3, label='Loss')
+    
+    ax2.set_xlabel('Trade Sequence')
+    ax2.set_ylabel('Cumulative Profit ($)')
+    ax2.set_title('Cumulative Profit Over Trade Sequence', fontweight='bold')
+    ax2.grid(True, alpha=0.3)
+    ax2.legend()
+    
+    # Plot 3: Exit reason distribution
+    if 'exit_reason' in df.columns:
+        exit_reasons = df['exit_reason'].value_counts()
+        colors = ['skyblue', 'orange', 'lightgreen', 'pink', 'yellow'][:len(exit_reasons)]
+        
+        wedges, texts, autotexts = ax3.pie(exit_reasons.values, labels=exit_reasons.index, 
+                                          colors=colors, autopct='%1.1f%%', startangle=90)
+        ax3.set_title('Exit Reason Distribution', fontweight='bold')
+    else:
+        ax3.text(0.5, 0.5, 'Exit reason\ndata not available', ha='center', va='center', 
+                transform=ax3.transAxes, fontsize=12)
+        ax3.set_title('Exit Reason Distribution', fontweight='bold')
+    
+    # Plot 4: Profit vs Hold Time scatter
+    if 'hold_time_minutes' in df.columns:
+        valid_times = df[df['hold_time_minutes'] > 0]
+        
+        if len(valid_times) > 0:
+            # Color points by profit/loss
+            colors = ['red' if p < 0 else 'green' for p in valid_times['profit_pct']]
+            scatter = ax4.scatter(valid_times['hold_time_minutes'], valid_times['profit_pct'], 
+                                 c=colors, alpha=0.6, s=50)
+            
+            ax4.axhline(y=0, color='black', linestyle='--', alpha=0.5)
+            ax4.set_xlabel('Hold Time (minutes)')
+            ax4.set_ylabel('Profit Percentage (%)')
+            ax4.set_title('Profit vs Hold Time', fontweight='bold')
+            ax4.grid(True, alpha=0.3)
+            
+            # Add trendline
+            if len(valid_times) > 1:
+                try:
+                    z = np.polyfit(valid_times['hold_time_minutes'], valid_times['profit_pct'], 1)
+                    p = np.poly1d(z)
+                    ax4.plot(valid_times['hold_time_minutes'], p(valid_times['hold_time_minutes']), 
+                            "r--", alpha=0.8, linewidth=1, label=f'Trend: {z[0]:.3f}x + {z[1]:.2f}')
+                    ax4.legend()
+                except:
+                    pass  # Skip trendline if polyfit fails
+        else:
+            ax4.text(0.5, 0.5, 'No valid hold time data', ha='center', va='center', 
+                    transform=ax4.transAxes, fontsize=12)
+            ax4.set_title('Profit vs Hold Time', fontweight='bold')
+    else:
+        ax4.text(0.5, 0.5, 'Hold time data\nnot available', ha='center', va='center', 
+                transform=ax4.transAxes, fontsize=12)
+        ax4.set_title('Profit vs Hold Time', fontweight='bold')
+    
+    plt.tight_layout()
+    
+    # Save the plot
+    output_path = Path(output_dir)
+    output_path.mkdir(exist_ok=True)
+    output_file = output_path / 'trade_distribution_analysis.png'
+    plt.savefig(output_file, dpi=300)
+    plt.close()
+    
+    print(f"✅ Trade distribution analysis saved: {output_file}")
+    
+    # Print detailed analysis
+    print(f"\n🔍 DETAILED PERFORMANCE BREAKDOWN:")
+    
+    # Profit ranges
+    profit_ranges = [
+        ('Big Loss', profits < -10),
+        ('Small Loss', (profits >= -10) & (profits < 0)),
+        ('Small Profit', (profits >= 0) & (profits < 10)),
+        ('Good Profit', (profits >= 10) & (profits < 20)),
+        ('Excellent Profit', profits >= 20)
+    ]
+    
+    for range_name, condition in profit_ranges:
+        count = len(df[condition])
+        pct = count / len(df) * 100 if len(df) > 0 else 0
+        avg_profit = df[condition]['profit_pct'].mean() if count > 0 else 0
+        print(f"   {range_name}: {count} trades ({pct:.1f}%) | Avg: {avg_profit:.2f}%")
+    
+    return True
+
+
 def main():
     """Main execution function with CLI interface."""
     parser = argparse.ArgumentParser(description='Exit Strategy Optimization System')
@@ -2306,13 +2478,16 @@ def main():
     
     # Generate random trade charts
     if detailed_trades:
-        print(f"\n📊 GENERATING TRADE VISUALIZATION CHARTS")
-        chart_files = trade_tracker.generate_random_trade_charts(num_charts=8, output_dir="optimization_charts")
+        print(f"\n📊 GENERATING TRADE VISUALIZATION CHARTS (20 random trades)")
+        chart_files = trade_tracker.generate_random_trade_charts(num_charts=20, output_dir="optimization_charts")
         
         if chart_files:
             print(f"📁 Trade charts saved in optimization_charts/ directory:")
             for chart_file in chart_files:
                 print(f"   📊 {Path(chart_file).name}")
+        
+        # Generate trade distribution analysis
+        create_trade_distribution_analysis("best_parameter_trades.csv", "optimization_charts")
 
     # Generate profitability visualization charts
     charts_created = create_profitability_visualizations(results)
@@ -2325,6 +2500,8 @@ def main():
         print("  🎯 4_win_rate_analysis.png - Comprehensive win rate analysis")
         print("  📈 5_parameter_distributions.png - Parameter performance distributions")
         print("  🏆 6_performance_comparison.png - Best strategy performance summary")
+        print("  📊 trade_distribution_analysis.png - Trade profit distribution and performance analysis")
+        print("  📊 trade_01-20_*.png - Individual trade charts with entry/exit visualization")
         print(f"\n📁 All charts saved in optimization_charts/ directory")
 
     return 0
