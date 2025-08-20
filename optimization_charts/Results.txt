@@ -4,19 +4,15 @@ Best Combined Parameters:
   Alert Timeframe: 20 minutes
   Alert Green Threshold: 0.60
   Take Profit: 15%
-  Trailing Stop: 15%
-  MACD Enabled: True
-  MACD Exit Threshold: 1
-  MACD Lookback Minutes: 15
-  MACD Only Mode: False
+  Trailing Stop: 20.0%
 
 Performance Metrics:
-  Total Return: 79037.02%
-  Win Rate: 68.2%
-  Sharpe Ratio: 10.631
-  Profit Factor: 3.81
+  Total Return: 452942.79%
+  Win Rate: 77.3%
+  Sharpe Ratio: 13.680
+  Profit Factor: 5.19
   Max Drawdown: 44.99%
   Total Trades: 88
-  Winning Trades: 60
-  Average Win: 17.30%
-  Average Loss: 9.72%
+  Winning Trades: 68
+  Average Win: 17.36%
+  Average Loss: 11.37%

@@ -63,13 +63,13 @@ ALERT_PARAMETERS = {
 
 EXIT_PARAMETERS = {
     'take_profit_pct': [5, 7.5, 10, 12.5, 15],              # 5 values (5-15% in 2.5% increments)
-    'trailing_stop_pct': [5, 7.5, 10, 12.5, 15],            # 5 values
+    'trailing_stop_pct': [5, 7.5, 10, 12.5, 15, 17.5, 20.0], # 7 values (5-20% range)
     # 'stop_loss_pct': removed - using trailing stops instead
 }
 
 # Total combinations (FOCUSED): 1 × 4 = 4 alert combinations
-# 5 × 5 = 25 exit combinations per alert set
-# Total parameter sets: 4 × 25 = 100 (significant reduction, trailing stops only)
+# 5 × 7 = 35 exit combinations per alert set
+# Total parameter sets: 4 × 35 = 140 (trailing stops only)
 
 # Orin Nano optimized configuration
 ORIN_NANO_CONFIG = {
