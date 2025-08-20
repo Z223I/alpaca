@@ -126,3 +126,33 @@ else:
 - Use `*italic*` for italic text
 - Use emojis for visual appeal (📊 🚨 ✅ ❌ ⚠️ 🔧)
 - Keep messages concise and informative
+
+## CRITICAL API NOTES
+
+### Alpaca Bar Object Attributes
+
+**⚠️ CRITICAL**: Alpaca Bar objects use single-letter attributes, NOT full words:
+
+```python
+# ❌ WRONG - These will cause AttributeError
+bar.open   # Does not exist
+bar.high   # Does not exist 
+bar.low    # Does not exist
+bar.close  # Does not exist
+bar.volume # Does not exist
+
+# ✅ CORRECT - Use single letters
+bar.o  # Open price
+bar.h  # High price
+bar.l  # Low price  
+bar.c  # Close price
+bar.v  # Volume
+bar.t  # Timestamp
+```
+
+**Common mistake locations:**
+- `atoms/alerts/superduper_alert_filter.py` (MACD data collection)
+- Any code processing Alpaca market data bars
+- MACD analysis failures often trace back to this attribute naming issue
+
+**Impact:** Using wrong attributes causes "BLIND FLIGHT" MACD conditions instead of proper 🟢/🟡/🔴 analysis.
