@@ -82,6 +82,10 @@ Send alert to Bruce the first time a symbol is at 20, 30, etc. percent above orb
 
 Why didn't I get alerts for THAR on 8/20????
 
+## Massive maximize_profit changes
+
+- [X] git tag -a V1.0.7 -m "Maximize profit filter late day trades."
+
 ## Stuff
 
 - [X] Change this back.  open -> o, etc.  How did this even get back into the code??

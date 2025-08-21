@@ -1327,14 +1327,18 @@ class BestParametersTradeTracker:
         
         return detailed_trades
     
-    def save_trades_to_csv(self, filename: str = "best_parameter_trades.csv") -> str:
+    def save_trades_to_csv(self, filename: str = "best_parameter_trades.csv", output_dir: str = "optimization_charts") -> str:
         """Save tracked trades to CSV file."""
         if not self.trades:
             print("❌ No trades to save!")
             return ""
             
+        # Ensure output directory exists
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            
         df = pd.DataFrame(self.trades)
-        filepath = Path(filename)
+        filepath = Path(output_dir) / filename
         df.to_csv(filepath, index=False)
         
         print(f"💾 Saved {len(self.trades)} trades to: {filepath}")
@@ -2520,9 +2524,22 @@ def main():
     print(f"  Average Win: {metrics['avg_win']:.2f}%")
     print(f"  Average Loss: {metrics['avg_loss']:.2f}%")
 
-    # Save results
+    # Save results in optimization_charts directory
     import json
-    with open(args.output, 'w') as f:
+    import os
+    
+    # Ensure optimization_charts directory exists
+    charts_dir = "optimization_charts"
+    if not os.path.exists(charts_dir):
+        os.makedirs(charts_dir)
+    
+    # Update output path to be in charts directory
+    if not args.output.startswith(charts_dir):
+        output_path = os.path.join(charts_dir, os.path.basename(args.output))
+    else:
+        output_path = args.output
+    
+    with open(output_path, 'w') as f:
         # Convert numpy types for JSON serialization
         def convert_numpy(obj):
             if isinstance(obj, np.integer):
@@ -2535,7 +2552,7 @@ def main():
 
         json.dump(results, f, indent=2, default=convert_numpy)
 
-    print(f"\nResults saved to {args.output}")
+    print(f"\nResults saved to {output_path}")
 
     # Track and visualize trades with best parameters
     print(f"\n🎯 TRADE TRACKING AND VISUALIZATION")
@@ -2561,8 +2578,8 @@ def main():
     # Track trades with best parameters
     detailed_trades = trade_tracker.track_best_parameter_trades(alerts, best_combined_params)
     
-    # Save trades to CSV
-    csv_file = trade_tracker.save_trades_to_csv("best_parameter_trades.csv")
+    # Save trades to CSV in optimization_charts directory
+    csv_file = trade_tracker.save_trades_to_csv("best_parameter_trades.csv", "optimization_charts")
     
     # Generate random trade charts
     if detailed_trades:
@@ -2584,7 +2601,7 @@ def main():
                 print(f"   📊 {Path(chart_file).name}")
         
         # Generate trade distribution analysis
-        create_trade_distribution_analysis("best_parameter_trades.csv", "optimization_charts")
+        create_trade_distribution_analysis("optimization_charts/best_parameter_trades.csv", "optimization_charts")
 
     # Generate profitability visualization charts
     charts_created = create_profitability_visualizations(results)
