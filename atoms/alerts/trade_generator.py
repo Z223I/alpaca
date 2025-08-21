@@ -834,7 +834,7 @@ def main():
                           "• Price Movement: **+20.28%**\\n• Momentum: 🟢 **0.8451%/min**\\n"
                           "• Penetration Increase: **+0.0%**\\n• Pattern: **Accelerating Breakout** 🚀\\n\\n"
                           "⚡ **Alert Level:** HIGH\\n⚠️ **Risk Level:** LOW\\n\\n🎯 **Action Zones:**\\n"
-                          "• Watch for continuation above $25.02\\n• Target approach to $17.15\\n"
+                          "• Watch for continuation above $25.02\\n• Watch for major resistance\\n"
                           "• Monitor for volume confirmation\\n\\n⏰ **Alert Generated:** 12:00:00 ET")
     }
 

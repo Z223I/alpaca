@@ -168,7 +168,7 @@ historical_data/YYYY-MM-DD/superduper_alerts/bullish/
 
 🎯 **Action Zones:**
 • Watch for continuation above $150.25
-• Target approach to $155.00
+• Watch for major resistance
 • Monitor for volume confirmation
 
 ⏰ **Alert Generated:** 14:30:15 ET

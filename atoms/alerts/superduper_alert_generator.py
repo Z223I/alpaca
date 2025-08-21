@@ -240,7 +240,7 @@ class SuperduperAlertGenerator:
             f"",
             f"🎯 **Action Zones:**",
             f"• Watch for continuation above ${current_price:.4f}",
-            f"• Target approach to ${resistance_price:.4f}",
+            f"• Watch for major resistance",
             f"• Monitor for volume confirmation",
             f"",
             f"⏰ **Alert Generated:** {datetime.now(pytz.timezone('US/Eastern')).strftime('%H:%M:%S ET')}"

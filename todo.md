@@ -75,15 +75,16 @@ Work on filtering. May have to pass candlestick info all the way through the pip
 Filter out stocks below two dollars. ???
 
 
-
+Incorporate major resistance into trading.
 
 Send alert to Bruce the first time a symbol is at 20, 30, etc. percent above orb high in the 30 minutes.
 
 
 Why didn't I get alerts for THAR on 8/20????
 
+## Trading 2025-08-21
 
-Trade Live with $10 and limit of 5 trades
+- [X] Trade Live with $10 and limit of 3 trades
 
 
 ## Massive maximize_profit changes

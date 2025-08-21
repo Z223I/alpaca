@@ -417,10 +417,18 @@ Questions? Contact the bot administrator."""
                     converted_parts.append(part)
                 else:
                     # Convert single hyphen to double hyphen and normalize case for CLI arguments
-                    converted_parts.append(('-' + part).lower())
+                    # Special case: preserve PNL in uppercase as it's defined as --PNL in alpaca.py
+                    if part[1:].upper() == 'PNL':  # Remove the leading hyphen before checking
+                        converted_parts.append('--PNL')
+                    else:
+                        converted_parts.append(('-' + part).lower())
             elif part.startswith('--'):
                 # Normalize existing double hyphen arguments to lowercase
-                converted_parts.append(part.lower())
+                # Special case: preserve --PNL in uppercase
+                if part.upper() == '--PNL':
+                    converted_parts.append('--PNL')
+                else:
+                    converted_parts.append(part.lower())
             else:
                 # Non-hyphen arguments (like symbol names, values) keep original case
                 converted_parts.append(part)
