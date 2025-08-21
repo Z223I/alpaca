@@ -730,18 +730,12 @@ class TradeGenerator:
                 self.logger.error("Could not load account configuration")
                 return None
 
-            # Find first account with auto_trade enabled (single trade limit per specs)
-            trade_executed = False
-            result_filename = None
+            # Execute trades on all accounts with auto_trade enabled
+            executed_trades = []
+            successful_trades = []
 
             for account_name, account_config in config.providers["alpaca"].accounts.items():
-                if trade_executed:
-                    break
-
                 for account_type in ["paper", "live", "cash"]:
-                    if trade_executed:
-                        break
-
                     env_config = getattr(account_config, account_type)
 
                     if env_config.auto_trade == "yes":
@@ -764,6 +758,7 @@ class TradeGenerator:
                         )
 
                         if trade_record is None:
+                            self.logger.warning(f"Failed to create trade record for {account_name}/{account_type}")
                             continue
 
                         # Execute trade command
@@ -772,6 +767,7 @@ class TradeGenerator:
                         # Save trade record
                         filename = self.save_trade_record(trade_record)
                         if filename is None:
+                            self.logger.warning(f"Failed to save trade record for {account_name}/{account_type}")
                             continue
 
                         # Display trade execution
@@ -785,10 +781,24 @@ class TradeGenerator:
                         current_count = self.trades_executed_by_account[account_key]
                         self.logger.info(f"Trade counter for {account_key}: {current_count}/{max_trades} (remaining: {remaining})")
 
-                        result_filename = filename
-                        trade_executed = True
+                        # Track all executed trades
+                        executed_trades.append(filename)
+                        
+                        # Track successful trades separately
+                        if trade_record['execution_status']['success'] == "yes":
+                            successful_trades.append(filename)
+                            self.logger.info(f"✅ Successful trade executed on {account_name}/{account_type}: {filename}")
+                        else:
+                            self.logger.warning(f"❌ Trade failed on {account_name}/{account_type}: {trade_record['execution_status']['reason']}")
 
-            return result_filename
+            # Log summary of all trade attempts
+            if executed_trades:
+                self.logger.info(f"Trade execution summary: {len(executed_trades)} total attempts, {len(successful_trades)} successful")
+                # Return all executed trades for Telegram notification
+                return executed_trades
+            else:
+                self.logger.info("No trades were executed (no accounts configured for auto_trade or all limits reached)")
+                return []
 
         except Exception as e:
             self.logger.error(f"Error in create_and_execute_trade: {e}")

@@ -295,65 +295,69 @@ class ORBTradeStocksMonitor:
                 self.logger.info(f"🔴 Trade rejected for {symbol}: Market is closed (outside trading hours)")
                 return
 
-            # Use TradeGenerator to create and execute trade
-            trade_filename = self.trade_generator.create_and_execute_trade(superduper_alert_data)
+            # Use TradeGenerator to create and execute trades on all accounts
+            trade_filenames = self.trade_generator.create_and_execute_trade(superduper_alert_data)
 
-            if trade_filename:
-                self.executed_trades.add(trade_filename)
-                self.logger.info(f"✅ Trade executed and saved: {trade_filename}")
+            if trade_filenames and len(trade_filenames) > 0:
+                self.logger.info(f"✅ {len(trade_filenames)} trades executed for {symbol}")
+                
+                # Process each executed trade
+                for trade_filename in trade_filenames:
+                    self.executed_trades.add(trade_filename)
+                    self.logger.info(f"✅ Trade executed and saved: {trade_filename}")
 
-                # Send Telegram notification (if enabled)
-                if not self.no_telegram:
-                    try:
-                        # Extract trade execution details for notification
-                        trade_file_path = self._find_trade_file(trade_filename)
+                    # Send Telegram notification (if enabled)
+                    if not self.no_telegram:
+                        try:
+                            # Extract trade execution details for notification
+                            trade_file_path = self._find_trade_file(trade_filename)
 
-                        if trade_file_path and trade_file_path.exists():
-                            with open(trade_file_path, 'r') as f:
-                                trade_data = json.load(f)
+                            if trade_file_path and trade_file_path.exists():
+                                with open(trade_file_path, 'r') as f:
+                                    trade_data = json.load(f)
 
-                            execution_status = trade_data.get('execution_status', {})
-                            success = execution_status.get('success', 'no')
-                            amount = trade_data.get('auto_amount', 0)
-                            account_name = trade_data.get('account_name', 'Unknown')
-                            account_type = trade_data.get('account_type', 'Unknown')
-                            account = f"{account_name}/{account_type}"
+                                execution_status = trade_data.get('execution_status', {})
+                                success = execution_status.get('success', 'no')
+                                amount = trade_data.get('auto_amount', 0)
+                                account_name = trade_data.get('account_name', 'Unknown')
+                                account_type = trade_data.get('account_type', 'Unknown')
+                                account = f"{account_name}/{account_type}"
 
-                            # Create trade notification message with trading parameters
-                            trailing_percent = trade_data.get('trailing_percent', 0)
-                            take_profit_percent = trade_data.get('take_profit_percent', 0)
-                            reason = execution_status.get('reason', 'No reason provided')
-                            trade_message = self._create_trade_notification_message(
-                                symbol, success, amount, account, execution_status, trailing_percent, take_profit_percent, reason)
+                                # Create trade notification message with trading parameters
+                                trailing_percent = trade_data.get('trailing_percent', 0)
+                                take_profit_percent = trade_data.get('take_profit_percent', 0)
+                                reason = execution_status.get('reason', 'No reason provided')
+                                trade_message = self._create_trade_notification_message(
+                                    symbol, success, amount, account, execution_status, trailing_percent, take_profit_percent, reason)
 
-                            # Determine urgency - all executed trades are considered urgent
-                            is_urgent = True
+                                # Determine urgency - all executed trades are considered urgent
+                                is_urgent = True
 
-                            # Send targeted notification to specific user based on account
-                            result = await self._send_trade_notification(trade_message, is_urgent, account_name)
+                                # Send targeted notification to specific user based on account
+                                result = await self._send_trade_notification(trade_message, is_urgent, account_name)
 
-                            if result['success']:
-                                if result.get('skipped'):
-                                    reason = result.get('reason', 'Non-urgent filtered')
-                                    target_user = result.get('target_user', 'unknown')
-                                    self.logger.info(f"⏭️ Telegram trade notification skipped for {target_user}: {reason}")
+                                if result['success']:
+                                    if result.get('skipped'):
+                                        reason = result.get('reason', 'Non-urgent filtered')
+                                        target_user = result.get('target_user', 'unknown')
+                                        self.logger.info(f"⏭️ Telegram trade notification skipped for {target_user}: {reason}")
+                                    else:
+                                        emoji = "💰"
+                                        target_user = result.get('target_user', 'unknown')
+                                        account_name = result.get('account_name', 'unknown')
+                                        msg = f"📤 {emoji} Telegram trade notification sent to {target_user} for {account_name} account"
+                                        self.logger.info(msg)
                                 else:
-                                    emoji = "💰"
                                     target_user = result.get('target_user', 'unknown')
                                     account_name = result.get('account_name', 'unknown')
-                                    msg = f"📤 {emoji} Telegram trade notification sent to {target_user} for {account_name} account"
-                                    self.logger.info(msg)
-                            else:
-                                target_user = result.get('target_user', 'unknown')
-                                account_name = result.get('account_name', 'unknown')
-                                errors = result.get('errors', ['Unknown error'])
-                                error_msg = ', '.join(errors) if isinstance(errors, list) else str(errors)
-                                self.logger.warning(f"❌ Telegram trade notification failed for {target_user} ({account_name}): {error_msg}")
+                                    errors = result.get('errors', ['Unknown error'])
+                                    error_msg = ', '.join(errors) if isinstance(errors, list) else str(errors)
+                                    self.logger.warning(f"❌ Telegram trade notification failed for {target_user} ({account_name}): {error_msg}")
 
-                    except Exception as e:
-                        self.logger.error(f"❌ Error sending Telegram trade notification: {e}")
-                else:
-                    self.logger.info(f"💰 Trade executed for {symbol} (Telegram disabled)")
+                        except Exception as e:
+                            self.logger.error(f"❌ Error sending Telegram trade notification for {trade_filename}: {e}")
+                    else:
+                        self.logger.info(f"💰 Trade executed for {symbol} on account (Telegram disabled): {trade_filename}")
             else:
                 # Alert was filtered out (no green momentum or other reasons)
                 self.filtered_superduper_alerts.add(file_path)
