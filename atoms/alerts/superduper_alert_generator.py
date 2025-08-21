@@ -13,6 +13,7 @@ from typing import Dict, Any, Optional
 import pytz
 
 from .config import get_momentum_thresholds
+from ..config.alert_config import config as alert_config
 
 
 class SuperduperAlertGenerator:
@@ -286,11 +287,16 @@ class SuperduperAlertGenerator:
         # Extract time for comparison
         current_time = et_timestamp.time()
         
-        # Define market periods (all times in ET)
-        morning_power_start = et_timestamp.replace(hour=9, minute=30, second=0, microsecond=0).time()
-        morning_power_end = et_timestamp.replace(hour=12, minute=0, second=0, microsecond=0).time()
-        lunch_hour_end = et_timestamp.replace(hour=13, minute=30, second=0, microsecond=0).time()
-        market_close = et_timestamp.replace(hour=16, minute=0, second=0, microsecond=0).time()
+        # Define market periods from configuration (all times in ET)
+        morning_power_start_hour, morning_power_start_min = map(int, alert_config.morning_power_start.split(':'))
+        morning_power_end_hour, morning_power_end_min = map(int, alert_config.morning_power_end.split(':'))
+        lunch_hour_end_hour, lunch_hour_end_min = map(int, alert_config.lunch_hour_end.split(':'))
+        market_close_hour, market_close_min = map(int, alert_config.market_close.split(':'))
+        
+        morning_power_start = et_timestamp.replace(hour=morning_power_start_hour, minute=morning_power_start_min, second=0, microsecond=0).time()
+        morning_power_end = et_timestamp.replace(hour=morning_power_end_hour, minute=morning_power_end_min, second=0, microsecond=0).time()
+        lunch_hour_end = et_timestamp.replace(hour=lunch_hour_end_hour, minute=lunch_hour_end_min, second=0, microsecond=0).time()
+        market_close = et_timestamp.replace(hour=market_close_hour, minute=market_close_min, second=0, microsecond=0).time()
         
         # Determine period and color
         if morning_power_start <= current_time < morning_power_end:

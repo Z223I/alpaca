@@ -40,6 +40,12 @@ class ORBAlertConfig:
     alert_window_start: str = "09:45"    # Post-ORB period
     alert_window_end: str = "20:00"      # Extended for testing
 
+    # Trading Time Periods (for time-of-day analysis and trade filtering)
+    morning_power_start: str = "09:30"   # Morning Power period start (🟢 optimal trading)
+    morning_power_end: str = "12:00"     # Morning Power period end
+    lunch_hour_end: str = "13:30"        # Lunch Hour period end (🟡 moderate activity)
+    market_close: str = "16:00"          # Market close (🔴 caution period is lunch_hour_end to market_close)
+
     # Alpaca API Configuration
     api_key: str = ""
     secret_key: str = ""
@@ -101,6 +107,22 @@ class ORBAlertConfig:
 
         if self.data_save_interval_minutes <= 0:
             errors.append("data_save_interval_minutes must be positive")
+
+        # Validate time format for trading periods
+        time_fields = [
+            ('morning_power_start', self.morning_power_start),
+            ('morning_power_end', self.morning_power_end),
+            ('lunch_hour_end', self.lunch_hour_end),
+            ('market_close', self.market_close)
+        ]
+        
+        for field_name, time_str in time_fields:
+            try:
+                hour, minute = map(int, time_str.split(':'))
+                if not (0 <= hour <= 23) or not (0 <= minute <= 59):
+                    errors.append(f"{field_name} must be in HH:MM format with valid hour/minute")
+            except (ValueError, IndexError):
+                errors.append(f"{field_name} must be in HH:MM format")
 
         return errors
 

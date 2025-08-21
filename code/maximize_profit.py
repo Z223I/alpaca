@@ -26,6 +26,15 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 from scipy.stats import ttest_rel
+import pytz
+
+# Import trading time configuration
+try:
+    from atoms.config.alert_config import config as alert_config
+    CONFIG_AVAILABLE = True
+except ImportError:
+    CONFIG_AVAILABLE = False
+    print("Warning: Could not import alert_config - time filtering will be disabled")
 
 # Optional statistical packages
 try:
@@ -284,6 +293,31 @@ def parse_json_alert_file(json_file: Path) -> Optional[Dict[str, Any]]:
                 entry_time = pd.to_datetime(entry_timestamp)
         else:
             entry_time = pd.to_datetime(entry_timestamp)
+
+        # IMPORTANT: Filter out alerts after lunch_hour_end time
+        if CONFIG_AVAILABLE:
+            # Convert alert time to Eastern Time for comparison
+            et_tz = pytz.timezone('US/Eastern')
+            if entry_time.tz is None:
+                # Assume ET timezone if no timezone info
+                alert_et_time = et_tz.localize(entry_time)
+            else:
+                alert_et_time = entry_time.astimezone(et_tz)
+            
+            # Parse lunch_hour_end time from config
+            lunch_hour_end_hour, lunch_hour_end_min = map(int, alert_config.lunch_hour_end.split(':'))
+            lunch_hour_end_time = alert_et_time.replace(
+                hour=lunch_hour_end_hour, 
+                minute=lunch_hour_end_min, 
+                second=0, 
+                microsecond=0
+            ).time()
+            
+            # Check if alert time is after lunch_hour_end
+            alert_time_only = alert_et_time.time()
+            if alert_time_only > lunch_hour_end_time:
+                print(f"🚫 Filtering out alert after lunch_hour_end ({alert_config.lunch_hour_end}): {symbol} at {alert_et_time.strftime('%H:%M')} ET")
+                return None
 
         alert_data = {
             'alert_timestamp': entry_time,
