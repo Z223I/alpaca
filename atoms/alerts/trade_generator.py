@@ -35,7 +35,7 @@ class TradeGenerator:
         self.logger = logging.getLogger(__name__)
         
         # Trade limit configuration for testing safety
-        self.max_trades_per_session = 1 if test_mode else 12
+        self.max_trades_per_session = 1 if test_mode else 3
         self.trades_executed_count = 0
         
         self.logger.info(f"TradeGenerator initialized: max_trades={self.max_trades_per_session}, test_mode={test_mode}")
