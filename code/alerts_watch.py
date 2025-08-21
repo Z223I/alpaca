@@ -473,7 +473,8 @@ class AlertsWatchdog:
                     time.sleep(1)  # Wait for log file to be created
                 
                 # Monitor the log file for critical errors
-                error_keywords = ['ERROR', 'CRITICAL', 'FATAL', 'Exception', 'Traceback']
+                # Note: Avoid 'CRITICAL' alone as superduper alerts use "Urgency: CRITICAL" in normal output
+                error_keywords = ['ERROR', 'FATAL', 'Exception', 'Traceback', '- CRITICAL -', 'CRITICAL:']
                 
                 with open(log_file, 'r') as f:
                     f.seek(0, 2)  # Go to end of file

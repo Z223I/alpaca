@@ -79,8 +79,29 @@ Incorporate major resistance into trading.
 
 Send alert to Bruce the first time a symbol is at 20, 30, etc. percent above orb high in the 30 minutes.
 
+Moving Google doc Trading into a .md file in the repo.
 
 Why didn't I get alerts for THAR on 8/20????
+
+Doc in phone notes close all positions and cancel all orders
+
+## Maximize
+
+- [ ] Run maximize_profit.py with 8/21 data
+
+## Major Resistance
+
+- [X] Update Claude to set m/r field to $0.00
+- [ ] Review code/alpaca.py: Is there trade monitoring software. Is it used the various buy orders?
+- [ ] Have it sell just below m/r?
+
+## Broadcast Message
+
+- [ ] Add a broadcast message to telegram_polling.
+
+## Holy Cow!
+
+Why so many trades today?  That must have been during testing.  They were great though!
 
 ## Trading 2025-08-21
 
