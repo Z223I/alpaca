@@ -135,40 +135,40 @@ class BacktestingSystem:
         """Copy config_current_run.py to config.py at startup"""
         config_current_run = Path("atoms/alerts/config_current_run.py")
         config_active = Path("atoms/alerts/config.py")
-        
+
         if not config_current_run.exists():
             raise FileNotFoundError(f"Current run config not found: {config_current_run}")
-            
+
         if not self.dry_run:
             shutil.copy2(config_current_run, config_active)
             # Ensure the runs/current directory exists
             current_run_dir = Path("./runs/current")
             current_run_dir.mkdir(parents=True, exist_ok=True)
-            
+
         self.logger.info("✅ Configured all processes to use ./runs/current directory")
 
     def _restore_original_config(self):
         """Copy config_orig.py to config.py at shutdown"""
         if self.config_restored:
             return  # Already restored
-            
+
         config_orig = Path("atoms/alerts/config_orig.py")
         config_active = Path("atoms/alerts/config.py")
-        
+
         if not config_orig.exists():
             self.logger.error(f"Original config not found: {config_orig}")
             return
-            
+
         if not self.dry_run:
             shutil.copy2(config_orig, config_active)
-            
+
         self.config_restored = True
         self.logger.info("✅ Restored original config file")
 
     def _update_config_for_run(self, timeframe: int, threshold: float):
         """Update the current run config file with run-specific parameters"""
         config_current_run = Path("atoms/alerts/config_current_run.py")
-        
+
         if self.dry_run:
             self.logger.info(f"Would update config with timeframe={timeframe}, threshold={threshold}")
             return
@@ -185,46 +185,46 @@ class BacktestingSystem:
                            f'momentum=MomentumThresholds(green_threshold={threshold}), '
                            f'trend_analysis_timeframe_minutes={timeframe})')
                 break
-        
+
         # Write back to both current_run config and active config
         updated_content = '\n'.join(lines)
-        
+
         # Update current_run config (template for next startup)
         with open(config_current_run, 'w') as f:
             f.write(updated_content)
-            
+
         # Update active config (what processes will use)
         config_active = Path("atoms/alerts/config.py")
         with open(config_active, 'w') as f:
             f.write(updated_content)
-        
+
         # Allow file system to propagate changes
         import time
         time.sleep(0.5)
-        
+
         self.logger.info(f"✅ Config updated: timeframe={timeframe}, threshold={threshold}")
 
     def _get_target_run_directory(self, symbol: str, date: str, timeframe: int, threshold: float) -> Path:
         """Get target run directory name for this combination of parameters"""
         run_id = str(uuid.uuid4())[:8]  # Short UUID
         return Path(f"runs/{date}/{symbol}/run_{date}_tf{timeframe}_th{threshold}_{run_id}")
-    
+
     def _move_current_to_target(self, target_dir: Path) -> bool:
         """Move ./runs/current to target directory using bash mv command"""
         current_dir = Path("./runs/current")
-        
+
         if self.dry_run:
             self.logger.info(f"Would move {current_dir} to {target_dir}")
             return True
-            
+
         if not current_dir.exists():
             self.logger.warning(f"Current run directory does not exist: {current_dir}")
             return False
-        
+
         try:
             # Ensure parent directory exists
             target_dir.parent.mkdir(parents=True, exist_ok=True)
-            
+
             # Use bash mv command to move the directory
             result = subprocess.run(
                 ["mv", str(current_dir), str(target_dir)],
@@ -232,14 +232,14 @@ class BacktestingSystem:
                 text=True,
                 timeout=30
             )
-            
+
             if result.returncode == 0:
                 self.logger.info(f"✅ Moved {current_dir} to {target_dir}")
                 return True
             else:
                 self.logger.error(f"❌ Failed to move directory: {result.stderr}")
                 return False
-                
+
         except Exception as e:
             self.logger.error(f"❌ Error moving directory: {e}")
             return False
@@ -355,24 +355,24 @@ class BacktestingSystem:
             import time
             self.logger.info("Monitoring file processing...")
             print("Monitoring file processing...")
-            
+
             # Track last three count sets to detect when processing is complete
             previous_counts = []
             consecutive_identical = 0
             max_iterations = 12  # Maximum 2 minutes as fallback
             current_run_dir = Path("./runs/current")
-            
+
             for i in range(max_iterations):
                 alert_count = len(list((current_run_dir / "historical_data" / date / "alerts" / "bullish").glob("*.json")))
                 super_count = len(list((current_run_dir / "historical_data" / date / "super_alerts" / "bullish").glob("*.json")))
                 superduper_count = len(list((current_run_dir / "historical_data" / date / "superduper_alerts" / "bullish").glob("*.json")))
                 superduper_green_count = len(list((current_run_dir / "historical_data" / date / "superduper_alerts_sent" / "bullish" / "green").glob("*.json")))
-                
+
                 current_counts = (alert_count, super_count, superduper_count, superduper_green_count)
                 progress_msg = f"Files: {alert_count} alerts → {super_count} super → {superduper_count} superduper → {superduper_green_count} sent"
                 self.logger.info(progress_msg)
                 print(progress_msg)
-                
+
                 # Check for consecutive identical counts
                 if previous_counts and current_counts == previous_counts[-1]:
                     consecutive_identical += 1
@@ -382,16 +382,16 @@ class BacktestingSystem:
                         break
                 else:
                     consecutive_identical = 0
-                
+
                 previous_counts.append(current_counts)
                 if len(previous_counts) > 2:  # Keep only last 2 for comparison
                     previous_counts.pop(0)
-                
+
                 if superduper_green_count > 0:
                     self.logger.info("✅ Superduper alerts sent detected!")
                     print("✅ Superduper alerts sent detected!")
                     # Don't break here - let it stabilize with identical counts
-                
+
                 if i < max_iterations - 1:  # Don't sleep after the last iteration
                     time.sleep(10)
 
@@ -489,7 +489,7 @@ class BacktestingSystem:
         for result in self.run_results:
             date = result['date']
             alerts_by_date[date] = alerts_by_date.get(date, 0) + result['superduper_alerts']
-            
+
             # Use detailed symbol breakdown to avoid double counting
             for sym, count in result.get('alerts_by_symbol', {}).items():
                 alerts_by_symbol[sym] = alerts_by_symbol.get(sym, 0) + count
@@ -524,18 +524,18 @@ class BacktestingSystem:
             sorted_symbols = sorted(alerts_by_symbol.items())
             symbols = [item[0] for item in sorted_symbols]
             counts = [item[1] for item in sorted_symbols]
-            
+
             bars = plt.bar(symbols, counts, color='steelblue', alpha=0.7)
             plt.title('Superduper Alerts by Symbol', fontsize=16, fontweight='bold')
             plt.xlabel('Symbol', fontsize=12)
             plt.ylabel('Number of Alerts', fontsize=12)
             plt.xticks(rotation=45)
-            
+
             # Add value labels on top of bars
             for bar, count in zip(bars, counts):
                 plt.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.1,
                         str(count), ha='center', va='bottom', fontweight='bold')
-            
+
             plt.tight_layout()
             symbols_filename = runs_dir / f"summary_alerts_by_symbol_bar_{timestamp}.png"
             plt.savefig(symbols_filename, dpi=300, bbox_inches='tight')
@@ -549,11 +549,11 @@ class BacktestingSystem:
             return
 
         self.logger.info("🚀 Running parameter optimization analysis...")
-        
+
         try:
             # Import and run the analysis tool
             import subprocess
-            
+
             analysis_cmd = "python3 code/analyze_backtesting_results.py"
             result = subprocess.run(
                 analysis_cmd.split(),
@@ -561,7 +561,7 @@ class BacktestingSystem:
                 text=True,
                 timeout=300  # 5 minute timeout
             )
-            
+
             if result.returncode == 0:
                 self.logger.info("✅ Parameter optimization analysis completed successfully")
                 # Log the output for visibility
@@ -570,7 +570,7 @@ class BacktestingSystem:
                         self.logger.info(f"   {line}")
             else:
                 self.logger.error(f"❌ Parameter analysis failed: {result.stderr}")
-                
+
         except subprocess.TimeoutExpired:
             self.logger.error("⏰ Parameter analysis timed out")
         except Exception as e:
@@ -594,7 +594,7 @@ class BacktestingSystem:
             # Calculate total runs for progress tracking
             total_runs = self._calculate_total_runs()
             self.logger.info(f"📊 Total runs to execute: {total_runs}")
-            
+
             # Setup current run config at startup
             self._setup_current_run_config()
 
@@ -632,7 +632,7 @@ class BacktestingSystem:
 
                                 # Move current directory to target with symbol isolation
                                 move_success = self._move_current_to_target(target_run_dir)
-                                
+
                                 if move_success:
                                     # Analyze results from moved directory
                                     results = self._analyze_run_results(target_run_dir)

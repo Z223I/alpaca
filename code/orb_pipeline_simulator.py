@@ -300,30 +300,58 @@ class ORBPipelineSimulator:
             self._save_alert(alert)
 
     def _save_alert(self, alert: ORBAlert) -> None:
-        """Save alert to file."""
+        """Save alert to file in exact production format."""
         try:
-            # Create alerts directory using historical data config pattern
-            alert_type = "bullish" if alert.current_price > alert.orb_high else "bearish"
-            alerts_dir = self.historical_config.get_alerts_dir(self.date, alert_type)
+            # Determine subdirectory based on breakout type (match production exactly)
+            if alert.breakout_type.value == "bullish_breakout":
+                subdir = "bullish"
+            elif alert.breakout_type.value == "bearish_breakdown":
+                subdir = "bearish"
+            else:
+                subdir = ""  # Save in root alerts directory for other types
+
+            # Create alerts directory structure exactly like production
+            if subdir:
+                alerts_dir = self.historical_config.get_historical_data_path(self.date) / "alerts" / subdir
+            else:
+                alerts_dir = self.historical_config.get_historical_data_path(self.date) / "alerts"
+            
             alerts_dir.mkdir(parents=True, exist_ok=True)
             
-            # Save alert as JSON (match format: alert_SYMBOL_YYYYMMDD_HHMMSS.json)
+            # Save alert as JSON (match production format exactly)
             alert_filename = f"alert_{alert.symbol}_{alert.timestamp.strftime('%Y%m%d_%H%M%S')}.json"
             alert_filepath = alerts_dir / alert_filename
             
+            # Match production alert_data format EXACTLY
             alert_data = {
-                'symbol': alert.symbol,
-                'timestamp': alert.timestamp.isoformat(),
-                'current_price': float(alert.current_price),
-                'orb_high': float(alert.orb_high),
-                'orb_low': float(alert.orb_low),
-                'breakout_type': alert.breakout_type.value,
-                'confidence_score': float(alert.confidence_score),
-                'alert_message': alert.alert_message,
-                'simulation_metadata': {
-                    'speed': self.speed,
-                    'source': 'pipeline_simulator'
-                }
+                "symbol": alert.symbol,
+                "timestamp": alert.timestamp.isoformat(),
+                "current_price": float(alert.current_price),
+                "orb_high": float(alert.orb_high),
+                "orb_low": float(alert.orb_low),
+                "orb_range": float(alert.orb_range),
+                "orb_midpoint": float(alert.orb_midpoint),
+                "breakout_type": alert.breakout_type.value,
+                "breakout_percentage": float(alert.breakout_percentage),
+                "volume_ratio": float(alert.volume_ratio),
+                "confidence_score": float(alert.confidence_score),
+                "priority": alert.priority.value,
+                "confidence_level": alert.confidence_level,
+                "recommended_stop_loss": float(alert.recommended_stop_loss),
+                "recommended_take_profit": float(alert.recommended_take_profit),
+                "alert_message": alert.alert_message,
+                # Candlestick data for super alert filtering
+                "low_price": float(alert.low_price) if alert.low_price is not None else None,
+                "high_price": float(alert.high_price) if alert.high_price is not None else None,
+                "open_price": float(alert.open_price) if alert.open_price is not None else None,
+                "close_price": float(alert.close_price) if alert.close_price is not None else None,
+                "volume": int(alert.volume) if alert.volume is not None else None,
+                # EMA Technical Indicators
+                "ema_9": float(alert.ema_9) if alert.ema_9 is not None else None,
+                "ema_20": float(alert.ema_20) if alert.ema_20 is not None else None,
+                "ema_9_above_20": bool(alert.ema_9_above_20) if alert.ema_9_above_20 is not None else None,
+                "ema_9_below_20": bool(alert.ema_9_below_20) if alert.ema_9_below_20 is not None else None,
+                "ema_divergence": float(alert.ema_divergence) if alert.ema_divergence is not None else None
             }
             
             with open(alert_filepath, 'w') as f:

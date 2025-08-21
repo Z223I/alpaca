@@ -1360,6 +1360,60 @@ class BestParametersTradeTracker:
         print(f"✅ Generated {len(chart_files)} trade charts in {charts_dir}/")
         return chart_files
     
+    def generate_loss_and_thar_charts(self, output_dir: str = "optimization_charts") -> List[str]:
+        """
+        Generate candlestick charts for all losing trades and all THAR trades.
+        
+        Args:
+            output_dir: Directory to save charts
+            
+        Returns:
+            List of generated chart filenames
+        """
+        if not self.trades:
+            print("❌ No trades available for charting!")
+            return []
+            
+        # Create output directory
+        charts_dir = Path(output_dir)
+        charts_dir.mkdir(exist_ok=True)
+        
+        # Filter valid trades (with valid exit data)
+        valid_trades = [t for t in self.trades if t['exit_time'] and t['exit_price']]
+        if not valid_trades:
+            print("❌ No valid trades with exit data for charting!")
+            return []
+            
+        # Filter for losses (profit_pct < 0) and THAR trades
+        loss_trades = [t for t in valid_trades if t.get('profit_pct', 0) < 0]
+        thar_trades = [t for t in valid_trades if t.get('symbol', '').upper() == 'THAR']
+        
+        # Combine and deduplicate (in case THAR trade is also a loss)
+        trades_to_chart = {}
+        for trade in loss_trades:
+            key = f"{trade['symbol']}_{trade['date']}_{trade['entry_time']}"
+            trades_to_chart[key] = trade
+        for trade in thar_trades:
+            key = f"{trade['symbol']}_{trade['date']}_{trade['entry_time']}"
+            trades_to_chart[key] = trade
+            
+        selected_trades = list(trades_to_chart.values())
+        
+        print(f"📊 Generating charts for {len(loss_trades)} loss trades and {len(thar_trades)} THAR trades ({len(selected_trades)} total after dedup)...")
+        
+        chart_files = []
+        for i, trade in enumerate(selected_trades):
+            try:
+                chart_file = self._create_trade_chart(trade, i + 1, charts_dir)
+                if chart_file:
+                    chart_files.append(chart_file)
+            except Exception as e:
+                print(f"⚠️ Error creating chart for trade {trade['trade_id']}: {e}")
+                continue
+                
+        print(f"✅ Generated {len(chart_files)} loss/THAR trade charts in {charts_dir}/")
+        return chart_files
+    
     def _create_trade_chart(self, trade: Dict[str, Any], chart_num: int, output_dir: Path) -> Optional[str]:
         """Create a candlestick chart for a specific trade."""
         symbol = trade['symbol']
@@ -2482,8 +2536,17 @@ def main():
         chart_files = trade_tracker.generate_random_trade_charts(num_charts=20, output_dir="optimization_charts")
         
         if chart_files:
-            print(f"📁 Trade charts saved in optimization_charts/ directory:")
+            print(f"📁 Random trade charts saved in optimization_charts/ directory:")
             for chart_file in chart_files:
+                print(f"   📊 {Path(chart_file).name}")
+        
+        # Generate charts for all loss trades and all THAR trades
+        print(f"\n📊 GENERATING CHARTS FOR ALL LOSSES AND THAR TRADES")
+        loss_thar_charts = trade_tracker.generate_loss_and_thar_charts(output_dir="optimization_charts")
+        
+        if loss_thar_charts:
+            print(f"📁 Loss/THAR trade charts saved in optimization_charts/ directory:")
+            for chart_file in loss_thar_charts:
                 print(f"   📊 {Path(chart_file).name}")
         
         # Generate trade distribution analysis
