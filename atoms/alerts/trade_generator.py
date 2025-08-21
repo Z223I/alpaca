@@ -34,37 +34,62 @@ class TradeGenerator:
         self.test_mode = test_mode
         self.logger = logging.getLogger(__name__)
         
-        # Trade limit configuration for testing safety
-        self.max_trades_per_session = 1 if test_mode else 3
-        self.trades_executed_count = 0
+        # Trade limit configuration per account (loaded from config)
+        self.trades_executed_by_account = {}  # Track trades per account: {"account_name/account_type": count}
         
-        self.logger.info(f"TradeGenerator initialized: max_trades={self.max_trades_per_session}, test_mode={test_mode}")
+        self.logger.info(f"TradeGenerator initialized: test_mode={test_mode}")
 
-    def can_execute_trade(self) -> bool:
+    def can_execute_trade(self, account_name: str, account_type: str, env_config) -> bool:
         """
-        Check if we can execute another trade within the session limit.
+        Check if we can execute another trade for a specific account within the session limit.
+        
+        Args:
+            account_name: Name of the account
+            account_type: Type of account (paper, live, cash)
+            env_config: Environment configuration with max_trades_per_day
         
         Returns:
             True if trade can be executed, False if limit reached
         """
-        return self.trades_executed_count < self.max_trades_per_session
+        account_key = f"{account_name}/{account_type}"
+        current_count = self.trades_executed_by_account.get(account_key, 0)
+        max_trades = 1 if self.test_mode else env_config.max_trades_per_day
+        return current_count < max_trades
     
-    def get_remaining_trades(self) -> int:
+    def get_remaining_trades(self, account_name: str, account_type: str, env_config) -> int:
         """
-        Get the number of trades remaining in this session.
+        Get the number of trades remaining for a specific account in this session.
+        
+        Args:
+            account_name: Name of the account
+            account_type: Type of account (paper, live, cash)
+            env_config: Environment configuration with max_trades_per_day
         
         Returns:
-            Number of trades remaining
+            Number of trades remaining for this account
         """
-        return max(0, self.max_trades_per_session - self.trades_executed_count)
+        account_key = f"{account_name}/{account_type}"
+        current_count = self.trades_executed_by_account.get(account_key, 0)
+        max_trades = 1 if self.test_mode else env_config.max_trades_per_day
+        return max(0, max_trades - current_count)
     
-    def reset_trade_counter(self) -> None:
+    def reset_trade_counter(self, account_name: str = None, account_type: str = None) -> None:
         """
         Reset the trade counter (useful for testing or new trading sessions).
+        
+        Args:
+            account_name: If specified, reset only this account. If None, reset all accounts.
+            account_type: Account type to reset (required if account_name specified)
         """
-        old_count = self.trades_executed_count
-        self.trades_executed_count = 0
-        self.logger.info(f"Trade counter reset: {old_count} → 0")
+        if account_name and account_type:
+            account_key = f"{account_name}/{account_type}"
+            old_count = self.trades_executed_by_account.get(account_key, 0)
+            self.trades_executed_by_account[account_key] = 0
+            self.logger.info(f"Trade counter reset for {account_key}: {old_count} → 0")
+        else:
+            old_counts = dict(self.trades_executed_by_account)
+            self.trades_executed_by_account.clear()
+            self.logger.info(f"All trade counters reset: {old_counts} → {{}}")
 
     def is_market_hours(self) -> bool:
         """
@@ -711,6 +736,15 @@ class TradeGenerator:
 
                     if env_config.auto_trade == "yes":
                         symbol = superduper_alert['symbol']
+                        
+                        # Check if this account can still execute trades
+                        if not self.can_execute_trade(account_name, account_type, env_config):
+                            remaining = self.get_remaining_trades(account_name, account_type, env_config)
+                            max_trades = 1 if self.test_mode else env_config.max_trades_per_day
+                            current_count = self.trades_executed_by_account.get(f"{account_name}/{account_type}", 0)
+                            self.logger.warning(f"🚫 Trade limit reached for {account_name}/{account_type}: {current_count}/{max_trades} trades executed (remaining: {remaining})")
+                            continue
+                        
                         self.logger.info(f"Creating and executing trade for {symbol} on {account_name}/{account_type}")
 
                         # Create trade record
@@ -733,9 +767,13 @@ class TradeGenerator:
                         # Display trade execution
                         self._display_trade_execution(trade_record, filename)
 
-                        # Increment trade counter for session limit tracking
-                        self.trades_executed_count += 1
-                        self.logger.info(f"Trade counter: {self.trades_executed_count}/{self.max_trades_per_session}")
+                        # Increment trade counter for this specific account
+                        account_key = f"{account_name}/{account_type}"
+                        self.trades_executed_by_account[account_key] = self.trades_executed_by_account.get(account_key, 0) + 1
+                        remaining = self.get_remaining_trades(account_name, account_type, env_config)
+                        max_trades = 1 if self.test_mode else env_config.max_trades_per_day
+                        current_count = self.trades_executed_by_account[account_key]
+                        self.logger.info(f"Trade counter for {account_key}: {current_count}/{max_trades} (remaining: {remaining})")
 
                         result_filename = filename
                         trade_executed = True
