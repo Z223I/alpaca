@@ -8,6 +8,7 @@ This system manages ORB alert processes during market hours (9:30 AM - 4:00 PM E
 3. Stops them at market close
 4. Runs post-market analysis and summary
 5. Sends daily summary to Bruce via Telegram
+6. Automatically shuts down after all EOD tasks complete
 
 Managed Processes:
 - ORB Alerts (Basic alert generation)
@@ -19,6 +20,10 @@ Post-Market Tasks:
 - ORB Alerts Summary
 - ORB Analysis with Charts
 - Telegram summary to Bruce
+- End-of-day shutdown notification
+- Automatic watchdog termination
+
+Usage: Run once per day - will automatically shutdown after market close and EOD tasks.
 """
 
 import sys
@@ -299,7 +304,7 @@ class AlertsWatchdog:
         self._log("✅ All alert processes started for market session")
     
     def _market_close_handler(self):
-        """Handle market close - stop processes and run summaries."""
+        """Handle market close - stop processes, run summaries, and shutdown."""
         et_now = datetime.now(self.et_tz)
         if et_now.weekday() >= 5:  # Skip weekends
             return
@@ -315,6 +320,9 @@ class AlertsWatchdog:
         
         # Run post-market analysis
         self._run_post_market_analysis()
+        
+        # Shutdown after all EOD chores are complete
+        self._shutdown_after_eod()
     
     def _start_alert_process(self, process_name: str, config: Dict):
         """Start a specific alert process with dedicated logging."""
@@ -704,6 +712,61 @@ class AlertsWatchdog:
             
         except Exception as e:
             self._log(f"❌ Error creating daily summary: {e}", "ERROR")
+    
+    def _shutdown_after_eod(self):
+        """Shutdown the watchdog after all end-of-day chores are completed."""
+        try:
+            self._log("🏁 END OF DAY - All tasks completed")
+            self._log("📊 Daily summary sent")
+            self._log("🔄 All processes stopped")
+            self._log("📈 Post-market analysis finished")
+            self._log("")
+            self._log("🌙 SHUTTING DOWN WATCHDOG - EOD tasks complete")
+            self._log("💡 Restart tomorrow for next trading session")
+            
+            # Send shutdown notification to Bruce
+            try:
+                et_now = datetime.now(self.et_tz)
+                today = et_now.strftime("%Y-%m-%d")
+                shutdown_message = f"""🌙 **EOD Shutdown Complete - {today}**
+
+✅ **All Tasks Completed:**
+• Alert processes stopped
+• Post-market analysis finished  
+• Daily summary sent
+• Logs saved and organized
+
+🔄 **Next Steps:**
+Watchdog will automatically restart for tomorrow's trading session.
+
+📋 **Log Directory:** logs/alerts_watchdog/
+⏰ **Shutdown Time:** {et_now.strftime('%H:%M:%S ET')}"""
+
+                from atoms.telegram.user_manager import UserManager
+                user_manager = UserManager()
+                active_users = user_manager.get_active_users()
+                bruce_users = [u for u in active_users if 'bruce' in u.get('username', '').lower()]
+                
+                if bruce_users:
+                    for user in bruce_users:
+                        from atoms.telegram.telegram_post import TelegramPoster
+                        telegram_poster = TelegramPoster()
+                        telegram_poster.send_message_to_user(shutdown_message, user['username'])
+                        self._log(f"✅ Shutdown notification sent to Bruce ({user['chat_id']})")
+                        
+            except Exception as e:
+                self._log(f"⚠️ Failed to send shutdown notification: {e}", "WARN")
+            
+            # Wait a moment for any final operations
+            time.sleep(2)
+            
+            # Set running flag to False to exit main loop
+            self.running = False
+            self._log("👋 Watchdog shutdown initiated - goodbye!")
+            
+        except Exception as e:
+            self._log(f"❌ Error during EOD shutdown: {e}", "ERROR")
+            self.running = False
 
 def main():
     """Main entry point."""

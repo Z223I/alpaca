@@ -590,24 +590,9 @@ class BacktestingSystem:
         """Execute the full backtesting suite"""
         self.logger.info("Starting backtesting system")
 
-        # Check if Telegram notifications are disabled
+        # Automatically manage Telegram notifications during backtesting
         if not self.dry_run:
-            print("\n" + "="*80)
-            print("🚨 TELEGRAM NOTIFICATION CHECK 🚨")
-            print("="*80)
-            print("Before running backtesting, you should disable Telegram notifications")
-            print("to prevent spam during extensive parameter testing.")
-            print("")
-            print("Edit .telegram_users.csv and set enabled=false for all users.")
-            print("="*80)
-            
-            response = input("\nHave you disabled Telegram notifications for all users? (y/n): ").lower().strip()
-            if response not in ['y', 'yes']:
-                print("\n❌ Please disable Telegram notifications first by editing .telegram_users.csv")
-                print("Set enabled=false for all users to prevent notification spam.")
-                print("Then run backtesting again.")
-                return
-            print("✅ Proceeding with backtesting...")
+            self._manage_telegram_notifications_start()
 
         try:
             # Calculate total runs for progress tracking
@@ -681,25 +666,88 @@ class BacktestingSystem:
             self.logger.info(f"Backtesting complete: {len(self.run_results)} runs, "
                              f"{total_alerts} total alerts")
 
-            # Remind to re-enable Telegram notifications
-            if not self.dry_run:
-                print("\n" + "="*80)
-                print("✅ BACKTESTING COMPLETED ✅")
-                print("="*80)
-                print("Don't forget to re-enable Telegram notifications!")
-                print("Edit .telegram_users.csv and set enabled=true for users who should receive alerts.")
-                print("="*80)
-                
-                response = input("\nHave you re-enabled Telegram notifications? (y/n): ").lower().strip()
-                if response not in ['y', 'yes']:
-                    print("\n⚠️  REMINDER: Re-enable Telegram notifications by editing .telegram_users.csv")
-                    print("Set enabled=true for users who should receive live trading alerts.")
-                else:
-                    print("✅ Great! Telegram notifications are ready for live trading.")
-
         finally:
             # Always restore original config
             self._restore_original_config()
+            
+            # Restore Telegram notifications
+            if not self.dry_run:
+                self._manage_telegram_notifications_end()
+    
+    def _manage_telegram_notifications_start(self):
+        """Backup and disable Telegram notifications at start of backtesting."""
+        try:
+            import csv
+            import shutil
+            from pathlib import Path
+            
+            telegram_file = Path('.telegram_users.csv')
+            backup_file = Path('.telegram_users_backup.csv')
+            
+            if not telegram_file.exists():
+                self.logger.warning("⚠️ .telegram_users.csv not found, skipping notification management")
+                return
+            
+            self.logger.info("🔄 Managing Telegram notifications for backtesting...")
+            
+            # Create backup
+            shutil.copy2(telegram_file, backup_file)
+            self.logger.info(f"✅ Created backup: {backup_file}")
+            
+            # Read current users
+            users = []
+            with open(telegram_file, 'r', newline='') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    users.append(row)
+            
+            # Count enabled users before disabling
+            enabled_count = sum(1 for user in users if user.get('enabled', '').lower() == 'true')
+            
+            # Disable all users
+            for user in users:
+                user['enabled'] = 'false'
+            
+            # Write updated file
+            with open(telegram_file, 'w', newline='') as f:
+                if users:
+                    writer = csv.DictWriter(f, fieldnames=users[0].keys())
+                    writer.writeheader()
+                    writer.writerows(users)
+            
+            self.logger.info(f"🔇 Disabled notifications for {enabled_count} users during backtesting")
+            self.logger.info("   This prevents spam during extensive parameter testing")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error managing Telegram notifications at start: {e}")
+    
+    def _manage_telegram_notifications_end(self):
+        """Restore Telegram notifications at end of backtesting."""
+        try:
+            import shutil
+            from pathlib import Path
+            
+            telegram_file = Path('.telegram_users.csv')
+            backup_file = Path('.telegram_users_backup.csv')
+            
+            if not backup_file.exists():
+                self.logger.warning("⚠️ Backup file not found, cannot restore notifications")
+                return
+            
+            self.logger.info("🔄 Restoring original Telegram notification settings...")
+            
+            # Restore from backup
+            shutil.copy2(backup_file, telegram_file)
+            
+            # Clean up backup file
+            backup_file.unlink()
+            
+            self.logger.info("✅ Telegram notifications restored to original settings")
+            self.logger.info("📱 Users can now receive live trading alerts again")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error restoring Telegram notifications: {e}")
+            self.logger.error("⚠️ Please manually restore .telegram_users.csv from backup if needed")
 
 
 def main():
