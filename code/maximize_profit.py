@@ -1385,16 +1385,9 @@ class BestParametersTradeTracker:
         
         # Select random trades
         selected_trades = random.sample(valid_trades, min(num_charts, len(valid_trades)))
-        chart_files = []
         
-        for i, trade in enumerate(selected_trades):
-            try:
-                chart_file = self._create_trade_chart(trade, i + 1, charts_dir)
-                if chart_file:
-                    chart_files.append(chart_file)
-            except Exception as e:
-                print(f"⚠️ Error creating chart for trade {trade['trade_id']}: {e}")
-                continue
+        # Generate charts in parallel for better performance
+        chart_files = self._generate_charts_parallel(selected_trades, charts_dir)
                 
         print(f"✅ Generated {len(chart_files)} trade charts in {charts_dir}/")
         return chart_files
@@ -1440,18 +1433,210 @@ class BestParametersTradeTracker:
         
         print(f"📊 Generating charts for {len(loss_trades)} loss trades and {len(thar_trades)} THAR trades ({len(selected_trades)} total after dedup)...")
         
-        chart_files = []
-        for i, trade in enumerate(selected_trades):
-            try:
-                chart_file = self._create_trade_chart(trade, i + 1, charts_dir)
-                if chart_file:
-                    chart_files.append(chart_file)
-            except Exception as e:
-                print(f"⚠️ Error creating chart for trade {trade['trade_id']}: {e}")
-                continue
+        # Generate charts in parallel for better performance
+        chart_files = self._generate_charts_parallel(selected_trades, charts_dir)
                 
         print(f"✅ Generated {len(chart_files)} loss/THAR trade charts in {charts_dir}/")
         return chart_files
+    
+    def _generate_charts_parallel(self, trades: List[Dict[str, Any]], charts_dir: Path) -> List[str]:
+        """
+        Generate charts in parallel using ProcessPoolExecutor to avoid matplotlib threading issues.
+        
+        Args:
+            trades: List of trade dictionaries
+            charts_dir: Directory to save charts
+            
+        Returns:
+            List of generated chart file paths
+        """
+        chart_files = []
+        
+        # Use ProcessPoolExecutor to avoid matplotlib threading issues
+        max_workers = min(4, len(trades), mp.cpu_count())  # Limit processes to avoid memory issues
+        
+        # Create arguments for the static chart creation function
+        chart_args = [
+            (trade, i + 1, str(charts_dir), self.data_loader)
+            for i, trade in enumerate(trades)
+        ]
+        
+        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all chart generation tasks
+            future_to_trade = {
+                executor.submit(_create_trade_chart_static, args): trades[i] 
+                for i, args in enumerate(chart_args)
+            }
+            
+            # Collect results as they complete
+            for future in concurrent.futures.as_completed(future_to_trade):
+                trade = future_to_trade[future]
+                try:
+                    chart_file = future.result()
+                    if chart_file:
+                        chart_files.append(chart_file)
+                except Exception as e:
+                    trade_id = trade.get('trade_id', 'unknown')
+                    print(f"⚠️ Error creating chart for trade {trade_id}: {e}")
+                    continue
+        
+        return chart_files
+
+
+def _create_trade_chart_static(args) -> Optional[str]:
+    """
+    Static function for creating trade charts that can be used with ProcessPoolExecutor.
+    
+    Args:
+        args: Tuple of (trade, chart_num, output_dir_str, data_loader)
+        
+    Returns:
+        Path to created chart file or None if failed
+    """
+    import matplotlib
+    matplotlib.use('Agg')  # Use non-interactive backend for multiprocessing
+    import matplotlib.pyplot as plt
+    import pandas as pd
+    from pathlib import Path
+    
+    trade, chart_num, output_dir_str, data_loader = args
+    output_dir = Path(output_dir_str)
+    
+    symbol = trade['symbol']
+    date = trade['date']
+    
+    try:
+        # Get price data from cache
+        price_data = data_loader.get_symbol_data(symbol, date)
+        if price_data is None or len(price_data) == 0:
+            print(f"⚠️ No price data for {symbol} on {date}")
+            return None
+            
+        # Validate required columns
+        required_cols = ['timestamp', 'close', 'high', 'low']
+        if not all(col in price_data.columns for col in required_cols):
+            print(f"⚠️ Missing required columns in price data for {symbol} on {date}")
+            return None
+            
+        # Reset index to ensure positional indexing works correctly
+        price_data = price_data.reset_index(drop=True)
+        
+        # Filter for market hours only (9:30 AM - 4:00 PM ET) on the trade date
+        trade_date = pd.to_datetime(date).date()
+        price_data['date_only'] = price_data['timestamp'].dt.date
+        price_data['time_only'] = price_data['timestamp'].dt.time
+        
+        market_start = pd.Timestamp('09:30:00').time()
+        market_end = pd.Timestamp('16:00:00').time()
+        
+        # Filter for the specific trade date AND market hours
+        date_mask = price_data['date_only'] == trade_date
+        time_mask = (price_data['time_only'] >= market_start) & (price_data['time_only'] <= market_end)
+        market_hours_mask = date_mask & time_mask
+        market_data = price_data[market_hours_mask].copy()
+        
+        if len(market_data) == 0:
+            print(f"⚠️ No market hours data for {symbol} on {date}")
+            return None
+        
+        # Create the chart
+        fig, ax = plt.subplots(figsize=(14, 8))
+        
+        # Plot candlesticks (simplified as OHLC line chart)
+        ax.plot(market_data['timestamp'], market_data['close'], 'k-', alpha=0.7, linewidth=1)
+        ax.fill_between(market_data['timestamp'], market_data['low'], market_data['high'], 
+                       alpha=0.2, color='gray', label='High-Low Range')
+        
+        # Mark entry point
+        if trade['entry_time']:
+            entry_time = pd.to_datetime(trade['entry_time'])
+            
+            # Handle timezone consistency with market data
+            if entry_time.tz is None and hasattr(market_data['timestamp'].iloc[0], 'tz') and market_data['timestamp'].iloc[0].tz is not None:
+                entry_time = entry_time.tz_localize('US/Eastern')
+            elif entry_time.tz is not None and (not hasattr(market_data['timestamp'].iloc[0], 'tz') or market_data['timestamp'].iloc[0].tz is None):
+                entry_time = entry_time.tz_convert(None) if entry_time.tz else entry_time.replace(tzinfo=None)
+            
+            # Find the closest timestamp in market data to entry time
+            try:
+                time_diffs = (market_data['timestamp'] - entry_time).abs()
+                closest_pos = time_diffs.argmin()
+                
+                if 0 <= closest_pos < len(market_data):
+                    actual_entry_time = market_data['timestamp'].iloc[closest_pos]
+                    actual_entry_price = market_data['close'].iloc[closest_pos]
+                else:
+                    actual_entry_time = entry_time
+                    actual_entry_price = trade['entry_price']
+                    
+                # Plot entry point
+                ax.axvline(x=actual_entry_time, color='green', linestyle='--', alpha=0.8, linewidth=2, label='Entry')
+                ax.plot(actual_entry_time, actual_entry_price, 'go', markersize=10, markerfacecolor='green', markeredgecolor='darkgreen', markeredgewidth=2)
+                ax.text(actual_entry_time, actual_entry_price + 0.2, f'ENTRY\n${actual_entry_price:.2f}', 
+                       ha='center', va='bottom', fontsize=10, fontweight='bold', color='green')
+                       
+            except Exception as e:
+                print(f"⚠️ Error processing entry time for {symbol}: {e}")
+        
+        # Mark exit point
+        if trade['exit_time']:
+            exit_time = pd.to_datetime(trade['exit_time'])
+            
+            # Handle timezone consistency with market data (same as entry)
+            if exit_time.tz is None and hasattr(market_data['timestamp'].iloc[0], 'tz') and market_data['timestamp'].iloc[0].tz is not None:
+                exit_time = exit_time.tz_localize('US/Eastern')
+            elif exit_time.tz is not None and (not hasattr(market_data['timestamp'].iloc[0], 'tz') or market_data['timestamp'].iloc[0].tz is None):
+                exit_time = exit_time.tz_convert(None) if exit_time.tz else exit_time.replace(tzinfo=None)
+            
+            # Find the closest timestamp in market data to exit time
+            try:
+                time_diffs = (market_data['timestamp'] - exit_time).abs()
+                closest_pos = time_diffs.argmin()
+                
+                if 0 <= closest_pos < len(market_data):
+                    actual_exit_time = market_data['timestamp'].iloc[closest_pos]
+                else:
+                    actual_exit_time = exit_time
+                    
+                exit_reason = trade.get('exit_reason', 'unknown')
+                ax.axvline(x=actual_exit_time, color='red', linestyle='--', alpha=0.8, linewidth=2, label='Exit')
+                ax.plot(actual_exit_time, trade['exit_price'], 'ro', markersize=10, markerfacecolor='red', markeredgecolor='darkred', markeredgewidth=2)
+                ax.text(actual_exit_time, trade['exit_price'] - 0.4, f'EXIT ({exit_reason})\n${trade["exit_price"]:.2f}', 
+                       ha='center', va='top', fontsize=10, fontweight='bold', color='red')
+                       
+            except Exception as e:
+                print(f"⚠️ Error processing exit time for {symbol}: {e}")
+        
+        # Chart formatting
+        profit_pct = trade.get('profit_pct', 0)
+        hold_time = trade.get('hold_time_minutes', 'N/A')
+        tp_pct = trade.get('take_profit_percent', 'N/A')
+        ts_pct = trade.get('trailing_stop_percent', 'N/A')
+        
+        ax.set_title(f'Trade #{chart_num}: {symbol} on {date}\n'
+                    f'Profit: {profit_pct:+.2f}% | Hold: {hold_time}min | TP: {tp_pct}% | TS: {ts_pct}%', 
+                    fontsize=14, fontweight='bold')
+        ax.set_xlabel('Time', fontsize=12)
+        ax.set_ylabel('Price ($)', fontsize=12)
+        ax.legend(loc='upper right')
+        ax.grid(True, alpha=0.3)
+        
+        # Rotate x-axis labels
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        
+        # Save chart
+        filename = f"trade_{chart_num:02d}_{symbol}_{date}_{profit_pct:+.1f}pct.png"
+        filepath = output_dir / filename
+        plt.savefig(filepath, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print(f"   📊 Chart {chart_num}: {filename}")
+        return str(filepath)
+        
+    except Exception as e:
+        print(f"⚠️ Error creating chart for {symbol} on {date}: {e}")
+        return None
     
     def _create_trade_chart(self, trade: Dict[str, Any], chart_num: int, output_dir: Path) -> Optional[str]:
         """Create a candlestick chart for a specific trade."""
@@ -1473,35 +1658,53 @@ class BestParametersTradeTracker:
         # Reset index to ensure positional indexing works correctly
         price_data = price_data.reset_index(drop=True)
         
+        # Filter for market hours only (9:30 AM - 4:00 PM ET) on the trade date
+        trade_date = pd.to_datetime(date).date()
+        price_data['date_only'] = price_data['timestamp'].dt.date
+        price_data['time_only'] = price_data['timestamp'].dt.time
+        
+        market_start = pd.Timestamp('09:30:00').time()
+        market_end = pd.Timestamp('16:00:00').time()
+        
+        # Filter for the specific trade date AND market hours
+        date_mask = price_data['date_only'] == trade_date
+        time_mask = (price_data['time_only'] >= market_start) & (price_data['time_only'] <= market_end)
+        market_hours_mask = date_mask & time_mask
+        market_data = price_data[market_hours_mask].copy()
+        
+        if len(market_data) == 0:
+            print(f"⚠️ No market hours data for {symbol} on {date}")
+            return None
+        
         # Create the chart
         fig, ax = plt.subplots(figsize=(14, 8))
         
         # Plot candlesticks (simplified as OHLC line chart)
-        ax.plot(price_data['timestamp'], price_data['close'], 'k-', alpha=0.7, linewidth=1)
-        ax.fill_between(price_data['timestamp'], price_data['low'], price_data['high'], 
+        ax.plot(market_data['timestamp'], market_data['close'], 'k-', alpha=0.7, linewidth=1)
+        ax.fill_between(market_data['timestamp'], market_data['low'], market_data['high'], 
                        alpha=0.2, color='gray', label='High-Low Range')
         
         # Mark entry point
         if trade['entry_time']:
             entry_time = pd.to_datetime(trade['entry_time'])
             
-            # Handle timezone consistency with price data
-            if entry_time.tz is None and hasattr(price_data['timestamp'].iloc[0], 'tz') and price_data['timestamp'].iloc[0].tz is not None:
-                # Entry time is naive, price data has timezone - localize entry time
+            # Handle timezone consistency with market data
+            if entry_time.tz is None and hasattr(market_data['timestamp'].iloc[0], 'tz') and market_data['timestamp'].iloc[0].tz is not None:
+                # Entry time is naive, market data has timezone - localize entry time
                 entry_time = entry_time.tz_localize('US/Eastern')
-            elif entry_time.tz is not None and (not hasattr(price_data['timestamp'].iloc[0], 'tz') or price_data['timestamp'].iloc[0].tz is None):
-                # Entry time has timezone, price data is naive - convert entry time to naive
+            elif entry_time.tz is not None and (not hasattr(market_data['timestamp'].iloc[0], 'tz') or market_data['timestamp'].iloc[0].tz is None):
+                # Entry time has timezone, market data is naive - convert entry time to naive
                 entry_time = entry_time.tz_convert(None) if entry_time.tz else entry_time.replace(tzinfo=None)
             
-            # Find the closest timestamp in price data to entry time
+            # Find the closest timestamp in market data to entry time
             try:
-                time_diffs = (price_data['timestamp'] - entry_time).abs()
+                time_diffs = (market_data['timestamp'] - entry_time).abs()
                 closest_pos = time_diffs.argmin()  # Use argmin() for positional index
                 
                 # Validate the position is within bounds
-                if 0 <= closest_pos < len(price_data):
-                    actual_entry_time = price_data['timestamp'].iloc[closest_pos]
-                    actual_entry_price = price_data['close'].iloc[closest_pos]
+                if 0 <= closest_pos < len(market_data):
+                    actual_entry_time = market_data['timestamp'].iloc[closest_pos]
+                    actual_entry_price = market_data['close'].iloc[closest_pos]
                 else:
                     # Fallback to original values if position is invalid
                     actual_entry_time = entry_time
@@ -1525,20 +1728,20 @@ class BestParametersTradeTracker:
         if trade['exit_time']:
             exit_time = pd.to_datetime(trade['exit_time'])
             
-            # Handle timezone consistency with price data (same as entry)
-            if exit_time.tz is None and hasattr(price_data['timestamp'].iloc[0], 'tz') and price_data['timestamp'].iloc[0].tz is not None:
+            # Handle timezone consistency with market data (same as entry)
+            if exit_time.tz is None and hasattr(market_data['timestamp'].iloc[0], 'tz') and market_data['timestamp'].iloc[0].tz is not None:
                 exit_time = exit_time.tz_localize('US/Eastern')
-            elif exit_time.tz is not None and (not hasattr(price_data['timestamp'].iloc[0], 'tz') or price_data['timestamp'].iloc[0].tz is None):
+            elif exit_time.tz is not None and (not hasattr(market_data['timestamp'].iloc[0], 'tz') or market_data['timestamp'].iloc[0].tz is None):
                 exit_time = exit_time.tz_convert(None) if exit_time.tz else exit_time.replace(tzinfo=None)
             
-            # Find the closest timestamp in price data to exit time
+            # Find the closest timestamp in market data to exit time
             try:
-                time_diffs = (price_data['timestamp'] - exit_time).abs()
+                time_diffs = (market_data['timestamp'] - exit_time).abs()
                 closest_pos = time_diffs.argmin()  # Use argmin() for positional index
                 
                 # Validate the position is within bounds
-                if 0 <= closest_pos < len(price_data):
-                    actual_exit_time = price_data['timestamp'].iloc[closest_pos]
+                if 0 <= closest_pos < len(market_data):
+                    actual_exit_time = market_data['timestamp'].iloc[closest_pos]
                 else:
                     # Fallback to original values if position is invalid
                     actual_exit_time = exit_time
