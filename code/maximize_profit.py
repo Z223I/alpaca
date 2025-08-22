@@ -2418,24 +2418,6 @@ def main():
     data_loader = HistoricalDataLoader()
     print(f"Data loader initialized with {data_loader.max_memory_bytes / 1024**3:.1f}GB cache limit")
 
-    # Update symbols.json before collecting alerts
-    print("\nUpdating symbols.json with latest superduper alert symbols...")
-    try:
-        import subprocess
-        result = subprocess.run([
-            sys.executable, 
-            "code/update_symbols_json.py"
-        ], capture_output=True, text=True, cwd=".")
-        
-        if result.returncode == 0:
-            print("✅ symbols.json updated successfully")
-        else:
-            print(f"⚠️ Warning: symbols.json update failed: {result.stderr}")
-            print("Continuing with existing symbols.json...")
-    except Exception as e:
-        print(f"⚠️ Warning: Could not update symbols.json: {e}")
-        print("Continuing with existing symbols.json...")
-
     # Collect alerts
     print("\nCollecting alerts from runs directory...")
     alerts = collect_superduper_alerts_from_runs()

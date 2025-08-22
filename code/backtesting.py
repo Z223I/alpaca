@@ -593,6 +593,10 @@ class BacktestingSystem:
         # Automatically manage Telegram notifications during backtesting
         if not self.dry_run:
             self._manage_telegram_notifications_start()
+            
+        # Optional symbols.json update for repeatability
+        if not self.dry_run:
+            self._prompt_symbols_update()
 
         try:
             # Calculate total runs for progress tracking
@@ -748,6 +752,67 @@ class BacktestingSystem:
         except Exception as e:
             self.logger.error(f"❌ Error restoring Telegram notifications: {e}")
             self.logger.error("⚠️ Please manually restore .telegram_users.csv from backup if needed")
+    
+    def _prompt_symbols_update(self):
+        """Prompt user to optionally update symbols.json before backtesting."""
+        try:
+            print("\n" + "="*80)
+            print("📋 SYMBOLS UPDATE - Optional for Repeatability")
+            print("="*80)
+            print("Update symbols.json with latest symbols from superduper alerts?")
+            print("")
+            print("• YES: Include newest symbols found in historical_data/")
+            print("• NO:  Use existing symbols.json (for repeatable testing)")
+            print("="*80)
+            
+            while True:
+                response = input("\nUpdate symbols.json with latest alerts? (y/n): ").lower().strip()
+                if response in ['y', 'yes']:
+                    self._update_symbols_json()
+                    break
+                elif response in ['n', 'no']:
+                    print("✅ Using existing symbols.json for repeatability")
+                    self.logger.info("Skipped symbols.json update - using existing file")
+                    break
+                else:
+                    print("Please enter 'y' for yes or 'n' for no.")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error in symbols update prompt: {e}")
+            print("⚠️ Continuing with existing symbols.json...")
+    
+    def _update_symbols_json(self):
+        """Update symbols.json with latest superduper alert symbols."""
+        try:
+            import subprocess
+            import sys
+            
+            print("\n🔄 Updating symbols.json with latest superduper alert symbols...")
+            self.logger.info("Running symbols update script...")
+            
+            result = subprocess.run([
+                sys.executable,
+                "code/update_symbols_json.py"
+            ], capture_output=True, text=True, cwd=".")
+            
+            if result.returncode == 0:
+                print("✅ symbols.json updated successfully")
+                self.logger.info("✅ Symbols update completed successfully")
+                
+                # Log some output for visibility
+                if result.stdout:
+                    for line in result.stdout.strip().split('\n')[-5:]:  # Last 5 lines
+                        if line.strip():
+                            self.logger.info(f"   {line.strip()}")
+            else:
+                print(f"❌ symbols.json update failed: {result.stderr}")
+                self.logger.error(f"❌ Symbols update failed: {result.stderr}")
+                print("Continuing with existing symbols.json...")
+                
+        except Exception as e:
+            print(f"❌ Error updating symbols.json: {e}")
+            self.logger.error(f"❌ Error in symbols update: {e}")
+            print("Continuing with existing symbols.json...")
 
 
 def main():
