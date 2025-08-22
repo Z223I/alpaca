@@ -85,14 +85,26 @@ Why didn't I get alerts for THAR on 8/20????
 
 Doc in phone notes close all positions and cancel all orders
 
-## Maximize
+## Test Monitor Positions
 
-- [ ] Run code/backtesting.py first.  Then
-- [ ] Run maximize_profit.py with 8/21 data
+- [ ] Do this in the paper account
+- [ ] Update the monitor to send a Telegram post to the account holder every 15 minutes
+- [ ] Buy AAPL
+- [ ] Verify the monitor works for this simple case
+- [ ] Expand testing to include closing positions
 
 ## Trades
 
 - [ ] My trades place two orders.  Provide feedback in the Telegram post for both orders.
+
+## maximize_profit.py
+
+- [X] Review code/maximize_profit.py: Is it printing all charts for trades with losses?  It is supposed to do that. It does.
+
+## Maximize
+
+- [X] Run code/backtesting.py first.  Then
+- [X] Run maximize_profit.py with 8/21 data
 
 ## Major Resistance
 
