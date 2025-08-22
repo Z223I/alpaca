@@ -88,6 +88,7 @@ Doc in phone notes close all positions and cancel all orders
 ## Test Monitor Positions
 
 - [ ] Do this in the paper account
+- [ ] Test on Sat. if possible with AAPL
 - [ ] Update the monitor to send a Telegram post to the account holder every 15 minutes
 - [ ] Buy AAPL
 - [ ] Verify the monitor works for this simple case
@@ -100,7 +101,7 @@ Doc in phone notes close all positions and cancel all orders
 ## maximize_profit.py
 
 - [X] Review code/maximize_profit.py: Is it printing all charts for trades with losses?  It is supposed to do that.
-- [ ] Verify
+- [X] Verify
 
 ## Maximize
 
