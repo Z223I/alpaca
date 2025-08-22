@@ -99,7 +99,8 @@ Doc in phone notes close all positions and cancel all orders
 
 ## maximize_profit.py
 
-- [X] Review code/maximize_profit.py: Is it printing all charts for trades with losses?  It is supposed to do that. It does.
+- [X] Review code/maximize_profit.py: Is it printing all charts for trades with losses?  It is supposed to do that.
+- [ ] Verify
 
 ## Maximize
 
