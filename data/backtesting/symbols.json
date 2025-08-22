@@ -1,13 +1,13 @@
 {
   "symbols": [
     {
-      "symbol": "THAR",
-      "date": "2025-08-20",
+      "symbol": "AEMD",
+      "date": "2025-08-21",
       "active": "yes"
     },
     {
-      "symbol": "BSLK",
-      "date": "2025-08-13",
+      "symbol": "APM",
+      "date": "2025-08-21",
       "active": "yes"
     },
     {
@@ -16,13 +16,43 @@
       "active": "yes"
     },
     {
-      "symbol": "STAI",
-      "date": "2025-07-29",
+      "symbol": "BJDX",
+      "date": "2025-08-11",
+      "active": "yes"
+    },
+    {
+      "symbol": "BSLK",
+      "date": "2025-08-13",
       "active": "yes"
     },
     {
       "symbol": "BTAI",
       "date": "2025-08-04",
+      "active": "yes"
+    },
+    {
+      "symbol": "CREG",
+      "date": "2025-08-07",
+      "active": "yes"
+    },
+    {
+      "symbol": "IOBT",
+      "date": "2025-08-15",
+      "active": "yes"
+    },
+    {
+      "symbol": "LOBO",
+      "date": "2025-08-01",
+      "active": "yes"
+    },
+    {
+      "symbol": "MRM",
+      "date": "2025-08-08",
+      "active": "yes"
+    },
+    {
+      "symbol": "THAR",
+      "date": "2025-08-20",
       "active": "yes"
     },
     {

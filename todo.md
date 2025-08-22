@@ -87,7 +87,12 @@ Doc in phone notes close all positions and cancel all orders
 
 ## Maximize
 
+- [ ] Run code/backtesting.py first.  Then
 - [ ] Run maximize_profit.py with 8/21 data
+
+## Trades
+
+- [ ] My trades place two orders.  Provide feedback in the Telegram post for both orders.
 
 ## Major Resistance
 

@@ -590,6 +590,25 @@ class BacktestingSystem:
         """Execute the full backtesting suite"""
         self.logger.info("Starting backtesting system")
 
+        # Check if Telegram notifications are disabled
+        if not self.dry_run:
+            print("\n" + "="*80)
+            print("🚨 TELEGRAM NOTIFICATION CHECK 🚨")
+            print("="*80)
+            print("Before running backtesting, you should disable Telegram notifications")
+            print("to prevent spam during extensive parameter testing.")
+            print("")
+            print("Edit .telegram_users.csv and set enabled=false for all users.")
+            print("="*80)
+            
+            response = input("\nHave you disabled Telegram notifications for all users? (y/n): ").lower().strip()
+            if response not in ['y', 'yes']:
+                print("\n❌ Please disable Telegram notifications first by editing .telegram_users.csv")
+                print("Set enabled=false for all users to prevent notification spam.")
+                print("Then run backtesting again.")
+                return
+            print("✅ Proceeding with backtesting...")
+
         try:
             # Calculate total runs for progress tracking
             total_runs = self._calculate_total_runs()
@@ -661,6 +680,22 @@ class BacktestingSystem:
             total_alerts = sum(r['superduper_alerts'] for r in self.run_results)
             self.logger.info(f"Backtesting complete: {len(self.run_results)} runs, "
                              f"{total_alerts} total alerts")
+
+            # Remind to re-enable Telegram notifications
+            if not self.dry_run:
+                print("\n" + "="*80)
+                print("✅ BACKTESTING COMPLETED ✅")
+                print("="*80)
+                print("Don't forget to re-enable Telegram notifications!")
+                print("Edit .telegram_users.csv and set enabled=true for users who should receive alerts.")
+                print("="*80)
+                
+                response = input("\nHave you re-enabled Telegram notifications? (y/n): ").lower().strip()
+                if response not in ['y', 'yes']:
+                    print("\n⚠️  REMINDER: Re-enable Telegram notifications by editing .telegram_users.csv")
+                    print("Set enabled=true for users who should receive live trading alerts.")
+                else:
+                    print("✅ Great! Telegram notifications are ready for live trading.")
 
         finally:
             # Always restore original config
