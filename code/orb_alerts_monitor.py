@@ -27,7 +27,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 # Add project root to path
-sys.path.append('/home/wilsonb/dl/github.com/z223i/alpaca')
+sys.path.append(str(Path(__file__).parent.parent))
 
 from atoms.config.alert_config import config
 from atoms.config.symbol_manager import SymbolManager

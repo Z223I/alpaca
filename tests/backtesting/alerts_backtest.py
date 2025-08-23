@@ -34,7 +34,7 @@ from typing import Dict, List, Optional, Tuple, Any
 import pytz
 
 # Add project root to path
-sys.path.append('/home/wilsonb/dl/github.com/z223i/alpaca')
+sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from atoms.indicators.orb_calculator import ORBCalculator
 from atoms.alerts.breakout_detector import BreakoutDetector

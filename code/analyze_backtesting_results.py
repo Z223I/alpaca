@@ -28,7 +28,7 @@ from datetime import datetime
 from mpl_toolkits.mplot3d import Axes3D
 
 # Add project root to path
-sys.path.append('/home/wilsonb/dl/github.com/z223i/alpaca')
+sys.path.append(str(Path(__file__).parent.parent))
 
 from code.backtesting import BacktestingSystem
 

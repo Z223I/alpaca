@@ -27,7 +27,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 # Add project root to path
-sys.path.append('/home/wilsonb/dl/github.com/z223i/alpaca')
+sys.path.append(str(Path(__file__).parent.parent))
 
 from atoms.alerts.superduper_alert_filter import SuperduperAlertFilter
 from atoms.alerts.superduper_alert_generator import SuperduperAlertGenerator

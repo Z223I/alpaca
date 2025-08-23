@@ -17,8 +17,10 @@ from unittest.mock import Mock, patch, MagicMock
 from typing import Optional, Dict, Any
 
 # Add project root to path
-sys.path.append('/home/wilsonb/dl/github.com/z223i/alpaca')
-sys.path.append('/home/wilsonb/dl/github.com/z223i/alpaca/code')
+from pathlib import Path
+project_root = Path(__file__).parent.parent
+sys.path.append(str(project_root))
+sys.path.append(str(project_root / "code"))
 
 from alpaca import alpaca_private
 

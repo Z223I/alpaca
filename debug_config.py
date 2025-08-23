@@ -4,7 +4,8 @@ Debug script to verify config.py directory settings
 """
 
 import sys
-sys.path.append('/home/wilsonb/dl/github.com/z223i/alpaca')
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
 
 from atoms.alerts.config import (
     DEFAULT_PLOTS_ROOT_DIR, DEFAULT_DATA_ROOT_DIR, DEFAULT_LOGS_ROOT_DIR,
