@@ -2,106 +2,106 @@
   "optimization_method": "hierarchical",
   "best_alert_parameters": {
     "timeframe_minutes": 20,
-    "green_threshold": 0.6
+    "green_threshold": 0.7
   },
   "best_exit_parameters": {
-    "take_profit_pct": 15,
+    "take_profit_pct": 10,
     "trailing_stop_pct": 20.0
   },
   "performance_metrics": {
-    "total_return": 906956.1800001881,
-    "win_rate": 83.33333333333334,
-    "avg_win": 17.844393463766778,
-    "avg_loss": 15.47241868811623,
-    "profit_factor": 5.766517124265894,
-    "sharpe_ratio": 15.221663692011012,
-    "max_drawdown": 88.78554835547436,
-    "total_trades": 84,
-    "winning_trades": 70,
-    "losing_trades": 14,
-    "mean_return": 12.291591438452949,
-    "std_return": 12.818767312705255
+    "total_return": 169.2529004044581,
+    "win_rate": 69.23076923076923,
+    "avg_win": 15.628001495682875,
+    "avg_loss": 18.273889701814017,
+    "profit_factor": 1.9242210574246759,
+    "sharpe_ratio": 5.073876739582123,
+    "max_drawdown": 69.69144437815817,
+    "total_trades": 26,
+    "winning_trades": 18,
+    "losing_trades": 8,
+    "mean_return": 5.196650357991522,
+    "std_return": 16.258626533682047
   },
   "alert_optimization_results": [
     {
       "timeframe_minutes": 20,
       "green_threshold": 0.6,
       "metrics": {
-        "total_return": 62371.37386929123,
-        "win_rate": 80.95238095238095,
-        "avg_win": 13.513714303588204,
-        "avg_loss": 12.516044477103847,
-        "profit_factor": 4.588772906273635,
-        "sharpe_ratio": 12.50354797802293,
-        "max_drawdown": 26.85671417854462,
-        "total_trades": 84,
-        "winning_trades": 68,
-        "losing_trades": 16,
-        "mean_return": 8.555665012027815,
-        "std_return": 10.862274593925916
+        "total_return": 43.319411515689055,
+        "win_rate": 57.14285714285714,
+        "avg_win": 14.802355076744595,
+        "avg_loss": 14.191949061457542,
+        "profit_factor": 1.3906809663839426,
+        "sharpe_ratio": 2.536381452970905,
+        "max_drawdown": 32.16792085090387,
+        "total_trades": 28,
+        "winning_trades": 16,
+        "losing_trades": 12,
+        "mean_return": 2.376224731800822,
+        "std_return": 14.872131379565598
       },
-      "alert_count": 84,
-      "valid_trades": 84
+      "alert_count": 28,
+      "valid_trades": 28
     },
     {
       "timeframe_minutes": 20,
       "green_threshold": 0.65,
       "metrics": {
-        "total_return": 12113.350999743912,
-        "win_rate": 76.92307692307693,
-        "avg_win": 13.101825013516406,
-        "avg_loss": 13.19834135941569,
-        "profit_factor": 3.3089574557714103,
-        "sharpe_ratio": 9.648200613939183,
-        "max_drawdown": 45.84614864911549,
-        "total_trades": 78,
-        "winning_trades": 60,
-        "losing_trades": 18,
-        "mean_return": 7.032555850532075,
-        "std_return": 11.57089986383495
+        "total_return": 119.34242426790868,
+        "win_rate": 57.14285714285714,
+        "avg_win": 16.244891630817,
+        "avg_loss": 12.523229789448235,
+        "profit_factor": 1.729574229006487,
+        "sharpe_ratio": 4.152058712417982,
+        "max_drawdown": 29.62594814023433,
+        "total_trades": 28,
+        "winning_trades": 16,
+        "losing_trades": 12,
+        "mean_return": 3.915696736417614,
+        "std_return": 14.970828437165876
       },
-      "alert_count": 78,
-      "valid_trades": 78
+      "alert_count": 28,
+      "valid_trades": 28
     },
     {
       "timeframe_minutes": 20,
       "green_threshold": 0.7,
       "metrics": {
-        "total_return": 21200.736481534463,
-        "win_rate": 77.5,
-        "avg_win": 13.691112952654395,
-        "avg_loss": 13.19834135941569,
-        "profit_factor": 3.573045783846856,
-        "sharpe_ratio": 10.208937363127571,
-        "max_drawdown": 46.71082407775367,
-        "total_trades": 80,
-        "winning_trades": 62,
-        "losing_trades": 18,
-        "mean_return": 7.640985732438622,
-        "std_return": 11.881441114003648
+        "total_return": 123.67501985443283,
+        "win_rate": 61.53846153846154,
+        "avg_win": 15.753166309326218,
+        "avg_loss": 14.063189254245032,
+        "profit_factor": 1.7922724098528147,
+        "sharpe_ratio": 4.436570876461494,
+        "max_drawdown": 45.9578336216755,
+        "total_trades": 26,
+        "winning_trades": 16,
+        "losing_trades": 10,
+        "mean_return": 4.285337246414199,
+        "std_return": 15.333378350665052
       },
-      "alert_count": 80,
-      "valid_trades": 80
+      "alert_count": 26,
+      "valid_trades": 26
     },
     {
       "timeframe_minutes": 20,
       "green_threshold": 0.75,
       "metrics": {
-        "total_return": 3921.4371453154386,
-        "win_rate": 73.52941176470588,
-        "avg_win": 13.37577508057207,
-        "avg_loss": 13.19834135941569,
-        "profit_factor": 2.815121216186803,
-        "sharpe_ratio": 8.20017700644428,
-        "max_drawdown": 45.95783362167549,
-        "total_trades": 68,
-        "winning_trades": 50,
-        "losing_trades": 18,
-        "mean_return": 6.3414501405753105,
-        "std_return": 12.276247215365668
+        "total_return": 73.21308811099605,
+        "win_rate": 57.14285714285714,
+        "avg_win": 15.939990909466513,
+        "avg_loss": 13.898578479523865,
+        "profit_factor": 1.52917229945016,
+        "sharpe_ratio": 3.2132368840920282,
+        "max_drawdown": 47.59306171209153,
+        "total_trades": 28,
+        "winning_trades": 16,
+        "losing_trades": 12,
+        "mean_return": 3.1520325998992074,
+        "std_return": 15.572137413811932
       },
-      "alert_count": 68,
-      "valid_trades": 68
+      "alert_count": 28,
+      "valid_trades": 28
     }
   ],
   "exit_optimization_results": [
@@ -111,21 +111,21 @@
         "trailing_stop_pct": 5
       },
       "metrics": {
-        "total_return": 2640.969596744423,
-        "win_rate": 78.57142857142857,
-        "avg_win": 7.928933302760914,
-        "avg_loss": 8.91767985545463,
-        "profit_factor": 3.260125493928096,
-        "sharpe_ratio": 8.969998701448734,
-        "max_drawdown": 19.941169502902028,
-        "total_trades": 84,
-        "winning_trades": 66,
-        "losing_trades": 18,
-        "mean_return": 4.318944768857584,
-        "std_return": 7.643381564442126
+        "total_return": -21.97387621216248,
+        "win_rate": 53.84615384615385,
+        "avg_win": 8.102815600493184,
+        "avg_loss": 10.287719440454676,
+        "profit_factor": 0.9188902284862708,
+        "sharpe_ratio": -0.5781431138043274,
+        "max_drawdown": 59.17646295485343,
+        "total_trades": 26,
+        "winning_trades": 14,
+        "losing_trades": 12,
+        "mean_return": -0.3851236491750597,
+        "std_return": 10.574628067663065
       },
-      "trade_count": 84,
-      "valid_trades": 84
+      "trade_count": 26,
+      "valid_trades": 26
     },
     {
       "parameters": {
@@ -133,21 +133,21 @@
         "trailing_stop_pct": 7.5
       },
       "metrics": {
-        "total_return": 1974.2099662901055,
-        "win_rate": 78.57142857142857,
-        "avg_win": 7.928933302760914,
-        "avg_loss": 10.370208191298147,
-        "profit_factor": 2.8034881178038646,
-        "sharpe_ratio": 7.895306827674904,
-        "max_drawdown": 19.941169502902028,
-        "total_trades": 84,
-        "winning_trades": 66,
-        "losing_trades": 18,
-        "mean_return": 4.007688696891115,
-        "std_return": 8.057962424186876
+        "total_return": 3.268971103019336,
+        "win_rate": 61.53846153846154,
+        "avg_win": 8.720398433040234,
+        "avg_loss": 11.99743724158909,
+        "profit_factor": 1.1629681582744675,
+        "sharpe_ratio": 1.068771395797353,
+        "max_drawdown": 44.393854259201234,
+        "total_trades": 26,
+        "winning_trades": 16,
+        "losing_trades": 10,
+        "mean_return": 0.7520000966443394,
+        "std_return": 11.169490029997231
       },
-      "trade_count": 84,
-      "valid_trades": 84
+      "trade_count": 26,
+      "valid_trades": 26
     },
     {
       "parameters": {
@@ -155,21 +155,21 @@
         "trailing_stop_pct": 10
       },
       "metrics": {
-        "total_return": 1618.8321724524908,
-        "win_rate": 78.57142857142857,
-        "avg_win": 7.928933302760914,
-        "avg_loss": 11.328160716562799,
-        "profit_factor": 2.5664144578165864,
-        "sharpe_ratio": 7.215800462642956,
-        "max_drawdown": 23.062344533501772,
-        "total_trades": 84,
-        "winning_trades": 66,
-        "losing_trades": 18,
-        "mean_return": 3.802413155762976,
-        "std_return": 8.365175542881635
+        "total_return": -11.23122939177903,
+        "win_rate": 61.53846153846154,
+        "avg_win": 8.720398433040234,
+        "avg_loss": 13.392385157150276,
+        "profit_factor": 1.041833648684676,
+        "sharpe_ratio": 0.29551489391638963,
+        "max_drawdown": 48.2474188064074,
+        "total_trades": 26,
+        "winning_trades": 16,
+        "losing_trades": 10,
+        "mean_return": 0.21548166758234558,
+        "std_return": 11.57527250746984
       },
-      "trade_count": 84,
-      "valid_trades": 84
+      "trade_count": 26,
+      "valid_trades": 26
     },
     {
       "parameters": {
@@ -177,21 +177,21 @@
         "trailing_stop_pct": 12.5
       },
       "metrics": {
-        "total_return": 3878.690456611399,
-        "win_rate": 85.71428571428571,
-        "avg_win": 7.955599238713423,
-        "avg_loss": 13.953566325558432,
-        "profit_factor": 3.4208885612883027,
-        "sharpe_ratio": 9.427383012003503,
-        "max_drawdown": 26.865168802488313,
-        "total_trades": 84,
-        "winning_trades": 72,
-        "losing_trades": 12,
-        "mean_return": 4.8257184438174425,
-        "std_return": 8.125892975793205
+        "total_return": 26.465774804821883,
+        "win_rate": 69.23076923076923,
+        "avg_win": 9.22929778612881,
+        "avg_loss": 15.41788637134264,
+        "profit_factor": 1.3468720367136457,
+        "sharpe_ratio": 2.16128930768492,
+        "max_drawdown": 44.472403374258086,
+        "total_trades": 26,
+        "winning_trades": 18,
+        "losing_trades": 8,
+        "mean_return": 1.6455488145991348,
+        "std_return": 12.086432625653307
       },
-      "trade_count": 84,
-      "valid_trades": 84
+      "trade_count": 26,
+      "valid_trades": 26
     },
     {
       "parameters": {
@@ -199,21 +199,21 @@
         "trailing_stop_pct": 15
       },
       "metrics": {
-        "total_return": 5603.519771973747,
-        "win_rate": 88.09523809523809,
-        "avg_win": 7.906495413852307,
-        "avg_loss": 14.474028954999943,
-        "profit_factor": 4.042279191537464,
-        "sharpe_ratio": 10.780074024660067,
-        "max_drawdown": 26.865168802488313,
-        "total_trades": 84,
-        "winning_trades": 74,
-        "losing_trades": 10,
-        "mean_return": 5.242147274703229,
-        "std_return": 7.719474649123529
+        "total_return": 19.493414987741133,
+        "win_rate": 69.23076923076923,
+        "avg_win": 9.22929778612881,
+        "avg_loss": 16.044090610263645,
+        "profit_factor": 1.2943033371742212,
+        "sharpe_ratio": 1.8745662772720408,
+        "max_drawdown": 46.97722032994211,
+        "total_trades": 26,
+        "winning_trades": 18,
+        "losing_trades": 8,
+        "mean_return": 1.4528705872388252,
+        "std_return": 12.303435651007812
       },
-      "trade_count": 84,
-      "valid_trades": 84
+      "trade_count": 26,
+      "valid_trades": 26
     },
     {
       "parameters": {
@@ -221,21 +221,21 @@
         "trailing_stop_pct": 17.5
       },
       "metrics": {
-        "total_return": 4112.933916969201,
-        "win_rate": 88.09523809523809,
-        "avg_win": 7.906495413852307,
-        "avg_loss": 17.048528415105242,
-        "profit_factor": 3.431854330058659,
-        "sharpe_ratio": 9.23040459050315,
-        "max_drawdown": 47.753596766043984,
-        "total_trades": 84,
-        "winning_trades": 74,
-        "losing_trades": 10,
-        "mean_return": 4.935659243738312,
-        "std_return": 8.488377808611455
+        "total_return": 4.793595950646901,
+        "win_rate": 69.23076923076923,
+        "avg_win": 9.22929778612881,
+        "avg_loss": 17.442098501345022,
+        "profit_factor": 1.1905631663064216,
+        "sharpe_ratio": 1.261168041925156,
+        "max_drawdown": 50.06007196770703,
+        "total_trades": 26,
+        "winning_trades": 18,
+        "losing_trades": 8,
+        "mean_return": 1.0227143130599399,
+        "std_return": 12.873055665884547
       },
-      "trade_count": 84,
-      "valid_trades": 84
+      "trade_count": 26,
+      "valid_trades": 26
     },
     {
       "parameters": {
@@ -243,21 +243,21 @@
         "trailing_stop_pct": 20.0
       },
       "metrics": {
-        "total_return": 14834.997386394949,
-        "win_rate": 92.85714285714286,
-        "avg_win": 8.25112041757968,
-        "avg_loss": 17.439101826073,
-        "profit_factor": 6.150807908476441,
-        "sharpe_ratio": 14.084695739302452,
-        "max_drawdown": 20.4346577141672,
-        "total_trades": 84,
-        "winning_trades": 78,
+        "total_return": 84.8404080718298,
+        "win_rate": 76.92307692307693,
+        "avg_win": 9.769036306169541,
+        "avg_loss": 18.667740296590267,
+        "profit_factor": 1.7443704399426587,
+        "sharpe_ratio": 4.036672174687029,
+        "max_drawdown": 52.757567150751356,
+        "total_trades": 26,
+        "winning_trades": 20,
         "losing_trades": 6,
-        "mean_return": 6.416104543033059,
-        "std_return": 7.231430761811219
+        "mean_return": 3.206703243994201,
+        "std_return": 12.610594487005413
       },
-      "trade_count": 84,
-      "valid_trades": 84
+      "trade_count": 26,
+      "valid_trades": 26
     },
     {
       "parameters": {
@@ -265,21 +265,21 @@
         "trailing_stop_pct": 5
       },
       "metrics": {
-        "total_return": 6799.346104465766,
-        "win_rate": 71.42857142857143,
-        "avg_win": 10.85903631764936,
-        "avg_loss": 7.506825966412447,
-        "profit_factor": 3.6163873940316447,
-        "sharpe_ratio": 9.382911227255065,
-        "max_drawdown": 33.42369610481944,
-        "total_trades": 84,
-        "winning_trades": 60,
-        "losing_trades": 24,
-        "mean_return": 5.611647093631703,
-        "std_return": 9.494082782376266
+        "total_return": 7.951694708063317,
+        "win_rate": 46.15384615384615,
+        "avg_win": 13.27045695347372,
+        "avg_loss": 9.295171252076504,
+        "profit_factor": 1.2237189697985071,
+        "sharpe_ratio": 1.353356123384769,
+        "max_drawdown": 56.30246956450775,
+        "total_trades": 26,
+        "winning_trades": 12,
+        "losing_trades": 14,
+        "mean_return": 1.119734073562062,
+        "std_return": 13.134183273628633
       },
-      "trade_count": 84,
-      "valid_trades": 84
+      "trade_count": 26,
+      "valid_trades": 26
     },
     {
       "parameters": {
@@ -287,439 +287,439 @@
         "trailing_stop_pct": 7.5
       },
       "metrics": {
-        "total_return": 4892.7739643734885,
-        "win_rate": 71.42857142857143,
-        "avg_win": 10.85903631764936,
-        "avg_loss": 8.780044150976954,
-        "profit_factor": 3.091965180050113,
-        "sharpe_ratio": 8.408402780816413,
-        "max_drawdown": 33.42369610481944,
-        "total_trades": 84,
-        "winning_trades": 60,
-        "losing_trades": 24,
-        "mean_return": 5.247870469470415,
-        "std_return": 9.907632070082908
-      },
-      "trade_count": 84,
-      "valid_trades": 84
-    },
-    {
-      "parameters": {
-        "take_profit_pct": 7.5,
-        "trailing_stop_pct": 10
-      },
-      "metrics": {
-        "total_return": 3497.2910504136194,
-        "win_rate": 71.42857142857143,
-        "avg_win": 10.85903631764936,
-        "avg_loss": 10.053960997948016,
-        "profit_factor": 2.700188592303485,
-        "sharpe_ratio": 7.501402105465971,
-        "max_drawdown": 33.89950732259342,
-        "total_trades": 84,
-        "winning_trades": 60,
-        "losing_trades": 24,
-        "mean_return": 4.883894227478682,
-        "std_return": 10.335323482555678
-      },
-      "trade_count": 84,
-      "valid_trades": 84
-    },
-    {
-      "parameters": {
-        "take_profit_pct": 7.5,
-        "trailing_stop_pct": 12.5
-      },
-      "metrics": {
-        "total_return": 19079.466962219092,
-        "win_rate": 83.33333333333334,
-        "avg_win": 10.980051920768451,
-        "avg_loss": 13.19511410560074,
-        "profit_factor": 4.160650613891963,
-        "sharpe_ratio": 11.121637797049319,
-        "max_drawdown": 26.85671417854462,
-        "total_trades": 84,
-        "winning_trades": 70,
-        "losing_trades": 14,
-        "mean_return": 6.950857583040253,
-        "std_return": 9.921330418563594
-      },
-      "trade_count": 84,
-      "valid_trades": 84
-    },
-    {
-      "parameters": {
-        "take_profit_pct": 7.5,
-        "trailing_stop_pct": 15
-      },
-      "metrics": {
-        "total_return": 18044.340699739765,
-        "win_rate": 83.33333333333334,
-        "avg_win": 10.980051920768451,
-        "avg_loss": 13.552191461265819,
-        "profit_factor": 4.05102449745898,
-        "sharpe_ratio": 10.914706555265786,
-        "max_drawdown": 26.85671417854462,
-        "total_trades": 84,
-        "winning_trades": 70,
-        "losing_trades": 14,
-        "mean_return": 6.891344690429406,
-        "std_return": 10.02287188796948
-      },
-      "trade_count": 84,
-      "valid_trades": 84
-    },
-    {
-      "parameters": {
-        "take_profit_pct": 7.5,
-        "trailing_stop_pct": 17.5
-      },
-      "metrics": {
-        "total_return": 12177.063598578485,
-        "win_rate": 83.33333333333334,
-        "avg_win": 10.980051920768451,
-        "avg_loss": 15.938773170030633,
-        "profit_factor": 3.4444470109575387,
-        "sharpe_ratio": 9.510757520228344,
-        "max_drawdown": 35.97150970337822,
-        "total_trades": 84,
-        "winning_trades": 70,
-        "losing_trades": 14,
-        "mean_return": 6.493581072301938,
-        "std_return": 10.838506143599744
-      },
-      "trade_count": 84,
-      "valid_trades": 84
-    },
-    {
-      "parameters": {
-        "take_profit_pct": 7.5,
-        "trailing_stop_pct": 20.0
-      },
-      "metrics": {
-        "total_return": 37183.11344157603,
-        "win_rate": 88.09523809523809,
-        "avg_win": 11.177167113512649,
-        "avg_loss": 17.049382366027885,
-        "profit_factor": 4.851262929312984,
-        "sharpe_ratio": 12.395113756558839,
-        "max_drawdown": 36.566445176489594,
-        "total_trades": 84,
-        "winning_trades": 74,
-        "losing_trades": 10,
-        "mean_return": 7.816863604043538,
-        "std_return": 10.01111124996383
-      },
-      "trade_count": 84,
-      "valid_trades": 84
-    },
-    {
-      "parameters": {
-        "take_profit_pct": 10,
-        "trailing_stop_pct": 5
-      },
-      "metrics": {
-        "total_return": 11964.131261724337,
-        "win_rate": 69.04761904761905,
-        "avg_win": 12.37109112566641,
-        "avg_loss": 6.951330748061787,
-        "profit_factor": 3.9700383184721413,
-        "sharpe_ratio": 9.824560946196817,
-        "max_drawdown": 33.42369610481944,
-        "total_trades": 84,
-        "winning_trades": 58,
-        "losing_trades": 26,
-        "mean_return": 6.390341498083873,
-        "std_return": 10.325502272903604
-      },
-      "trade_count": 84,
-      "valid_trades": 84
-    },
-    {
-      "parameters": {
-        "take_profit_pct": 10,
-        "trailing_stop_pct": 7.5
-      },
-      "metrics": {
-        "total_return": 10466.491159270246,
-        "win_rate": 66.66666666666666,
-        "avg_win": 13.200712390396687,
-        "avg_loss": 7.550902077166986,
-        "profit_factor": 3.496459695938593,
-        "sharpe_ratio": 9.154139236970877,
-        "max_drawdown": 33.42369610481944,
-        "total_trades": 84,
-        "winning_trades": 56,
-        "losing_trades": 28,
-        "mean_return": 6.283507567875461,
-        "std_return": 10.896446703792035
-      },
-      "trade_count": 84,
-      "valid_trades": 84
-    },
-    {
-      "parameters": {
-        "take_profit_pct": 10,
-        "trailing_stop_pct": 10
-      },
-      "metrics": {
-        "total_return": 5713.793683614739,
-        "win_rate": 64.28571428571429,
-        "avg_win": 13.682195482769858,
-        "avg_loss": 8.925824250525162,
-        "profit_factor": 2.759179564569258,
-        "sharpe_ratio": 7.701892581182326,
-        "max_drawdown": 64.72474378872948,
-        "total_trades": 84,
-        "winning_trades": 54,
-        "losing_trades": 30,
-        "mean_return": 5.607902720878777,
-        "std_return": 11.558548099467298
-      },
-      "trade_count": 84,
-      "valid_trades": 84
-    },
-    {
-      "parameters": {
-        "take_profit_pct": 10,
-        "trailing_stop_pct": 12.5
-      },
-      "metrics": {
-        "total_return": 62371.37386929123,
-        "win_rate": 80.95238095238095,
-        "avg_win": 13.513714303588204,
-        "avg_loss": 12.516044477103847,
-        "profit_factor": 4.588772906273635,
-        "sharpe_ratio": 12.50354797802293,
-        "max_drawdown": 26.85671417854462,
-        "total_trades": 84,
-        "winning_trades": 68,
-        "losing_trades": 16,
-        "mean_return": 8.555665012027815,
-        "std_return": 10.862274593925916
-      },
-      "trade_count": 84,
-      "valid_trades": 84
-    },
-    {
-      "parameters": {
-        "take_profit_pct": 10,
-        "trailing_stop_pct": 15
-      },
-      "metrics": {
-        "total_return": 58999.75984724099,
-        "win_rate": 80.95238095238095,
-        "avg_win": 13.513714303588204,
-        "avg_loss": 12.828487163310786,
-        "profit_factor": 4.477011596075641,
-        "sharpe_ratio": 12.301463703887558,
-        "max_drawdown": 26.85671417854462,
-        "total_trades": 84,
-        "winning_trades": 68,
-        "losing_trades": 16,
-        "mean_return": 8.496152119416967,
-        "std_return": 10.963917538616725
-      },
-      "trade_count": 84,
-      "valid_trades": 84
-    },
-    {
-      "parameters": {
-        "take_profit_pct": 10,
-        "trailing_stop_pct": 17.5
-      },
-      "metrics": {
-        "total_return": 57057.14937628404,
-        "win_rate": 83.33333333333334,
-        "avg_win": 13.421150254992535,
-        "avg_loss": 15.938773170030633,
-        "profit_factor": 4.210220608518373,
-        "sharpe_ratio": 11.765953657090648,
-        "max_drawdown": 35.97150970337822,
-        "total_trades": 84,
-        "winning_trades": 70,
-        "losing_trades": 14,
-        "mean_return": 8.52782968415534,
-        "std_return": 11.505663148924144
-      },
-      "trade_count": 84,
-      "valid_trades": 84
-    },
-    {
-      "parameters": {
-        "take_profit_pct": 10,
-        "trailing_stop_pct": 20.0
-      },
-      "metrics": {
-        "total_return": 173475.42111615714,
-        "win_rate": 88.09523809523809,
-        "avg_win": 13.486314186427323,
-        "avg_loss": 17.049382366027885,
-        "profit_factor": 5.853509695366933,
-        "sharpe_ratio": 14.932078640138391,
-        "max_drawdown": 23.144012318588977,
-        "total_trades": 84,
-        "winning_trades": 74,
-        "losing_trades": 10,
-        "mean_return": 9.851112215896942,
-        "std_return": 10.472859280526338
-      },
-      "trade_count": 84,
-      "valid_trades": 84
-    },
-    {
-      "parameters": {
-        "take_profit_pct": 12.5,
-        "trailing_stop_pct": 5
-      },
-      "metrics": {
-        "total_return": 25471.63400170315,
-        "win_rate": 69.04761904761905,
-        "avg_win": 13.86204413471316,
-        "avg_loss": 6.951330748061787,
-        "profit_factor": 4.448503840779745,
-        "sharpe_ratio": 10.59558325590156,
-        "max_drawdown": 42.74546496126413,
-        "total_trades": 84,
-        "winning_trades": 58,
-        "losing_trades": 26,
-        "mean_return": 7.419809051949486,
-        "std_return": 11.116501500439904
-      },
-      "trade_count": 84,
-      "valid_trades": 84
-    },
-    {
-      "parameters": {
-        "take_profit_pct": 12.5,
-        "trailing_stop_pct": 7.5
-      },
-      "metrics": {
-        "total_return": 22297.17379935656,
-        "win_rate": 66.66666666666666,
-        "avg_win": 14.744913721195108,
-        "avg_loss": 7.550902077166986,
-        "profit_factor": 3.9054707823008172,
-        "sharpe_ratio": 9.95770912351807,
-        "max_drawdown": 33.42369610481944,
-        "total_trades": 84,
-        "winning_trades": 56,
-        "losing_trades": 28,
-        "mean_return": 7.312975121741075,
-        "std_return": 11.658292048579183
-      },
-      "trade_count": 84,
-      "valid_trades": 84
-    },
-    {
-      "parameters": {
-        "take_profit_pct": 12.5,
-        "trailing_stop_pct": 10
-      },
-      "metrics": {
-        "total_return": 11241.639360215735,
-        "win_rate": 61.904761904761905,
-        "avg_win": 15.758770961702112,
-        "avg_loss": 8.446412117712532,
-        "profit_factor": 3.0318201925128343,
-        "sharpe_ratio": 8.380804386511302,
-        "max_drawdown": 64.72474378872937,
-        "total_trades": 84,
-        "winning_trades": 52,
-        "losing_trades": 32,
-        "mean_return": 6.5377488362108185,
-        "std_return": 12.383482604119921
-      },
-      "trade_count": 84,
-      "valid_trades": 84
-    },
-    {
-      "parameters": {
-        "take_profit_pct": 12.5,
-        "trailing_stop_pct": 12.5
-      },
-      "metrics": {
-        "total_return": 157355.98711176714,
-        "win_rate": 78.57142857142857,
-        "avg_win": 15.635488099823053,
-        "avg_loss": 11.427557898755254,
-        "profit_factor": 5.016830677263881,
-        "sharpe_ratio": 13.398796949983826,
-        "max_drawdown": 26.85671417854462,
-        "total_trades": 84,
-        "winning_trades": 66,
-        "losing_trades": 18,
-        "mean_return": 9.836263957270557,
-        "std_return": 11.653721610113974
-      },
-      "trade_count": 84,
-      "valid_trades": 84
-    },
-    {
-      "parameters": {
-        "take_profit_pct": 12.5,
-        "trailing_stop_pct": 15
-      },
-      "metrics": {
-        "total_return": 140645.5919127843,
-        "win_rate": 78.57142857142857,
-        "avg_win": 15.635488099823053,
-        "avg_loss": 12.007469761157706,
-        "profit_factor": 4.774538197725766,
-        "sharpe_ratio": 13.030298293537983,
-        "max_drawdown": 26.85671417854462,
-        "total_trades": 84,
-        "winning_trades": 66,
-        "losing_trades": 18,
-        "mean_return": 9.711997129612888,
-        "std_return": 11.83189911383924
-      },
-      "trade_count": 84,
-      "valid_trades": 84
-    },
-    {
-      "parameters": {
-        "take_profit_pct": 12.5,
-        "trailing_stop_pct": 17.5
-      },
-      "metrics": {
-        "total_return": 133732.0097160738,
-        "win_rate": 80.95238095238095,
-        "avg_win": 15.568449166991835,
-        "avg_loss": 15.044752883609444,
-        "profit_factor": 4.397939233139547,
-        "sharpe_ratio": 12.411205720420634,
-        "max_drawdown": 35.971509703378274,
-        "total_trades": 84,
-        "winning_trades": 68,
-        "losing_trades": 16,
-        "mean_return": 9.737363062115401,
-        "std_return": 12.45453906811752
-      },
-      "trade_count": 84,
-      "valid_trades": 84
-    },
-    {
-      "parameters": {
-        "take_profit_pct": 12.5,
-        "trailing_stop_pct": 20.0
-      },
-      "metrics": {
-        "total_return": 380640.95049197914,
-        "win_rate": 85.71428571428571,
-        "avg_win": 15.516128823633185,
-        "avg_loss": 16.16039883361459,
-        "profit_factor": 5.760796741485875,
-        "sharpe_ratio": 15.175804930847931,
-        "max_drawdown": 40.886388691609056,
-        "total_trades": 84,
-        "winning_trades": 72,
+        "total_return": 42.87599973108862,
+        "win_rate": 53.84615384615385,
+        "avg_win": 13.238031425958841,
+        "avg_loss": 10.554511388292152,
+        "profit_factor": 1.463295592639563,
+        "sharpe_ratio": 2.6564972256886916,
+        "max_drawdown": 41.51986086885557,
+        "total_trades": 26,
+        "winning_trades": 14,
         "losing_trades": 12,
-        "mean_return": 10.9909105868835,
-        "std_return": 11.496938539028495
+        "mean_return": 2.2568578193814615,
+        "std_return": 13.48637102295535
       },
-      "trade_count": 84,
-      "valid_trades": 84
+      "trade_count": 26,
+      "valid_trades": 26
+    },
+    {
+      "parameters": {
+        "take_profit_pct": 7.5,
+        "trailing_stop_pct": 10
+      },
+      "metrics": {
+        "total_return": 13.032524967075698,
+        "win_rate": 53.84615384615385,
+        "avg_win": 13.238031425958841,
+        "avg_loss": 12.37184683200637,
+        "profit_factor": 1.248347979623939,
+        "sharpe_ratio": 1.6034165834581484,
+        "max_drawdown": 53.23197158502049,
+        "total_trades": 26,
+        "winning_trades": 14,
+        "losing_trades": 12,
+        "mean_return": 1.4180876145902845,
+        "std_return": 14.039672051095387
+      },
+      "trade_count": 26,
+      "valid_trades": 26
+    },
+    {
+      "parameters": {
+        "take_profit_pct": 7.5,
+        "trailing_stop_pct": 12.5
+      },
+      "metrics": {
+        "total_return": 56.292501264574454,
+        "win_rate": 61.53846153846154,
+        "avg_win": 13.24583907406867,
+        "avg_loss": 14.063189254245032,
+        "profit_factor": 1.5070082706959638,
+        "sharpe_ratio": 3.0185495804368023,
+        "max_drawdown": 57.33121033567817,
+        "total_trades": 26,
+        "winning_trades": 16,
+        "losing_trades": 10,
+        "mean_return": 2.742366640101861,
+        "std_return": 14.422065843462534
+      },
+      "trade_count": 26,
+      "valid_trades": 26
+    },
+    {
+      "parameters": {
+        "take_profit_pct": 7.5,
+        "trailing_stop_pct": 15
+      },
+      "metrics": {
+        "total_return": 39.5340080285844,
+        "win_rate": 61.53846153846154,
+        "avg_win": 13.24583907406867,
+        "avg_loss": 15.074958146364162,
+        "profit_factor": 1.4058641034185133,
+        "sharpe_ratio": 2.525547653350151,
+        "max_drawdown": 64.9440823011854,
+        "total_trades": 26,
+        "winning_trades": 16,
+        "losing_trades": 10,
+        "mean_return": 2.353224758517581,
+        "std_return": 14.791360159414129
+      },
+      "trade_count": 26,
+      "valid_trades": 26
+    },
+    {
+      "parameters": {
+        "take_profit_pct": 7.5,
+        "trailing_stop_pct": 17.5
+      },
+      "metrics": {
+        "total_return": 13.85889075201776,
+        "win_rate": 61.53846153846154,
+        "avg_win": 13.24583907406867,
+        "avg_loss": 16.822048152745953,
+        "profit_factor": 1.2598550620038713,
+        "sharpe_ratio": 1.7182813745931471,
+        "max_drawdown": 76.82389864615766,
+        "total_trades": 26,
+        "winning_trades": 16,
+        "losing_trades": 10,
+        "mean_return": 1.6812670637553517,
+        "std_return": 15.532547593028575
+      },
+      "trade_count": 26,
+      "valid_trades": 26
+    },
+    {
+      "parameters": {
+        "take_profit_pct": 7.5,
+        "trailing_stop_pct": 20.0
+      },
+      "metrics": {
+        "total_return": 88.13995994877344,
+        "win_rate": 69.23076923076923,
+        "avg_win": 13.399266175453938,
+        "avg_loss": 18.273889701814017,
+        "profit_factor": 1.64980468782071,
+        "sharpe_ratio": 3.742729055561349,
+        "max_drawdown": 82.51224837543276,
+        "total_trades": 26,
+        "winning_trades": 18,
+        "losing_trades": 8,
+        "mean_return": 3.653679751679184,
+        "std_return": 15.49681184458408
+      },
+      "trade_count": 26,
+      "valid_trades": 26
+    },
+    {
+      "parameters": {
+        "take_profit_pct": 10,
+        "trailing_stop_pct": 5
+      },
+      "metrics": {
+        "total_return": 16.729060464080536,
+        "win_rate": 46.15384615384615,
+        "avg_win": 14.061007381264567,
+        "avg_loss": 9.295171252076504,
+        "profit_factor": 1.2966186113452702,
+        "sharpe_ratio": 1.7246498892244546,
+        "max_drawdown": 58.7969808825485,
+        "total_trades": 26,
+        "winning_trades": 12,
+        "losing_trades": 14,
+        "mean_return": 1.484603501773222,
+        "std_return": 13.665005352456399
+      },
+      "trade_count": 26,
+      "valid_trades": 26
+    },
+    {
+      "parameters": {
+        "take_profit_pct": 10,
+        "trailing_stop_pct": 7.5
+      },
+      "metrics": {
+        "total_return": 104.47425063902784,
+        "win_rate": 53.84615384615385,
+        "avg_win": 16.10354826625319,
+        "avg_loss": 10.554511388292152,
+        "profit_factor": 1.7800419447304634,
+        "sharpe_ratio": 4.156995222156825,
+        "max_drawdown": 40.65331495762835,
+        "total_trades": 26,
+        "winning_trades": 14,
+        "losing_trades": 12,
+        "mean_return": 3.7998284256938004,
+        "std_return": 14.510578677861087
+      },
+      "trade_count": 26,
+      "valid_trades": 26
+    },
+    {
+      "parameters": {
+        "take_profit_pct": 10,
+        "trailing_stop_pct": 10
+      },
+      "metrics": {
+        "total_return": 61.76433329586699,
+        "win_rate": 53.84615384615385,
+        "avg_win": 16.10354826625319,
+        "avg_loss": 12.37184683200637,
+        "profit_factor": 1.518566567498361,
+        "sharpe_ratio": 3.1097398585218365,
+        "max_drawdown": 44.58258804210773,
+        "total_trades": 26,
+        "winning_trades": 14,
+        "losing_trades": 12,
+        "mean_return": 2.9610582209026237,
+        "std_return": 15.115522249148333
+      },
+      "trade_count": 26,
+      "valid_trades": 26
+    },
+    {
+      "parameters": {
+        "take_profit_pct": 10,
+        "trailing_stop_pct": 12.5
+      },
+      "metrics": {
+        "total_return": 123.67501985443283,
+        "win_rate": 61.53846153846154,
+        "avg_win": 15.753166309326218,
+        "avg_loss": 14.063189254245032,
+        "profit_factor": 1.7922724098528147,
+        "sharpe_ratio": 4.436570876461494,
+        "max_drawdown": 45.9578336216755,
+        "total_trades": 26,
+        "winning_trades": 16,
+        "losing_trades": 10,
+        "mean_return": 4.285337246414199,
+        "std_return": 15.333378350665052
+      },
+      "trade_count": 26,
+      "valid_trades": 26
+    },
+    {
+      "parameters": {
+        "take_profit_pct": 10,
+        "trailing_stop_pct": 15
+      },
+      "metrics": {
+        "total_return": 99.69142322016442,
+        "win_rate": 61.53846153846154,
+        "avg_win": 15.753166309326218,
+        "avg_loss": 15.074958146364162,
+        "profit_factor": 1.6719824924357092,
+        "sharpe_ratio": 3.9342405484144107,
+        "max_drawdown": 52.12327830391082,
+        "total_trades": 26,
+        "winning_trades": 16,
+        "losing_trades": 10,
+        "mean_return": 3.8961953648299206,
+        "std_return": 15.720997027724271
+      },
+      "trade_count": 26,
+      "valid_trades": 26
+    },
+    {
+      "parameters": {
+        "take_profit_pct": 10,
+        "trailing_stop_pct": 17.5
+      },
+      "metrics": {
+        "total_return": 62.94697086234275,
+        "win_rate": 61.53846153846154,
+        "avg_win": 15.753166309326218,
+        "avg_loss": 16.822048152745953,
+        "profit_factor": 1.4983351531310167,
+        "sharpe_ratio": 3.104680843706495,
+        "max_drawdown": 61.4929668768427,
+        "total_trades": 26,
+        "winning_trades": 16,
+        "losing_trades": 10,
+        "mean_return": 3.2242376700676902,
+        "std_return": 16.485812498359095
+      },
+      "trade_count": 26,
+      "valid_trades": 26
+    },
+    {
+      "parameters": {
+        "take_profit_pct": 10,
+        "trailing_stop_pct": 20.0
+      },
+      "metrics": {
+        "total_return": 169.2529004044581,
+        "win_rate": 69.23076923076923,
+        "avg_win": 15.628001495682875,
+        "avg_loss": 18.273889701814017,
+        "profit_factor": 1.9242210574246759,
+        "sharpe_ratio": 5.073876739582123,
+        "max_drawdown": 69.69144437815817,
+        "total_trades": 26,
+        "winning_trades": 18,
+        "losing_trades": 8,
+        "mean_return": 5.196650357991522,
+        "std_return": 16.258626533682047
+      },
+      "trade_count": 26,
+      "valid_trades": 26
+    },
+    {
+      "parameters": {
+        "take_profit_pct": 12.5,
+        "trailing_stop_pct": 5
+      },
+      "metrics": {
+        "total_return": 16.729060464080536,
+        "win_rate": 46.15384615384615,
+        "avg_win": 14.061007381264567,
+        "avg_loss": 9.295171252076504,
+        "profit_factor": 1.2966186113452702,
+        "sharpe_ratio": 1.7246498892244546,
+        "max_drawdown": 58.7969808825485,
+        "total_trades": 26,
+        "winning_trades": 12,
+        "losing_trades": 14,
+        "mean_return": 1.484603501773222,
+        "std_return": 13.665005352456399
+      },
+      "trade_count": 26,
+      "valid_trades": 26
+    },
+    {
+      "parameters": {
+        "take_profit_pct": 12.5,
+        "trailing_stop_pct": 7.5
+      },
+      "metrics": {
+        "total_return": 104.47425063902784,
+        "win_rate": 53.84615384615385,
+        "avg_win": 16.10354826625319,
+        "avg_loss": 10.554511388292152,
+        "profit_factor": 1.7800419447304634,
+        "sharpe_ratio": 4.156995222156825,
+        "max_drawdown": 40.65331495762835,
+        "total_trades": 26,
+        "winning_trades": 14,
+        "losing_trades": 12,
+        "mean_return": 3.7998284256938004,
+        "std_return": 14.510578677861087
+      },
+      "trade_count": 26,
+      "valid_trades": 26
+    },
+    {
+      "parameters": {
+        "take_profit_pct": 12.5,
+        "trailing_stop_pct": 10
+      },
+      "metrics": {
+        "total_return": 61.76433329586699,
+        "win_rate": 53.84615384615385,
+        "avg_win": 16.10354826625319,
+        "avg_loss": 12.37184683200637,
+        "profit_factor": 1.518566567498361,
+        "sharpe_ratio": 3.1097398585218365,
+        "max_drawdown": 44.58258804210773,
+        "total_trades": 26,
+        "winning_trades": 14,
+        "losing_trades": 12,
+        "mean_return": 2.9610582209026237,
+        "std_return": 15.115522249148333
+      },
+      "trade_count": 26,
+      "valid_trades": 26
+    },
+    {
+      "parameters": {
+        "take_profit_pct": 12.5,
+        "trailing_stop_pct": 12.5
+      },
+      "metrics": {
+        "total_return": 123.67501985443283,
+        "win_rate": 61.53846153846154,
+        "avg_win": 15.753166309326218,
+        "avg_loss": 14.063189254245032,
+        "profit_factor": 1.7922724098528147,
+        "sharpe_ratio": 4.436570876461494,
+        "max_drawdown": 45.9578336216755,
+        "total_trades": 26,
+        "winning_trades": 16,
+        "losing_trades": 10,
+        "mean_return": 4.285337246414199,
+        "std_return": 15.333378350665052
+      },
+      "trade_count": 26,
+      "valid_trades": 26
+    },
+    {
+      "parameters": {
+        "take_profit_pct": 12.5,
+        "trailing_stop_pct": 15
+      },
+      "metrics": {
+        "total_return": 99.69142322016442,
+        "win_rate": 61.53846153846154,
+        "avg_win": 15.753166309326218,
+        "avg_loss": 15.074958146364162,
+        "profit_factor": 1.6719824924357092,
+        "sharpe_ratio": 3.9342405484144107,
+        "max_drawdown": 52.12327830391082,
+        "total_trades": 26,
+        "winning_trades": 16,
+        "losing_trades": 10,
+        "mean_return": 3.8961953648299206,
+        "std_return": 15.720997027724271
+      },
+      "trade_count": 26,
+      "valid_trades": 26
+    },
+    {
+      "parameters": {
+        "take_profit_pct": 12.5,
+        "trailing_stop_pct": 17.5
+      },
+      "metrics": {
+        "total_return": 62.94697086234275,
+        "win_rate": 61.53846153846154,
+        "avg_win": 15.753166309326218,
+        "avg_loss": 16.822048152745953,
+        "profit_factor": 1.4983351531310167,
+        "sharpe_ratio": 3.104680843706495,
+        "max_drawdown": 61.4929668768427,
+        "total_trades": 26,
+        "winning_trades": 16,
+        "losing_trades": 10,
+        "mean_return": 3.2242376700676902,
+        "std_return": 16.485812498359095
+      },
+      "trade_count": 26,
+      "valid_trades": 26
+    },
+    {
+      "parameters": {
+        "take_profit_pct": 12.5,
+        "trailing_stop_pct": 20.0
+      },
+      "metrics": {
+        "total_return": 169.2529004044581,
+        "win_rate": 69.23076923076923,
+        "avg_win": 15.628001495682875,
+        "avg_loss": 18.273889701814017,
+        "profit_factor": 1.9242210574246759,
+        "sharpe_ratio": 5.073876739582123,
+        "max_drawdown": 69.69144437815817,
+        "total_trades": 26,
+        "winning_trades": 18,
+        "losing_trades": 8,
+        "mean_return": 5.196650357991522,
+        "std_return": 16.258626533682047
+      },
+      "trade_count": 26,
+      "valid_trades": 26
     },
     {
       "parameters": {
@@ -727,21 +727,21 @@
         "trailing_stop_pct": 5
       },
       "metrics": {
-        "total_return": 22061.299784222338,
-        "win_rate": 69.04761904761905,
-        "avg_win": 13.674298378350802,
-        "avg_loss": 6.951330748061787,
-        "profit_factor": 4.3882538725822995,
-        "sharpe_ratio": 9.908727188007546,
-        "max_drawdown": 61.2328599192474,
-        "total_trades": 84,
-        "winning_trades": 58,
-        "losing_trades": 26,
-        "mean_return": 7.290175077318333,
-        "std_return": 11.679395286237863
+        "total_return": 11.546902005821114,
+        "win_rate": 46.15384615384615,
+        "avg_win": 13.756537767332036,
+        "avg_loss": 9.295171252076504,
+        "profit_factor": 1.2685423179966124,
+        "sharpe_ratio": 1.5219728708602704,
+        "max_drawdown": 76.85691829188455,
+        "total_trades": 26,
+        "winning_trades": 12,
+        "losing_trades": 14,
+        "mean_return": 1.3440790645735916,
+        "std_return": 14.019036798967468
       },
-      "trade_count": 84,
-      "valid_trades": 84
+      "trade_count": 26,
+      "valid_trades": 26
     },
     {
       "parameters": {
@@ -749,21 +749,21 @@
         "trailing_stop_pct": 7.5
       },
       "metrics": {
-        "total_return": 16453.76842144447,
-        "win_rate": 66.66666666666666,
-        "avg_win": 14.251867243634194,
-        "avg_loss": 7.550902077166986,
-        "profit_factor": 3.7748780471488605,
-        "sharpe_ratio": 9.066610024748389,
-        "max_drawdown": 42.708392632750815,
-        "total_trades": 84,
-        "winning_trades": 56,
-        "losing_trades": 28,
-        "mean_return": 6.984277470033799,
-        "std_return": 12.228602237930895
+        "total_return": 107.60606676632611,
+        "win_rate": 53.84615384615385,
+        "avg_win": 16.339468721391764,
+        "avg_loss": 10.554511388292152,
+        "profit_factor": 1.8061199431208317,
+        "sharpe_ratio": 4.136081391298647,
+        "max_drawdown": 40.65331495762835,
+        "total_trades": 26,
+        "winning_trades": 14,
+        "losing_trades": 12,
+        "mean_return": 3.9268625169222635,
+        "std_return": 15.071514319386326
       },
-      "trade_count": 84,
-      "valid_trades": 84
+      "trade_count": 26,
+      "valid_trades": 26
     },
     {
       "parameters": {
@@ -771,21 +771,21 @@
         "trailing_stop_pct": 10
       },
       "metrics": {
-        "total_return": 5559.174362633435,
-        "win_rate": 57.14285714285714,
-        "avg_win": 15.880221049477711,
-        "avg_loss": 7.788421357443198,
-        "profit_factor": 2.7186033079393144,
-        "sharpe_ratio": 6.960870548491943,
-        "max_drawdown": 91.86302483810294,
-        "total_trades": 84,
-        "winning_trades": 48,
-        "losing_trades": 36,
-        "mean_return": 5.736517160797321,
-        "std_return": 13.08232729805227
+        "total_return": 51.16038144440469,
+        "win_rate": 46.15384615384615,
+        "avg_win": 18.502489418654537,
+        "avg_loss": 10.724488160927427,
+        "profit_factor": 1.4787910067672227,
+        "sharpe_ratio": 2.796047716514348,
+        "max_drawdown": 50.378284869441195,
+        "total_trades": 26,
+        "winning_trades": 12,
+        "losing_trades": 14,
+        "mean_return": 2.7648861065719403,
+        "std_return": 15.697588417109786
       },
-      "trade_count": 84,
-      "valid_trades": 84
+      "trade_count": 26,
+      "valid_trades": 26
     },
     {
       "parameters": {
@@ -793,21 +793,21 @@
         "trailing_stop_pct": 12.5
       },
       "metrics": {
-        "total_return": 75411.71264593615,
-        "win_rate": 66.66666666666666,
-        "avg_win": 17.67033272030998,
-        "avg_loss": 8.270115341531206,
-        "profit_factor": 4.273297769275932,
-        "sharpe_ratio": 11.069188785995305,
-        "max_drawdown": 44.826631301875295,
-        "total_trades": 84,
-        "winning_trades": 56,
-        "losing_trades": 28,
-        "mean_return": 9.023516699696248,
-        "std_return": 12.94077548058798
+        "total_return": 117.21651526152166,
+        "win_rate": 53.84615384615385,
+        "avg_win": 18.322330831753153,
+        "avg_loss": 12.104478440162174,
+        "profit_factor": 1.7659623041766475,
+        "sharpe_ratio": 4.197258166410747,
+        "max_drawdown": 55.94811185539298,
+        "total_trades": 26,
+        "winning_trades": 14,
+        "losing_trades": 12,
+        "mean_return": 4.2791880908691535,
+        "std_return": 16.18437616105566
       },
-      "trade_count": 84,
-      "valid_trades": 84
+      "trade_count": 26,
+      "valid_trades": 26
     },
     {
       "parameters": {
@@ -815,21 +815,21 @@
         "trailing_stop_pct": 15
       },
       "metrics": {
-        "total_return": 187775.13462935816,
-        "win_rate": 73.80952380952381,
-        "avg_win": 17.621888224280916,
-        "avg_loss": 10.665263552115032,
-        "profit_factor": 4.656395479870945,
-        "sharpe_ratio": 12.527717797358411,
-        "max_drawdown": 58.116536457614416,
-        "total_trades": 84,
-        "winning_trades": 62,
-        "losing_trades": 22,
-        "mean_return": 10.213348473320071,
-        "std_return": 12.94185288209986
+        "total_return": 83.23386133111545,
+        "win_rate": 53.84615384615385,
+        "avg_win": 18.322330831753153,
+        "avg_loss": 13.402801256423919,
+        "profit_factor": 1.5948943976767447,
+        "sharpe_ratio": 3.508536747516232,
+        "max_drawdown": 66.29207625787504,
+        "total_trades": 26,
+        "winning_trades": 14,
+        "losing_trades": 12,
+        "mean_return": 3.679962175671428,
+        "std_return": 16.65012873160293
       },
-      "trade_count": 84,
-      "valid_trades": 84
+      "trade_count": 26,
+      "valid_trades": 26
     },
     {
       "parameters": {
@@ -837,21 +837,21 @@
         "trailing_stop_pct": 17.5
       },
       "metrics": {
-        "total_return": 261684.42235258766,
-        "win_rate": 78.57142857142857,
-        "avg_win": 17.56835544291425,
-        "avg_loss": 14.306820490379259,
-        "profit_factor": 4.502558995131276,
-        "sharpe_ratio": 12.638727050542274,
-        "max_drawdown": 74.47334280313976,
-        "total_trades": 84,
-        "winning_trades": 66,
-        "losing_trades": 18,
-        "mean_return": 10.737960600065643,
-        "std_return": 13.48710509634654
+        "total_return": 39.119728619674675,
+        "win_rate": 53.84615384615385,
+        "avg_win": 18.322330831753153,
+        "avg_loss": 15.418933684711263,
+        "profit_factor": 1.386350902996677,
+        "sharpe_ratio": 2.4921429975198985,
+        "max_drawdown": 86.2425756351671,
+        "total_trades": 26,
+        "winning_trades": 14,
+        "losing_trades": 12,
+        "mean_return": 2.749439516461882,
+        "std_return": 17.5134409524919
       },
-      "trade_count": 84,
-      "valid_trades": 84
+      "trade_count": 26,
+      "valid_trades": 26
     },
     {
       "parameters": {
@@ -859,26 +859,26 @@
         "trailing_stop_pct": 20.0
       },
       "metrics": {
-        "total_return": 906956.1800001881,
-        "win_rate": 83.33333333333334,
-        "avg_win": 17.844393463766778,
-        "avg_loss": 15.47241868811623,
-        "profit_factor": 5.766517124265894,
-        "sharpe_ratio": 15.221663692011012,
-        "max_drawdown": 88.78554835547436,
-        "total_trades": 84,
-        "winning_trades": 70,
-        "losing_trades": 14,
-        "mean_return": 12.291591438452949,
-        "std_return": 12.818767312705255
+        "total_return": 145.54957147495844,
+        "win_rate": 61.53846153846154,
+        "avg_win": 18.831917078763198,
+        "avg_loss": 16.888019324476424,
+        "profit_factor": 1.7841682169531312,
+        "sharpe_ratio": 4.4843896653030955,
+        "max_drawdown": 90.16276334052574,
+        "total_trades": 26,
+        "winning_trades": 16,
+        "losing_trades": 10,
+        "mean_return": 5.093480000594112,
+        "std_return": 18.030656203301604
       },
-      "trade_count": 84,
-      "valid_trades": 84
+      "trade_count": 26,
+      "valid_trades": 26
     }
   ],
   "total_combinations_tested": 39,
   "data_quality": {
-    "total_alerts_used": 84,
-    "valid_trades": 84
+    "total_alerts_used": 26,
+    "valid_trades": 26
   }
 }

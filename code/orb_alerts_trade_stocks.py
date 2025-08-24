@@ -162,17 +162,17 @@ class ORBTradeStocksMonitor:
 
     def _validate_time_of_day_signal(self, superduper_alert_data: Dict) -> bool:
         """
-        Validate both time of day emoji signal AND current ET market hours.
+        Validate both time of day emoji signal AND historical alert timestamp market hours.
         
         Requires BOTH conditions:
         1. Alert message contains green (🟢) or yellow (🟡) time signal
-        2. Current ET time is within market hours (M-F 9:30-16:00 ET)
+        2. Alert's historical timestamp is within market hours (M-F 9:30-16:00 ET)
         
         Args:
             superduper_alert_data: Superduper alert JSON data
             
         Returns:
-            True if both emoji signal is green/yellow AND market is open, False otherwise
+            True if both emoji signal is green/yellow AND alert was during market hours, False otherwise
         """
         try:
             # FIRST: Check emoji-based time signal from alert message
@@ -219,34 +219,63 @@ class ORBTradeStocksMonitor:
             emoji = "🟢" if "🟢" in time_line else "🟡"
             period = "MORNING POWER" if "MORNING POWER" in time_line else \
                     "LUNCH HOUR" if "LUNCH HOUR" in time_line else "UNKNOWN"
-            self.logger.info(f"Time of day emoji signal is {emoji} {period} - checking actual market hours...")
+            self.logger.info(f"Time of day emoji signal is {emoji} {period} - checking historical alert timestamp...")
             
-            # SECOND: Check actual current ET market hours
+            # SECOND: Use historical alert timestamp instead of current system time
             et_tz = pytz.timezone('US/Eastern')
-            current_et = datetime.now(et_tz)
+            
+            # Get the historical timestamp from the alert (try multiple sources)
+            historical_timestamp = None
+            if 'latest_super_alert' in superduper_alert_data:
+                timestamp_str = superduper_alert_data['latest_super_alert'].get('timestamp')
+                if timestamp_str:
+                    try:
+                        historical_timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                    except ValueError:
+                        pass
+            
+            # Fallback to original_alert timestamp if available
+            if not historical_timestamp and 'latest_super_alert' in superduper_alert_data:
+                original_alert = superduper_alert_data['latest_super_alert'].get('original_alert', {})
+                timestamp_str = original_alert.get('timestamp')
+                if timestamp_str:
+                    try:
+                        historical_timestamp = datetime.fromisoformat(timestamp_str + '-04:00' if '+' not in timestamp_str else timestamp_str)
+                    except ValueError:
+                        pass
+            
+            if not historical_timestamp:
+                self.logger.error(f"Could not extract historical timestamp from superduper alert - using current time as fallback")
+                historical_et = datetime.now(et_tz)
+            else:
+                # Convert to ET timezone
+                if historical_timestamp.tzinfo is None:
+                    historical_et = et_tz.localize(historical_timestamp)
+                else:
+                    historical_et = historical_timestamp.astimezone(et_tz)
             
             # Check if it's a weekday (Monday=0, Sunday=6)
-            if current_et.weekday() > 4:  # Saturday=5, Sunday=6
-                self.logger.info(f"Market closed: Weekend (day {current_et.weekday()}) - rejecting trade despite good emoji signal")
+            if historical_et.weekday() > 4:  # Saturday=5, Sunday=6
+                self.logger.info(f"Market closed: Weekend (day {historical_et.weekday()}) - rejecting trade despite good emoji signal")
                 return False
             
-            # Get current time as hour and minute
-            current_time = current_et.time()
+            # Get historical time as hour and minute
+            historical_time = historical_et.time()
             
             # Market open: 9:30 AM ET
-            market_open = current_et.replace(hour=9, minute=30, second=0, microsecond=0).time()
+            market_open = historical_et.replace(hour=9, minute=30, second=0, microsecond=0).time()
             
             # Market close: 4:00 PM ET
-            market_close = current_et.replace(hour=16, minute=0, second=0, microsecond=0).time()
+            market_close = historical_et.replace(hour=16, minute=0, second=0, microsecond=0).time()
             
-            # Check if current time is within market hours
-            is_open = market_open <= current_time <= market_close
+            # Check if historical alert time was within market hours
+            is_open = market_open <= historical_time <= market_close
             
             if is_open:
-                self.logger.info(f"✅ BOTH conditions met: Good emoji signal ({emoji}) AND market is OPEN ({current_et.strftime('%Y-%m-%d %H:%M:%S %Z')}) - allowing trade")
+                self.logger.info(f"✅ BOTH conditions met: Good emoji signal ({emoji}) AND alert was during market hours ({historical_et.strftime('%Y-%m-%d %H:%M:%S %Z')}) - allowing trade")
                 return True
             else:
-                self.logger.info(f"❌ Market is CLOSED: {current_et.strftime('%Y-%m-%d %H:%M:%S %Z')} (Hours: 9:30-16:00 ET) - rejecting trade despite good emoji signal")
+                self.logger.info(f"❌ Alert was outside market hours: {historical_et.strftime('%Y-%m-%d %H:%M:%S %Z')} (Hours: 9:30-16:00 ET) - rejecting trade despite good emoji signal")
                 return False
                 
         except Exception as e:
