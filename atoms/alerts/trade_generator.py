@@ -438,6 +438,8 @@ class TradeGenerator:
             auto_amount = trade_record['auto_amount']
             trailing_percent = trade_record['trailing_percent']
             take_profit_percent = trade_record['take_profit_percent']
+            account_name = trade_record['account_name']
+            account_type = trade_record['account_type']
 
             # Build the alpaca.py command
             alpaca_script = Path(__file__).parent.parent.parent / "code" / "alpaca.py"
@@ -450,6 +452,8 @@ class TradeGenerator:
                 "--amount", str(auto_amount),
                 "--trailing-percent", str(trailing_percent),
                 "--take-profit-percent", str(take_profit_percent),
+                "--account-name", account_name,
+                "--account", account_type,
                 "--submit"  # Added --submit flag for actual trade execution
             ]
 
