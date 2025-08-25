@@ -1452,6 +1452,10 @@ class BestParametersTradeTracker:
         """
         chart_files = []
         
+        # Early return if no trades to process
+        if not trades:
+            return chart_files
+        
         # Use ProcessPoolExecutor to avoid matplotlib threading issues
         max_workers = min(4, len(trades), mp.cpu_count())  # Limit processes to avoid memory issues
         
