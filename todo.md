@@ -99,6 +99,7 @@ Doc in phone notes close all positions and cancel all orders
 - [ ] My trades place two orders.  Provide feedback in the Telegram post for both orders.
 
 
+Hardcoded root
 
     {
       "parameters": {
