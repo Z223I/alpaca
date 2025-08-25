@@ -96,7 +96,13 @@ Doc in phone notes close all positions and cancel all orders
 
 ## Trades
 
+- [ ] VERY IMPORTANT. Update atoms/alerts/trade_generator.py: It is currently not using --account-name and --account.  Does it know those values?  Update the alpaca.py call with those values.  Review code/alpaca.py parsing mechanism to determine the order of the args. Example: --account-name Bruce --account paper.
+- [ ] Why not any Telegram posts for the trades?
+- [ ] Why 15 trades?
+
 - [ ] My trades place two orders.  Provide feedback in the Telegram post for both orders.
+
+
 
 
 Hardcoded root

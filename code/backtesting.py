@@ -28,7 +28,7 @@ from typing import Dict, List, Tuple, Optional
 import matplotlib.pyplot as plt
 
 # Add project root to path
-sys.path.append('/home/wilsonb/dl/github.com/z223i/alpaca')
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from atoms.alerts.config import (  # noqa: E402
     DEFAULT_PLOTS_ROOT_DIR, DEFAULT_DATA_ROOT_DIR, DEFAULT_LOGS_ROOT_DIR,

@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Add project root to path
-sys.path.append('/home/wilsonb/dl/github.com/z223i/alpaca')
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 class AlertsSummaryGenerator:

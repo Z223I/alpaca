@@ -24,7 +24,7 @@ import pandas as pd
 import pytz
 
 # Add project root to path
-sys.path.append('/home/wilsonb/dl/github.com/Z223I/alpaca')
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from atoms.config.alert_config import config
 from atoms.alerts.config import get_logs_root_dir, get_data_root_dir

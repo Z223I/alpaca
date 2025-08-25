@@ -26,7 +26,7 @@ import json
 import time as time_module
 
 # Add project root to path
-sys.path.append('/home/wilsonb/dl/github.com/z223i/alpaca')
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from atoms.config.alert_config import config
 from atoms.alerts.config import get_data_root_dir, get_historical_root_dir, get_logs_root_dir

@@ -24,7 +24,7 @@ from pathlib import Path
 import pytz
 
 # Add project root to path
-sys.path.append('/home/wilsonb/dl/github.com/z223i/alpaca')
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from atoms.config.alert_config import config
 from atoms.config.symbol_manager import SymbolManager
