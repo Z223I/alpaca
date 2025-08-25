@@ -55,7 +55,8 @@ class ORBTradeStocksMonitor:
     """Main ORB Trade Stocks Monitor that watches for superduper alerts and executes trades."""
 
     def __init__(self, test_mode: bool = False, post_only_urgent: bool = False,
-                 no_telegram: bool = False, date: Optional[str] = None):
+                 no_telegram: bool = False, date: Optional[str] = None,
+                 backtesting_mode: bool = False):
         """
         Initialize ORB Trade Stocks Monitor.
 
@@ -64,6 +65,7 @@ class ORBTradeStocksMonitor:
             post_only_urgent: Only send urgent telegram notifications
             no_telegram: Disable telegram notifications
             date: Date in YYYY-MM-DD format (default: current date)
+            backtesting_mode: Run in backtesting mode (monitors runs/current)
         """
         # Setup logging
         self.logger = self._setup_logging()
@@ -73,6 +75,7 @@ class ORBTradeStocksMonitor:
         self.test_mode = test_mode
         self.post_only_urgent = post_only_urgent
         self.no_telegram = no_telegram
+        self.backtesting_mode = backtesting_mode
 
         # Alert monitoring setup
         if date:
@@ -88,9 +91,26 @@ class ORBTradeStocksMonitor:
             target_date = datetime.now(et_tz).strftime('%Y-%m-%d')
 
         self.target_date = target_date
-        historical_root = get_historical_root_dir()
-        self.superduper_alerts_dir = historical_root.get_superduper_alerts_sent_dir(target_date)
-        self.trades_dir = historical_root.get_trades_dir(target_date)
+        
+        if self.backtesting_mode:
+            # In backtesting mode, monitor superduper_alerts in runs/current and move to _sent
+            from pathlib import Path
+            current_run_dir = Path("runs/current/historical_data") / target_date
+            self.source_alerts_dir = current_run_dir / "superduper_alerts/bullish"
+            self.superduper_alerts_dir = current_run_dir / "superduper_alerts_sent/bullish/green"
+            self.trades_dir = current_run_dir / "trades"
+            
+            self.logger.info(f"ORB Trade Stocks Monitor initialized in BACKTESTING mode")
+            self.logger.info(f"Source alerts: {self.source_alerts_dir}")
+            self.logger.info(f"Monitoring superduper alerts in: {self.source_alerts_dir}")
+        else:
+            # Normal mode - monitor superduper_alerts_sent directory
+            historical_root = get_historical_root_dir()
+            self.source_alerts_dir = historical_root.get_superduper_alerts_dir(target_date) / "bullish"
+            self.superduper_alerts_dir = historical_root.get_superduper_alerts_sent_dir(target_date)
+            self.trades_dir = historical_root.get_trades_dir(target_date)
+            
+            self.logger.info(f"ORB Trade Stocks Monitor initialized in LIVE mode")
 
         # Ensure directories exist
         self.superduper_alerts_dir.mkdir(parents=True, exist_ok=True)
@@ -162,17 +182,17 @@ class ORBTradeStocksMonitor:
 
     def _validate_time_of_day_signal(self, superduper_alert_data: Dict) -> bool:
         """
-        Validate both time of day emoji signal AND current ET market hours.
+        Validate both time of day emoji signal AND historical alert timestamp market hours.
         
         Requires BOTH conditions:
         1. Alert message contains green (🟢) or yellow (🟡) time signal
-        2. Current ET time is within market hours (M-F 9:30-16:00 ET)
+        2. Alert's historical timestamp is within market hours (M-F 9:30-16:00 ET)
         
         Args:
             superduper_alert_data: Superduper alert JSON data
             
         Returns:
-            True if both emoji signal is green/yellow AND market is open, False otherwise
+            True if both emoji signal is green/yellow AND alert was during market hours, False otherwise
         """
         try:
             # FIRST: Check emoji-based time signal from alert message
@@ -205,48 +225,91 @@ class ORBTradeStocksMonitor:
                 self.logger.info(f"Time of day emoji signal is RED (🔴) - rejecting trade")
                 return False
             
-            # Check for closed hours (⚫) which should also be rejected
-            if "⚫" in time_line:
-                self.logger.info(f"Time of day emoji signal is CLOSED HOURS (⚫) - rejecting trade")
-                return False
+            # IMPORTANT FIX: Don't trust the emoji in the message during backtesting!
+            # The emoji was generated using backtesting runtime, not historical alert time.
+            # We'll determine the correct emoji based on the historical timestamp below.
             
-            # Require green (🟢) or yellow (🟡) signals
-            if not ("🟢" in time_line or "🟡" in time_line):
-                self.logger.info(f"Time of day emoji signal is not green/yellow - rejecting trade: {time_line}")
-                return False
+            self.logger.info(f"Found time signal in message: {time_line}")
+            self.logger.info(f"⚠️  NOTE: During backtesting, ignoring emoji in message (may be wrong) - will validate using historical timestamp")
             
-            # Emoji signal is valid, log it
-            emoji = "🟢" if "🟢" in time_line else "🟡"
-            period = "MORNING POWER" if "MORNING POWER" in time_line else \
-                    "LUNCH HOUR" if "LUNCH HOUR" in time_line else "UNKNOWN"
-            self.logger.info(f"Time of day emoji signal is {emoji} {period} - checking actual market hours...")
-            
-            # SECOND: Check actual current ET market hours
+            # SECOND: Use historical alert timestamp instead of current system time
             et_tz = pytz.timezone('US/Eastern')
-            current_et = datetime.now(et_tz)
+            
+            # Get the historical timestamp from the alert (try multiple sources)
+            historical_timestamp = None
+            if 'latest_super_alert' in superduper_alert_data:
+                timestamp_str = superduper_alert_data['latest_super_alert'].get('timestamp')
+                if timestamp_str:
+                    try:
+                        historical_timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                    except ValueError:
+                        pass
+            
+            # Fallback to original_alert timestamp if available
+            if not historical_timestamp and 'latest_super_alert' in superduper_alert_data:
+                original_alert = superduper_alert_data['latest_super_alert'].get('original_alert', {})
+                timestamp_str = original_alert.get('timestamp')
+                if timestamp_str:
+                    try:
+                        historical_timestamp = datetime.fromisoformat(timestamp_str + '-04:00' if '+' not in timestamp_str else timestamp_str)
+                    except ValueError:
+                        pass
+            
+            if not historical_timestamp:
+                self.logger.error(f"Could not extract historical timestamp from superduper alert - using current time as fallback")
+                historical_et = datetime.now(et_tz)
+            else:
+                # Convert to ET timezone
+                if historical_timestamp.tzinfo is None:
+                    historical_et = et_tz.localize(historical_timestamp)
+                else:
+                    historical_et = historical_timestamp.astimezone(et_tz)
             
             # Check if it's a weekday (Monday=0, Sunday=6)
-            if current_et.weekday() > 4:  # Saturday=5, Sunday=6
-                self.logger.info(f"Market closed: Weekend (day {current_et.weekday()}) - rejecting trade despite good emoji signal")
+            if historical_et.weekday() > 4:  # Saturday=5, Sunday=6
+                self.logger.info(f"Market closed: Weekend (day {historical_et.weekday()}) - rejecting trade despite good emoji signal")
                 return False
             
-            # Get current time as hour and minute
-            current_time = current_et.time()
+            # Get historical time as hour and minute
+            historical_time = historical_et.time()
             
             # Market open: 9:30 AM ET
-            market_open = current_et.replace(hour=9, minute=30, second=0, microsecond=0).time()
+            market_open = historical_et.replace(hour=9, minute=30, second=0, microsecond=0).time()
             
             # Market close: 4:00 PM ET
-            market_close = current_et.replace(hour=16, minute=0, second=0, microsecond=0).time()
+            market_close = historical_et.replace(hour=16, minute=0, second=0, microsecond=0).time()
             
-            # Check if current time is within market hours
-            is_open = market_open <= current_time <= market_close
+            # Check if historical alert time was within market hours
+            is_open = market_open <= historical_time <= market_close
             
-            if is_open:
-                self.logger.info(f"✅ BOTH conditions met: Good emoji signal ({emoji}) AND market is OPEN ({current_et.strftime('%Y-%m-%d %H:%M:%S %Z')}) - allowing trade")
+            if not is_open:
+                self.logger.info(f"❌ Alert was outside market hours: {historical_et.strftime('%Y-%m-%d %H:%M:%S %Z')} (Hours: 9:30-16:00 ET) - rejecting trade")
+                return False
+            
+            # Now determine the correct emoji signal based on historical timestamp
+            hour_minute = historical_et.hour + historical_et.minute / 60.0
+            
+            if 9.5 <= hour_minute < 12.0:
+                correct_emoji = "🟢"
+                correct_period = "MORNING POWER"
+            elif 12.0 <= hour_minute < 14.0:
+                correct_emoji = "🟡" 
+                correct_period = "LUNCH HOUR"
+            elif 14.0 <= hour_minute <= 16.0:
+                correct_emoji = "🟢"
+                correct_period = "AFTERNOON POWER"
+            else:
+                # Should not reach here since we already checked market hours
+                self.logger.warning(f"Historical time {hour_minute} doesn't match expected market periods")
+                correct_emoji = "⚫"
+                correct_period = "UNKNOWN"
+            
+            # Only allow green or yellow signals
+            if correct_emoji in ["🟢", "🟡"]:
+                self.logger.info(f"✅ BOTH conditions met: Historical time shows {correct_emoji} {correct_period} signal AND alert was during market hours ({historical_et.strftime('%Y-%m-%d %H:%M:%S %Z')}) - allowing trade")
                 return True
             else:
-                self.logger.info(f"❌ Market is CLOSED: {current_et.strftime('%Y-%m-%d %H:%M:%S %Z')} (Hours: 9:30-16:00 ET) - rejecting trade despite good emoji signal")
+                self.logger.info(f"❌ Historical time shows {correct_emoji} signal - rejecting trade")
                 return False
                 
         except Exception as e:
@@ -294,6 +357,21 @@ class ORBTradeStocksMonitor:
                 self.filtered_superduper_alerts.add(file_path)
                 self.logger.info(f"🔴 Trade rejected for {symbol}: Market is closed (outside trading hours)")
                 return
+
+            # In backtesting mode, move validated alert to superduper_alerts_sent directory
+            if self.backtesting_mode:
+                import shutil
+                from pathlib import Path
+                
+                source_path = Path(file_path)
+                dest_path = self.superduper_alerts_dir / source_path.name
+                
+                try:
+                    # Copy (don't move) the file to preserve original in source directory for analysis
+                    shutil.copy2(source_path, dest_path)
+                    self.logger.info(f"📋 Copied validated alert to sent directory: {dest_path.name}")
+                except Exception as e:
+                    self.logger.error(f"❌ Failed to copy alert to sent directory: {e}")
 
             # Use TradeGenerator to create and execute trades on all accounts
             trade_filenames = self.trade_generator.create_and_execute_trade(superduper_alert_data)
@@ -528,12 +606,28 @@ class ORBTradeStocksMonitor:
             # await self._scan_existing_superduper_alerts()
 
             # Start file system monitoring
-            if self.superduper_alerts_dir.exists():
-                self.observer.schedule(self.file_handler, str(self.superduper_alerts_dir), recursive=False)
-                self.observer.start()
-                self.logger.info(f"Started monitoring {self.superduper_alerts_dir}")
+            if self.backtesting_mode:
+                # In backtesting mode, monitor the source alerts directory
+                monitor_dir = self.source_alerts_dir
+                if monitor_dir.exists():
+                    self.observer.schedule(self.file_handler, str(monitor_dir), recursive=False)
+                    self.observer.start()
+                    self.logger.info(f"Started monitoring {monitor_dir}")
+                else:
+                    self.logger.warning(f"Source superduper alerts directory does not exist: {monitor_dir}")
+                    # Create the directory structure if it doesn't exist
+                    monitor_dir.mkdir(parents=True, exist_ok=True)
+                    self.observer.schedule(self.file_handler, str(monitor_dir), recursive=False)
+                    self.observer.start()
+                    self.logger.info(f"Created and started monitoring {monitor_dir}")
             else:
-                self.logger.warning(f"Superduper alerts directory does not exist: {self.superduper_alerts_dir}")
+                # Normal mode - monitor superduper_alerts_sent
+                if self.superduper_alerts_dir.exists():
+                    self.observer.schedule(self.file_handler, str(self.superduper_alerts_dir), recursive=False)
+                    self.observer.start()
+                    self.logger.info(f"Started monitoring {self.superduper_alerts_dir}")
+                else:
+                    self.logger.warning(f"Superduper alerts directory does not exist: {self.superduper_alerts_dir}")
 
             # Print status
             print("\n" + "="*80)
@@ -627,6 +721,12 @@ def parse_arguments():
         help="Date in YYYY-MM-DD format (default: current date)"
     )
 
+    parser.add_argument(
+        "--backtesting",
+        action="store_true",
+        help="Run in backtesting mode (monitors runs/current instead of historical_data)"
+    )
+
     return parser.parse_args()
 
 
@@ -644,7 +744,8 @@ async def main():
             test_mode=args.test,
             post_only_urgent=args.post_only_urgent,
             no_telegram=args.no_telegram,
-            date=args.date
+            date=args.date,
+            backtesting_mode=args.backtesting
         )
 
         if args.test:

@@ -304,6 +304,11 @@ class BacktestingSystem:
                 'name': 'super_alert_copier',
                 'cmd': f"python3 code/copy_super_alerts.py {date} ./runs/current {symbol}",
                 'primary': False  # Copies existing super alerts for the current symbol at 1 per 3 seconds
+            },
+            {
+                'name': 'trade_monitor',
+                'cmd': f"python3 code/orb_alerts_trade_stocks.py --date {date} --backtesting --verbose",
+                'primary': False  # Moves validated superduper alerts to superduper_alerts_sent
             }
         ]
 
