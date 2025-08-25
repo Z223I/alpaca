@@ -98,6 +98,32 @@ Doc in phone notes close all positions and cancel all orders
 
 - [ ] My trades place two orders.  Provide feedback in the Telegram post for both orders.
 
+
+
+    {
+      "parameters": {
+        "take_profit_pct": 12.5,
+        "trailing_stop_pct": 12.5
+      },
+      "metrics": {
+        "total_return": 481469.8460905292,
+        "win_rate": 74.50980392156863,
+        "avg_win": 15.840112785812831,
+        "avg_loss": 9.60207755819928,
+        "profit_factor": 4.822067710087149,
+        "sharpe_ratio": 12.625597465750946,
+        "max_drawdown": 68.02693468719997,
+        "total_trades": 102,
+        "winning_trades": 76,
+        "losing_trades": 26,
+        "mean_return": 9.354848580476416,
+        "std_return": 11.76210613259913
+      },
+      "trade_count": 102,
+      "valid_trades": 102
+    },
+
+
 ## maximize_profit.py
 
 - [X] Review code/maximize_profit.py: Is it printing all charts for trades with losses?  It is supposed to do that.

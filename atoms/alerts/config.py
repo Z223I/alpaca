@@ -179,7 +179,7 @@ class MomentumThresholds:
     red_threshold: float = 0.3
 
     # Green momentum threshold (at or above this = green 🟢)
-    green_threshold: float = 0.70
+    green_threshold: float = 0.75
 
     # Yellow momentum is implicitly between red_threshold and green_threshold (🟡)
 
