@@ -122,6 +122,8 @@ class AlertsWatchdog:
             }
         ]
         
+        # PNL reports will be generated dynamically for each account
+        
         # Create log subdirectories for post-market scripts
         for script_config in self.post_market_scripts:
             script_log_dir = self.logs_dir / script_config['log_dir']
@@ -140,6 +142,10 @@ class AlertsWatchdog:
         self._log(f"📋 Watchdog log: {self.log_file}")
         self._log(f"📁 Process logs will be saved to: {self.logs_dir}/[program_name]/")
         self._log(f"🕘 Market hours: {self.market_open_time} - {self.market_close_time} ET")
+        
+        # Create PNL logs directory
+        pnl_log_dir = self.logs_dir / "pnl_reports"
+        pnl_log_dir.mkdir(exist_ok=True)
     
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals gracefully."""
@@ -210,6 +216,235 @@ class AlertsWatchdog:
             return False
         
         return True
+    
+    def _get_trading_account_combinations(self):
+        """
+        Get unique account-name/account combinations where auto_trade is enabled.
+        
+        Returns:
+            List of tuples: [(account_name, account_type), ...]
+        """
+        try:
+            # Add the code directory to Python path to import alpaca_config
+            import sys
+            code_dir = self.project_root / "code"
+            if str(code_dir) not in sys.path:
+                sys.path.insert(0, str(code_dir))
+            
+            from alpaca_config import get_current_config
+            config = get_current_config()
+            
+            account_combinations = []
+            
+            # Loop through all accounts and account types to find auto_trade enabled ones
+            for account_name, account_config in config.providers["alpaca"].accounts.items():
+                for account_type in ["paper", "live", "cash"]:
+                    env_config = getattr(account_config, account_type)
+                    if env_config.auto_trade == "yes":
+                        account_combinations.append((account_name, account_type))
+            
+            self._log(f"Found {len(account_combinations)} trading account combinations: {account_combinations}")
+            return account_combinations
+            
+        except ImportError as e:
+            self._log(f"❌ Could not import alpaca_config: {e}", "ERROR")
+            return []
+        except Exception as e:
+            self._log(f"❌ Error loading trading accounts: {e}", "ERROR")
+            return []
+    
+    def _generate_pnl_reports(self):
+        """Generate PNL reports for all trading accounts and send to Bruce via Telegram."""
+        self._log("💰 Generating PNL reports for all trading accounts...")
+        
+        # Get all trading account combinations
+        account_combinations = self._get_trading_account_combinations()
+        
+        if not account_combinations:
+            self._log("⚠️ No trading accounts found with auto_trade enabled", "WARN")
+            return
+        
+        pnl_results = {}
+        
+        for account_name, account_type in account_combinations:
+            self._log(f"📊 Generating PNL report for {account_name}/{account_type}...")
+            
+            try:
+                # Execute alpaca.py --PNL for this account
+                python_path = os.path.expanduser('~/miniconda3/envs/alpaca/bin/python')
+                alpaca_script = self.project_root / "code" / "alpaca.py"
+                
+                cmd = [
+                    python_path,
+                    str(alpaca_script),
+                    "--account-name", account_name,
+                    "--account", account_type,
+                    "--PNL"
+                ]
+                
+                # Setup PNL-specific log file
+                et_now = datetime.now(self.et_tz)
+                timestamp = et_now.strftime("%Y%m%d_%H%M%S")
+                pnl_log_dir = self.logs_dir / "pnl_reports"
+                pnl_log_file = pnl_log_dir / f"pnl_{account_name}_{account_type}_{timestamp}.log"
+                
+                self._log(f"📝 PNL logs: {pnl_log_file}")
+                
+                # Execute PNL command with output saved to log file
+                with open(pnl_log_file, 'w') as log_file:
+                    # Write header
+                    et_now = datetime.now(self.et_tz)
+                    log_file.write(f"# PNL Report for {account_name}/{account_type}\n")
+                    log_file.write(f"# Generated: {et_now.strftime('%Y-%m-%d %H:%M:%S ET')}\n")
+                    log_file.write(f"# Command: {' '.join(cmd)}\n")
+                    log_file.write("# " + "="*50 + "\n\n")
+                    log_file.flush()
+                    
+                    result = subprocess.run(
+                        cmd,
+                        cwd=str(self.project_root),
+                        stdout=log_file,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        timeout=60  # 1 minute timeout for PNL report
+                    )
+                    
+                    # Write completion info
+                    et_now = datetime.now(self.et_tz)
+                    log_file.write(f"\n\n# Completed: {et_now.strftime('%Y-%m-%d %H:%M:%S ET')}\n")
+                    log_file.write(f"# Return code: {result.returncode}\n")
+                
+                # Read the PNL output for Telegram notification
+                try:
+                    with open(pnl_log_file, 'r') as f:
+                        log_content = f.read()
+                        # Extract just the actual PNL output (skip headers)
+                        output_lines = []
+                        in_output = False
+                        for line in log_content.split('\n'):
+                            if line.startswith('# ========'):
+                                in_output = True
+                                continue
+                            elif in_output and not line.startswith('# Completed:') and not line.startswith('# Return code:'):
+                                output_lines.append(line)
+                        pnl_output = '\n'.join(output_lines).strip()
+                except Exception:
+                    pnl_output = "PNL output saved to log file"
+                
+                pnl_results[f"{account_name}/{account_type}"] = {
+                    'success': result.returncode == 0,
+                    'output': pnl_output,
+                    'log_file': str(pnl_log_file),
+                    'error': None if result.returncode == 0 else f"PNL command failed with return code {result.returncode}"
+                }
+                
+                if result.returncode == 0:
+                    self._log(f"✅ PNL report generated successfully for {account_name}/{account_type}")
+                else:
+                    self._log(f"❌ PNL report failed for {account_name}/{account_type}: return code {result.returncode}", "ERROR")
+                
+                # Send individual Telegram notification to Bruce for this account's PNL
+                self._send_pnl_notification_to_bruce(account_name, account_type, pnl_results[f"{account_name}/{account_type}"])
+                
+            except subprocess.TimeoutExpired:
+                error_msg = f"PNL command timed out after 60 seconds for {account_name}/{account_type}"
+                self._log(f"❌ {error_msg}", "ERROR")
+                pnl_results[f"{account_name}/{account_type}"] = {
+                    'success': False,
+                    'output': '',
+                    'log_file': str(pnl_log_file) if 'pnl_log_file' in locals() else None,
+                    'error': error_msg
+                }
+            except Exception as e:
+                error_msg = f"Error generating PNL report for {account_name}/{account_type}: {e}"
+                self._log(f"❌ {error_msg}", "ERROR")
+                pnl_results[f"{account_name}/{account_type}"] = {
+                    'success': False,
+                    'output': '',
+                    'log_file': None,
+                    'error': error_msg
+                }
+        
+        self._log(f"💰 PNL report generation completed for {len(account_combinations)} accounts")
+        return pnl_results
+    
+    def _send_pnl_notification_to_bruce(self, account_name: str, account_type: str, pnl_result: dict):
+        """Send individual PNL report to Bruce via Telegram."""
+        try:
+            account_key = f"{account_name}/{account_type}"
+            
+            # Create PNL notification message
+            if pnl_result['success']:
+                # Extract key PNL information from output
+                pnl_output = pnl_result['output']
+                
+                message_parts = [
+                    f"💰 **PNL Report - {account_key}**",
+                    "",
+                    "📊 **Daily Profit/Loss Summary:**"
+                ]
+                
+                # Add the PNL output (truncate if too long for Telegram)
+                if pnl_output:
+                    # Telegram messages have a 4096 character limit
+                    if len(pnl_output) > 3500:
+                        pnl_output = pnl_output[:3500] + "\n...\n[Output truncated - see log file for full report]"
+                    
+                    # Format the PNL output with proper markdown
+                    formatted_output = pnl_output.replace('$', '\\$')  # Escape dollar signs for Telegram
+                    message_parts.extend([
+                        "```",
+                        formatted_output,
+                        "```"
+                    ])
+                else:
+                    message_parts.append("• No PNL data available")
+                
+                message_parts.extend([
+                    "",
+                    f"📋 **Log File:** {pnl_result['log_file']}",
+                    f"⏰ **Generated:** {datetime.now(self.et_tz).strftime('%H:%M:%S ET')}"
+                ])
+            else:
+                message_parts = [
+                    f"❌ **PNL Report Failed - {account_key}**",
+                    "",
+                    f"**Error:** {pnl_result['error']}",
+                    f"📋 **Log File:** {pnl_result.get('log_file', 'N/A')}",
+                    f"⏰ **Generated:** {datetime.now(self.et_tz).strftime('%H:%M:%S ET')}"
+                ]
+            
+            pnl_message = "\n".join(message_parts)
+            
+            # Send to Bruce
+            try:
+                from atoms.telegram.user_manager import UserManager
+                user_manager = UserManager()
+                active_users = user_manager.get_active_users()
+                
+                # Look for Bruce specifically
+                bruce_users = [u for u in active_users if 'bruce' in u.get('username', '').lower()]
+                
+                if bruce_users:
+                    from atoms.telegram.telegram_post import TelegramPoster
+                    telegram_poster = TelegramPoster()
+                    
+                    for user in bruce_users:
+                        result = telegram_poster.send_message_to_user(pnl_message, user['username'])
+                        if result['success']:
+                            self._log(f"✅ PNL notification sent to Bruce for {account_key}")
+                        else:
+                            errors = result.get('errors', ['Unknown error'])
+                            error_msg = ', '.join(errors) if isinstance(errors, list) else str(errors)
+                            self._log(f"❌ Failed to send PNL notification to Bruce for {account_key}: {error_msg}", "ERROR")
+                else:
+                    self._log(f"⚠️ No Bruce user found for PNL notification ({account_key})", "WARN")
+                    
+            except Exception as e:
+                self._log(f"❌ Error sending PNL notification to Bruce for {account_key}: {e}", "ERROR")
+                
+        except Exception as e:
+            self._log(f"❌ Error creating PNL notification for {account_name}/{account_type}: {e}", "ERROR")
     
     def _setup_market_schedule(self):
         """Setup scheduled tasks for market open/close."""
@@ -531,6 +766,32 @@ class AlertsWatchdog:
                     'output': ''
                 }
         
+        # Generate PNL reports for all trading accounts
+        self._log("💰 Generating PNL reports for all trading accounts...")
+        try:
+            pnl_results = self._generate_pnl_reports()
+            if pnl_results:
+                analysis_results['pnl_reports'] = {
+                    'success': True,
+                    'output': f"Generated PNL reports for {len(pnl_results)} accounts",
+                    'pnl_data': pnl_results
+                }
+                self._log(f"✅ PNL reports completed for {len(pnl_results)} accounts")
+            else:
+                analysis_results['pnl_reports'] = {
+                    'success': False,
+                    'error': 'No trading accounts found or all PNL reports failed',
+                    'output': ''
+                }
+                self._log("⚠️ No PNL reports generated", "WARN")
+        except Exception as e:
+            self._log(f"❌ Error generating PNL reports: {e}", "ERROR")
+            analysis_results['pnl_reports'] = {
+                'success': False,
+                'error': str(e),
+                'output': ''
+            }
+        
         # Send summary to Bruce
         self._send_daily_summary(analysis_results)
     
@@ -653,14 +914,34 @@ class AlertsWatchdog:
             
             # Add analysis results
             for script_name, result in analysis_results.items():
-                status = "✅" if result['success'] else "❌"
-                summary_lines.append(f"{status} {script_name.replace('_', ' ').title()}")
-                
-                if result.get('log_file'):
-                    summary_lines.append(f"   Log: {result['log_file']}")
+                if script_name == 'pnl_reports':
+                    # Special handling for PNL reports
+                    status = "✅" if result['success'] else "❌"
+                    summary_lines.append(f"{status} PNL Reports")
                     
-                if not result['success'] and result['error']:
-                    summary_lines.append(f"   Error: {result['error']}")
+                    if result['success'] and result.get('pnl_data'):
+                        pnl_data = result['pnl_data']
+                        successful_count = sum(1 for pnl_result in pnl_data.values() if pnl_result['success'])
+                        total_count = len(pnl_data)
+                        summary_lines.append(f"   Accounts: {successful_count}/{total_count} successful")
+                        
+                        # Show account names that were processed
+                        account_names = list(pnl_data.keys())
+                        if account_names:
+                            summary_lines.append(f"   Processed: {', '.join(account_names)}")
+                    
+                    if not result['success'] and result.get('error'):
+                        summary_lines.append(f"   Error: {result['error']}")
+                else:
+                    # Normal script handling
+                    status = "✅" if result['success'] else "❌"
+                    summary_lines.append(f"{status} {script_name.replace('_', ' ').title()}")
+                    
+                    if result.get('log_file'):
+                        summary_lines.append(f"   Log: {result['log_file']}")
+                        
+                    if not result['success'] and result['error']:
+                        summary_lines.append(f"   Error: {result['error']}")
             
             # Add log directory information
             summary_lines.extend([
@@ -670,13 +951,15 @@ class AlertsWatchdog:
                 "• Trade execution monitoring completed", 
                 "• ORB analysis charts generated",
                 "• Alert summary processed",
+                "• PNL reports generated and sent individually",
                 "",
                 "📋 **Log Files Available:**",
                 f"• Watchdog logs: logs/alerts_watchdog/",
                 f"• ORB Monitor: logs/orb_monitor/",
                 f"• Superduper Alerts: logs/orb_superduper/",
                 f"• Trade Execution: logs/orb_trades/",
-                f"• Post-Market Analysis: logs/orb_alerts_summary/ & logs/orb_analysis/"
+                f"• Post-Market Analysis: logs/orb_alerts_summary/ & logs/orb_analysis/",
+                f"• PNL Reports: logs/pnl_reports/"
             ])
             
             summary_message = "\n".join(summary_lines)

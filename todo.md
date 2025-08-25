@@ -85,6 +85,11 @@ Why didn't I get alerts for THAR on 8/20????
 
 Doc in phone notes close all positions and cancel all orders
 
+## Strategies
+
+- [ ] VWAP bounce Two FULL candles
+- [ ] EMA9
+
 ## Test Monitor Positions
 
 - [ ] Do this in the paper account
@@ -94,11 +99,20 @@ Doc in phone notes close all positions and cancel all orders
 - [ ] Verify the monitor works for this simple case
 - [ ] Expand testing to include closing positions
 
+## Trades Exponential Decay
+
+- [ ] VERY IMPORTANT. Update atoms/alerts/trade_generator.py: Do an exponential decay on trades.
+
+## EOD
+
+- [ ] IMPORTANT.  What does code/alerts_watch.py do at the end of the day?
+- [ ] VERY IMPORTANT.  How is atoms/alerts/trade_generator.py keeping track of trades per account-name and account? If so, use that information to create a list of unique account-name/account combinations.  Then get the alpaca.py --account-name <account name> --account <account> --PNL for each unique combination.  Also, send a Telegram post to Bruce for the PNL for each unique combination.  Both of those can be put inside the same loop.
+
+
 ## Trades
 
-- [ ] VERY IMPORTANT. Update atoms/alerts/trade_generator.py: It is currently not using --account-name and --account.  Does it know those values?  Update the alpaca.py call with those values.  Review code/alpaca.py parsing mechanism to determine the order of the args. Example: --account-name Bruce --account paper.
-- [ ] Why not any Telegram posts for the trades?
-- [ ] Why 15 trades?
+- [X] VERY IMPORTANT. Update atoms/alerts/trade_generator.py: It is currently not using --account-name and --account.  Does it know those values?  Update the alpaca.py call with those values.  Review code/alpaca.py parsing mechanism to determine the order of the args. Example: --account-name Bruce --account paper.
+- [X] Why 15 trades?
 
 - [ ] My trades place two orders.  Provide feedback in the Telegram post for both orders.
 
