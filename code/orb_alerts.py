@@ -15,6 +15,7 @@ Usage:
 import asyncio
 import argparse
 import logging
+import os
 import sys
 import json
 from typing import Optional
