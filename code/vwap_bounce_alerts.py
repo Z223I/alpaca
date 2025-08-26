@@ -4,7 +4,7 @@ VWAP Bounce Alerts System
 This system monitors historical data files for VWAP bounce patterns and sends Telegram alerts.
 It watches for new CSV files in historical_data/YYYY-MM-DD/market_data/ directory,
 analyzes the last 10 1-minute candlesticks, combines them into two 5-minute candlesticks,
-and alerts when both are green and one is within 7% above VWAP.
+and alerts when both are green, the first is within 7% above VWAP, and the second is higher.
 
 Usage:
     python3 code/vwap_bounce_alerts.py                     # Start monitoring for current date
@@ -99,24 +99,33 @@ class VWAPBounceDetector:
             self.logger.debug(f"Candles not both green: first={first_green}, second={second_green}")
             return None
             
+        # Check if second candle is higher than first candle
+        second_higher_than_first = second_5min['close'] > first_5min['close']
+        
+        if not second_higher_than_first:
+            self.logger.debug(f"Second candle not higher than first: first_close={first_5min['close']:.4f}, second_close={second_5min['close']:.4f}")
+            return None
+            
         # Get the most recent VWAP value
         current_vwap = df.iloc[-1]['vwap']
         
-        # Check if either candle is within 7% above VWAP
+        # Check if FIRST candle is within 7% above VWAP (not either candle)
         first_distance = ((first_5min['close'] / current_vwap) - 1) * 100
         second_distance = ((second_5min['close'] / current_vwap) - 1) * 100
         
-        within_7_percent = (0 <= first_distance <= 7) or (0 <= second_distance <= 7)
+        first_within_7_percent = (0 <= first_distance <= 7)
         
-        if not within_7_percent:
-            self.logger.debug(f"Not within 7% of VWAP: first={first_distance:.2f}%, second={second_distance:.2f}%")
+        if not first_within_7_percent:
+            self.logger.debug(f"First candle not within 7% of VWAP: first={first_distance:.2f}%, second={second_distance:.2f}%")
             return None
             
-        # Use the closer distance for reporting
-        vwap_distance = min(first_distance, second_distance) if first_distance > 0 and second_distance > 0 else max(first_distance, second_distance)
+        # Use the first candle distance for reporting since it's the one within 7% of VWAP
+        vwap_distance = first_distance
         
         symbol = df.iloc[-1]['symbol']
-        timestamp = pd.to_datetime(df.iloc[-1]['timestamp'])
+        # Use first candlestick timestamp plus 10 minutes (5 min first candle + 5 min second candle)
+        first_candle_time = pd.to_datetime(df.iloc[0]['timestamp'])
+        timestamp = first_candle_time + pd.Timedelta(minutes=10)
         
         self.logger.info(f"VWAP bounce pattern detected for {symbol}: {vwap_distance:.2f}% from VWAP")
         

@@ -77,7 +77,7 @@ python code/orb_alerts_trade_stocks.py --verbose
 
 #### VWAP Bounce Alerts
 
-Monitors historical market data files for VWAP bounce patterns and sends alerts to Bruce when detected. Automatically analyzes the last 10 1-minute candlesticks, combines them into two 5-minute candles, and alerts when both are green and within 7% above VWAP.
+Monitors historical market data files for VWAP bounce patterns and sends alerts to Bruce when detected. Automatically analyzes the last 10 1-minute candlesticks, combines them into two 5-minute candles, and alerts when both are green, the first is within 7% above VWAP, and the second is higher.
 
 ```bash
 python3 code/vwap_bounce_alerts.py --verbose
