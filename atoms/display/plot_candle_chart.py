@@ -300,6 +300,8 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
                     color = 'green'
                 elif alert_level == 'yellow':
                     color = 'gold'  # Use gold for better visibility than pure yellow
+                elif alert_type == 'vwap_bounce':
+                    color = 'blue'  # Blue color for VWAP bounce alerts (matches volume chart)
                 else:
                     # Fallback to old logic if neither macd_score nor alert_level is available
                     color = 'green' if alert_type == 'bullish' else 'red'
@@ -324,7 +326,10 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
 
                 # Add small label at top of chart
                 label_y = y_max - (y_max - y_min) * 0.05  # 5% from top
-                alert_symbol = '↑' if alert_type == 'bullish' else '↓'
+                if alert_type == 'vwap_bounce':
+                    alert_symbol = 'V'  # V for VWAP bounce
+                else:
+                    alert_symbol = '↑' if alert_type == 'bullish' else '↓'
 
                 # Add edge indicator for out-of-range alerts
                 if not within_range:

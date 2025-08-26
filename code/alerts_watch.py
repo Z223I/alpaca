@@ -3,7 +3,7 @@
 Alerts Watch - Automated Market Hours Alert System
 
 This system manages ORB alert processes during market hours (9:30 AM - 4:00 PM ET, Mon-Fri):
-1. Starts 4 alert processes at market open
+1. Starts 5 alert processes at market open
 2. Monitors and restarts them if they fail
 3. Stops them at market close
 4. Runs post-market analysis and summary
@@ -15,6 +15,7 @@ Managed Processes:
 - ORB Alerts Monitor (Super alerts)
 - ORB Superduper Alerts
 - ORB Trade Execution
+- VWAP Bounce Alerts (Bounce pattern detection)
 
 Post-Market Tasks:
 - ORB Alerts Summary
@@ -98,6 +99,12 @@ class AlertsWatchdog:
                 'args': ['--verbose'],
                 'python_cmd': 'python',
                 'log_dir': 'orb_trades'
+            },
+            'vwap_bounce_alerts': {
+                'script': 'code/vwap_bounce_alerts.py',
+                'args': ['--verbose'],
+                'python_cmd': 'python3',
+                'log_dir': 'vwap_bounce_alerts'
             }
         }
         
@@ -146,6 +153,11 @@ class AlertsWatchdog:
         # Create PNL logs directory
         pnl_log_dir = self.logs_dir / "pnl_reports"
         pnl_log_dir.mkdir(exist_ok=True)
+        
+    def _get_today_date(self) -> str:
+        """Get today's date in YYYY-MM-DD format (Eastern Time)."""
+        et_now = datetime.now(self.et_tz)
+        return et_now.strftime('%Y-%m-%d')
     
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals gracefully."""
@@ -805,6 +817,11 @@ class AlertsWatchdog:
             script_path = self.project_root / script_config['script']
             cmd = [python_path, str(script_path)] + script_config['args']
             
+            # Set environment variable for ORB script auto-selection
+            env = os.environ.copy()
+            if 'orb.py' in script_config['script']:
+                env['AUTO_SELECT_DEFAULT'] = '1'
+            
             # Setup script-specific log file
             et_now = datetime.now(self.et_tz)
             timestamp = et_now.strftime("%Y%m%d_%H%M%S")
@@ -831,7 +848,8 @@ class AlertsWatchdog:
                     stdout=log_file,
                     stderr=subprocess.STDOUT,
                     text=True,
-                    timeout=300  # 5 minute timeout
+                    timeout=300,  # 5 minute timeout
+                    env=env
                 )
                 
                 # Write completion info
@@ -949,6 +967,7 @@ class AlertsWatchdog:
                 "🔍 **Key Highlights:**",
                 "• Superduper alerts monitoring completed",
                 "• Trade execution monitoring completed", 
+                "• VWAP bounce alerts monitoring completed",
                 "• ORB analysis charts generated",
                 "• Alert summary processed",
                 "• PNL reports generated and sent individually",
@@ -958,6 +977,7 @@ class AlertsWatchdog:
                 f"• ORB Monitor: logs/orb_monitor/",
                 f"• Superduper Alerts: logs/orb_superduper/",
                 f"• Trade Execution: logs/orb_trades/",
+                f"• VWAP Bounce Alerts: logs/vwap_bounce_alerts/",
                 f"• Post-Market Analysis: logs/orb_alerts_summary/ & logs/orb_analysis/",
                 f"• PNL Reports: logs/pnl_reports/"
             ])

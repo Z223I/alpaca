@@ -28,7 +28,7 @@ python code/alerts_watch.py
 
 Features:
 - Automatic market hours scheduling (Eastern Time)
-- Starts/stops all 4 alert processes automatically (including orb_alerts.py)
+- Starts/stops all 5 alert processes automatically (including orb_alerts.py and vwap_bounce_alerts.py)
 - Process monitoring and restart on failures
 - Post-market analysis and Telegram summary to Bruce
 - Comprehensive logging
@@ -73,6 +73,30 @@ Generates trades. Configuration required.
 
 ```bash
 python code/orb_alerts_trade_stocks.py --verbose
+```
+
+#### VWAP Bounce Alerts
+
+Monitors historical market data files for VWAP bounce patterns and sends alerts to Bruce when detected. Automatically analyzes the last 10 1-minute candlesticks, combines them into two 5-minute candles, and alerts when both are green and within 7% above VWAP.
+
+```bash
+python3 code/vwap_bounce_alerts.py --verbose
+```
+
+**Features:**
+- File watchdog monitoring of `historical_data/YYYY-MM-DD/market_data/` directory
+- Real-time analysis of 5-minute green candle patterns near VWAP
+- Telegram alerts sent directly to Bruce
+- Operating window: 9:45 AM - 8:00 PM ET
+- Test mode available: `--test` flag
+
+**Manual Testing:**
+```bash
+# Test mode (no alerts sent)
+python3 code/vwap_bounce_alerts.py --test --verbose
+
+# Monitor specific date
+python3 code/vwap_bounce_alerts.py --date 2025-07-18 --verbose
 ```
 
 After market close

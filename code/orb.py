@@ -95,6 +95,7 @@ class ORB:
     def _load_alerts_for_symbol(self, symbol: str, target_date: date) -> List[Dict[str, Any]]:
         """
         Load alerts for a specific symbol and date. Loads sent superduper alerts or regular alerts based on plot_super_alerts setting.
+        Also loads VWAP bounce alerts and combines them.
 
         Args:
             symbol: Stock symbol to load alerts for
@@ -103,10 +104,17 @@ class ORB:
         Returns:
             List of alert dictionaries containing timestamp, type, level, and alert data
         """
+        # Load ORB alerts based on setting
         if self.plot_super_alerts:
-            return self._load_super_alerts_for_symbol(symbol, target_date)
+            alerts = self._load_super_alerts_for_symbol(symbol, target_date)
         else:
-            return self._load_regular_alerts_for_symbol(symbol, target_date)
+            alerts = self._load_regular_alerts_for_symbol(symbol, target_date)
+            
+        # Load and combine VWAP bounce alerts
+        vwap_alerts = self._load_vwap_bounce_alerts_for_symbol(symbol, target_date)
+        alerts.extend(vwap_alerts)
+        
+        return alerts
 
     def _load_super_alerts_for_symbol(self, symbol: str, target_date: date) -> List[Dict[str, Any]]:
         """
@@ -370,6 +378,88 @@ class ORB:
             print(f"Error loading regular alerts for {symbol} on {target_date}: {e}")
             return alerts
 
+    def _load_vwap_bounce_alerts_for_symbol(self, symbol: str, target_date: date) -> List[Dict[str, Any]]:
+        """
+        Load VWAP bounce alerts for a specific symbol and date from historical_data/YYYY-MM-DD/alerts/vwap_bounce/.
+
+        Args:
+            symbol: Stock symbol to load alerts for
+            target_date: Date to load alerts for
+
+        Returns:
+            List of alert dictionaries containing timestamp, type, level, and alert data
+        """
+        alerts = []
+        
+        try:
+            import json
+            import pytz
+            
+            # Construct path to VWAP bounce alerts for this date
+            date_str = target_date.strftime('%Y-%m-%d')
+            vwap_alerts_dir = f"historical_data/{date_str}/alerts/vwap_bounce"
+            
+            if not os.path.exists(vwap_alerts_dir):
+                return alerts
+                
+            # Load all VWAP bounce alert files for this symbol
+            vwap_pattern = f"vwap_bounce_{symbol}_*.json"
+            vwap_files = glob.glob(os.path.join(vwap_alerts_dir, vwap_pattern))
+            
+            for alert_file in vwap_files:
+                try:
+                    with open(alert_file, 'r') as f:
+                        alert_data = json.load(f)
+                        
+                        # Convert timestamp to datetime object if present
+                        if 'timestamp' in alert_data:
+                            timestamp_str = alert_data['timestamp']
+                            try:
+                                # Try parsing as ISO format first
+                                alert_dt = datetime.fromisoformat(timestamp_str)
+                                
+                                # Ensure timezone-aware (assume ET if not specified)
+                                if alert_dt.tzinfo is None:
+                                    et_tz = pytz.timezone('America/New_York')
+                                    alert_dt = et_tz.localize(alert_dt)
+                            except (ValueError, OSError):
+                                # Skip alerts with invalid timestamps
+                                continue
+                                
+                            alert_data['timestamp_dt'] = alert_dt
+                            
+                        # Set alert properties for plotting
+                        alert_data['alert_type'] = 'vwap_bounce'
+                        alert_data['alert_level'] = 'vwap_bounce'
+                        
+                        alerts.append(alert_data)
+                        
+                except Exception as e:
+                    print(f"Warning: Error loading VWAP bounce alert file {alert_file}: {e}")
+                    continue
+                    
+            # Sort VWAP bounce alerts by timestamp
+            def safe_sort_key(alert):
+                timestamp_dt = alert.get('timestamp_dt')
+                if timestamp_dt is None:
+                    return datetime.max.replace(tzinfo=pytz.UTC)
+                elif timestamp_dt.tzinfo is None:
+                    et_tz = pytz.timezone('America/New_York')
+                    return et_tz.localize(timestamp_dt)
+                else:
+                    return timestamp_dt
+                    
+            alerts.sort(key=safe_sort_key)
+            
+            if alerts:
+                print(f"Loaded {len(alerts)} VWAP bounce alerts for {symbol}")
+                
+            return alerts
+            
+        except Exception as e:
+            print(f"Error loading VWAP bounce alerts for {symbol} on {target_date}: {e}")
+            return alerts
+
     def _get_most_recent_csv(self) -> Optional[str]:
         """
         Get the most recent CSV file from the data directory.
@@ -411,6 +501,9 @@ class ORB:
         """
         List all CSV files in the data directory and allow user to select one.
         The most recent file is the default selection.
+        
+        If AUTO_SELECT_DEFAULT environment variable is set, automatically selects
+        the most recent (default) file without user interaction.
 
         Returns:
             Path to selected CSV file, or None if cancelled
@@ -434,6 +527,12 @@ class ORB:
 
             # Sort by modification time, most recent first
             csv_files.sort(key=os.path.getmtime, reverse=True)
+
+            # Check for auto-select environment variable (for automated runs)
+            if os.getenv('AUTO_SELECT_DEFAULT'):
+                selected_file = csv_files[0]
+                print(f"Auto-selecting default (most recent): {os.path.basename(selected_file)}")
+                return selected_file
 
             # Pagination variables
             files_per_page = 5  # Show 5 files initially

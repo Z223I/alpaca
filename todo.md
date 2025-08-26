@@ -87,7 +87,11 @@ Doc in phone notes close all positions and cancel all orders
 
 ## Strategies
 
-- [ ] VWAP bounce Two FULL candles
+- [ ] VERY IMPORTANT. Create code/vwap_bounce_alerts.py: It is to use a watchdog to monitor the creation of new files in                                 │
+│   historical_data/YYYY-MM-DD/market_data/[symbol]*.csv; For each symbol for the current date; Take the 10 most recent candlesticks (They are         │
+│   1-minute each) and combine them into two 5-minute candlesticks. Check if both candlesticks are green.  If the are both green and one of them is    │
+│   within 4% above VWAP, send a VWAP Bounce alert Telegram post to Bruce. It is only to send alerts during the currently configured timeframe that    │
+│   starts close to market open and ends at 20:00 ET.  
 - [ ] EMA9
 
 ## Test Monitor Positions
@@ -102,6 +106,11 @@ Doc in phone notes close all positions and cancel all orders
 ## Trades Exponential Decay
 
 - [ ] VERY IMPORTANT. Update atoms/alerts/trade_generator.py: Do an exponential decay on trades.
+
+## Stock Review
+
+- [ ] 2025-08-26 Did $HKPD take off very early.  Why not detected.
+
 
 
 Work M/r into alters and not yet trades.
