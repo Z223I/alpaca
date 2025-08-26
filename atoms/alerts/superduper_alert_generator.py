@@ -224,8 +224,8 @@ class SuperduperAlertGenerator:
                 f"",
                 f"📊 **MACD Technical Analysis:**",
                 f"• MACD Condition: 🔴 **BLIND FLIGHT**",
-                f"• Status: **No live data available**",
-                f"• Reason: Market closed or API error",
+                f"• Status: **No historical data available**",
+                f"• Reason: Historical data file missing or insufficient",
                 f"• Action: Monitor manually for MACD confirmation"
             ])
 

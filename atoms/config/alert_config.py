@@ -60,7 +60,7 @@ class ORBAlertConfig:
     symbols_file: str = ""  # Empty string means use current date file (data/YYYYMMDD.csv)
 
     # Data Collection Configuration
-    data_save_interval_minutes: int = 10  # Save historical data every N minutes (configurable)
+    data_save_interval_minutes: int = 1  # Save historical data every N minutes (configurable)
     market_open_time: str = "09:00"       # Data collection start time (ET) - 09:00 to allow EMA20 calculation by 09:30
     start_collection_at_open: bool = True # Wait until data collection start time to begin data collection
                                           # This ensures EMA20 can be calculated by market open (09:30)

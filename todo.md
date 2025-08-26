@@ -103,11 +103,21 @@ Doc in phone notes close all positions and cancel all orders
 
 - [ ] VERY IMPORTANT. Update atoms/alerts/trade_generator.py: Do an exponential decay on trades.
 
+
+
+
+
 ## EOD
 
-- [ ] IMPORTANT.  What does code/alerts_watch.py do at the end of the day?
-- [ ] VERY IMPORTANT.  How is atoms/alerts/trade_generator.py keeping track of trades per account-name and account? If so, use that information to create a list of unique account-name/account combinations.  Then get the alpaca.py --account-name <account name> --account <account> --PNL for each unique combination.  Also, send a Telegram post to Bruce for the PNL for each unique combination.  Both of those can be put inside the same loop.
+- [X] IMPORTANT.  What does code/alerts_watch.py do at the end of the day?
+- [X] VERY IMPORTANT.  How is atoms/alerts/trade_generator.py keeping track of trades per account-name and account? If so, use that information to create a list of unique account-name/account combinations.  Then get the alpaca.py --account-name <account name> --account <account> --PNL for each unique combination.  Also, send a Telegram post to Bruce for the PNL for each unique combination.  Both of those can be put inside the same loop.
 
+## BLIND FLIGHT
+
+- [X] VERY IMPORTANT. Do a root cause analysis.  Review sent superduper alerts. Why does the "MACD Technical Analysis" "Status" show "No live data available"? There should be data availble. It should be retrieved via the Alpaca API that is instantiated with the account-name Janice and account paper. !Current SIP data is not allowed.!
+- [] IMPORTANT. Update code/orb_alerts.py: It currently saves historically data every ten minutes. Change that to every minute.  Also, once the data is saved, delete the previous data for the symbol.
+- [ ] VERY IMPORTANT. The historical data files do have current data. Use that data to perform the "MACD Technical Analysis".
+- [ ] VERY IMPORTANT. Use the same data file to conduct the "Momentum Short" analysis in the "Trend Analysis" section.
 
 ## Trades
 
@@ -117,7 +127,7 @@ Doc in phone notes close all positions and cancel all orders
 - [ ] My trades place two orders.  Provide feedback in the Telegram post for both orders.
 
 
-
+## Max Results
 
 Hardcoded root
 

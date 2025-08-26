@@ -17,8 +17,6 @@ import pytz
 # Import MACD calculation utilities
 from ..utils.calculate_macd import calculate_macd
 from ..utils.macd_alert_scorer import MACDAlertScorer
-from ..api.init_alpaca_client import init_alpaca_client
-import alpaca_trade_api as tradeapi
 
 
 class SuperduperAlertData:
@@ -79,31 +77,29 @@ class SuperduperAlertData:
                 self.logger.warning(f"Market data directory not found: {market_data_dir}")
                 return False
 
-            # Find market data files for this symbol
+            # Find the latest historical data file for this symbol (same approach as MACD analysis)
             pattern = f"{self.symbol}_*.csv"
             data_files = list(market_data_dir.glob(pattern))
 
             if not data_files:
-                self.logger.warning(f"No market data files found for {self.symbol} on {date_str}")
+                self.logger.warning(f"No historical data files found for {self.symbol} on {date_str}")
                 return False
 
-            # Load and combine all data files
-            all_data = []
-            for file_path in sorted(data_files):
-                try:
-                    df = pd.read_csv(file_path)
-                    if not df.empty:
-                        all_data.append(df)
-                        self.logger.debug(f"Loaded {len(df)} market data records from {file_path.name}")
-                except Exception as e:
-                    self.logger.warning(f"Error loading market data from {file_path}: {e}")
+            # Get the most recent data file (should be the only one due to cleanup)
+            latest_file = max(data_files, key=lambda f: f.stat().st_mtime)
 
-            if not all_data:
-                self.logger.warning(f"No valid market data loaded for {self.symbol}")
+            # Load historical data from the latest file
+            try:
+                combined_data = pd.read_csv(latest_file)
+                if combined_data.empty:
+                    self.logger.warning(f"Historical data file is empty: {latest_file}")
+                    return False
+                
+                self.logger.debug(f"Loaded {len(combined_data)} historical data records from {latest_file.name}")
+                
+            except Exception as e:
+                self.logger.warning(f"Error loading market data from {latest_file}: {e}")
                 return False
-
-            # Combine all data
-            combined_data = pd.concat(all_data, ignore_index=True)
 
             # Ensure timestamp column exists and convert to datetime
             if 'timestamp' not in combined_data.columns:
@@ -140,7 +136,7 @@ class SuperduperAlertData:
                     'vwap': float(row.get('vwap', row.get('price', 0)))
                 })
 
-            self.logger.info(f"Loaded {len(self.market_data)} market data points for {self.symbol} (filtered to before {current_timestamp_naive})")
+            self.logger.info(f"Loaded {len(self.market_data)} historical data points for {self.symbol} from {latest_file.name} (filtered to before {current_timestamp_naive})")
             return True
 
         except Exception as e:
@@ -205,8 +201,7 @@ class SuperduperAlertData:
         price_end = prices[-1]
         price_change_percent = ((price_end - price_start) / price_start) * 100
 
-        # Calculate moving averages and volatility
-        price_mean = sum(prices) / len(prices)
+        # Calculate volatility
         price_volatility = self._calculate_volatility(prices)
 
         # Analyze price momentum (slope)
@@ -268,7 +263,7 @@ class SuperduperAlertData:
 
     def _calculate_macd_analysis(self, alert_timestamp: datetime) -> Optional[Dict[str, Any]]:
         """
-        Calculate MACD analysis using live Alpaca data for the alert timestamp.
+        Calculate MACD analysis using historical data files for the alert timestamp.
         
         Args:
             alert_timestamp: Timestamp of the current alert
@@ -279,107 +274,107 @@ class SuperduperAlertData:
         try:
             self.logger.debug(f"Calculating MACD analysis for {self.symbol} at {alert_timestamp}")
             
-            # Initialize Alpaca client for live data
-            api_client = init_alpaca_client("alpaca", "Janice", "paper")
+            # Extract date from alert timestamp for finding historical data file
+            alert_date = alert_timestamp.strftime('%Y-%m-%d')
+            historical_data_dir = Path(f"historical_data/{alert_date}/market_data")
             
-            # Calculate timeframe for MACD (need at least 26 + 9 = 35 periods for reliable MACD)
-            # Use 1-minute bars and fetch 60 minutes of data to ensure we have enough
-            end_time = alert_timestamp
-            start_time = end_time - timedelta(minutes=60)
-            
-            # Fetch the data using alpaca_trade_api
-            # Format timestamps for Alpaca API (YYYY-MM-DD format without time component)
-            start_date = start_time.strftime('%Y-%m-%d')
-            end_date = end_time.strftime('%Y-%m-%d')
-            
-            bars = api_client.get_bars(
-                self.symbol,
-                tradeapi.TimeFrame.Minute,
-                start=start_date,
-                end=end_date,
-                limit=1000,
-                adjustment='raw'
-            )
-            
-            if not bars or len(bars) == 0:
-                self.logger.warning(f"No market data returned for {self.symbol}")
+            if not historical_data_dir.exists():
+                self.logger.warning(f"Historical data directory not found: {historical_data_dir}")
                 return None
+            
+            # Find the latest historical data file for this symbol
+            pattern = f"{self.symbol}_*.csv"
+            data_files = list(historical_data_dir.glob(pattern))
+            
+            if not data_files:
+                self.logger.warning(f"No historical data files found for {self.symbol} on {alert_date}")
+                return None
+            
+            # Get the most recent data file (should be the only one due to cleanup)
+            latest_file = max(data_files, key=lambda f: f.stat().st_mtime)
+            
+            # Load historical data
+            try:
+                df = pd.read_csv(latest_file)
+                if df.empty:
+                    self.logger.warning(f"Historical data file is empty: {latest_file}")
+                    return None
                 
-            if len(bars) < 26:  # Need minimum 26 periods for MACD
-                self.logger.warning(f"Insufficient data for MACD calculation: {len(bars)} bars")
-                return None
-            
-            # Convert to DataFrame format expected by MACD calculator
-            df_data = []
-            et_tz = pytz.timezone('America/New_York')
-            
-            for bar in bars:
-                # Convert timestamp to ET and ensure it's timezone-aware
-                timestamp = bar.t
-                if timestamp.tzinfo is None:
-                    timestamp = pytz.UTC.localize(timestamp)
-                timestamp_et = timestamp.astimezone(et_tz)
+                # Convert timestamp to datetime and ensure timezone-naive Eastern Time
+                df['timestamp'] = pd.to_datetime(df['timestamp'])
+                # Assume timestamps in historical files are already in Eastern Time and timezone-naive
                 
-                df_data.append({
-                    'timestamp': timestamp_et,
-                    'open': float(bar.o),
-                    'high': float(bar.h),
-                    'low': float(bar.l),
-                    'close': float(bar.c),
-                    'volume': int(bar.v),
-                    'symbol': self.symbol
-                })
-            
-            # Create DataFrame
-            df = pd.DataFrame(df_data)
-            df = df.sort_values('timestamp').reset_index(drop=True)
-            
-            self.logger.debug(f"Created DataFrame with {len(df)} bars for MACD calculation")
-            
-            # Calculate MACD using existing atom
-            macd_success, macd_values = calculate_macd(df, fast_length=12, slow_length=26, 
-                                                     signal_length=9, source='close')
-            
-            if not macd_success or macd_values is None:
-                self.logger.warning(f"MACD calculation failed for {self.symbol}")
+                # Filter data to only include timestamps before or at the alert timestamp
+                # Convert alert_timestamp to timezone-naive if needed for comparison
+                if alert_timestamp.tzinfo is not None:
+                    et_tz = pytz.timezone('US/Eastern')
+                    alert_timestamp_naive = alert_timestamp.astimezone(et_tz).replace(tzinfo=None)
+                else:
+                    alert_timestamp_naive = alert_timestamp
+                
+                # Filter to data up to the alert timestamp (for backtesting accuracy)
+                mask = df['timestamp'] <= alert_timestamp_naive
+                df_filtered = df[mask].copy()
+                
+                if len(df_filtered) < 26:  # Need minimum 26 periods for MACD
+                    self.logger.warning(f"Insufficient historical data for MACD calculation: {len(df_filtered)} bars (need at least 26)")
+                    return None
+                
+                # Sort by timestamp
+                df_filtered = df_filtered.sort_values('timestamp').reset_index(drop=True)
+                
+                self.logger.debug(f"Using {len(df_filtered)} historical data points for MACD calculation from {latest_file.name}")
+                
+                # Calculate MACD using existing atom
+                macd_success, macd_values = calculate_macd(df_filtered, fast_length=12, slow_length=26, 
+                                                         signal_length=9, source='close')
+                
+                if not macd_success or macd_values is None:
+                    self.logger.warning(f"MACD calculation failed for {self.symbol}")
+                    return None
+                
+                # Get the latest MACD values (most recent timestamp)
+                latest_idx = len(macd_values['macd']) - 1
+                latest_macd = macd_values['macd'].iloc[latest_idx]
+                latest_signal = macd_values['signal'].iloc[latest_idx] 
+                latest_histogram = macd_values['histogram'].iloc[latest_idx]
+                
+                # Calculate MACD color score using existing scorer
+                scorer = MACDAlertScorer()
+                
+                # Create a dummy alert for scoring (we just need the timestamp)
+                dummy_alert = {
+                    'timestamp_dt': alert_timestamp,
+                    'alert_type': 'bullish',
+                    'alert_level': 'green'
+                }
+                
+                scored_alerts = scorer.score_alerts_batch(df_filtered, [dummy_alert])
+                macd_score_info = scored_alerts[0].get('macd_score', {}) if scored_alerts else {}
+                
+                # Compile MACD analysis
+                macd_analysis = {
+                    'macd_value': round(float(latest_macd), 6),
+                    'signal_value': round(float(latest_signal), 6),
+                    'histogram_value': round(float(latest_histogram), 6),
+                    'macd_color': macd_score_info.get('color', 'UNKNOWN'),
+                    'macd_score': macd_score_info.get('score', 0),
+                    'macd_reasoning': macd_score_info.get('reasoning', 'No reasoning available'),
+                    'data_points_used': len(df_filtered),
+                    'data_source': 'historical_files',
+                    'data_file': latest_file.name,
+                    'calculated_at': alert_timestamp.isoformat()
+                }
+                
+                self.logger.info(f"MACD analysis for {self.symbol}: {macd_analysis['macd_color']} "
+                               f"(MACD: {macd_analysis['macd_value']}, Signal: {macd_analysis['signal_value']}) "
+                               f"using {len(df_filtered)} historical data points")
+                
+                return macd_analysis
+                
+            except Exception as file_error:
+                self.logger.error(f"Error reading historical data file {latest_file}: {file_error}")
                 return None
-            
-            # Get the latest MACD values (most recent timestamp)
-            latest_idx = len(macd_values['macd']) - 1
-            latest_macd = macd_values['macd'].iloc[latest_idx]
-            latest_signal = macd_values['signal'].iloc[latest_idx] 
-            latest_histogram = macd_values['histogram'].iloc[latest_idx]
-            
-            # Calculate MACD color score using existing scorer
-            scorer = MACDAlertScorer()
-            
-            # Create a dummy alert for scoring (we just need the timestamp)
-            dummy_alert = {
-                'timestamp_dt': alert_timestamp,
-                'alert_type': 'bullish',
-                'alert_level': 'green'
-            }
-            
-            scored_alerts = scorer.score_alerts_batch(df, [dummy_alert])
-            macd_score_info = scored_alerts[0].get('macd_score', {}) if scored_alerts else {}
-            
-            # Compile MACD analysis
-            macd_analysis = {
-                'macd_value': round(float(latest_macd), 6),
-                'signal_value': round(float(latest_signal), 6),
-                'histogram_value': round(float(latest_histogram), 6),
-                'macd_color': macd_score_info.get('color', 'UNKNOWN'),
-                'macd_score': macd_score_info.get('score', 0),
-                'macd_reasoning': macd_score_info.get('reasoning', 'No reasoning available'),
-                'data_points_used': len(df),
-                'timeframe_minutes': 60,
-                'calculated_at': alert_timestamp.isoformat()
-            }
-            
-            self.logger.info(f"MACD analysis for {self.symbol}: {macd_analysis['macd_color']} "
-                           f"(MACD: {macd_analysis['macd_value']}, Signal: {macd_analysis['signal_value']})")
-            
-            return macd_analysis
             
         except Exception as e:
             self.logger.error(f"Error calculating MACD analysis for {self.symbol}: {e}")
@@ -502,7 +497,7 @@ class SuperduperAlertFilter:
                 return False, "Could not extract date from path", None
 
             # Load all super alerts for this symbol on this day
-            all_super_alerts = self._load_symbol_super_alerts(symbol, date_str, super_alert_path)
+            all_super_alerts = self._load_symbol_super_alerts(symbol, super_alert_path)
             if len(all_super_alerts) < 2:
                 return False, f"Insufficient super alerts for {symbol} (need at least 2, found {len(all_super_alerts)})", None
 
@@ -593,8 +588,8 @@ class SuperduperAlertFilter:
 
         return None
 
-    def _load_symbol_super_alerts(self, symbol: str, date_str: str, current_path: str) -> List[Dict[str, Any]]:
-        """Load all super alerts for a symbol on a specific date, only including files prior to current timestamp."""
+    def _load_symbol_super_alerts(self, symbol: str, current_path: str) -> List[Dict[str, Any]]:
+        """Load all super alerts for a symbol, only including files prior to current timestamp."""
         super_alerts = []
 
         # Extract timestamp from current file for backtesting filter
@@ -651,7 +646,6 @@ class SuperduperAlertFilter:
             Tuple of (should_create, reason)
         """
         symbol = latest_super_alert.get('symbol', 'UNKNOWN')
-        current_price = latest_super_alert.get('signal_analysis', {}).get('current_price', 0)
         penetration = latest_super_alert.get('signal_analysis', {}).get('penetration_percent', 0)
 
         # Minimum strength threshold
