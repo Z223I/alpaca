@@ -96,6 +96,7 @@ Doc in phone notes close all positions and cancel all orders
 ## Scanner
 
 - [ ] VERY IMPORTANT, think hard: Review the following CSV info. It is from a stock screen filter on my computer.  Review Alpaca Trading API version 2 for stock screening. Create specs/alpaca_screener.md with all the info necessary to write a stock screener. also add the ability to screen stocks for which the volume is up N times versus the last M days.
+```text
 Metric,From,To,Unit
 Price,0.75,,USD
 Volume,1000000,,Shares
@@ -110,6 +111,27 @@ P/E Ratio,,,Ratio
 SMA,,,Days
 Avg Daily Volume,,,Shares (5 Days)
 Avg Daily Range,,,USD (5 Days)
+```
+
+### Config
+
+- [ ] claude --dangerously-skip-permissions
+- [ ] /login
+- [ ] /commit
+- [ ] Sync changes
+- [ ] /clear
+- [ ] git switch -c feature/alpaca-scanner
+- [ ] /clear
+- [ ] /read...
+
+### Spec File
+
+- [ ] VERY IMPORTANT. Think hard. Implement the instructions in specs/exit-strategy-testing.md to create code/maximize_profit.py.
+- [ ] Nudge
+- [ ] /commit
+- [ ] Publish the branch
+- [ ] git switch master; merge current branch
+- [ ] Sync changes
 
 
 
