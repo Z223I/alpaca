@@ -87,12 +87,31 @@ Doc in phone notes close all positions and cancel all orders
 
 ## Strategies
 
-- [ ] VERY IMPORTANT. Create code/vwap_bounce_alerts.py: It is to use a watchdog to monitor the creation of new files in                                 │
-│   historical_data/YYYY-MM-DD/market_data/[symbol]*.csv; For each symbol for the current date; Take the 10 most recent candlesticks (They are         │
-│   1-minute each) and combine them into two 5-minute candlesticks. Check if both candlesticks are green.  If the are both green and one of them is    │
-│   within 4% above VWAP, send a VWAP Bounce alert Telegram post to Bruce. It is only to send alerts during the currently configured timeframe that    │
-│   starts close to market open and ends at 20:00 ET.  
 - [ ] EMA9
+
+## Strategies VWAP Bounce
+
+- [X] VERY IMPORTANT. Create code/vwap_bounce_alerts.py: It is to use a watchdog to monitor the creation of new files in historical_data/YYYY-MM-DD/market_data/[symbol]*.csv; For each symbol for the current date; Take the 10 most recent candlesticks (They are 1-minute each) and combine them into two 5-minute candlesticks. Check if both candlesticks are green.  If the are both green and one of them is within 4% above VWAP, send a VWAP Bounce alert Telegram post to Bruce. It is only to send alerts during the currently configured timeframe that starts close to market open and ends at 20:00 ET.
+
+## Scanner
+
+- [ ] VERY IMPORTANT, think hard: Review the following CSV info. It is from a stock screen filter on my computer.  Review Alpaca Trading API version 2 for stock screening. Create specs/alpaca_screener.md with all the info necessary to write a stock screener. also add the ability to screen stocks for which the volume is up N times versus the last M days.
+Metric,From,To,Unit
+Price,0.75,,USD
+Volume,1000000,,Shares
+% Change,,,Percent
+Float,,,Shares
+Trades,,,Count
+Market Capitalization,,,USD
+$ Volume,,,USD
+Day Range,,,USD
+EPS,,,USD
+P/E Ratio,,,Ratio
+SMA,,,Days
+Avg Daily Volume,,,Shares (5 Days)
+Avg Daily Range,,,USD (5 Days)
+
+
 
 ## Test Monitor Positions
 
