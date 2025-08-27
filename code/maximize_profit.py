@@ -72,7 +72,7 @@ warnings.filterwarnings('ignore', category=UserWarning)
 
 # FOCUSED TESTING Parameter Space (80% reduction)
 ALERT_PARAMETERS = {
-    'timeframe_minutes': [20],                          # 1 value (focused testing)
+    'timeframe_minutes': [10, 15, 20, 25, 30],         # 5 values (matching ./runs data)
     'green_threshold': [0.60, 0.65, 0.70, 0.75]        # 4 values
 }
 
