@@ -197,8 +197,9 @@ class VWAPBounceDetector:
 class MarketDataFileHandler(FileSystemEventHandler):
     """Handles file creation events in the market data directory."""
     
-    def __init__(self, vwap_system):
+    def __init__(self, vwap_system, event_loop):
         self.vwap_system = vwap_system
+        self.event_loop = event_loop
         self.logger = logging.getLogger(__name__)
         
     def on_created(self, event):
@@ -209,7 +210,11 @@ class MarketDataFileHandler(FileSystemEventHandler):
             if '_' in filename:
                 symbol = filename.split('_')[0]
                 self.logger.debug(f"New file created for symbol {symbol}: {filename}")
-                asyncio.create_task(self.vwap_system.process_symbol_file(event.src_path, symbol))
+                # Schedule the coroutine in the main event loop from this thread
+                asyncio.run_coroutine_threadsafe(
+                    self.vwap_system.process_symbol_file(event.src_path, symbol),
+                    self.event_loop
+                )
 
 
 class VWAPBounceSystem:
@@ -251,7 +256,7 @@ class VWAPBounceSystem:
             
         # Initialize file system observer
         self.observer = Observer()
-        self.file_handler = MarketDataFileHandler(self)
+        self.file_handler = None  # Will be created in start_monitoring with event loop
         
         # Track processed files and alerts sent to avoid duplicates
         self.processed_files = set()
@@ -450,6 +455,10 @@ class VWAPBounceSystem:
         """Start monitoring for new market data files."""
         try:
             self.logger.info("Starting VWAP Bounce monitoring...")
+            
+            # Get the current event loop and create file handler
+            current_loop = asyncio.get_running_loop()
+            self.file_handler = MarketDataFileHandler(self, current_loop)
             
             # Setup file system watcher
             self.observer.schedule(
