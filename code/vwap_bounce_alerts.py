@@ -3,8 +3,11 @@ VWAP Bounce Alerts System
 
 This system monitors historical data files for VWAP bounce patterns and sends Telegram alerts.
 It watches for new CSV files in historical_data/YYYY-MM-DD/market_data/ directory,
-analyzes the last 10 1-minute candlesticks, combines them into two 5-minute candlesticks,
-and alerts when both are green, the first is within 7% above VWAP, and the second is higher.
+analyzes market data for VWAP bounces where:
+1. All candles in the previous 30 minutes are above VWAP
+2. The last 10 minutes form two consecutive 5-minute green candlesticks  
+3. The first 5-minute candle is within 7% above VWAP
+4. The second 5-minute candle is higher than the first
 
 Usage:
     python3 code/vwap_bounce_alerts.py                     # Start monitoring for current date
@@ -22,7 +25,7 @@ import pandas as pd
 import pytz
 from datetime import datetime, time as dt_time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileCreatedEvent
 
@@ -51,11 +54,12 @@ class VWAPBounceAlert:
         """Format the alert message for Telegram."""
         return f"""🟢 VWAP BOUNCE ALERT - {self.symbol}
 
-📊 **Pattern Detected**: Two consecutive 5-minute green candles
+📊 **Pattern Detected**: Two consecutive 5-minute green candles after 30min above VWAP
 ⏰ **Time**: {self.timestamp.strftime('%H:%M ET')}
 📈 **VWAP**: ${self.current_vwap:.4f}
 🎯 **Distance to VWAP**: {self.vwap_distance:.2f}%
 
+✅ **Pre-condition**: All 30 previous minutes above VWAP
 **5-Min Candle 1**: ${self.first_5min['open']:.4f} → ${self.first_5min['close']:.4f} (+{((self.first_5min['close']/self.first_5min['open']-1)*100):.2f}%)
 **5-Min Candle 2**: ${self.second_5min['open']:.4f} → ${self.second_5min['close']:.4f} (+{((self.second_5min['close']/self.second_5min['open']-1)*100):.2f}%)
 
@@ -72,7 +76,13 @@ class VWAPBounceDetector:
         
     def analyze_data(self, df: pd.DataFrame) -> Optional[VWAPBounceAlert]:
         """
-        Analyze the last 10 minutes of data for VWAP bounce pattern.
+        Analyze data for VWAP bounce pattern.
+        
+        A VWAP bounce occurs when:
+        1. All candles in the previous 30 minutes are above VWAP
+        2. The last 10 minutes form two consecutive 5-minute green candles
+        3. The first 5-minute candle is within 7% above VWAP
+        4. The second 5-minute candle is higher than the first
         
         Args:
             df: DataFrame with 1-minute candlestick data
@@ -80,16 +90,27 @@ class VWAPBounceDetector:
         Returns:
             VWAPBounceAlert if pattern detected, None otherwise
         """
-        if len(df) < 10:
-            self.logger.debug(f"Insufficient data: {len(df)} rows (need 10)")
+        if len(df) < 40:  # Need 30 min historical + 10 min current = 40 minutes total
+            self.logger.debug(f"Insufficient data: {len(df)} rows (need 40 for 30min history + 10min analysis)")
             return None
             
-        # Get the last 10 rows and sort by timestamp
-        df = df.sort_values('timestamp').tail(10).reset_index(drop=True)
+        # Get the data and sort by timestamp
+        df = df.sort_values('timestamp').reset_index(drop=True)
         
+        # Split data: last 10 minutes for analysis, previous 30 minutes for VWAP check
+        analysis_data = df.tail(10).reset_index(drop=True)  # Last 10 minutes for bounce analysis
+        history_data = df.iloc[-40:-10].reset_index(drop=True)  # 30 minutes before the analysis period
+        
+        # Check if all candles in the previous 30 minutes are above VWAP
+        vwap_above_check = self._check_all_above_vwap(history_data)
+        if not vwap_above_check:
+            self.logger.debug("Not all candles in previous 30 minutes are above VWAP")
+            return None
+        
+        # Now analyze the last 10 minutes for the bounce pattern
         # Combine into two 5-minute candlesticks
-        first_5min = self._combine_candlesticks(df.iloc[:5])
-        second_5min = self._combine_candlesticks(df.iloc[5:])
+        first_5min = self._combine_candlesticks(analysis_data.iloc[:5])
+        second_5min = self._combine_candlesticks(analysis_data.iloc[5:])
         
         # Check if both candles are green
         first_green = first_5min['close'] > first_5min['open']
@@ -107,7 +128,7 @@ class VWAPBounceDetector:
             return None
             
         # Get the most recent VWAP value
-        current_vwap = df.iloc[-1]['vwap']
+        current_vwap = analysis_data.iloc[-1]['vwap']
         
         # Check if FIRST candle is within 7% above VWAP (not either candle)
         first_distance = ((first_5min['close'] / current_vwap) - 1) * 100
@@ -122,12 +143,12 @@ class VWAPBounceDetector:
         # Use the first candle distance for reporting since it's the one within 7% of VWAP
         vwap_distance = first_distance
         
-        symbol = df.iloc[-1]['symbol']
+        symbol = analysis_data.iloc[-1]['symbol']
         # Use first candlestick timestamp plus 10 minutes (5 min first candle + 5 min second candle)
-        first_candle_time = pd.to_datetime(df.iloc[0]['timestamp'])
+        first_candle_time = pd.to_datetime(analysis_data.iloc[0]['timestamp'])
         timestamp = first_candle_time + pd.Timedelta(minutes=10)
         
-        self.logger.info(f"VWAP bounce pattern detected for {symbol}: {vwap_distance:.2f}% from VWAP")
+        self.logger.info(f"VWAP bounce pattern detected for {symbol}: {vwap_distance:.2f}% from VWAP (30min history above VWAP confirmed)")
         
         return VWAPBounceAlert(
             symbol=symbol,
@@ -137,6 +158,29 @@ class VWAPBounceDetector:
             vwap_distance=vwap_distance,
             current_vwap=current_vwap
         )
+        
+    def _check_all_above_vwap(self, df: pd.DataFrame) -> bool:
+        """
+        Check if all candles in the provided timeframe are above VWAP.
+        
+        Args:
+            df: DataFrame with 1-minute candlestick data
+            
+        Returns:
+            True if all candles have close prices above VWAP, False otherwise
+        """
+        if len(df) == 0:
+            return False
+            
+        # Check that all close prices are above their respective VWAP values
+        all_above_vwap = (df['close'] > df['vwap']).all()
+        
+        if not all_above_vwap:
+            # Log details for debugging
+            below_vwap_count = (df['close'] <= df['vwap']).sum()
+            self.logger.debug(f"Found {below_vwap_count} candles at/below VWAP in 30-minute history")
+            
+        return all_above_vwap
         
     def _combine_candlesticks(self, df_slice: pd.DataFrame) -> Dict:
         """Combine multiple 1-minute candles into a single 5-minute candle."""
@@ -384,6 +428,7 @@ class VWAPBounceSystem:
                 },
                 "total_volume": int(alert.first_5min['volume'] + alert.second_5min['volume']),
                 "detection_criteria": {
+                    "previous_30min_above_vwap": True,
                     "both_candles_green": True,
                     "within_7_percent_of_vwap": True,
                     "max_vwap_distance_threshold": 7.0
@@ -429,7 +474,6 @@ class VWAPBounceSystem:
                     if not self._is_within_trading_window():
                         et_tz = pytz.timezone('US/Eastern')
                         current_time = datetime.now(et_tz).time()
-                        end_time = dt_time.fromisoformat(config.alert_window_end)
                         
                         # If it's past 21:00 ET, stop for the day
                         if current_time > dt_time(21, 0):
