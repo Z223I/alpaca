@@ -130,7 +130,7 @@ Avg Daily Range,,,USD (5 Days)
 - [ ] Nudge
 - [ ] /commit
 - [ ] Publish the branch
-- [ ] git switch master; merge current branch and verify that all changes get merged.
+- [ ] git switch master; merge current branch and verify that all changes are merged.
 - [ ] Sync changes
 
 
