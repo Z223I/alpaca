@@ -126,12 +126,22 @@ Avg Daily Range,,,USD (5 Days)
 
 ### Spec File
 
-- [ ] VERY IMPORTANT. Think hard. Implement the instructions in specs/exit-strategy-testing.md to create code/maximize_profit.py.
+- [ ] VERY IMPORTANT. Think hard. Implement the instructions in specs/alpaca_screener.md.
 - [ ] Nudge
 - [ ] /commit
 - [ ] Publish the branch
-- [ ] git switch master; merge current branch
+- [ ] git switch master; merge current branch and verify that all changes get merged.
 - [ ] Sync changes
+
+
+# Basic screening
+  python code/alpaca_screener.py --min-price 0.75 --min-volume 1000000
+
+  # Volume surge detection
+  python code/alpaca_screener.py --volume-surge 2.0 --surge-days 5
+
+  # Export results
+  python code/alpaca_screener.py --min-volume 500000 --export-csv results.csv --export-json results.json
 
 
 
