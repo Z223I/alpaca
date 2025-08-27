@@ -8,7 +8,6 @@ Only processes alerts with green momentum indicators (🟢) for high-quality sig
 
 import json
 import logging
-import os
 import re
 import subprocess
 import sys
@@ -37,10 +36,7 @@ class TradeGenerator:
         # Trade limit configuration per account (loaded from config)
         self.trades_executed_by_account = {}  # Track trades per account: {"account_name/account_type": count}
         
-        # Session-wide trade limits (for backward compatibility with orb_alerts_trade_stocks.py)
-        self.max_trades_per_session = 5 if not test_mode else 1  # Default session limit
-        
-        self.logger.info(f"TradeGenerator initialized: test_mode={test_mode}, max_trades_per_session={self.max_trades_per_session}")
+        self.logger.info(f"TradeGenerator initialized: test_mode={test_mode}, using per-account limits only")
 
     def can_execute_trade(self, account_name: str, account_type: str, env_config) -> bool:
         """
@@ -59,28 +55,22 @@ class TradeGenerator:
         max_trades = 1 if self.test_mode else env_config.max_trades_per_day
         return current_count < max_trades
     
-    def get_remaining_trades(self, account_name: str = None, account_type: str = None, env_config=None) -> int:
+    def get_remaining_trades(self, account_name: str, account_type: str, env_config) -> int:
         """
-        Get the number of trades remaining in this session.
+        Get the number of trades remaining for a specific account.
         
         Args:
-            account_name: Name of the account (optional for backward compatibility)
-            account_type: Type of account (paper, live, cash) (optional for backward compatibility)
-            env_config: Environment configuration with max_trades_per_day (optional for backward compatibility)
+            account_name: Name of the account (required)
+            account_type: Type of account (paper, live, cash) (required)
+            env_config: Environment configuration with max_trades_per_day (required)
         
         Returns:
-            Number of trades remaining (session-wide if no params, account-specific if params provided)
+            Number of trades remaining for the specified account
         """
-        if account_name and account_type and env_config:
-            # Per-account remaining trades (original behavior)
-            account_key = f"{account_name}/{account_type}"
-            current_count = self.trades_executed_by_account.get(account_key, 0)
-            max_trades = 1 if self.test_mode else env_config.max_trades_per_day
-            return max(0, max_trades - current_count)
-        else:
-            # Session-wide remaining trades (for backward compatibility)
-            total_executed = sum(self.trades_executed_by_account.values())
-            return max(0, self.max_trades_per_session - total_executed)
+        account_key = f"{account_name}/{account_type}"
+        current_count = self.trades_executed_by_account.get(account_key, 0)
+        max_trades = 1 if self.test_mode else env_config.max_trades_per_day
+        return max(0, max_trades - current_count)
     
     def reset_trade_counter(self, account_name: str = None, account_type: str = None) -> None:
         """
@@ -709,12 +699,7 @@ class TradeGenerator:
             Filename if successful, None otherwise
         """
         try:
-            # Check session-wide trade limit before processing
-            total_executed = sum(self.trades_executed_by_account.values())
-            if total_executed >= self.max_trades_per_session:
-                symbol = superduper_alert.get('symbol', 'UNKNOWN')
-                self.logger.warning(f"🚫 Trade limit reached for {symbol}: {total_executed}/{self.max_trades_per_session} trades executed this session")
-                return None
+            # No session-wide limit check - rely only on per-account limits from config
             
             # Check if alert has green momentum indicator
             if not self.has_green_momentum_indicator(superduper_alert):
