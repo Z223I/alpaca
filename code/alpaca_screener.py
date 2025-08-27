@@ -57,8 +57,15 @@ class ScreeningCriteria:
     feed: str = "iex"  # iex, sip, or other feed names
     max_symbols: int = 3000
     
-    # Exchange filtering (NYSE and NASDAQ only for safety)
-    exchanges: Optional[List[str]] = None  # NYSE, NASDAQ only
+    # Exchange filtering (NYSE, NASDAQ, and AMEX only for safety)
+    exchanges: Optional[List[str]] = None  # NYSE, NASDAQ, AMEX only
+    
+    # Specific symbol analysis
+    specific_symbols: Optional[List[str]] = None  # Analyze specific symbols only
+    
+    # Top performers
+    top_gainers: Optional[int] = None  # Get top N gainers
+    top_losers: Optional[int] = None   # Get top N losers
 
 
 @dataclass
@@ -206,13 +213,13 @@ class AlpacaScreener:
         try:
             # Convert exchanges to uppercase and validate safety
             exchanges_upper = [ex.upper() for ex in exchanges]
-            safe_exchanges = ['NYSE', 'NASDAQ']
+            safe_exchanges = ['NYSE', 'NASDAQ', 'AMEX']
             
-            # Safety check - only allow NYSE and NASDAQ
+            # Safety check - only allow NYSE, NASDAQ, and AMEX
             for exchange in exchanges_upper:
                 if exchange not in safe_exchanges:
                     if self.verbose:
-                        print(f"Warning: Exchange {exchange} not in safe list (NYSE, NASDAQ). Skipping.")
+                        print(f"Warning: Exchange {exchange} not in safe list (NYSE, NASDAQ, AMEX). Skipping.")
                     exchanges_upper.remove(exchange)
             
             if not exchanges_upper:
@@ -540,8 +547,13 @@ class AlpacaScreener:
         if self.verbose:
             print("Starting stock screening process...")
             
-        # Get active symbols
-        symbols = self.get_active_symbols(criteria.max_symbols, criteria.exchanges)
+        # Get symbols to analyze
+        if criteria.specific_symbols:
+            symbols = criteria.specific_symbols
+            if self.verbose:
+                print(f"Analyzing specific symbols: {', '.join(symbols)}")
+        else:
+            symbols = self.get_active_symbols(criteria.max_symbols, criteria.exchanges)
         
         if not symbols:
             print("No symbols found for screening")
@@ -558,10 +570,58 @@ class AlpacaScreener:
         # Apply filters and return results
         results = self.apply_filters(stock_data, criteria)
         
+        # Apply top gainers/losers filtering if requested
+        if criteria.top_gainers or criteria.top_losers:
+            results = self._filter_top_performers(results, criteria)
+        
         end_time = time.time()
         if self.verbose:
             print(f"Screening completed in {end_time - start_time:.2f} seconds")
             
+        return results
+
+    def _filter_top_performers(self, results: List[StockResult], criteria: ScreeningCriteria) -> List[StockResult]:
+        """
+        Filter results to get top gainers or losers.
+        
+        Args:
+            results: List of screening results
+            criteria: Screening criteria containing top_gainers/top_losers
+            
+        Returns:
+            Filtered and sorted list of top performers
+        """
+        if not results:
+            return results
+            
+        if criteria.top_gainers:
+            # Sort by percent change descending (highest gains first)
+            sorted_results = sorted(results, key=lambda x: x.percent_change, reverse=True)
+            top_results = sorted_results[:criteria.top_gainers]
+            
+            if self.verbose:
+                print(f"Filtered to top {len(top_results)} gainers from {len(results)} results")
+                if top_results:
+                    print(f"Top gainer: {top_results[0].symbol} (+{top_results[0].percent_change:.2f}%)")
+                    if len(top_results) > 1:
+                        print(f"Lowest in top gainers: {top_results[-1].symbol} (+{top_results[-1].percent_change:.2f}%)")
+            
+            return top_results
+            
+        elif criteria.top_losers:
+            # Sort by percent change ascending (lowest/most negative first)
+            sorted_results = sorted(results, key=lambda x: x.percent_change, reverse=False)
+            top_results = sorted_results[:criteria.top_losers]
+            
+            if self.verbose:
+                print(f"Filtered to top {len(top_results)} losers from {len(results)} results")
+                if top_results:
+                    print(f"Top loser: {top_results[0].symbol} ({top_results[0].percent_change:.2f}%)")
+                    if len(top_results) > 1:
+                        print(f"Smallest loss in top losers: {top_results[-1].symbol} ({top_results[-1].percent_change:.2f}%)")
+            
+            return top_results
+        
         return results
 
     def export_to_csv(self, results: List[StockResult], filename: str):
@@ -664,13 +724,15 @@ def print_results(results: List[StockResult], criteria: ScreeningCriteria):
     print(f"Results found: {len(results)} stocks")
     print()
     
-    # Sort results by volume surge ratio (if applicable), then by volume
-    def sort_key(result):
-        if result.volume_surge_ratio:
-            return (result.volume_surge_detected, result.volume_surge_ratio, result.volume)
-        return (False, 0, result.volume)
-    
-    results.sort(key=sort_key, reverse=True)
+    # Sort results - if it's already top gainers/losers, preserve that order
+    # Otherwise sort by volume surge ratio (if applicable), then by volume
+    if not (criteria.top_gainers or criteria.top_losers):
+        def sort_key(result):
+            if result.volume_surge_ratio:
+                return (result.volume_surge_detected, result.volume_surge_ratio, result.volume)
+            return (False, 0, result.volume)
+        
+        results.sort(key=sort_key, reverse=True)
     
     # Print header
     header = f"{'Symbol':<8} {'Price':<8} {'Volume':<12} {'%Change':<8} {'$Volume':<12} {'Range':<8} {'Surge':<12}"
@@ -699,7 +761,9 @@ def parse_screener_args() -> argparse.Namespace:
 Examples:
   python alpaca_screener.py --min-price 0.75 --min-volume 1000000
   python alpaca_screener.py --volume-surge 2.0 --surge-days 5
-  python alpaca_screener.py --exchanges NYSE NASDAQ --min-price 1.0 --max-price 50.0
+  python alpaca_screener.py --exchanges NYSE NASDAQ AMEX --min-price 1.0 --max-price 50.0
+  python alpaca_screener.py --symbols AAPL TSLA NVDA --volume-surge 1.5 --verbose
+  python alpaca_screener.py --top-gainers 10 --min-volume 100000 --verbose
   python alpaca_screener.py --min-volume 500000 --export-csv results.csv --export-json results.json
         """
     )
@@ -725,8 +789,15 @@ Examples:
     parser.add_argument('--max-symbols', type=int, default=3000, help='Maximum symbols to analyze (default: 3000)')
     parser.add_argument('--feed', choices=['iex', 'sip', 'boats'], default='iex', help='Data feed to use (default: iex)')
     
-    # Exchange filtering (NYSE and NASDAQ only for safety)
-    parser.add_argument('--exchanges', type=str, nargs='+', choices=['NYSE', 'NASDAQ'], help='Filter by stock exchanges (NYSE, NASDAQ only)')
+    # Exchange filtering (NYSE, NASDAQ, and AMEX for safety)
+    parser.add_argument('--exchanges', type=str, nargs='+', choices=['NYSE', 'NASDAQ', 'AMEX'], help='Filter by stock exchanges (NYSE, NASDAQ, AMEX only)')
+    
+    # Specific symbol analysis
+    parser.add_argument('--symbols', type=str, nargs='+', help='Analyze specific symbols (e.g., AAPL MSFT TSLA)')
+    
+    # Top performers
+    parser.add_argument('--top-gainers', type=int, help='Get top N gainers (e.g., --top-gainers 10)')
+    parser.add_argument('--top-losers', type=int, help='Get top N losers (e.g., --top-losers 10)')
     
     # Output options  
     parser.add_argument('--export-csv', help='Export results to CSV file')
@@ -759,7 +830,10 @@ def main():
         sma_periods=args.sma_periods or [],
         feed=args.feed,
         max_symbols=args.max_symbols,
-        exchanges=args.exchanges
+        exchanges=args.exchanges,
+        specific_symbols=[symbol.upper() for symbol in args.symbols] if args.symbols else None,
+        top_gainers=args.top_gainers,
+        top_losers=args.top_losers
     )
     
     # Initialize screener

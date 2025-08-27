@@ -1,0 +1,41 @@
+{
+  "scan_metadata": {
+    "timestamp": "2025-08-27T16:28:42.046892",
+    "total_symbols_scanned": 3000,
+    "results_count": 1,
+    "account": "Bruce",
+    "environment": "paper",
+    "criteria": {
+      "min_price": null,
+      "max_price": null,
+      "min_volume": null,
+      "min_avg_volume_5d": null,
+      "min_percent_change": null,
+      "max_percent_change": null,
+      "volume_surge_multiplier": null,
+      "volume_surge_days": null,
+      "min_trades": null
+    }
+  },
+  "results": [
+    {
+      "symbol": "AAPL",
+      "price": 230.5,
+      "volume": 952676,
+      "percent_change": 0.5233318796336627,
+      "dollar_volume": 219591818.0,
+      "day_range": 2.5999999999999943,
+      "timestamp": "2025-08-27T00:00:00-04:00",
+      "trades": null,
+      "avg_volume_5d": 936826.6,
+      "avg_range_5d": 3.3460000000000036,
+      "volume_surge_detected": false,
+      "volume_surge_ratio": null,
+      "market_cap": null,
+      "sma_values": {
+        "20": 223.038,
+        "50": 217.7755405405405
+      }
+    }
+  ]
+}

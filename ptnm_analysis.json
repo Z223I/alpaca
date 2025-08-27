@@ -1,0 +1,38 @@
+{
+  "scan_metadata": {
+    "timestamp": "2025-08-27T16:31:27.281150",
+    "total_symbols_scanned": 3000,
+    "results_count": 1,
+    "account": "Bruce",
+    "environment": "paper",
+    "criteria": {
+      "min_price": null,
+      "max_price": null,
+      "min_volume": null,
+      "min_avg_volume_5d": null,
+      "min_percent_change": null,
+      "max_percent_change": null,
+      "volume_surge_multiplier": null,
+      "volume_surge_days": null,
+      "min_trades": null
+    }
+  },
+  "results": [
+    {
+      "symbol": "PTNM",
+      "price": 1.66,
+      "volume": 1467544,
+      "percent_change": 67.67676767676767,
+      "dollar_volume": 2436123.04,
+      "day_range": 0.6600000000000001,
+      "timestamp": "2025-08-27T00:00:00-04:00",
+      "trades": null,
+      "avg_volume_5d": 293708.8,
+      "avg_range_5d": 0.13200000000000003,
+      "volume_surge_detected": false,
+      "volume_surge_ratio": null,
+      "market_cap": null,
+      "sma_values": {}
+    }
+  ]
+}

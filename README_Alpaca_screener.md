@@ -8,7 +8,7 @@ A comprehensive stock screener built with the Alpaca Trading API v2, featuring v
 - **Price Filtering**: Min/max price ranges
 - **Volume Analysis**: Daily volume and 5-day average volume filtering
 - **Percent Change**: Filter by daily price movement
-- **Exchange Filtering**: NYSE and NASDAQ only (for safety)
+- **Exchange Filtering**: NYSE, NASDAQ, and AMEX only (for safety)
 - **Technical Indicators**: Simple Moving Averages (SMA)
 
 ### 📊 **Volume Surge Detection**
@@ -17,7 +17,7 @@ A comprehensive stock screener built with the Alpaca Trading API v2, featuring v
 - **Real-time Analysis**: Compare current trading activity to historical patterns
 
 ### 🏛️ **Exchange Support**
-- **Safe Exchanges Only**: NYSE and NASDAQ filtering
+- **Safe Exchanges Only**: NYSE, NASDAQ, and AMEX filtering
 - **Asset Discovery**: Automatic discovery of tradable symbols by exchange
 - **Compliance Focus**: Avoids risky or illiquid exchanges
 
@@ -40,7 +40,7 @@ A comprehensive stock screener built with the Alpaca Trading API v2, featuring v
    source ~/miniconda3/etc/profile.d/conda.sh && conda activate alpaca
    ```
 
-2. **API Credentials**: 
+2. **API Credentials**:
    - Credentials are managed via the existing `code/alpaca_config.py` configuration
    - Supports multiple accounts (Bruce, Dale Wilson, Janice)
    - Supports multiple environments (paper, live, cash)
@@ -56,8 +56,16 @@ python code/alpaca_screener.py --min-price 0.75 --min-volume 1000000
 # Volume surge detection (2x volume over 5 days)
 python code/alpaca_screener.py --volume-surge 2.0 --surge-days 5
 
-# Exchange filtering (NYSE and NASDAQ only)
-python code/alpaca_screener.py --exchanges NYSE NASDAQ --min-price 1.0 --max-price 50.0
+# Exchange filtering (NYSE, NASDAQ, and AMEX)
+python code/alpaca_screener.py --exchanges NYSE NASDAQ AMEX --min-price 1.0 --max-price 50.0
+python code/alpaca_screener.py --exchanges AMEX --min-price 1.0 --max-price 10.0
+
+# Analyze specific symbols
+python code/alpaca_screener.py --symbols AAPL TSLA NVDA --volume-surge 1.5 --verbose
+
+# Get top gainers and losers
+python code/alpaca_screener.py --top-gainers 10 --min-volume 100000 --verbose
+python code/alpaca_screener.py --top-losers 5 --exchanges NYSE NASDAQ --verbose
 
 # Export results
 python code/alpaca_screener.py --min-volume 500000 --export-csv results.csv --export-json results.json
@@ -68,7 +76,7 @@ python code/alpaca_screener.py --min-volume 500000 --export-csv results.csv --ex
 ```bash
 # Complex screening with multiple criteria
 python code/alpaca_screener.py \
-  --exchanges NYSE NASDAQ \
+  --exchanges NYSE NASDAQ AMEX \
   --min-price 5.0 \
   --max-price 200.0 \
   --min-volume 500000 \
@@ -112,7 +120,14 @@ python code/alpaca_screener.py \
 - `--surge-days`: Days for volume surge calculation (default: 5)
 
 ### Exchange Filtering
-- `--exchanges`: Filter by exchanges (NYSE, NASDAQ only)
+- `--exchanges`: Filter by exchanges (NYSE, NASDAQ, AMEX only)
+
+### Specific Symbol Analysis
+- `--symbols`: Analyze specific symbols only (e.g., AAPL MSFT TSLA)
+
+### Top Performers
+- `--top-gainers`: Get top N gainers sorted by percent change (e.g., --top-gainers 10)
+- `--top-losers`: Get top N losers sorted by percent change (e.g., --top-losers 5)
 
 ### Technical Analysis
 - `--sma-periods`: SMA periods to calculate (e.g., 20 50 200)
@@ -135,11 +150,11 @@ Alpaca Stock Screener Results
 Scan completed at: 2025-08-27 15:34:31
 Results found: 4 stocks
 
-Symbol   Price    Volume       %Change  $Volume      Range    Surge       
+Symbol   Price    Volume       %Change  $Volume      Range    Surge
 --------------------------------------------------------------------------
-AAPL     $230.50  952,464       +0.52% $219.5M      $2.60    No          
-GOOGL    $207.42  778,382       +0.12% $161.5M      $3.19    No          
-MSFT     $506.69  568,567       +0.92% $288.1M      $7.23    No          
+AAPL     $230.50  952,464       +0.52% $219.5M      $2.60    No
+GOOGL    $207.42  778,382       +0.12% $161.5M      $3.19    No
+MSFT     $506.69  568,567       +0.92% $288.1M      $7.23    No
 NVDA     $181.57  2.6M          -0.07% $474.9M      $3.38    Yes (3.2x)
 ```
 
@@ -208,7 +223,7 @@ volume_surge_detected = surge_ratio >= N_multiplier
 ## Safety & Compliance
 
 ### Exchange Restrictions
-- **NYSE and NASDAQ Only**: Prevents trading on risky or illiquid exchanges
+- **NYSE, NASDAQ, and AMEX Only**: Prevents trading on risky or illiquid exchanges
 - **Validation**: Command line and runtime validation
 - **Tradable Assets**: Filters for `tradable=True` and `status='active'`
 
@@ -238,7 +253,7 @@ python code/alpaca_screener.py \
 python code/alpaca_screener.py \
   --volume-surge 2.5 \
   --surge-days 5 \
-  --exchanges NYSE NASDAQ \
+  --exchanges NYSE NASDAQ AMEX \
   --verbose
 ```
 
@@ -260,11 +275,53 @@ python code/alpaca_screener.py \
   --export-csv technical_screen.csv
 ```
 
+### 5. **Specific Symbol Analysis**
+```bash
+# Analyze single symbol with volume surge detection
+python code/alpaca_screener.py \
+  --symbols AAPL \
+  --volume-surge 2.0 \
+  --surge-days 5 \
+  --sma-periods 20 50 200 \
+  --export-json aapl_analysis.json
+
+# Compare multiple symbols
+python code/alpaca_screener.py \
+  --symbols AAPL MSFT GOOGL TSLA \
+  --verbose
+```
+
+### 6. **Top Performers Scanning**
+```bash
+# Get top 10 gainers with decent volume
+python code/alpaca_screener.py \
+  --top-gainers 10 \
+  --min-volume 100000 \
+  --exchanges NYSE NASDAQ \
+  --export-json top_gainers.json
+
+# Get top 5 losers from all exchanges
+python code/alpaca_screener.py \
+  --top-losers 5 \
+  --min-price 5.0 \
+  --verbose
+
+# Combine with other filters for quality movers
+python code/alpaca_screener.py \
+  --top-gainers 20 \
+  --min-volume 500000 \
+  --volume-surge 1.5 \
+  --export-csv quality_gainers.csv
+
+# Comprehensive NASDAQ scan (covers all ~5,000 NASDAQ symbols)
+python code/alpaca_screener.py --top-gainers 50 --exchanges NASDAQ --max-symbols 6000 --min-volume 10000 --verbose
+```
+
 ## Performance Optimization
 
 ### Efficient Data Collection
 - **Batch Processing**: Processes symbols in configurable batches
-- **Rate Limiting**: Stays within API limits automatically  
+- **Rate Limiting**: Stays within API limits automatically
 - **Parallel Processing**: Concurrent API requests where possible
 
 ### Caching Strategy
