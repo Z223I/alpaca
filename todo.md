@@ -95,7 +95,7 @@ Doc in phone notes close all positions and cancel all orders
 
 ## Scanner
 
-- [ ] VERY IMPORTANT, think hard: Review the following CSV info. It is from a stock screen filter on my computer.  Review Alpaca Trading API version 2 for stock screening. Create specs/alpaca_screener.md with all the info necessary to write a stock screener. also add the ability to screen stocks for which the volume is up N times versus the last M days.
+- [X] VERY IMPORTANT, think hard: Review the following CSV info. It is from a stock screen filter on my computer.  Review Alpaca Trading API version 2 for stock screening. Create specs/alpaca_screener.md with all the info necessary to write a stock screener. also add the ability to screen stocks for which the volume is up N times versus the last M days.
 ```text
 Metric,From,To,Unit
 Price,0.75,,USD
@@ -115,23 +115,23 @@ Avg Daily Range,,,USD (5 Days)
 
 ### Config
 
-- [ ] claude --dangerously-skip-permissions
-- [ ] /login
-- [ ] /commit
-- [ ] Sync changes
-- [ ] /clear
-- [ ] git switch -c feature/alpaca-scanner
-- [ ] /clear
-- [ ] /read...
+- [X] claude --dangerously-skip-permissions
+- [X] /login
+- [X] /commit
+- [X] Sync changes
+- [X] /clear
+- [X] git switch -c feature/alpaca-scanner
+- [X] /clear
+- [X] /read...
 
 ### Spec File
 
-- [ ] VERY IMPORTANT. Think hard. Implement the instructions in specs/alpaca_screener.md.
-- [ ] Nudge
-- [ ] /commit
-- [ ] Publish the branch
-- [ ] git switch master; merge current branch and verify that all changes are merged.
-- [ ] Sync changes
+- [X] VERY IMPORTANT. Think hard. Implement the instructions in specs/alpaca_screener.md.
+- [X] Nudge
+- [X] /commit
+- [X] Publish the branch
+- [X] git switch master; merge current branch and verify that all changes are merged.
+- [X] Sync changes
 
 
 # Basic screening
