@@ -245,6 +245,23 @@ class MomentumThresholds:
         else:
             return 'urgent'
 
+    def get_urgency_level_dual(self, momentum: float, momentum_short: float) -> str:
+        """
+        Get urgency level for Telegram notifications requiring BOTH momentum indicators to be green.
+
+        Args:
+            momentum: Regular momentum value to evaluate
+            momentum_short: Short-term momentum value to evaluate
+
+        Returns:
+            'filtered' - If either momentum is red/yellow, don't send to Telegram
+            'urgent' - Only if BOTH momentums are green, urgent Telegram notification
+        """
+        if momentum < self.green_threshold or momentum_short < self.green_threshold:
+            return 'filtered'
+        else:
+            return 'urgent'
+
 
 @dataclass
 class PriceMomentumConfig:

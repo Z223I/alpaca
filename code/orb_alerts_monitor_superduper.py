@@ -4,6 +4,7 @@ ORB Superduper Alerts Monitor - Advanced Alert Generation System
 This system monitors the super_alerts directory for bullish super alerts and creates 
 superduper alerts when advanced trend analysis criteria are met. It analyzes price 
 movement patterns, momentum, and consolidation to identify the highest quality alerts.
+Requires BOTH green momentum AND green momentum short indicators for Telegram delivery.
 
 Usage:
     python3 code/orb_alerts_monitor_superduper.py                           # Monitor current date super alerts
@@ -227,15 +228,26 @@ class ORBSuperduperAlertMonitor:
                         # Determine urgency based on momentum color thresholds
                         urgency_level = self._determine_urgency(trend_type, trend_strength, analysis_data)
                         momentum = abs(analysis_data.get('price_momentum', 0))
+                        momentum_short = abs(analysis_data.get('price_momentum_short', 0))
 
-                        self.logger.info(f"📊 Superduper analysis: {trend_type.upper()} trend, strength {trend_strength:.2f}, momentum {momentum:.4f} ({urgency_level.upper()})")
+                        self.logger.info(f"📊 Superduper analysis: {trend_type.upper()} trend, strength {trend_strength:.2f}, "
+                                          f"momentum {momentum:.4f}, momentum_short {momentum_short:.4f} ({urgency_level.upper()})")
 
-                        # Filter out red and yellow momentum alerts
+                        # Filter out alerts where either momentum is red/yellow
                         if urgency_level == 'filtered':
                             green_threshold = self.momentum_thresholds.green_threshold
-                            self.logger.info(f"🚫 Telegram superduper alert filtered (momentum < {green_threshold}): {symbol}")
+                            if momentum < green_threshold and momentum_short < green_threshold:
+                                self.logger.info(f"🚫 Telegram superduper alert filtered "
+                                                f"(both momentum {momentum:.4f} & "
+                                                f"momentum_short {momentum_short:.4f} < {green_threshold}): {symbol}")
+                            elif momentum < green_threshold:
+                                self.logger.info(f"🚫 Telegram superduper alert filtered "
+                                                f"(momentum {momentum:.4f} < {green_threshold}): {symbol}")
+                            else:
+                                self.logger.info(f"🚫 Telegram superduper alert filtered "
+                                                f"(momentum_short {momentum_short:.4f} < {green_threshold}): {symbol}")
                         else:
-                            # Only green momentum alerts are sent (urgent)
+                            # Only alerts with BOTH green momentum and green momentum short are sent (urgent)
                             is_urgent = (urgency_level == 'urgent')
 
                             file_path = self.superduper_alerts_dir / filename
@@ -266,13 +278,15 @@ class ORBSuperduperAlertMonitor:
     def _determine_urgency(self, trend_type: str, trend_strength: float, analysis_data: Dict) -> str:
         """
         Determine alert priority based on centralized momentum thresholds.
+        Requires BOTH regular momentum AND momentum short to be green.
 
         Returns:
-            'filtered' - Red and yellow momentum, don't send to Telegram
-            'urgent' - Green momentum, urgent Telegram notification
+            'filtered' - If either momentum is red/yellow, don't send to Telegram
+            'urgent' - Only if BOTH momentums are green, urgent Telegram notification
         """
         momentum = abs(analysis_data.get('price_momentum', 0))
-        return self.momentum_thresholds.get_urgency_level(momentum)
+        momentum_short = abs(analysis_data.get('price_momentum_short', 0))
+        return self.momentum_thresholds.get_urgency_level_dual(momentum, momentum_short)
 
     async def _scan_existing_super_alerts(self) -> None:
         """Scan existing super alert files on startup."""
