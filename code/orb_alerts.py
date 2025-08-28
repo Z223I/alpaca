@@ -3,6 +3,7 @@ ORB Trading Alerts System - Main Entry Point
 
 This is the main entry point for the ORB (Opening Range Breakout) trading alerts system.
 Based on PCA analysis showing 82.31% variance explained by ORB patterns.
+Includes VWAP filtering: Only alerts where current_price >= VWAP are processed.
 
 Usage:
     python3 code/orb_alerts.py                      # Start monitoring all symbols (SIP feed)
@@ -299,6 +300,11 @@ class ORBAlertSystem:
         Args:
             alert: Generated ORB alert
         """
+        # VWAP filtering: Only process alerts where price >= VWAP
+        if not self._passes_vwap_filter(alert):
+            self.logger.info(f"Alert filtered out: {alert.symbol} price ${alert.current_price:.2f} < VWAP - rejected")
+            return
+
         # Save alert to historical data
         self._save_alert_data(alert)
 
@@ -308,6 +314,45 @@ class ORBAlertSystem:
         else:
             # Alert is already printed by the engine
             pass
+
+    def _passes_vwap_filter(self, alert: ORBAlert) -> bool:
+        """
+        Check if alert passes VWAP filtering (price >= VWAP).
+
+        Args:
+            alert: ORB alert to check
+
+        Returns:
+            True if alert passes VWAP filter (price >= VWAP), False otherwise
+        """
+        try:
+            # Get latest market data for the symbol
+            symbol_data = self.alert_engine.data_buffer.get_symbol_data(alert.symbol)
+            
+            if not symbol_data or len(symbol_data) == 0:
+                self.logger.warning(f"No market data available for VWAP filter check: {alert.symbol}")
+                return True  # Allow alert through if no VWAP data available
+            
+            # Get the most recent market data point
+            latest_data = symbol_data[-1]
+            current_vwap = latest_data.vwap
+            current_price = alert.current_price
+            
+            # Filter: Only allow alerts where price >= VWAP
+            passes_filter = current_price >= current_vwap
+            
+            if passes_filter:
+                self.logger.debug(f"VWAP filter PASSED: {alert.symbol} price ${current_price:.2f} >= "
+                                  f"VWAP ${current_vwap:.2f}")
+            else:
+                self.logger.info(f"VWAP filter FAILED: {alert.symbol} price ${current_price:.2f} < "
+                                 f"VWAP ${current_vwap:.2f}")
+            
+            return passes_filter
+            
+        except Exception as e:
+            self.logger.error(f"Error in VWAP filter for {alert.symbol}: {e}")
+            return True  # Allow alert through if error occurs
 
     def _save_alert_data(self, alert: ORBAlert) -> None:
         """Save alert data to historical files."""
