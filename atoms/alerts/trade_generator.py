@@ -2,8 +2,8 @@
 Trade Generator - Executes Automated Trades Based on Superduper Alerts
 
 This atom handles the execution of trades based on superduper alerts by creating
-trade records and executing buy-market-trailing-sell-take-profit-percent orders through alpaca.py for configured accounts.
-Only processes alerts with green momentum indicators (🟢) for high-quality signals.
+trade records and executing buy-market-trailing-sell-take-profit-percent orders through alpaca.py.
+Only processes alerts with BOTH green momentum indicators (🟢) AND green momentum short indicators (🟢).
 """
 
 import json
@@ -19,7 +19,7 @@ import pytz
 
 
 class TradeGenerator:
-    """Generates trades from superduper alerts with green momentum indicators."""
+    """Generates trades from superduper alerts with BOTH green momentum and green momentum short indicators."""
 
     def __init__(self, trades_dir: Path, test_mode: bool = False):
         """
@@ -166,30 +166,41 @@ class TradeGenerator:
 
     def has_green_momentum_indicator(self, superduper_alert: Dict[str, Any]) -> bool:
         """
-        Check if a superduper alert contains green momentum indicator.
+        Check if a superduper alert contains green momentum indicator AND green momentum short indicator.
 
         Args:
             superduper_alert: Superduper alert data dictionary
 
         Returns:
-            True if alert has green momentum emoji (🟢), False otherwise
+            True if alert has BOTH green momentum emoji (🟢) AND green momentum short emoji (🟢)
         """
         try:
             alert_message = superduper_alert.get('alert_message', '')
 
             # Check for green momentum emoji in the alert message
-            has_green = '🟢' in alert_message
+            has_green_momentum = 'Momentum: 🟢' in alert_message
+            
+            # Check for green momentum short emoji in the alert message
+            has_green_momentum_short = 'Momentum Short: 🟢' in alert_message
 
-            if has_green:
-                self.logger.debug(f"Alert for {superduper_alert.get('symbol', 'UNKNOWN')} has GREEN momentum indicator")
+            # Both indicators must be green
+            has_both_green = has_green_momentum and has_green_momentum_short
+
+            if has_both_green:
+                symbol = superduper_alert.get('symbol', 'UNKNOWN')
+                self.logger.debug(f"Alert for {symbol} has BOTH GREEN momentum and GREEN momentum short indicators")
             else:
                 symbol = superduper_alert.get('symbol', 'UNKNOWN')
-                self.logger.debug(f"Alert for {symbol} does NOT have green momentum indicator")
+                if not has_green_momentum:
+                    self.logger.debug(f"Alert for {symbol} does NOT have green momentum indicator")
+                if not has_green_momentum_short:
+                    self.logger.debug(f"Alert for {symbol} does NOT have green momentum short indicator")
+                self.logger.debug(f"Alert for {symbol} rejected - requires BOTH green momentum indicators")
 
-            return has_green
+            return has_both_green
 
         except Exception as e:
-            self.logger.error(f"Error checking green indicator: {e}")
+            self.logger.error(f"Error checking green indicators: {e}")
             return False
 
     def load_account_config(self) -> Optional[Any]:
@@ -821,6 +832,7 @@ def main():
                           "• Entry Signal: $16.41 ✅\\n• Current Price: $25.02\\n• Resistance Target: $17.15\\n"
                           "• Penetration: **100.0%** into range\\n\\n📈 **Trend Analysis (30m):**\\n"
                           "• Price Movement: **+20.28%**\\n• Momentum: 🟢 **0.8451%/min**\\n"
+                          "• Momentum Short: 🟢 **0.9123%/min**\\n"
                           "• Penetration Increase: **+0.0%**\\n• Pattern: **Accelerating Breakout** 🚀\\n\\n"
                           "⚡ **Alert Level:** HIGH\\n⚠️ **Risk Level:** LOW\\n\\n🎯 **Action Zones:**\\n"
                           "• Watch for continuation above $25.02\\n• Watch for major resistance\\n"
