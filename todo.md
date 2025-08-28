@@ -97,12 +97,17 @@ Doc in phone notes close all positions and cancel all orders
 
 - [ ] VERY IMPORTANT.  Update lsdkfj skdj: Daily trade counts need to be saved to a dated file if the script shuts down during market hours and then restored if restarted during market hours.
 
+## BAM
+
+- [ ] lskdjf
+
 ## Do not send on yellow or red momentum short
+
+- [X] Do not send on yellow or red momentum short
 
 ## Major Oops
 
-- [ ] Filter sent superduper alerts on VWAP.
-
+- [X] Filter sent superduper alerts on VWAP.
 
 
 ## Scanner
