@@ -101,6 +101,13 @@ Doc in phone notes close all positions and cancel all orders
 
 - [ ] lskdjf
 
+## Surge
+
+- [ ] Incoporate surge detection in daily routine.
+
+Find photo clicker
+TCM
+
 ## Do not send on yellow or red momentum short
 
 - [X] Do not send on yellow or red momentum short
@@ -910,6 +917,9 @@ This stock rocketed.
 
         python code/alpaca.py --buy-market-trailing-sell-take-profit-percent --symbol VTAK --take-profit-percent 5 --submit
         57chevy --buy-market-trailing-sell-take-profit-percent --symbol AAPL --take-profit-percent 10
+
+        python alpaca_screener.py --volume-surge 2.0 --surge-days 5 --verbose
+        python code/alpaca_screener.py  --account-name Bruce --account live --exchanges NASDAQ --max-symbols 6000 --volume-surge 2.0 --surge-days 5 --export-csv surge_2025-08-28.csv --verbose
 
         ```
 
