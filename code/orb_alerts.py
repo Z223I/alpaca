@@ -334,8 +334,8 @@ class ORBAlertSystem:
                 return True  # Allow alert through if no VWAP data available
             
             # Get the most recent market data point
-            latest_data = symbol_data[-1]
-            current_vwap = latest_data.vwap
+            latest_data = symbol_data.iloc[-1]
+            current_vwap = latest_data['vwap']
             current_price = alert.current_price
             
             # Filter: Only allow alerts where price >= VWAP

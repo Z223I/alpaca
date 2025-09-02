@@ -444,6 +444,27 @@ class TradeGenerator:
 
             # Build the alpaca.py command
             alpaca_script = Path(__file__).parent.parent.parent / "code" / "alpaca.py"
+            
+            # For retry attempts, check if position already exists to prevent duplicate buys
+            if attempt_number > 1:
+                # Check current positions first to avoid duplicate orders
+                check_cmd = [
+                    sys.executable,
+                    str(alpaca_script),
+                    "--account-name", account_name,
+                    "--account", account_type
+                ]
+                try:
+                    check_result = subprocess.run(check_cmd, capture_output=True, text=True, timeout=30)
+                    if symbol in check_result.stdout and "Qty" in check_result.stdout:
+                        # Position already exists, don't retry
+                        self.logger.warning(f"Retry {attempt_number} cancelled: {symbol} position already exists in {account_name}/{account_type}")
+                        trade_record['execution_status']['completed'] = True
+                        trade_record['execution_status']['success'] = "yes"  # Mark as success since position exists
+                        trade_record['execution_status']['reason'] = f"Position already exists from previous attempt (retry {attempt_number})"
+                        return trade_record
+                except Exception as e:
+                    self.logger.warning(f"Could not check positions for retry {attempt_number}: {e}")
 
             cmd = [
                 sys.executable,
@@ -492,8 +513,14 @@ class TradeGenerator:
                 self.logger.info(f"Dry run trade executed for {symbol} (unexpected - should be actual trade)")
             else:
                 trade_record['execution_status']['dry_run_executed'] = False
-                # Success based on return code and output content
-                success = result.returncode == 0 and ("error" not in result.stdout.lower() and "failed" not in result.stdout.lower())
+                # Success based on return code and POSITIVE success indicators (not absence of failures)
+                success_indicators = [
+                    "Market buy order submitted successfully",
+                    "Buy order filled:",
+                    "Order reached terminal state: filled"
+                ]
+                has_success_indicator = any(indicator in result.stdout for indicator in success_indicators)
+                success = result.returncode == 0 and has_success_indicator
                 trade_record['execution_status']['success'] = "yes" if success else "no"
                 
                 if success:
@@ -773,13 +800,16 @@ class TradeGenerator:
                         # Display trade execution
                         self._display_trade_execution(trade_record, filename)
 
-                        # Increment trade counter for this specific account
+                        # Only increment trade counter for this account if trade actually succeeded
                         account_key = f"{account_name}/{account_type}"
-                        self.trades_executed_by_account[account_key] = self.trades_executed_by_account.get(account_key, 0) + 1
-                        remaining = self.get_remaining_trades(account_name, account_type, env_config)
-                        max_trades = 1 if self.test_mode else env_config.max_trades_per_day
-                        current_count = self.trades_executed_by_account[account_key]
-                        self.logger.info(f"Trade counter for {account_key}: {current_count}/{max_trades} (remaining: {remaining})")
+                        if trade_record['execution_status']['success'] == "yes":
+                            self.trades_executed_by_account[account_key] = self.trades_executed_by_account.get(account_key, 0) + 1
+                            remaining = self.get_remaining_trades(account_name, account_type, env_config)
+                            max_trades = 1 if self.test_mode else env_config.max_trades_per_day
+                            current_count = self.trades_executed_by_account[account_key]
+                            self.logger.info(f"Trade counter for {account_key}: {current_count}/{max_trades} (remaining: {remaining})")
+                        else:
+                            self.logger.warning(f"Trade failed for {account_key}, counter not incremented: {trade_record['execution_status']['reason']}")
 
                         # Track all executed trades
                         executed_trades.append(filename)
