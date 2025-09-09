@@ -477,6 +477,10 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
         filepath = os.path.join(date_specific_output_dir, filename)
         plt.savefig(filepath, dpi=300, bbox_inches='tight')
 
+        # Generate alert log file if alerts were provided
+        if alerts:
+            _generate_alerts_log(alerts, date_specific_output_dir, symbol, chart_date_obj)
+
         # Close the plot to free memory
         plt.close(fig)
 
@@ -485,4 +489,106 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
 
     except Exception as e:
         print(f"Error creating chart for {symbol}: {e}")
+        return False
+
+
+def _generate_alerts_log(alerts: List, output_dir: str, symbol: str, chart_date) -> bool:
+    """
+    Generate a log file with detailed information about sent superduper alerts.
+    
+    Args:
+        alerts: List of alert dictionaries
+        output_dir: Directory to save the log file
+        symbol: Stock symbol for this chart
+        chart_date: Date object for the chart
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        # Create log filename
+        log_filename = "sent_superduper_alerts.log"
+        log_filepath = os.path.join(output_dir, log_filename)
+        
+        # Filter alerts for this symbol only
+        symbol_alerts = [alert for alert in alerts if alert.get('symbol', '').upper() == symbol.upper()]
+        
+        if not symbol_alerts:
+            return True  # No alerts for this symbol, nothing to log
+            
+        # Check if log file exists to determine if we need to write header
+        file_exists = os.path.exists(log_filepath)
+        
+        # Open log file in append mode
+        with open(log_filepath, 'a') as log_file:
+            # Write header if this is a new file
+            if not file_exists:
+                log_file.write(f"# Sent Superduper Alerts Log - {chart_date.strftime('%Y-%m-%d')}\n")
+                log_file.write(f"# Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                log_file.write("# Format: TIMESTAMP | SYMBOL | TYPE | LEVEL | MACD_SCORE | PRICE | DETAILS\n")
+                log_file.write("# " + "="*80 + "\n\n")
+            
+            # Write section header for this symbol
+            log_file.write(f"## {symbol} Alerts ({len(symbol_alerts)} total)\n")
+            log_file.write("-" * 40 + "\n")
+            
+            # Sort alerts by timestamp
+            sorted_alerts = sorted(symbol_alerts, 
+                                   key=lambda x: x.get('timestamp_dt', datetime.min.replace(tzinfo=pytz.UTC)))
+            
+            # Write each alert
+            for alert in sorted_alerts:
+                timestamp = alert.get('timestamp_dt')
+                alert_type = alert.get('alert_type', 'unknown')
+                alert_level = alert.get('alert_level', 'unknown')
+                
+                # Format timestamp
+                if timestamp:
+                    timestamp_str = timestamp.strftime('%H:%M:%S %Z')
+                else:
+                    timestamp_str = 'unknown'
+                
+                # Get MACD score information
+                macd_score = alert.get('macd_score', {})
+                if isinstance(macd_score, dict):
+                    macd_color = macd_score.get('color', 'unknown')
+                    macd_details = f"{macd_color}"
+                elif isinstance(macd_score, str):
+                    macd_details = macd_score
+                else:
+                    macd_details = 'unknown'
+                
+                # Get price information if available
+                price_info = ""
+                if 'current_price' in alert:
+                    price_info = f"${alert['current_price']:.2f}"
+                elif 'price' in alert:
+                    price_info = f"${alert['price']:.2f}"
+                
+                # Get ORB levels if available
+                orb_info = ""
+                if 'orb_high' in alert and 'orb_low' in alert:
+                    orb_info = f" | ORB: ${alert['orb_high']:.2f}-${alert['orb_low']:.2f}"
+                
+                # Write alert line
+                log_line = f"{timestamp_str} | {symbol} | {alert_type} | {alert_level} | {macd_details} | {price_info}{orb_info}\n"
+                log_file.write(log_line)
+                
+                # Add additional details if available
+                if 'alert_message' in alert:
+                    log_file.write(f"    Message: {alert['alert_message']}\n")
+                if 'volume' in alert:
+                    log_file.write(f"    Volume: {alert['volume']:,}\n")
+                if 'reason' in alert:
+                    log_file.write(f"    Reason: {alert['reason']}\n")
+                
+                log_file.write("\n")
+            
+            log_file.write("\n")
+        
+        print(f"Alert log updated: {log_filepath} ({len(symbol_alerts)} alerts for {symbol})")
+        return True
+        
+    except Exception as e:
+        print(f"Error generating alerts log for {symbol}: {e}")
         return False
