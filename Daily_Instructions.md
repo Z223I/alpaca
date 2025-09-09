@@ -3,7 +3,7 @@
 Always running
 
 ```bash
-~/miniconda3/envs/alpaca/bin/python molecules/telegram_polling_watchdog.py
+python molecules/telegram_polling_watchdog.py
 ```
 
 The watchdog automatically starts and monitors the telegram polling service. It will restart the service if errors are detected and creates timestamped logs in the logs/ directory.

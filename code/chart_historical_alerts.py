@@ -76,21 +76,24 @@ class HistoricalAlertCharter:
     def get_unique_symbol_date_combinations(self):
         """Get unique symbol/date combinations from all alert files."""
         alert_files = self.find_alert_files()
-        combinations = set()
+        combinations = defaultdict(set)  # date -> set of symbols
         
         for alert_file in alert_files:
             symbol, date = self.extract_symbol_and_date(alert_file)
             if symbol and date:
-                combinations.add((symbol, date))
+                combinations[date].add(symbol)
         
-        # Sort by date, then by symbol
-        sorted_combinations = sorted(combinations, key=lambda x: (x[1], x[0]))
+        # Convert to sorted list of tuples
+        sorted_combinations = []
+        for date in sorted(combinations.keys()):
+            for symbol in sorted(combinations[date]):
+                sorted_combinations.append((symbol, date))
         
         print(f"📊 Found {len(sorted_combinations)} unique symbol/date combinations:")
         for symbol, date in sorted_combinations:
             print(f"  • {symbol} on {date}")
         
-        return sorted_combinations
+        return sorted_combinations, combinations
     
     def generate_chart(self, symbol, date):
         """Generate chart using alpaca.py --plot."""
@@ -141,9 +144,36 @@ class HistoricalAlertCharter:
             print(f"⚠️  Chart not found at: {chart_path}")
             return False
     
+    def create_sent_alerts_log(self, date, symbols_with_charts):
+        """Create sent_superduper_alerts.log file for a specific date."""
+        date_formatted = date.replace('-', '')
+        plots_dir = Path(f"plots/{date_formatted}")
+        
+        # Create plots directory if it doesn't exist
+        plots_dir.mkdir(parents=True, exist_ok=True)
+        
+        log_path = plots_dir / "sent_superduper_alerts.log"
+        
+        # Write log file with symbols that have charts
+        with open(log_path, 'w') as f:
+            f.write(f"Sent Superduper Alerts for {date}\n")
+            f.write("=" * 50 + "\n")
+            f.write(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+            
+            if symbols_with_charts:
+                f.write(f"Charts generated for {len(symbols_with_charts)} symbols:\n")
+                for symbol in sorted(symbols_with_charts):
+                    chart_filename = f"{symbol}_chart.png"
+                    f.write(f"  • {chart_filename}\n")
+            else:
+                f.write("No charts generated for this date.\n")
+        
+        print(f"📝 Created log file: {log_path}")
+        return log_path
+    
     def run_all_charts(self):
         """Generate charts for all unique symbol/date combinations."""
-        combinations = self.get_unique_symbol_date_combinations()
+        combinations, date_symbols = self.get_unique_symbol_date_combinations()
         
         if not combinations:
             print("❌ No valid symbol/date combinations found")
@@ -153,6 +183,7 @@ class HistoricalAlertCharter:
         
         successful = 0
         failed = 0
+        date_chart_tracking = defaultdict(set)  # date -> set of symbols with successful charts
         
         for symbol, date in combinations:
             print(f"\n{'='*60}")
@@ -164,16 +195,24 @@ class HistoricalAlertCharter:
                 # Copy to tmp
                 if self.copy_chart_to_tmp(symbol, date):
                     successful += 1
+                    date_chart_tracking[date].add(symbol)
                 else:
                     failed += 1
             else:
                 failed += 1
+        
+        # Create log files for each date
+        print(f"\n📝 Creating sent_superduper_alerts.log files...")
+        for date in date_chart_tracking:
+            symbols_with_charts = date_chart_tracking[date]
+            self.create_sent_alerts_log(date, symbols_with_charts)
         
         print(f"\n{'='*60}")
         print(f"📊 SUMMARY:")
         print(f"  ✅ Successful: {successful}")
         print(f"  ❌ Failed: {failed}")
         print(f"  📁 Charts saved to: {self.tmp_dir}")
+        print(f"  📝 Log files created for {len(date_chart_tracking)} dates")
         print(f"{'='*60}")
 
 
