@@ -1206,11 +1206,11 @@ class AlpacaPrivate:
         Liquidate all open positions and optionally cancel all orders.
 
         This method:
-        1. Optionally cancels all open orders
-        2. Closes all positions using Alpaca's close_all_positions API
+        1. Closes all positions using Alpaca's close_all_positions API
+        2. Optionally cancels all open orders (if cancel_orders=True)
 
         Args:
-            cancel_orders: Whether to cancel all open orders first
+            cancel_orders: Whether to cancel all open orders after liquidation
             submit_order: Whether to actually execute the liquidation (default: False for dry run)
 
         Returns:
@@ -1224,13 +1224,6 @@ class AlpacaPrivate:
             if not positions:
                 print("  No open positions to liquidate")
                 return []
-
-            print(f"  Found {len(positions)} positions to liquidate:")
-            total_value = 0
-            for pos in positions:
-                print(f"    {pos.symbol}: {pos.qty} shares @ ${pos.avg_entry_price} (${pos.market_value})")
-                total_value += float(pos.market_value)
-            print(f"  Total portfolio value: ${total_value:.2f}")
 
         except Exception as e:
             print(f"✗ Error checking positions: {str(e)}")
@@ -1265,8 +1258,9 @@ class AlpacaPrivate:
             print(f"✓ All positions liquidated successfully")
             print(f"  Generated {len(liquidation_orders)} liquidation orders")
 
-            for order in liquidation_orders:
-                print(f"    {order.symbol}: {order.side} {order.qty} shares (Order ID: {order.id})")
+            for liquidation_order in liquidation_orders:
+                # liquidation_orders contains Position objects, not Order objects
+                print(f"    {liquidation_order.symbol}: SELL shares")
 
             return liquidation_orders
 
