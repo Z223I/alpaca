@@ -329,7 +329,7 @@ class ORBAlertSystem:
             # Get latest market data for the symbol
             symbol_data = self.alert_engine.data_buffer.get_symbol_data(alert.symbol)
             
-            if not symbol_data or len(symbol_data) == 0:
+            if symbol_data is None or len(symbol_data) == 0:
                 self.logger.warning(f"No market data available for VWAP filter check: {alert.symbol}")
                 return True  # Allow alert through if no VWAP data available
             
