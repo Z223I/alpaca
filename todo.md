@@ -99,16 +99,36 @@ Doc in phone notes close all positions and cancel all orders
 
 - [ ] VERY IMPORTANT.  Update lsdkfj skdj: Daily trade counts need to be saved to a dated file if the script shuts down during market hours and then restored if restarted during market hours.
 
-## BAM
-
-- [ ] lskdjf
-
 ## Surge
 
 - [ ] Incoporate surge detection in daily routine.
 
 Find photo clicker
 TCM
+
+
+## Bam
+
+### Config
+
+- [ ] claude --dangerously-skip-permissions
+- [ ] /login
+- [ ] /commit
+- [ ] Sync changes
+- [ ] /clear
+- [O] git switch -c feature/bam
+- [ ] /clear
+- [ ] /read...
+
+### Spec File
+
+- [ ] VERY IMPORTANT. Think hard. Implement the instructions in specs/bam.md.
+- [ ] Nudge
+- [ ] /commit
+- [O] Publish the branch
+- [O] git switch master; merge current branch and verify that all changes are merged.
+- [ ] Sync changes
+
 
 ## Do not send on yellow or red momentum short
 

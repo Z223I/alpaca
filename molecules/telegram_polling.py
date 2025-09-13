@@ -46,7 +46,8 @@ class TelegramPollingService:
             '/status': self._handle_status,
             '/help': self._handle_help,
             '57chevy': self._handle_alpaca_command,
-            'plot': self._handle_plot_command
+            'plot': self._handle_plot_command,
+            'bam': self._handle_bam_command
         }
         
         # Authorized users for Alpaca commands
@@ -189,6 +190,9 @@ class TelegramPollingService:
             elif text.lower().startswith('plot'):
                 # Handle plot trigger word (any user)
                 self._handle_plot_command(chat_id, username, first_name, last_name, text)
+            elif text.lower() == 'bam':
+                # Handle bam trigger word (authorized users only)
+                self._handle_bam_command(chat_id, username, first_name, last_name, text)
             else:
                 # Handle non-command messages
                 self._handle_regular_message(chat_id, username, first_name, text)
@@ -307,6 +311,9 @@ Examples:
 
 Note: Use regular hyphens (-) in the command
 
+🚨 Admin Commands (Bruce only):
+bam - Execute Bulk Account Manager (liquidate all auto-trade positions/orders)
+
 You'll receive:
 🚀 ORB breakout signals
 📊 Trade notifications  
@@ -395,6 +402,30 @@ Questions? Contact the bot administrator."""
         except Exception as e:
             self._log(f"Error handling alpaca command: {e}", "ERROR")
             self._send_response(chat_id, f"❌ Error processing command: {str(e)}")
+
+    def _handle_bam_command(self, chat_id: str, username: str, first_name: str, last_name: str, text: str):
+        """Handle 'bam' command for bulk account management (Bruce only)."""
+        
+        # Check user authorization - only Bruce can use this command
+        if not self._is_authorized_user(username, first_name):
+            return  # Silently ignore unauthorized users
+        
+        try:
+            display_name = f"{first_name} {last_name}".strip() or username or f"User_{chat_id[-4:]}"
+            self._log(f"🚨 BAM command from {display_name}: {text}")
+            
+            # Send confirmation message
+            self._send_response(chat_id, "🚨 Executing BAM (Bulk Account Manager)...\nThis will liquidate all positions and cancel all orders for auto-trade accounts.")
+            
+            # Execute bam.py script
+            result = self._execute_bam_command()
+            
+            # Send result back to Bruce
+            self._send_response(chat_id, result)
+            
+        except Exception as e:
+            self._log(f"Error handling bam command: {e}", "ERROR")
+            self._send_response(chat_id, f"❌ Error executing BAM command: {str(e)}")
     
     def _is_authorized_user(self, username: str, first_name: str) -> bool:
         """Check if user is authorized for Alpaca commands."""
@@ -538,7 +569,7 @@ Questions? Contact the bot administrator."""
                 cwd=project_root,
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=60
             )
             
             # Get output
@@ -555,9 +586,51 @@ Questions? Contact the bot administrator."""
                 return f"❌ Command failed (exit code: {result.returncode}):\n```\n{error_msg}\n```"
                 
         except subprocess.TimeoutExpired:
-            return "❌ Command timed out after 30 seconds"
+            return "❌ Command timed out after 60 seconds"
         except Exception as e:
             return f"❌ Error executing command: {str(e)}"
+    
+    def _execute_bam_command(self) -> str:
+        """Execute BAM (Bulk Account Manager) command and return output."""
+        try:
+            import subprocess
+            
+            # Get project root directory
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            bam_script = os.path.join(project_root, 'code', 'bam.py')
+            
+            # Use conda environment python to execute the script
+            python_path = os.path.expanduser('~/miniconda3/envs/alpaca/bin/python')
+            
+            # Build command (no additional arguments needed for bam.py)
+            cmd = [python_path, bam_script]
+            
+            # Execute command
+            result = subprocess.run(
+                cmd,
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=120  # Longer timeout for BAM operations
+            )
+            
+            # Get output
+            output = result.stdout.strip()
+            error_output = result.stderr.strip()
+            
+            if result.returncode == 0:
+                if output:
+                    return f"✅ BAM executed successfully:\n```\n{output}\n```"
+                else:
+                    return "✅ BAM executed successfully (no output)"
+            else:
+                error_msg = error_output if error_output else output
+                return f"❌ BAM failed (exit code: {result.returncode}):\n```\n{error_msg}\n```"
+                
+        except subprocess.TimeoutExpired:
+            return "❌ BAM command timed out after 120 seconds"
+        except Exception as e:
+            return f"❌ Error executing BAM command: {str(e)}"
     
     def _send_response(self, chat_id: str, message: str):
         """Send a response message to a specific chat."""
