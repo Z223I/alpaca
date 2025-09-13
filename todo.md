@@ -111,23 +111,23 @@ TCM
 
 ### Config
 
-- [ ] claude --dangerously-skip-permissions
-- [ ] /login
-- [ ] /commit
-- [ ] Sync changes
-- [ ] /clear
+- [X] claude --dangerously-skip-permissions
+- [X] /login
+- [X] /commit
+- [X] Sync changes
+- [X] /clear
 - [O] git switch -c feature/bam
-- [ ] /clear
-- [ ] /read...
+- [X] /clear
+- [X] /read...
 
 ### Spec File
 
-- [ ] VERY IMPORTANT. Think hard. Implement the instructions in specs/bam.md.
-- [ ] Nudge
-- [ ] /commit
+- [X] VERY IMPORTANT. Think hard. Implement the instructions in specs/bam.md.
+- [X] Nudge
+- [X] /commit
 - [O] Publish the branch
 - [O] git switch master; merge current branch and verify that all changes are merged.
-- [ ] Sync changes
+- [X] Sync changes
 
 
 ## Do not send on yellow or red momentum short
