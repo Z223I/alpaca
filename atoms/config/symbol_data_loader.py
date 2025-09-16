@@ -53,12 +53,12 @@ class SymbolDataLoader:
                            f"Resistance=${resistance_price:.4f}")
             self.logger.warning(warning_msg)
 
-            # Auto-fix: set resistance = signal * 1.10
-            auto_resistance = signal_price * 1.10
+            # Auto-fix: set resistance = signal + 0.02
+            auto_resistance = signal_price + 0.02
             info_msg = (f"🔧 Auto-fixed {symbol}: Resistance ${resistance_price:.4f} → "
-                        f"${auto_resistance:.4f} (Signal * 1.10)")
+                        f"${auto_resistance:.4f} (Signal + $0.02)")
             self.logger.info(info_msg)
-            print(f"✅ Auto-fixed {symbol}: Resistance = ${auto_resistance:.4f} (Signal * 1.10)")
+            print(f"✅ Auto-fixed {symbol}: Resistance = ${auto_resistance:.4f} (Signal + $0.02)")
             return signal_price, auto_resistance
 
         return signal_price, resistance_price
