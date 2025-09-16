@@ -107,6 +107,10 @@ Find photo clicker
 TCM
 
 
+## Negative Long Delta
+
+- [X] Currently getting an error then autofix for a negative long delta.  This should not be an error.  Investigate.  Changed * 1.10 to + 0.02. I would have radically altered the alerts if left negative.  That value is used for penetration range calculation.  "Resistance" is major resistance and is very important.  I just set it to $0.02 above signal.
+
 ## Bam
 
 ### Config
