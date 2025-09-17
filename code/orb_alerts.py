@@ -3,7 +3,10 @@ ORB Trading Alerts System - Main Entry Point
 
 This is the main entry point for the ORB (Opening Range Breakout) trading alerts system.
 Based on PCA analysis showing 82.31% variance explained by ORB patterns.
-Includes VWAP filtering: Only alerts where current_price >= VWAP are processed.
+
+Alert Filtering Pipeline:
+1. Halt Filter: Rejects alerts for stocks with gaps >1 minute in data (trading halts)
+2. VWAP Filter: Only alerts where current_price >= VWAP are processed
 
 Usage:
     python3 code/orb_alerts.py                      # Start monitoring all symbols (SIP feed)
@@ -20,7 +23,7 @@ import os
 import sys
 import json
 from typing import Optional
-from datetime import datetime, timedelta, time
+from datetime import datetime, timedelta
 from pathlib import Path
 import pandas as pd
 import pytz
@@ -38,7 +41,6 @@ from atoms.alerts.alert_formatter import ORBAlert
 # Alpaca API imports
 try:
     from alpaca.data.historical import StockHistoricalDataClient
-    from alpaca.data.timeframe import TimeFrame
     ALPACA_AVAILABLE = True
 except ImportError:
     # Fallback to older alpaca-trade-api if available
@@ -80,11 +82,11 @@ class ORBAlertSystem:
             # Use centralized data configuration to determine symbols file path
             data_config = get_data_root_dir()
             default_symbols_file = data_config.get_symbols_file_path(self.target_date)
-            
+
             # Hard failure if expected symbols file doesn't exist
             if not default_symbols_file.exists():
                 raise FileNotFoundError(f"Required symbols file not found: {default_symbols_file}")
-            
+
             self.alert_engine = ORBAlertEngine(str(default_symbols_file))
             self.logger.info(f"Using default symbols file: {default_symbols_file}")
         self.test_mode = test_mode
@@ -92,7 +94,7 @@ class ORBAlertSystem:
 
         # Initialize historical data client
         self.historical_client = None
-        if ALPACA_AVAILABLE == True:
+        if ALPACA_AVAILABLE is True:
             try:
                 self.historical_client = StockHistoricalDataClient(
                     api_key=config.api_key,
@@ -151,25 +153,25 @@ class ORBAlertSystem:
             formatter = EasternFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
             console_handler.setFormatter(formatter)
             logger.addHandler(console_handler)
-            
+
             # Setup file handler using centralized logs config
             try:
                 logs_config = get_logs_root_dir()
                 log_dir = logs_config.get_component_logs_dir("orb_alerts")
                 log_dir.mkdir(parents=True, exist_ok=True)
-                
+
                 et_tz = pytz.timezone('US/Eastern')
                 log_filename = f"orb_alerts_{datetime.now(et_tz).strftime('%Y%m%d_%H%M%S')}.log"
                 log_file_path = log_dir / log_filename
-                
+
                 file_handler = logging.FileHandler(log_file_path)
                 file_handler.setFormatter(formatter)
                 logger.addHandler(file_handler)
-                
+
             except Exception as e:
                 # If file logging fails, continue with console logging only
                 logger.warning(f"Could not setup file logging: {e}")
-            
+
             logger.setLevel(logging.INFO)
 
         return logger
@@ -273,7 +275,6 @@ class ORBAlertSystem:
         except Exception as e:
             self.logger.error(f"Error cleaning up old files for {symbol}: {e}")
 
-
     def _should_save_data(self) -> bool:
         """Check if it's time to save historical data."""
         if self.last_data_save is None:
@@ -300,9 +301,18 @@ class ORBAlertSystem:
         Args:
             alert: Generated ORB alert
         """
+        # Stock halted filter: Check for gaps in minute-by-minute data indicating trading halt
+        if not self._passes_halt_filter(alert):
+            self.logger.info(
+                f"Alert filtered out: {alert.symbol} appears to be halted (gap in data) - rejected"
+            )
+            return
+
         # VWAP filtering: Only process alerts where price >= VWAP
         if not self._passes_vwap_filter(alert):
-            self.logger.info(f"Alert filtered out: {alert.symbol} price ${alert.current_price:.2f} < VWAP - rejected")
+            self.logger.info(
+                f"Alert filtered out: {alert.symbol} price ${alert.current_price:.2f} < VWAP - rejected"
+            )
             return
 
         # Save alert to historical data
@@ -314,6 +324,72 @@ class ORBAlertSystem:
         else:
             # Alert is already printed by the engine
             pass
+
+    def _passes_halt_filter(self, alert: ORBAlert) -> bool:
+        """
+        Check if alert passes halt filter (no gaps in minute-by-minute data).
+
+        A stock is considered halted if there's a gap larger than 1 minute between
+        consecutive timestamps in the recent data, indicating missing minute bars.
+
+        Args:
+            alert: ORB alert to check
+
+        Returns:
+            True if alert passes halt filter (no trading halt detected), False if halted
+        """
+        try:
+            # Get latest market data for the symbol
+            symbol_data = self.alert_engine.data_buffer.get_symbol_data(alert.symbol)
+
+            if symbol_data is None or len(symbol_data) < 2:
+                self.logger.warning(f"Insufficient market data for halt filter check: {alert.symbol}")
+                return True  # Allow alert through if insufficient data for halt detection
+
+            # Check all data points for gaps indicating a halt
+            # We'll check the entire data window to detect any trading halts
+            data_to_check = symbol_data.copy()
+
+            if len(data_to_check) < 2:
+                return True  # Not enough data to detect halt
+
+            # Convert timestamp column to datetime if it's not already
+            if 'timestamp' in data_to_check.columns:
+                data_to_check['timestamp'] = pd.to_datetime(data_to_check['timestamp'])
+
+                # Sort by timestamp to ensure proper ordering
+                data_to_check = data_to_check.sort_values('timestamp')
+
+                # Check for gaps between consecutive timestamps
+                timestamps = data_to_check['timestamp'].tolist()
+
+                for i in range(1, len(timestamps)):
+                    time_diff = timestamps[i] - timestamps[i - 1]
+
+                    # If gap is more than 61 seconds (allowing for slight timing variations),
+                    # consider it a halt
+                    if time_diff.total_seconds() > 61:
+                        self.logger.info(
+                            f"Trading halt detected for {alert.symbol}: "
+                            f"gap from {timestamps[i-1].strftime('%H:%M:%S')} to "
+                            f"{timestamps[i].strftime('%H:%M:%S')} "
+                            f"({time_diff.total_seconds():.0f} seconds)"
+                        )
+                        return False  # Stock appears to be halted
+
+                self.logger.debug(
+                    f"Halt filter PASSED: {alert.symbol} - no gaps detected in data window"
+                )
+                return True  # No halt detected
+            else:
+                self.logger.warning(
+                    f"No timestamp column found for halt filter: {alert.symbol}"
+                )
+                return True  # Allow through if no timestamp data available
+
+        except Exception as e:
+            self.logger.error(f"Error in halt filter for {alert.symbol}: {e}")
+            return True  # Allow alert through if error occurs
 
     def _passes_vwap_filter(self, alert: ORBAlert) -> bool:
         """
@@ -328,28 +404,28 @@ class ORBAlertSystem:
         try:
             # Get latest market data for the symbol
             symbol_data = self.alert_engine.data_buffer.get_symbol_data(alert.symbol)
-            
+
             if symbol_data is None or len(symbol_data) == 0:
                 self.logger.warning(f"No market data available for VWAP filter check: {alert.symbol}")
                 return True  # Allow alert through if no VWAP data available
-            
+
             # Get the most recent market data point
             latest_data = symbol_data.iloc[-1]
             current_vwap = latest_data['vwap']
             current_price = alert.current_price
-            
+
             # Filter: Only allow alerts where price >= VWAP
             passes_filter = current_price >= current_vwap
-            
+
             if passes_filter:
                 self.logger.debug(f"VWAP filter PASSED: {alert.symbol} price ${current_price:.2f} >= "
                                   f"VWAP ${current_vwap:.2f}")
             else:
                 self.logger.info(f"VWAP filter FAILED: {alert.symbol} price ${current_price:.2f} < "
                                  f"VWAP ${current_vwap:.2f}")
-            
+
             return passes_filter
-            
+
         except Exception as e:
             self.logger.error(f"Error in VWAP filter for {alert.symbol}: {e}")
             return True  # Allow alert through if error occurs
@@ -468,7 +544,7 @@ class ORBAlertSystem:
     async def _fetch_historical_data_from_data_start(self) -> bool:
         """
         Fetch historical data from data collection start time (9:00 AM) to current time.
-        This ensures EMA20 can be calculated by market open (9:30 AM) and complete data coverage 
+        This ensures EMA20 can be calculated by market open (9:30 AM) and complete data coverage
         regardless of when the system starts.
 
         Returns:
@@ -690,7 +766,7 @@ class ORBAlertSystem:
             if len(symbols) <= 25:
                 # Display all symbols, five per line
                 for i in range(0, len(symbols), 5):
-                    line_symbols = symbols[i:i+5]
+                    line_symbols = symbols[i:i + 5]
                     if i == 0:
                         self.logger.info(f"Monitoring {len(symbols)} symbols: {', '.join(line_symbols)}")
                     else:
@@ -698,7 +774,7 @@ class ORBAlertSystem:
             else:
                 # Display first 25 symbols, five per line, then show count of remaining
                 for i in range(0, 25, 5):
-                    line_symbols = symbols[i:i+5]
+                    line_symbols = symbols[i:i + 5]
                     if i == 0:
                         self.logger.info(f"Monitoring {len(symbols)} symbols: {', '.join(line_symbols)}")
                     else:
@@ -751,19 +827,19 @@ class ORBAlertSystem:
         """Print daily summary statistics."""
         summary = self.alert_engine.get_daily_summary()
 
-        print("\n" + "="*60)
-        print(f"ORB Alert System - Daily Summary")
+        print("\n" + "=" * 60)
+        print("ORB Alert System - Daily Summary")
         print(f"Date: {summary.get('date', 'N/A')}")
         print(f"Total Alerts: {summary.get('total_alerts', 0)}")
         print(f"Average Confidence: {summary.get('avg_confidence', 0):.3f}")
         print(f"Max Confidence: {summary.get('max_confidence', 0):.3f}")
 
         priority_breakdown = summary.get('priority_breakdown', {})
-        print(f"Priority Breakdown:")
+        print("Priority Breakdown:")
         for priority, count in priority_breakdown.items():
             print(f"  {priority}: {count}")
 
-        print("="*60 + "\n")
+        print("=" * 60 + "\n")
 
 
 def parse_arguments():

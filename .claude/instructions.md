@@ -156,3 +156,12 @@ bar.t  # Timestamp
 - MACD analysis failures often trace back to this attribute naming issue
 
 **Impact:** Using wrong attributes causes "BLIND FLIGHT" MACD conditions instead of proper 🟢/🟡/🔴 analysis.
+
+## Code Development
+
+When developing new code or modifying existing code, always follow this checklist:
+
+- **Conform to repo standards**: Follow existing code patterns, naming conventions, and architectural decisions
+- **Check linting compliance**: Run `~/miniconda3/envs/alpaca/bin/python -m flake8` on modified files
+- **Check for VS Code integration errors**: Use diagnostic tools to ensure no integration issues
+- **Test**: Write and run appropriate tests to verify functionality

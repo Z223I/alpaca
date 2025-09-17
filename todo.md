@@ -107,6 +107,31 @@ Find photo clicker
 TCM
 
 
+
+Filter out stocks that have halted.
+Create turn off/on program that accepts multiple symbols. Change all symbols to uppercase.
+Update telegram polling for turn off/on.  Change all symbols to uppercase.  Bruce is the only authorized user.
+Create a check program for stocks approaching the signal.
+Stop limit buy to purchase when the stop limit is hit
+
+## Halted Stocks
+
+- [X] VERY IMPORTANT: Review code/orb_alert.py:  How is it filtering stocks?
+- [ ] VERY IMPORTANT: Update code/orb_alert.py:  Before the VWAP filter add a stock halted filter.  When a stock halts there is missing timestamps in the stock date.  Stock data is per minute.  So if there is more than a minute between timestamps, the stock halted.  Here is an example 2025-09-16 09:36:00 and 2025-09-16 09:42:00.
+
+
+## Signal
+
+- [X] VERY IMPORTANT: Create code/signal.py: 1) Read data/YYYYMMDD.csv using current date, 2) For each symbol in data/YYYYMMDD.csv, compare the signal field to the most recent 'low' value in historical_data/YYYY-MM-DD/market_data/[symbol]_YYYYMMDD_*.csv; where the historical data file is the most recent (there are at least two per symbol), A) If the 'low' value is at 95% or greater of the signal value, store the symbol, signal, and low value to a list. 3) Finally, print the list to std in csv format.
+Example Files:  data/20250917.csv; historical_data/2025-09-17/market_data/ATCH_20250917_*.csv
+Conform to repo standards.
+Check linting compliance.
+Check for VS Code integration errors.
+Test.
+- [X] VERY IMPORTANT:  Update molecules/telegram_polling.py: Any user can send the command 'signal' case insensitive. Respond to the command by running code/oracle_signal.py.  Return the output to the user that sent the command. Add this to the /help command.
+
+
+
 ## Negative Long Delta
 
 - [X] Currently getting an error then autofix for a negative long delta.  This should not be an error.  Investigate.  Changed * 1.10 to + 0.02. I would have radically altered the alerts if left negative.  That value is used for penetration range calculation.  "Resistance" is major resistance and is very important.  I just set it to $0.02 above signal.

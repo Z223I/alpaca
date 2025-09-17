@@ -47,7 +47,8 @@ class TelegramPollingService:
             '/help': self._handle_help,
             '57chevy': self._handle_alpaca_command,
             'plot': self._handle_plot_command,
-            'bam': self._handle_bam_command
+            'bam': self._handle_bam_command,
+            'signal': self._handle_signal_command
         }
         
         # Authorized users for Alpaca commands
@@ -193,6 +194,9 @@ class TelegramPollingService:
             elif text.lower() == 'bam':
                 # Handle bam trigger word (authorized users only)
                 self._handle_bam_command(chat_id, username, first_name, last_name, text)
+            elif text.lower() == 'signal':
+                # Handle signal trigger word (any user)
+                self._handle_signal_command(chat_id, username, first_name, last_name, text)
             else:
                 # Handle non-command messages
                 self._handle_regular_message(chat_id, username, first_name, text)
@@ -311,6 +315,9 @@ Examples:
 
 Note: Use regular hyphens (-) in the command
 
+📈 Signal Analysis:
+signal - Run oracle signal analysis to identify stocks near support levels
+
 🚨 Admin Commands (Bruce only):
 bam - Execute Bulk Account Manager (liquidate all auto-trade positions/orders)
 
@@ -426,6 +433,25 @@ Questions? Contact the bot administrator."""
         except Exception as e:
             self._log(f"Error handling bam command: {e}", "ERROR")
             self._send_response(chat_id, f"❌ Error executing BAM command: {str(e)}")
+    
+    def _handle_signal_command(self, chat_id: str, username: str, first_name: str, last_name: str, text: str):
+        """Handle 'signal' command to run oracle_signal.py."""
+        try:
+            display_name = f"{first_name} {last_name}".strip() or username or f"User_{chat_id[-4:]}"
+            self._log(f"📊 Signal command from {display_name}: {text}")
+            
+            # Send processing message
+            self._send_response(chat_id, "📊 Running oracle signal analysis...")
+            
+            # Execute oracle_signal.py script
+            result = self._execute_oracle_signal_command()
+            
+            # Send result back to user
+            self._send_response(chat_id, result)
+            
+        except Exception as e:
+            self._log(f"Error handling signal command: {e}", "ERROR")
+            self._send_response(chat_id, f"❌ Error executing signal command: {str(e)}")
     
     def _is_authorized_user(self, username: str, first_name: str) -> bool:
         """Check if user is authorized for Alpaca commands."""
@@ -631,6 +657,48 @@ Questions? Contact the bot administrator."""
             return "❌ BAM command timed out after 120 seconds"
         except Exception as e:
             return f"❌ Error executing BAM command: {str(e)}"
+    
+    def _execute_oracle_signal_command(self) -> str:
+        """Execute oracle_signal.py command and return output."""
+        try:
+            import subprocess
+            
+            # Get project root directory
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            oracle_script = os.path.join(project_root, 'code', 'oracle_signal.py')
+            
+            # Use conda environment python to execute the script
+            python_path = os.path.expanduser('~/miniconda3/envs/alpaca/bin/python')
+            
+            # Build command (no additional arguments needed for oracle_signal.py)
+            cmd = [python_path, oracle_script]
+            
+            # Execute command
+            result = subprocess.run(
+                cmd,
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=60  # Standard timeout for oracle signal operations
+            )
+            
+            # Get output
+            output = result.stdout.strip()
+            error_output = result.stderr.strip()
+            
+            if result.returncode == 0:
+                if output:
+                    return f"📊 Oracle Signal Results:\n```\n{output}\n```"
+                else:
+                    return "📊 Oracle Signal executed successfully (no results found)"
+            else:
+                error_msg = error_output if error_output else output
+                return f"❌ Oracle Signal failed (exit code: {result.returncode}):\n```\n{error_msg}\n```"
+                
+        except subprocess.TimeoutExpired:
+            return "❌ Oracle Signal command timed out after 60 seconds"
+        except Exception as e:
+            return f"❌ Error executing Oracle Signal command: {str(e)}"
     
     def _send_response(self, chat_id: str, message: str):
         """Send a response message to a specific chat."""
