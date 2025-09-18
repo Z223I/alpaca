@@ -114,6 +114,12 @@ Update telegram polling for turn off/on.  Change all symbols to uppercase.  Bruc
 Create a check program for stocks approaching the signal.
 Stop limit buy to purchase when the stop limit is hit
 
+
+Check a penetration of 100% is required
+
+
+
+
 ## Halted Stocks
 
 - [X] VERY IMPORTANT: Review code/orb_alert.py:  How is it filtering stocks?

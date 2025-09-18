@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 
 import os
+import sys
 import csv
 import glob
 from datetime import datetime
+
+# Add project root to path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from atoms.telegram.telegram_post import TelegramPoster
 
 
 def get_current_date_str():
@@ -17,7 +23,7 @@ def get_current_date_dash():
 
 
 def read_signal_data(date_str):
-    """Read the data/YYYYMMDD.csv file and return symbol-signal pairs"""
+    """Read the data/YYYYMMDD.csv file and return symbol data with signal and resistance"""
     data_file = f"data/{date_str}.csv"
 
     if not os.path.exists(data_file):
@@ -30,7 +36,11 @@ def read_signal_data(date_str):
             symbol = row['Symbol']
             try:
                 signal = float(row['Signal'])
-                signals[symbol] = signal
+                resistance = float(row['Resistance'])
+                signals[symbol] = {
+                    'signal': signal,
+                    'resistance': resistance
+                }
             except (ValueError, TypeError):
                 continue
 
@@ -71,6 +81,47 @@ def get_most_recent_low(market_data_file):
         return None
 
 
+def send_telegram_message(results, date_str):
+    """Send results to Telegram via Bruce"""
+    if not results:
+        return
+
+    try:
+        telegram_poster = TelegramPoster()
+
+        # Format message with header
+        message_lines = [
+            f"🎯 **Oracle Signal Alert - {date_str}**",
+            "",
+            "Stocks approaching signal threshold (95%+):",
+            "",
+        ]
+
+        # Add each result (symbols are already sorted)
+        for result in results:
+            symbol = result['symbol']
+            signal = result['signal']
+            resistance = result['resistance']
+            low = result['low']
+
+            message_lines.append(
+                f"**{symbol}** | Signal: ${signal:.2f} | Resistance: ${resistance:.2f} | Low: ${low:.2f}"
+            )
+
+        message = "\n".join(message_lines)
+
+        # Send to Bruce
+        result = telegram_poster.send_message_to_user(message, "bruce", urgent=False)
+
+        if result['success']:
+            print("✅ Oracle signal alert sent to Bruce via Telegram")
+        else:
+            print(f"❌ Failed to send Telegram message: {result.get('errors', [])}")
+
+    except Exception as e:
+        print(f"❌ Error sending Telegram message: {e}")
+
+
 def main():
     """Main function to compare signals with recent lows"""
     date_str = get_current_date_str()
@@ -84,7 +135,10 @@ def main():
         results = []
 
         # Process each symbol
-        for symbol, signal in signals.items():
+        for symbol, data in signals.items():
+            signal = data['signal']
+            resistance = data['resistance']
+
             # Get most recent market data file
             market_file = get_most_recent_market_data_file(symbol, date_dash)
 
@@ -99,13 +153,24 @@ def main():
                         results.append({
                             'symbol': symbol,
                             'signal': signal,
+                            'resistance': resistance,
                             'low': recent_low
                         })
 
+        # Sort results by symbol name
+        results.sort(key=lambda x: x['symbol'])
+
         # Print results in CSV format
-        print("Symbol,Signal,Low")
+        print("Symbol,Signal,Resistance,Low")
         for result in results:
-            print(f"{result['symbol']},{result['signal']},{result['low']}")
+            print(f"{result['symbol']},{result['signal']},{result['resistance']},{result['low']}")
+
+        # Send Telegram message if there are results
+        if results:
+            send_telegram_message(results, date_str)
+            print(f"\n📊 Found {len(results)} symbols approaching signal threshold")
+        else:
+            print("No symbols found approaching signal threshold (95%+)")
 
     except FileNotFoundError as e:
         print(f"Error: {e}")
