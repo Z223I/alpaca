@@ -1,15 +1,9 @@
 #!/usr/bin/env python3
 
 import os
-import sys
 import csv
 import glob
 from datetime import datetime
-
-# Add project root to path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from atoms.telegram.telegram_post import TelegramPoster
 
 
 def get_current_date_str():
@@ -81,46 +75,6 @@ def get_most_recent_low(market_data_file):
         return None
 
 
-def send_telegram_message(results, date_str):
-    """Send results to Telegram via Bruce"""
-    if not results:
-        return
-
-    try:
-        telegram_poster = TelegramPoster()
-
-        # Format message with header
-        message_lines = [
-            f"🎯 **Oracle Signal Alert - {date_str}**",
-            "",
-            "Stocks approaching signal threshold (95%+):",
-            "",
-        ]
-
-        # Add each result (symbols are already sorted)
-        for result in results:
-            symbol = result['symbol']
-            signal = result['signal']
-            resistance = result['resistance']
-            low = result['low']
-
-            message_lines.append(
-                f"**{symbol}** | Signal: ${signal:.2f} | Resistance: ${resistance:.2f} | Low: ${low:.2f}"
-            )
-
-        message = "\n".join(message_lines)
-
-        # Send to Bruce
-        result = telegram_poster.send_message_to_user(message, "bruce", urgent=False)
-
-        if result['success']:
-            print("✅ Oracle signal alert sent to Bruce via Telegram")
-        else:
-            print(f"❌ Failed to send Telegram message: {result.get('errors', [])}")
-
-    except Exception as e:
-        print(f"❌ Error sending Telegram message: {e}")
-
 
 def main():
     """Main function to compare signals with recent lows"""
@@ -163,11 +117,10 @@ def main():
         # Print results in CSV format
         print("Symbol,Signal,Resistance,Low")
         for result in results:
-            print(f"{result['symbol']},{result['signal']},{result['resistance']},{result['low']}")
+            print(f"{result['symbol']},{result['signal']:.2f},{result['resistance']:.2f},{result['low']:.2f}")
 
-        # Send Telegram message if there are results
+        # Print summary
         if results:
-            send_telegram_message(results, date_str)
             print(f"\n📊 Found {len(results)} symbols approaching signal threshold")
         else:
             print("No symbols found approaching signal threshold (95%+)")
