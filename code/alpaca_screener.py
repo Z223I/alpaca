@@ -520,7 +520,13 @@ class AlpacaScreener:
                     sma_values=sma_values
                 )
                 
-                results.append(result)
+                # Only append results with volume surge if volume surge criteria is specified
+                if criteria.volume_surge_multiplier and criteria.volume_surge_days:
+                    if volume_surge_detected:
+                        results.append(result)
+                else:
+                    # If no volume surge criteria, append all results (existing behavior)
+                    results.append(result)
                 
             except Exception as e:
                 if self.verbose:
@@ -629,6 +635,14 @@ class AlpacaScreener:
         if not results:
             print("No results to export")
             return
+        
+        # Auto-create directory structure for historical_data/YYYY-MM-DD/scanner/
+        if not filename.startswith('/'):
+            today = datetime.now().strftime('%Y-%m-%d')
+            directory = f"./historical_data/{today}/scanner"
+            os.makedirs(directory, exist_ok=True)
+            if not filename.startswith(directory):
+                filename = os.path.join(directory, os.path.basename(filename))
             
         with open(filename, 'w', newline='') as csvfile:
             fieldnames = [
@@ -664,6 +678,14 @@ class AlpacaScreener:
         if not results:
             print("No results to export")
             return
+        
+        # Auto-create directory structure for historical_data/YYYY-MM-DD/scanner/
+        if not filename.startswith('/'):
+            today = datetime.now().strftime('%Y-%m-%d')
+            directory = f"./historical_data/{today}/scanner"
+            os.makedirs(directory, exist_ok=True)
+            if not filename.startswith(directory):
+                filename = os.path.join(directory, os.path.basename(filename))
             
         export_data = {
             "scan_metadata": {

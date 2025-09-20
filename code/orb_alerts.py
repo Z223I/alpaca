@@ -301,12 +301,17 @@ class ORBAlertSystem:
         Args:
             alert: Generated ORB alert
         """
-        # Stock halted filter: Check for gaps in minute-by-minute data indicating trading halt
-        if not self._passes_halt_filter(alert):
+        # Check if stock is halted (for display purposes, no longer filters out)
+        is_halted = not self._passes_halt_filter(alert)
+        if is_halted:
             self.logger.info(
-                f"Alert filtered out: {alert.symbol} appears to be halted (gap in data) - rejected"
+                f"Trading halt detected for {alert.symbol} but alert will still be processed"
             )
-            return
+
+        # Update alert's halted status 
+        alert.halted = "🔴" if is_halted else "🟢"
+        # Regenerate alert message with updated halted status
+        alert.alert_message = alert._generate_alert_message()
 
         # VWAP filtering: Only process alerts where price >= VWAP
         if not self._passes_vwap_filter(alert):
@@ -473,6 +478,7 @@ class ORBAlertSystem:
                 "recommended_stop_loss": float(alert.recommended_stop_loss),
                 "recommended_take_profit": float(alert.recommended_take_profit),
                 "alert_message": alert.alert_message,
+                "halted": alert.halted,
                 # Candlestick data for super alert filtering
                 "low_price": float(alert.low_price) if alert.low_price is not None else None,
                 "high_price": float(alert.high_price) if alert.high_price is not None else None,

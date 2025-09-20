@@ -250,7 +250,7 @@ class ORBAlertEngine:
                 return
             
             # Create and process alert
-            alert = self.alert_formatter.create_alert(breakout_signal, confidence, technical_indicators)
+            alert = self.alert_formatter.create_alert(breakout_signal, confidence, technical_indicators, is_halted=False)
             await self._process_alert(alert)
             
         except Exception as e:
@@ -649,7 +649,7 @@ class ORBAlertEngine:
                     print(f"✅ [CONFIDENCE PASSED] {symbol} {current_time} - Alert approved! Score {confidence.score:.3f} >= Threshold {confidence.threshold:.3f}")
             
             # Create and process alert
-            alert = self.alert_formatter.create_alert(breakout_signal, confidence, technical_indicators)
+            alert = self.alert_formatter.create_alert(breakout_signal, confidence, technical_indicators, is_halted=False)
             
             # TEMPORARILY BYPASS alert generation time calculation
             # alert_generation_time = (time.time() - alert_start_time) * 1000  # Convert to ms

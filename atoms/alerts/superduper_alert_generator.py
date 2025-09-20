@@ -77,7 +77,7 @@ class SuperduperAlertGenerator:
             # Create enhanced message
             alert_message = self._create_enhanced_message(
                 symbol, current_price, signal_price, resistance_price, 
-                penetration, trend_type, trend_strength, trend_analysis, superduper_alert_time
+                penetration, trend_type, trend_strength, trend_analysis, superduper_alert_time, latest_super_alert
             )
 
             # Create superduper alert data structure
@@ -125,8 +125,11 @@ class SuperduperAlertGenerator:
                                signal_price: float, resistance_price: float,
                                penetration: float, trend_type: str, 
                                trend_strength: float, trend_analysis: Dict[str, Any], 
-                               alert_timestamp: datetime) -> str:
+                               alert_timestamp: datetime, latest_super_alert: Dict[str, Any]) -> str:
         """Create enhanced Telegram message for superduper alerts."""
+
+        # Extract halted status from nested alert message
+        halted_status = self._extract_halted_status(latest_super_alert)
 
         # Trend type emojis and descriptions
         trend_emoji = {
@@ -243,6 +246,8 @@ class SuperduperAlertGenerator:
             f"• Watch for major resistance",
             f"• Monitor for volume confirmation",
             f"",
+            f"🚦 **Halted:** {halted_status}",
+            f"",
             f"⏰ **Alert Generated:** {datetime.now(pytz.timezone('US/Eastern')).strftime('%H:%M:%S ET')}"
         ])
 
@@ -250,6 +255,32 @@ class SuperduperAlertGenerator:
             message_parts.insert(1, "🧪 **[TEST MODE]**")
 
         return "\n".join(message_parts)
+
+    def _extract_halted_status(self, latest_super_alert: Dict[str, Any]) -> str:
+        """
+        Extract halted status from nested alert message path:
+        latest_super_alert -> original_alert -> alert_message
+        
+        Returns:
+            str: Halted status with icon (🟢 for not halted, 🔴 for halted)
+        """
+        try:
+            # Navigate the nested path: latest_super_alert -> original_alert -> alert_message
+            original_alert = latest_super_alert.get('original_alert', {})
+            alert_message = original_alert.get('alert_message', '')
+            
+            # Search for "| Halted 🟢" or "| Halted 🔴" pattern in alert message
+            if '| Halted 🟢' in alert_message:
+                return '🟢 **Not Halted**'
+            elif '| Halted 🔴' in alert_message:
+                return '🔴 **Halted**'
+            else:
+                # Fallback: If no halted field found, assume not halted (for older alerts)
+                return '🟢 **Not Halted** (legacy)'
+                
+        except Exception as e:
+            self.logger.warning(f"Error extracting halted status: {e}")
+            return '⚪ **Unknown**'
 
     def _calculate_momentum_score(self, trend_analysis: Dict[str, Any], trend_strength: float) -> float:
         """Calculate a momentum score from 0.0 to 1.0."""

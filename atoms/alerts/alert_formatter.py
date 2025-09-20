@@ -43,6 +43,7 @@ class ORBAlert:
     recommended_stop_loss: float
     recommended_take_profit: float
     alert_message: str
+    halted: str  # Traffic light icon: 🟢 for not halted, 🔴 for halted
     # EMA Technical Indicators
     ema_9: Optional[float] = None
     ema_20: Optional[float] = None
@@ -117,7 +118,7 @@ class ORBAlert:
             f"[{time_str}] ORB ALERT: {self.symbol} {direction} ${self.current_price:.2f} "
             f"({self.breakout_percentage:+.2f}% vs {vs_level})\n"
             f"Volume: {self.volume_ratio:.1f}x avg | Confidence: {self.confidence_score:.2f} | "
-            f"Priority: {self.priority.value}{ema_info}\n"
+            f"Priority: {self.priority.value} | Halted {self.halted}{ema_info}\n"
             f"Stop: ${self.recommended_stop_loss:.2f} | Target: ${self.recommended_take_profit:.2f}"
         )
 
@@ -135,7 +136,8 @@ class AlertFormatter:
 
     def create_alert(self, signal: BreakoutSignal, 
                     confidence: ConfidenceComponents, 
-                    technical_indicators: Optional[Dict[str, Any]] = None) -> ORBAlert:
+                    technical_indicators: Optional[Dict[str, Any]] = None,
+                    is_halted: bool = False) -> ORBAlert:
         """
         Create a formatted alert from breakout signal and confidence data.
 
@@ -143,6 +145,7 @@ class AlertFormatter:
             signal: BreakoutSignal to format
             confidence: ConfidenceComponents for the signal
             technical_indicators: Dictionary of technical indicators
+            is_halted: Whether the stock is currently halted
 
         Returns:
             Formatted ORBAlert
@@ -152,6 +155,9 @@ class AlertFormatter:
 
         # Get confidence level description
         confidence_level = self._get_confidence_level(confidence.total_score)
+
+        # Set halted status with traffic light icons
+        halted_status = "🔴" if is_halted else "🟢"
 
         # Extract EMA indicators from technical_indicators if available
         ema_9 = None
@@ -198,6 +204,7 @@ class AlertFormatter:
             recommended_stop_loss=0.0,  # Will be calculated in __post_init__
             recommended_take_profit=0.0,  # Will be calculated in __post_init__
             alert_message="",  # Will be generated in __post_init__
+            halted=halted_status,
             # EMA Technical Indicators
             ema_9=ema_9,
             ema_20=ema_20,
