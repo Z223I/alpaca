@@ -3,7 +3,13 @@ Trade Generator - Executes Automated Trades Based on Superduper Alerts
 
 This atom handles the execution of trades based on superduper alerts by creating
 trade records and executing buy-market-trailing-sell-take-profit-percent orders through alpaca.py.
-Only processes alerts with BOTH green momentum indicators (🟢) AND green momentum short indicators (🟢).
+
+SAFETY FILTERS:
+- BLOCKS halted stocks (🔴) to prevent trading on halted securities
+- Requires BOTH green momentum indicators (🟢) AND green momentum short indicators (🟢)
+- Validates market hours before executing trades
+
+Only processes alerts that pass ALL safety checks.
 """
 
 import json
@@ -19,7 +25,13 @@ import pytz
 
 
 class TradeGenerator:
-    """Generates trades from superduper alerts with BOTH green momentum and green momentum short indicators."""
+    """Generates trades from superduper alerts with BOTH green momentum and green momentum short indicators.
+    
+    SAFETY FEATURES:
+    - Filters out halted stocks (🔴) to prevent trading on halted securities
+    - Requires BOTH green momentum indicators (🟢) for trade execution
+    - Market hours validation before executing trades
+    """
 
     def __init__(self, trades_dir: Path, test_mode: bool = False):
         """
@@ -131,6 +143,46 @@ class TradeGenerator:
             self.logger.error(f"Error checking market hours: {e}")
             # Fail safe: don't trade if we can't determine market hours
             return False
+
+    def is_stock_halted(self, superduper_alert: Dict[str, Any]) -> bool:
+        """
+        Check if stock is halted by extracting halted status from superduper alert.
+        
+        Checks nested path: superduper_alert -> latest_super_alert -> original_alert -> alert_message
+        for "| Halted 🔴" pattern.
+        
+        Args:
+            superduper_alert: Superduper alert data dictionary
+            
+        Returns:
+            True if stock is halted (🔴), False if not halted (🟢) or unknown
+        """
+        try:
+            # Navigate nested path: superduper_alert -> latest_super_alert -> original_alert -> alert_message
+            latest_super_alert = superduper_alert.get('latest_super_alert', {})
+            original_alert = latest_super_alert.get('original_alert', {})
+            alert_message = original_alert.get('alert_message', '')
+            
+            # Check for halted indicator in alert message
+            if '| Halted 🔴' in alert_message:
+                symbol = superduper_alert.get('symbol', 'UNKNOWN')
+                self.logger.warning(f"Stock {symbol} is HALTED (🔴) - trading blocked for safety")
+                return True
+            elif '| Halted 🟢' in alert_message:
+                symbol = superduper_alert.get('symbol', 'UNKNOWN')
+                self.logger.debug(f"Stock {symbol} is NOT halted (🟢) - trading allowed")
+                return False
+            else:
+                # For legacy alerts without halted field, assume not halted (safe default)
+                symbol = superduper_alert.get('symbol', 'UNKNOWN')
+                self.logger.debug(f"Stock {symbol} has no halted field (legacy alert) - assuming not halted")
+                return False
+                
+        except Exception as e:
+            symbol = superduper_alert.get('symbol', 'UNKNOWN')
+            self.logger.error(f"Error checking halted status for {symbol}: {e}")
+            # Fail safe: assume halted if we can't determine status
+            return True
 
     def extract_symbol_from_filename(self, filename: str) -> Optional[str]:
         """
@@ -743,6 +795,12 @@ class TradeGenerator:
             if not self.has_green_momentum_indicator(superduper_alert):
                 symbol = superduper_alert.get('symbol', 'UNKNOWN')
                 self.logger.info(f"Skipping trade for {symbol} - no green momentum indicator")
+                return None
+
+            # CRITICAL: Filter out halted stocks to prevent trading
+            if self.is_stock_halted(superduper_alert):
+                symbol = superduper_alert.get('symbol', 'UNKNOWN')
+                self.logger.warning(f"🚫 TRADE BLOCKED for {symbol} - stock is halted (safety filter)")
                 return None
 
             # Check market hours before executing trade
