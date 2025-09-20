@@ -118,12 +118,28 @@ Stop limit buy to purchase when the stop limit is hit
 Check a penetration of 100% is required
 
 
+Filter out stocks that have halted.
+Create shut off program that accepts multiple symbols
+Create a check program for stocks approaching the signal.
+Stop limit buy to purchase when the stop limit is hit
+
+Check a penetration of 100% is required
+
+Try surge volume five
+
+## Halted Stocks Update
+
+NOTE: This was done because false positive were being generated.
+This give a person a chance to still trade false positive and even positives.
+- [X] Stop filtering halted stocks at orb alert level.
+- [X] Pass 'Halted' field through to trade_generator.py.
+- [X] Update trade_generator.py to filter stock that have been halted.
 
 
 ## Halted Stocks
 
 - [X] VERY IMPORTANT: Review code/orb_alert.py:  How is it filtering stocks?
-- [ ] VERY IMPORTANT: Update code/orb_alert.py:  Before the VWAP filter add a stock halted filter.  When a stock halts there is missing timestamps in the stock date.  Stock data is per minute.  So if there is more than a minute between timestamps, the stock halted.  Here is an example 2025-09-16 09:36:00 and 2025-09-16 09:42:00.
+- [X] VERY IMPORTANT: Update code/orb_alert.py:  Before the VWAP filter add a stock halted filter.  When a stock halts there is missing timestamps in the stock date.  Stock data is per minute.  So if there is more than a minute between timestamps, the stock halted.  Here is an example 2025-09-16 09:36:00 and 2025-09-16 09:42:00.
 
 
 ## Signal
