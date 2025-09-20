@@ -127,6 +127,16 @@ Check a penetration of 100% is required
 
 Try surge volume five
 
+Connect scanner to telegram polling.
+
+Create gainers.py. Connect it to Telegram.
+
+Add news column to CSV. Manually update it. Pass it through the alerts system.
+
+Add news column to signals. Also, volume surge if possible.
+
+
+
 ## Halted Stocks Update
 
 NOTE: This was done because false positive were being generated.
