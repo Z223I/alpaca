@@ -47,6 +47,7 @@ class TelegramPollingService:
             '/unsubscribe': self._handle_unsubscribe,
             '/status': self._handle_status,
             '/help': self._handle_help,
+            '/newbie': self._handle_newbie,
             '57chevy': self._handle_alpaca_command,
             'plot': self._handle_plot_command,
             'bam': self._handle_bam_command,
@@ -316,6 +317,7 @@ Available Commands:
 /unsubscribe - Same as /stop
 /status - Check your subscription status
 /help - Show this help message
+/newbie - New trader welcome guide and tips
 
 📊 Chart Generation:
 plot -plot -symbol [TICKER] [-date YYYY-MM-DD] - Generate and send chart for any stock symbol
@@ -362,6 +364,28 @@ You'll receive:
 Questions? Contact the bot administrator."""
 
         self._send_response(chat_id, help_text)
+
+    def _handle_newbie(self, chat_id: str, username: str, first_name: str, last_name: str, text: str):
+        """Handle /newbie command."""
+        newbie_text = """**Welcome!**
+
+Daytrading is frequently very fast. In and out of a stock in ten minutes is common.
+I once made almost 9% in less than 90 seconds.
+
+**Hot Keys**
+
+Hot keys are a way to buy and sell quickly. These are supported by Lightning Trader,
+Charles Schwab (Tos), and Webull. See https://www.youtube.com/watch?v=9hgpZMvCY08
+for setup instructions.
+
+**Scanner Commands**
+
+'volume surge' and 'top gainers' function only after market open. If before market open,
+the prior trading day results will be given.
+
+**Best wishes!**"""
+
+        self._send_response(chat_id, newbie_text)
 
     def _handle_unknown_command(self, chat_id: str, text: str):
         """Handle unknown commands."""

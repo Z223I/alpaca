@@ -125,21 +125,42 @@ Stop limit buy to purchase when the stop limit is hit
 
 Check a penetration of 100% is required
 
-Try surge volume five
-
-Connect scanner to telegram polling.
-
-Create gainers.py. Connect it to Telegram.
-
 Add news column to CSV. Manually update it. Pass it through the alerts system.
 
 Add news column to signals. Also, volume surge if possible.
 
+Create a program code/percentage_bin.Py. Have it go through all historical data and bin percentage gains by minute.
 
+Can the data from volume surge be saved, and then used for top gainers? Or, can they be combined and written to two different databases?
+
+Create program and connect to telegram polling to give a list of stocks that have any type of alert. Sort by alert type give the time stamp.
+
+
+## Webull Hot Keys
+
+- [X] Set up, shortcut keys!
+
+
+## /newbie
+
+- [X] Update molecules/telegram_polling.py: Add a new command /newbie.  This command is to display:
+"**Welcome!**
+
+Daytrading is frequently very fast.  In and out of a stock in ten minutes is common. I once made almost 9% in less than 90 seconds.
+
+**Hot Keys**
+
+Hot keys are a way to buy and sell quickly.  These are supported by Lightning Trader, Charles Schwab (Tos), and Webull.  See https://www.youtube.com/watch?v=9hgpZMvCY08 for setup instructions.
+
+**Scanner Commands**
+
+'volume surge' and 'top gainers' function only after market open.  If before market open, the prior trading day results will be given.
+
+**Best wishes!**"
 
 ## Top Gainers
 
-- [ ] VERY IMPORTANT:  Remember everything you did for 'volume surge'. And apply that to update molecules/telegram_polling.py: Any user can send the command 'top gainers' case insensitive. Respond to the command by running the Python script below.  The last line of the output will contain a filename of the form ./historical_data/YYYY-MM-DD/scanner/top_gainers_*.csv. Return the file contents to the user that sent the command. Add this to the /help command.  Use a timeout of 10 minutes.  This script takes a while to run.
+- [X] VERY IMPORTANT:  Remember everything you did for 'volume surge'. And apply that to update molecules/telegram_polling.py: Any user can send the command 'top gainers' case insensitive. Respond to the command by running the Python script below.  The last line of the output will contain a filename of the form ./historical_data/YYYY-MM-DD/scanner/top_gainers_*.csv. Return the file contents to the user that sent the command. Add this to the /help command.  Use a timeout of 10 minutes.  This script takes a while to run.
 ```bash
 python code/alpaca_screener.py  --exchanges NASDAQ AMEX  --max-symbols 7000  --min-price 0.75  --max-price 40.00  --min-volume 50000 --top-gainers 20 --export-csv top_gainers_nasdaq_amex.csv --verbose
 ```
