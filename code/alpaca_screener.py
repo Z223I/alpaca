@@ -54,7 +54,7 @@ class ScreeningCriteria:
     volume_surge_days: Optional[int] = None
     
     # Data source configuration
-    feed: str = "iex"  # iex, sip, or other feed names
+    feed: str = "sip"  # iex, sip, or other feed names
     max_symbols: int = 3000
     
     # Exchange filtering (NYSE, NASDAQ, and AMEX only for safety)
@@ -262,19 +262,20 @@ class AlpacaScreener:
             # Fallback to default symbols
             return self.get_active_symbols(max_symbols, exchanges=None)
 
-    def collect_stock_data(self, symbols: List[str], lookback_days: int = 10) -> Dict[str, Dict]:
+    def collect_stock_data(self, symbols: List[str], lookback_days: int = 10, feed: str = 'sip') -> Dict[str, Dict]:
         """
         Collect current and historical data for multiple symbols.
         
         Args:
             symbols: List of stock symbols
             lookback_days: Number of days of historical data to collect
+            feed: Data feed to use ('iex', 'sip', 'boats')
             
         Returns:
             Dictionary mapping symbols to their data
         """
         if self.verbose:
-            print(f"Collecting data for {len(symbols)} symbols...")
+            print(f"Collecting data for {len(symbols)} symbols using {feed.upper()} feed...")
             
         stock_data = {}
         batch_size = 200  # Process symbols in batches to avoid API limits
@@ -304,7 +305,7 @@ class AlpacaScreener:
                             start=start_str,
                             end=end_str,
                             limit=lookback_days + 5,
-                            feed='iex'  # Use IEX for free tier
+                            feed=feed  # Use configured data feed
                         )
                         
                         if bars and len(bars) > 0:
@@ -567,7 +568,7 @@ class AlpacaScreener:
         
         # Collect stock data
         lookback_days = max(10, criteria.volume_surge_days or 0, max(criteria.sma_periods) if criteria.sma_periods else 0)
-        stock_data = self.collect_stock_data(symbols, lookback_days)
+        stock_data = self.collect_stock_data(symbols, lookback_days, criteria.feed)
         
         if not stock_data:
             print("No stock data collected")
@@ -809,7 +810,7 @@ Examples:
     
     # Data source and limits
     parser.add_argument('--max-symbols', type=int, default=3000, help='Maximum symbols to analyze (default: 3000)')
-    parser.add_argument('--feed', choices=['iex', 'sip', 'boats'], default='iex', help='Data feed to use (default: iex)')
+    parser.add_argument('--feed', choices=['iex', 'sip', 'boats'], default='sip', help='Data feed to use (default: sip)')
     
     # Exchange filtering (NYSE, NASDAQ, and AMEX for safety)
     parser.add_argument('--exchanges', type=str, nargs='+', choices=['NYSE', 'NASDAQ', 'AMEX'], help='Filter by stock exchanges (NYSE, NASDAQ, AMEX only)')
@@ -836,7 +837,7 @@ def main():
     # Available feed options
     valid_feeds = ['iex', 'sip', 'boats']
     if args.feed not in valid_feeds:
-        args.feed = 'iex'  # Default to IEX
+        args.feed = 'sip'  # Default to SIP
     
     # Create screening criteria
     criteria = ScreeningCriteria(
