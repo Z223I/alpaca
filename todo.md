@@ -137,6 +137,22 @@ Add news column to signals. Also, volume surge if possible.
 
 
 
+## Top Gainers
+
+- [ ] VERY IMPORTANT:  Remember everything you did for 'volume surge'. And apply that to update molecules/telegram_polling.py: Any user can send the command 'top gainers' case insensitive. Respond to the command by running the Python script below.  The last line of the output will contain a filename of the form ./historical_data/YYYY-MM-DD/scanner/top_gainers_*.csv. Return the file contents to the user that sent the command. Add this to the /help command.  Use a timeout of 10 minutes.  This script takes a while to run.
+```bash
+python code/alpaca_screener.py  --exchanges NASDAQ AMEX  --max-symbols 7000  --min-price 0.75  --max-price 40.00  --min-volume 50000 --top-gainers 20 --export-csv top_gainers_nasdaq_amex.csv --verbose
+```
+
+
+## Relative Volume Surge
+
+- [X] VERY IMPORTANT:  Update molecules/telegram_polling.py: Any user can send the command 'volume surge' case insensitive. Respond to the command by running the Python script below.  The last line of the output will contain a filename of the form ./historical_data/YYYY-MM-DD/scanner/relative_volume_*.csv. Return the file contents to the user that sent the command. Add this to the /help command.  Use a timeout of 10 minutes.  This script takes a while to run.
+```bash
+python code/alpaca_screener.py  --exchanges NASDAQ AMEX  --max-symbols 7000  --min-price 0.75  --max-price 40.00  --min-volume 50000 --min-percent-change 5.0  --surge-days 50  --volume-surge 5.0  --export-csv relative_volume_nasdaq_amex.csv  --verbose
+```
+
+
 ## Halted Stocks Update
 
 NOTE: This was done because false positive were being generated.

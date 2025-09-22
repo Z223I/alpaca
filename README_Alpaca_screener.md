@@ -64,7 +64,7 @@ python code/alpaca_screener.py --exchanges AMEX --min-price 1.0 --max-price 10.0
 python code/alpaca_screener.py --symbols AAPL TSLA NVDA --volume-surge 1.5 --verbose
 
 # Get top gainers and losers
-python code/alpaca_screener.py --top-gainers 10 --min-volume 100000 --verbose
+python code/alpaca_screener.py  --exchanges NASDAQ AMEX  --max-symbols 7000  --min-price 0.75  --max-price 40.00  --min-volume 50000 --top-gainers 20 --export-csv gainers_nasdaq_amex.csv --verbose
 python code/alpaca_screener.py --top-losers 5 --exchanges NYSE NASDAQ --verbose
 
 # Export results
@@ -76,7 +76,7 @@ python code/alpaca_screener.py --min-volume 500000 --export-csv results.csv --ex
 ```bash
 # Bruce: Complex screening with multiple criteria
 
-python code/alpaca_screener.py  --exchanges NASDAQ AMEX  --max-symbols 7000  --min-price 0.75  --max-price 40.00  --min-volume 50000 --min-percent-change 5.0  --surge-days 30  --volume-surge 5.0  --export-csv nasdaq_amex.csv  --verbose
+python code/alpaca_screener.py  --exchanges NASDAQ AMEX  --max-symbols 7000  --min-price 0.75  --max-price 40.00  --min-volume 50000 --min-percent-change 5.0  --surge-days 50  --volume-surge 5.0  --export-csv relative_volume_nasdaq_amex.csv  --verbose
 
 
 
