@@ -96,6 +96,14 @@ ProfileHigh.hide();
 ProfileLow.hide();
 ```
 
+Sample chart: images/image.PNG
+
+#### Alpaca Trading
+
+If the ToS script does not have stock data, atoms/api/get_stock_data.py might be useful.  Of course the stock symbol will need to be specified.
+
+Research Alpaca Trading API v2 as needed.
+
 ### Standards
 Conform to repo standards.
 Check linting compliance.
@@ -105,3 +113,5 @@ Test.
 ## Low Level Requirements
 
 Convert ToS script "volumeprofile" to a Python script.
+
+It is not necessary to match the example chart in image.png.  Mirror atoms/display/generate_chart_from_df.py instead.
