@@ -136,6 +136,30 @@ Can the data from volume surge be saved, and then used for top gainers? Or, can 
 Create program and connect to telegram polling to give a list of stocks that have any type of alert. Sort by alert type give the time stamp.
 
 
+## Convert ToS to Python
+
+### Config
+
+- [ ] claude --dangerously-skip-permissions
+- [ ] /login
+- [ ] /commit
+- [ ] Sync changes
+- [ ] /clear
+- [ ] git switch -c feature/tos_to_python
+- [ ] /clear
+- [ ] /read...
+
+### Spec File
+
+- [ ] VERY IMPORTANT. Think hard. Implement the instructions in specs/tos_to_python.md.
+- [ ] Nudge
+- [ ] /commit
+- [ ] Publish the branch
+- [ ] git switch master; merge current branch and verify that all changes are merged.
+- [ ] Sync changes
+
+
+
 ## Webull Hot Keys
 
 - [X] Set up, shortcut keys!
@@ -204,6 +228,7 @@ Test.
 ## Negative Long Delta
 
 - [X] Currently getting an error then autofix for a negative long delta.  This should not be an error.  Investigate.  Changed * 1.10 to + 0.02. I would have radically altered the alerts if left negative.  That value is used for penetration range calculation.  "Resistance" is major resistance and is very important.  I just set it to $0.02 above signal.
+
 
 ## Bam
 
