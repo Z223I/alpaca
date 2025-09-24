@@ -135,9 +135,14 @@ Can the data from volume surge be saved, and then used for top gainers? Or, can 
 
 Create program and connect to telegram polling to give a list of stocks that have any type of alert. Sort by alert type give the time stamp.
 
+
+## Pre-market Top Gainer
+
+- [ ] VERY IMPORTANT. THINK HARD. Mirror code/alpaca_screener.py. Create code/premarket_top_gainers.py: Use 5-minute candles from the previous market close to determine top-gainers.  This must work during pre-market hours. Think about: you could collect data for the last 7 days and then use only the data from since the last market close.
+
 ## Run Volume Profile in Bulk
 
-- [ ] VERY IMPORTANT. THINK HARD. Create code/volume_profile_bulk.py: Read data/YYYYMMDD.csv for today's date;
+- [X] VERY IMPORTANT. THINK HARD. Create code/volume_profile_bulk.py: Read data/YYYYMMDD.csv for today's date;
 Add a new column "POC" after the 'Signal' column;
 For each stock symbol in that file run code/volume_profile.py --symbol [symbol] --days 1 --timeframe 5Min --time-per-profile DAY --chart;
 From the .JSON output, read "summary":"avg_poc" and put it in the 'POC' field; and

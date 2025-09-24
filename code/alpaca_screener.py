@@ -278,38 +278,104 @@ class AlpacaScreener:
             print(f"Collecting data for {len(symbols)} symbols using {feed.upper()} feed...")
             
         stock_data = {}
-        batch_size = 200  # Process symbols in batches to avoid API limits
-        
+        batch_size = 100  # Optimized batch size for multi-symbol requests
+
         for i in range(0, len(symbols), batch_size):
             batch_symbols = symbols[i:i + batch_size]
-            
+
             if self.verbose:
-                print(f"Processing batch {i//batch_size + 1}/{(len(symbols)-1)//batch_size + 1}")
-            
+                print(f"Processing batch {i//batch_size + 1}/{(len(symbols)-1)//batch_size + 1} ({len(batch_symbols)} symbols)")
+
             self._rate_limit_check()
-            
+
             try:
-                # Get historical data for each symbol individually 
+                # Get historical data for ALL symbols in batch with single API call
+                end_date = datetime.now()
+                start_date = end_date - timedelta(days=lookback_days)
+
+                # Format dates properly for Alpaca API
+                start_str = start_date.strftime('%Y-%m-%d')
+                end_str = end_date.strftime('%Y-%m-%d')
+
+                bars = self.client.get_bars(
+                    batch_symbols,  # ← Multiple symbols in single request
+                    tradeapi.TimeFrame.Day,
+                    start=start_str,
+                    end=end_str,
+                    limit=lookback_days + 5,
+                    feed=feed  # Use configured data feed
+                )
+
+                if bars and len(bars) > 0:
+                    if self.verbose:
+                        print(f"  Raw API response: {len(bars)} bars total")
+
+                    # Group bars by symbol
+                    symbol_bars = {}
+                    for bar in bars:
+                        symbol = bar.S  # Symbol attribute in multi-symbol response
+                        if symbol not in symbol_bars:
+                            symbol_bars[symbol] = []
+
+                        bar_dict = {
+                            'open': float(bar.o),
+                            'high': float(bar.h),
+                            'low': float(bar.l),
+                            'close': float(bar.c),
+                            'volume': int(bar.v),
+                            'timestamp': bar.t
+                        }
+                        # Add trade count if available
+                        if hasattr(bar, 'trade_count'):
+                            bar_dict['trade_count'] = bar.trade_count
+                        symbol_bars[symbol].append(bar_dict)
+
+                    # Convert each symbol's bars to DataFrame
+                    if self.verbose:
+                        print(f"  Symbols with data: {list(symbol_bars.keys())}")
+
+                    for symbol, bar_data in symbol_bars.items():
+                        if bar_data:
+                            df = pd.DataFrame(bar_data)
+                            df.set_index('timestamp', inplace=True)
+                            # Sort by timestamp to ensure proper order
+                            df.sort_index(inplace=True)
+
+                            stock_data[symbol] = {
+                                'bars': df,
+                                'current_bar': df.iloc[-1],
+                                'historical_bars': df.iloc[:-1] if len(df) > 1 else df
+                            }
+
+                if self.verbose:
+                    batch_count = len([s for s in batch_symbols if s in stock_data])
+                    print(f"✅ Batch processed: {batch_count}/{len(batch_symbols)} symbols returned data")
+
+            except Exception as batch_error:
+                if self.verbose:
+                    print(f"❌ Error fetching batch data: {batch_error}")
+                    print("Falling back to individual symbol requests for this batch...")
+
+                # Fallback to individual requests if batch fails
                 for symbol in batch_symbols:
                     try:
+                        self._rate_limit_check()
+
                         end_date = datetime.now()
                         start_date = end_date - timedelta(days=lookback_days)
-                        
-                        # Format dates properly for Alpaca API
                         start_str = start_date.strftime('%Y-%m-%d')
                         end_str = end_date.strftime('%Y-%m-%d')
-                        
+
                         bars = self.client.get_bars(
                             symbol,
                             tradeapi.TimeFrame.Day,
                             start=start_str,
                             end=end_str,
                             limit=lookback_days + 5,
-                            feed=feed  # Use configured data feed
+                            feed=feed
                         )
-                        
+
                         if bars and len(bars) > 0:
-                            # Convert to DataFrame format
                             bar_data = []
                             for bar in bars:
                                 bar_dict = {
@@ -320,11 +386,10 @@ class AlpacaScreener:
                                     'volume': int(bar.v),
                                     'timestamp': bar.t
                                 }
-                                # Add trade count if available
                                 if hasattr(bar, 'trade_count'):
                                     bar_dict['trade_count'] = bar.trade_count
                                 bar_data.append(bar_dict)
-                            
+
                             if bar_data:
                                 df = pd.DataFrame(bar_data)
                                 df.set_index('timestamp', inplace=True)
@@ -335,13 +400,8 @@ class AlpacaScreener:
                                 }
                     except Exception as symbol_error:
                         if self.verbose:
-                            print(f"Error fetching data for {symbol}: {symbol_error}")
+                            print(f"Error fetching individual data for {symbol}: {symbol_error}")
                         continue
-                            
-            except Exception as e:
-                if self.verbose:
-                    print(f"Error collecting data for batch: {e}")
-                continue
                 
         if self.verbose:
             print(f"Successfully collected data for {len(stock_data)} symbols")
