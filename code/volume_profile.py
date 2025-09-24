@@ -17,6 +17,11 @@ Key Features:
 - Configurable price granularity
 """
 
+"""
+Execution:
+python code/volume_profile.py --symbol BBAI --days 1 --timeframe 5Min --time-per-profile DAY --chart
+"""
+
 import os
 import sys
 import argparse
@@ -31,6 +36,7 @@ from typing import Dict, List, Optional, Tuple, Union
 from enum import Enum
 import pytz
 import alpaca_trade_api as tradeapi
+import json
 
 # Add parent directory to path for imports
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -619,10 +625,87 @@ class VolumeProfile:
             plt.close()
 
             print(f"📊 Volume profile chart saved: {filepath}")
+
+            # Save JSON data with same naming convention
+            json_filename = f"{symbol}_volume_profile_{chart_date.strftime('%Y%m%d')}.json"
+            json_filepath = os.path.join(output_dir, json_filename)
+
+            if self._save_json_output(json_filepath, symbol):
+                print(f"💾 Volume profile data saved: {json_filepath}")
+
             return True
 
         except Exception as e:
             print(f"❌ Error generating chart: {e}")
+            return False
+
+    def _save_json_output(self, filepath: str, symbol: str) -> bool:
+        """
+        Save volume profile analysis results to JSON file
+
+        Args:
+            filepath: Path to save JSON file
+            symbol: Stock symbol
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Prepare JSON output data
+            output_data = {
+                "symbol": symbol,
+                "analysis_timestamp": datetime.now().isoformat(),
+                "configuration": {
+                    "time_per_profile": self.time_per_profile.value,
+                    "price_per_row_height_mode": self.price_per_row_height_mode.value,
+                    "value_area_percent": self.value_area_percent,
+                    "custom_row_height": self.custom_row_height,
+                    "multiplier": self.multiplier,
+                    "on_expansion": self.on_expansion,
+                    "profiles": self.profiles
+                },
+                "summary": self.get_profile_summary(),
+                "profiles": []
+            }
+
+            # Add detailed profile data
+            for profile in self.volume_profiles:
+                profile_data = {
+                    "period": profile["period"],
+                    "start_time": profile["start_time"].isoformat(),
+                    "end_time": profile["end_time"].isoformat(),
+                    "point_of_control": profile["point_of_control"],
+                    "value_area_high": profile["value_area_high"],
+                    "value_area_low": profile["value_area_low"],
+                    "profile_high": profile["profile_high"],
+                    "profile_low": profile["profile_low"],
+                    "total_volume": profile["total_volume"],
+                    "volume_at_price": {str(price): volume for price, volume in profile["volume_at_price"].items()}
+                }
+                output_data["profiles"].append(profile_data)
+
+            # Add raw OHLCV data
+            if self.data is not None:
+                ohlcv_data = []
+                for _, row in self.data.iterrows():
+                    ohlcv_data.append({
+                        "timestamp": row["timestamp"].isoformat(),
+                        "open": float(row["open"]),
+                        "high": float(row["high"]),
+                        "low": float(row["low"]),
+                        "close": float(row["close"]),
+                        "volume": int(row["volume"])
+                    })
+                output_data["ohlcv_data"] = ohlcv_data
+
+            # Write JSON file
+            with open(filepath, 'w') as f:
+                json.dump(output_data, f, indent=2, default=str)
+
+            return True
+
+        except Exception as e:
+            print(f"❌ Error saving JSON: {e}")
             return False
 
 
