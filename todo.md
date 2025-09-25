@@ -142,14 +142,14 @@ Create program and connect to telegram polling to give a list of stocks that hav
 
 ## Top Gainers
 
-- [ ] VERY IMPORTANT. THINK HARD.  Update molecules/telegram_polling.py: Any user can send the command 'premarket top gainers' case insensitive. Respond to the command by running the Python script below.  The last line of the output will contain a filename of the form ./historical_data/{YYYY-MM-DD}/premarket/top_gainers_*.csv. Return the file contents to the user that sent the command. Add this to the /help command.  Use a timeout of 10 minutes.  This script takes a while to run.
+- [X] VERY IMPORTANT. THINK HARD.  Update molecules/telegram_polling.py: Any user can send the command 'premarket top gainers' case insensitive. Respond to the command by running the Python script below.  The last line of the output will contain a filename of the form ./historical_data/{YYYY-MM-DD}/premarket/top_gainers_*.csv. Return the file contents to the user that sent the command. Add this to the /help command.  Use a timeout of 10 minutes.  This script takes a while to run.
 ```bash
 python code/premarket_top_gainers.py  --exchanges NASDAQ AMEX  --max-symbols 7000  --min-price 0.75  --max-price 40.00  --min-volume 50000 --top-gainers 20 --export-csv top_gainers_nasdaq_amex.csv --verbose
 ```
-- [ ] /commit
-- [ ] Publish the branch
-- [ ] git switch master; merge current branch and verify that all changes are merged.
-- [ ] Sync changes
+- [X] /commit
+- [X] Publish the branch
+- [X] git switch master; merge current branch and verify that all changes are merged.
+- [X] Sync changes
 
 
 ## Pre-market Top Gainer
