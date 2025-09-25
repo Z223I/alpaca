@@ -136,9 +136,25 @@ Can the data from volume surge be saved, and then used for top gainers? Or, can 
 Create program and connect to telegram polling to give a list of stocks that have any type of alert. Sort by alert type give the time stamp.
 
 
+## Squeeze
+
+- [ ] Monitor 'premarket top gainers' for stocks that are in a squeeze.
+
+## Top Gainers
+
+- [ ] VERY IMPORTANT. THINK HARD.  Update molecules/telegram_polling.py: Any user can send the command 'premarket top gainers' case insensitive. Respond to the command by running the Python script below.  The last line of the output will contain a filename of the form ./historical_data/{YYYY-MM-DD}/premarket/top_gainers_*.csv. Return the file contents to the user that sent the command. Add this to the /help command.  Use a timeout of 10 minutes.  This script takes a while to run.
+```bash
+python code/premarket_top_gainers.py  --exchanges NASDAQ AMEX  --max-symbols 7000  --min-price 0.75  --max-price 40.00  --min-volume 50000 --top-gainers 20 --export-csv top_gainers_nasdaq_amex.csv --verbose
+```
+- [ ] /commit
+- [ ] Publish the branch
+- [ ] git switch master; merge current branch and verify that all changes are merged.
+- [ ] Sync changes
+
+
 ## Pre-market Top Gainer
 
-- [ ] VERY IMPORTANT. THINK HARD. Mirror code/alpaca_screener.py. Create code/premarket_top_gainers.py: Use 5-minute candles from the previous market close to determine top-gainers.  This must work during pre-market hours. Think about: you could collect data for the last 7 days and then use only the data from since the last market close.
+- [X] VERY IMPORTANT. THINK HARD. Mirror code/alpaca_screener.py. Create code/premarket_top_gainers.py: Use 5-minute candles from the previous market close to determine top-gainers.  This must work during pre-market hours. Think about: you could collect data for the last 7 days and then use only the data from since the last market close.
 
 ## Run Volume Profile in Bulk
 

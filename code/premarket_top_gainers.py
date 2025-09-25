@@ -328,83 +328,31 @@ class PremarketTopGainersScanner:
             print(f"Data range: {start_time.strftime('%Y-%m-%d %H:%M')} to {end_time.strftime('%Y-%m-%d %H:%M')} ET")
 
         all_bars_data = {}
-        batch_size = 100  # Optimized batch size for multi-symbol requests
+        batch_size = 50  # Process symbols in batches to avoid API limits
 
         for i in range(0, len(symbols), batch_size):
             batch_symbols = symbols[i:i + batch_size]
 
             if self.verbose:
-                print(f"Processing batch {i//batch_size + 1}/{(len(symbols)-1)//batch_size + 1} ({len(batch_symbols)} symbols)")
+                print(f"Processing batch {i//batch_size + 1}/{(len(symbols)-1)//batch_size + 1}")
+
+            self._rate_limit_check()
 
             try:
-                self._rate_limit_check()
-
-                # Get 5-minute bars for ALL symbols in batch with single API call
-                bars = self.client.get_bars(
-                    batch_symbols,  # ← Multiple symbols in single request
-                    tradeapi.TimeFrame(5, tradeapi.TimeFrameUnit.Minute),  # 5-minute bars
-                    start=start_time.strftime('%Y-%m-%d'),
-                    end=end_time.strftime('%Y-%m-%d'),
-                    limit=5000,  # Large limit to capture all data
-                    feed=criteria.feed
-                )
-
-                if bars and len(bars) > 0:
-                    # Group bars by symbol
-                    symbol_bars = {}
-                    for bar in bars:
-                        symbol = bar.S  # Symbol attribute in multi-symbol response
-                        if symbol not in symbol_bars:
-                            symbol_bars[symbol] = []
-
-                        bar_dict = {
-                            'open': float(bar.o),
-                            'high': float(bar.h),
-                            'low': float(bar.l),
-                            'close': float(bar.c),
-                            'volume': int(bar.v),
-                            'timestamp': bar.t
-                        }
-                        symbol_bars[symbol].append(bar_dict)
-
-                    # Convert each symbol's bars to DataFrame
-                    for symbol, bar_data in symbol_bars.items():
-                        if bar_data:
-                            df = pd.DataFrame(bar_data)
-                            df.set_index('timestamp', inplace=True)
-                            # Ensure timezone-aware index
-                            if df.index.tz is None:
-                                df.index = df.index.tz_localize('UTC')
-                            df.index = df.index.tz_convert(self.et_tz)
-                            # Sort by timestamp to ensure proper order
-                            df.sort_index(inplace=True)
-
-                            all_bars_data[symbol] = df
-
-                if self.verbose:
-                    batch_count = len([s for s in batch_symbols if s in all_bars_data])
-                    print(f"✅ Batch processed: {batch_count}/{len(batch_symbols)} symbols returned data")
-
-            except Exception as batch_error:
-                if self.verbose:
-                    print(f"❌ Error fetching batch data: {batch_error}")
-                    print("Falling back to individual symbol requests for this batch...")
-
-                # Fallback to individual requests if batch fails
+                # Get 5-minute bars for each symbol individually
                 for symbol in batch_symbols:
                     try:
-                        self._rate_limit_check()
-
                         bars = self.client.get_bars(
-                            symbol,
-                            tradeapi.TimeFrame(5, tradeapi.TimeFrameUnit.Minute),
+                            symbol,  # Individual symbol request
+                            tradeapi.TimeFrame(5, tradeapi.TimeFrameUnit.Minute),  # 5-minute bars
                             start=start_time.strftime('%Y-%m-%d'),
                             end=end_time.strftime('%Y-%m-%d'),
-                            limit=5000,
+                            limit=5000,  # Large limit to capture all data
                             feed=criteria.feed
                         )
 
                         if bars and len(bars) > 0:
+                            # Convert to DataFrame format
                             bar_data = []
                             for bar in bars:
                                 bar_dict = {
@@ -420,15 +368,22 @@ class PremarketTopGainersScanner:
                             if bar_data:
                                 df = pd.DataFrame(bar_data)
                                 df.set_index('timestamp', inplace=True)
+                                # Ensure timezone-aware index
                                 if df.index.tz is None:
                                     df.index = df.index.tz_localize('UTC')
                                 df.index = df.index.tz_convert(self.et_tz)
+
                                 all_bars_data[symbol] = df
 
                     except Exception as symbol_error:
                         if self.verbose:
-                            print(f"Error fetching individual data for {symbol}: {symbol_error}")
+                            print(f"Error fetching data for {symbol}: {symbol_error}")
                         continue
+
+            except Exception as e:
+                if self.verbose:
+                    print(f"Error collecting data for batch: {e}")
+                continue
 
         if self.verbose:
             print(f"Successfully collected raw data for {len(all_bars_data)} symbols")
