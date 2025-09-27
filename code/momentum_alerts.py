@@ -327,8 +327,8 @@ class MomentumAlertsSystem:
                     bars = self.historical_client.get_bars(
                         symbol,
                         tradeapi.TimeFrame(1, tradeapi.TimeFrameUnit.Minute),  # 1-minute bars
-                        start=start_time.strftime('%Y-%m-%dT%H:%M:%SZ'),
-                        end=end_time.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                        start=start_time.astimezone(pytz.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                        end=end_time.astimezone(pytz.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'),
                         limit=1000,
                         feed='sip'  # Use SIP feed
                     )
