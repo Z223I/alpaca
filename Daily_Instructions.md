@@ -18,6 +18,12 @@ Morning
 
 ## Execute Code
 
+### New
+
+```bash
+python code/volume_profile_bulk.py
+```
+
 ### Automated Alerts Watch (Recommended)
 
 Fully automated system that manages all ORB alert processes during market hours (9:30 AM - 4:00 PM ET, Mon-Fri). Automatically starts all processes at market open, monitors them, and runs post-market analysis.

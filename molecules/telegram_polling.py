@@ -54,7 +54,8 @@ class TelegramPollingService:
             'signal': self._handle_signal_command,
             'volume surge': self._handle_volume_surge_command,
             'top gainers': self._handle_top_gainers_command,
-            'premarket top gainers': self._handle_premarket_top_gainers_command
+            'premarket top gainers': self._handle_premarket_top_gainers_command,
+            'market open top gainers': self._handle_market_open_top_gainers_command
         }
 
         # Authorized users for Alpaca commands
@@ -212,6 +213,9 @@ class TelegramPollingService:
             elif text.lower() == 'premarket top gainers':
                 # Handle premarket top gainers trigger word (any user)
                 self._handle_premarket_top_gainers_command(chat_id, username, first_name, last_name, text)
+            elif text.lower() == 'market open top gainers':
+                # Handle market open top gainers trigger word (any user)
+                self._handle_market_open_top_gainers_command(chat_id, username, first_name, last_name, text)
             else:
                 # Handle non-command messages
                 self._handle_regular_message(chat_id, username, first_name, text)
@@ -354,7 +358,14 @@ premarket top gainers - Find top 20 premarket gaining stocks on NASDAQ/AMEX
   • Scans up to 7,000 symbols for premarket activity
   • Filters stocks $0.75-$40.00 with 50K+ volume
   • Analyzes 5-minute candles since last market close
-  • Returns detailed premarket CSV results (may take up to 10 minutes)"""
+  • Returns detailed premarket CSV results (may take up to 10 minutes)
+
+📈 Market Open Top Gainers Scanner:
+market open top gainers - Find top 20 market open gaining stocks on NASDAQ/AMEX
+  • Scans up to 7,000 symbols for market activity since open
+  • Filters stocks $0.75-$40.00 with 50K+ volume
+  • Analyzes 1-minute candles from market open to current/close
+  • Returns detailed market CSV results (may take up to 15 minutes)"""
 
         # Add admin commands section only for Bruce
         if self._is_authorized_user(username, first_name):
@@ -1019,6 +1030,26 @@ the prior trading day results will be given.
             self._log(f"Error handling premarket top gainers command: {e}", "ERROR")
             self._send_response(chat_id, f"❌ Error executing premarket top gainers command: {str(e)}")
 
+    def _handle_market_open_top_gainers_command(self, chat_id: str, username: str, first_name: str, last_name: str, text: str):
+        """Handle 'market open top gainers' command to run market_open_top_gainers.py."""
+        try:
+            display_name = f"{first_name} {last_name}".strip() or username or f"User_{chat_id[-4:]}"
+            self._log(f"📈 Market open top gainers command from {display_name}: {text}")
+
+            # Send processing message
+            message = "📈 Running market open top gainers scanner... This may take up to 15 minutes."
+            self._send_response(chat_id, message)
+
+            # Execute market_open_top_gainers.py script
+            result = self._execute_market_open_top_gainers_command()
+
+            # Send result back to user
+            self._send_response(chat_id, result)
+
+        except Exception as e:
+            self._log(f"Error handling market open top gainers command: {e}", "ERROR")
+            self._send_response(chat_id, f"❌ Error executing market open top gainers command: {str(e)}")
+
     def _execute_premarket_top_gainers_command(self) -> str:
         """Execute premarket_top_gainers.py command and return output with CSV file contents."""
         try:
@@ -1106,6 +1137,94 @@ the prior trading day results will be given.
             return "❌ Premarket Top Gainers Scanner timed out after 10 minutes"
         except Exception as e:
             return f"❌ Error executing Premarket Top Gainers Scanner: {str(e)}"
+
+    def _execute_market_open_top_gainers_command(self) -> str:
+        """Execute market_open_top_gainers.py command and return output with CSV file contents."""
+        try:
+            import subprocess
+            import glob
+
+            # Get project root directory
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            market_open_script = os.path.join(project_root, 'code', 'market_open_top_gainers.py')
+
+            # Use conda environment python to execute the script
+            python_path = os.path.expanduser('~/miniconda3/envs/alpaca/bin/python')
+
+            # Build command with the specified arguments for market open top gainers
+            cmd = [
+                python_path, market_open_script,
+                '--exchanges', 'NASDAQ', 'AMEX',
+                '--max-symbols', '7000',
+                '--min-price', '0.75',
+                '--max-price', '40.00',
+                '--min-volume', '50000',
+                '--top-gainers', '20',
+                '--export-csv', 'gainers_nasdaq_amex.csv',
+                '--verbose'
+            ]
+
+            # Execute command with 15 minute timeout
+            result = subprocess.run(
+                cmd,
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=900  # 15 minutes timeout
+            )
+
+            # Get output
+            output = result.stdout.strip()
+            error_output = result.stderr.strip()
+
+            if result.returncode == 0:
+                # Extract filename from last line of output
+                lines = output.split('\n')
+                csv_file_path = None
+
+                # Look for a line containing the CSV file path
+                for line in reversed(lines):
+                    if 'gainers_' in line and '.csv' in line:
+                        # Extract the file path from the line
+                        # Handle format like "Results exported to ./historical_data/..."
+                        if 'Results exported to' in line:
+                            csv_file_path = line.split('Results exported to')[1].strip()
+                        else:
+                            csv_file_path = line.strip()
+                        break
+
+                if csv_file_path:
+                    # Try to read the CSV file
+                    full_csv_path = os.path.join(project_root, csv_file_path)
+                    try:
+                        with open(full_csv_path, 'r') as f:
+                            csv_content = f.read().strip()
+
+                        # Format CSV content to 3 decimal places
+                        formatted_csv = self._format_csv_decimals(csv_content, decimal_places=3)
+
+                        # Return the CSV content
+                        return (f"📈 Market Open Top Gainers Scanner Results:\n\n"
+                                f"📄 **File:** `{csv_file_path}`\n\n"
+                                f"```csv\n{formatted_csv}\n```")
+
+                    except FileNotFoundError:
+                        return (f"📈 Scanner completed successfully but CSV file not found "
+                                f"at: {csv_file_path}\n\n```\n{output}\n```")
+                    except Exception as e:
+                        return (f"📈 Scanner completed but error reading CSV file: "
+                                f"{str(e)}\n\n```\n{output}\n```")
+                else:
+                    return f"📈 Market Open Top Gainers Scanner Results:\n```\n{output}\n```"
+            else:
+                error_msg = error_output if error_output else output
+                return (f"❌ Market Open Top Gainers Scanner failed (exit code: "
+                        f"{result.returncode}):\n```\n{error_msg}\n```")
+
+        except subprocess.TimeoutExpired:
+            return "❌ Market Open Top Gainers Scanner timed out after 15 minutes"
+        except Exception as e:
+            return f"❌ Error executing Market Open Top Gainers Scanner: {str(e)}"
 
     def _format_csv_decimals(self, csv_content: str, decimal_places: int = 3) -> str:
         """Format CSV content to show specified number of decimal places for numeric values."""

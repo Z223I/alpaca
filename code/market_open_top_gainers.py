@@ -1,27 +1,27 @@
 #!/usr/bin/env python3
 """
-Premarket Top Gainers Scanner
+Market Open Top Gainers Scanner
 
 A specialized scanner that identifies top gaining stocks by comparing current prices
-to the previous market close. Uses 5-minute candles and can run at any time of day
-to find stocks that have gained since the last market close.
+to the market open. Uses 1-minute candles and can run during market hours or after
+market close to find stocks that have gained since the market open.
 
 Strategy:
-- Collect 5-minute bars for the last 7 days
-- Identify the last market close (4:00 PM ET on most recent trading day)
-- Filter data to only include bars since that last market close
-- Calculate gains from previous close to current price (premarket or regular hours)
+- Collect 1-minute bars for the last 3 days
+- Identify the market open (9:30 AM ET on current or most recent trading day)
+- Filter data from market open to current time (during market hours) or market close (after hours)
+- Calculate gains from market open to current/close price
 - Rank stocks by highest percentage gains
 
-Can be run during premarket hours (4:00-9:30 AM ET) for real-time premarket analysis,
-or at any other time to analyze post-close and premarket activity since last close.
+Can be run during market hours (9:30 AM-4:00 PM ET) for real-time market analysis,
+or after market close to analyze full-day performance since market open.
 
-Mirrors the structure of alpaca_screener.py for consistency.
+Mirrors the structure of premarket_top_gainers.py for consistency.
 """
 
 """
 Usage:
-python code/premarket_top_gainers.py  --exchanges NASDAQ AMEX  --max-symbols 7000  --min-price 0.75  --max-price 40.00  --min-volume 50000 --top-gainers 20 --export-csv gainers_nasdaq_amex.csv --verbose
+python code/market_open_top_gainers.py  --exchanges NASDAQ AMEX  --max-symbols 7000  --min-price 0.75  --max-price 40.00  --min-volume 50000 --top-gainers 20 --export-csv gainers_nasdaq_amex.csv --verbose
 """
 
 import argparse
@@ -45,18 +45,18 @@ from atoms.api.init_alpaca_client import init_alpaca_client
 
 
 @dataclass
-class PremarketCriteria:
-    """Configuration class for premarket top gainers screening."""
+class MarketOpenCriteria:
+    """Configuration class for market open top gainers screening."""
     # Minimum thresholds
     min_price: Optional[float] = 0.75
     max_price: Optional[float] = None
-    min_volume: Optional[int] = 50_000  # Volume threshold (matches alpaca_screener.py)
+    min_volume: Optional[int] = 50_000  # Volume threshold during market hours
     min_gain_percent: Optional[float] = 1.0  # Minimum gain to be considered
 
     # Data collection settings
     feed: str = "sip"  # iex, sip, or other feed names
-    max_symbols: int = 1000  # Smaller set for premarket efficiency
-    lookback_days: int = 7  # Days to look back for finding last market close
+    max_symbols: int = 1000  # Smaller set for market efficiency
+    lookback_days: int = 3  # Days to look back for finding market open
 
     # Exchange filtering (NYSE, NASDAQ, and AMEX only for safety)
     exchanges: Optional[List[str]] = None
@@ -68,35 +68,35 @@ class PremarketCriteria:
 
 
 @dataclass
-class PremarketResult:
-    """Data class for premarket top gainers results."""
+class MarketOpenResult:
+    """Data class for market open top gainers results."""
     symbol: str
     current_price: float
-    previous_close: float
+    market_open_price: float
     gain_percent: float
-    premarket_volume: int
-    premarket_high: float
-    premarket_low: float
-    premarket_range: float
+    market_volume: int
+    market_high: float
+    market_low: float
+    market_range: float
     current_timestamp: datetime
-    previous_close_timestamp: datetime
+    market_open_timestamp: datetime
 
     # Additional metrics
     dollar_volume: float = 0.0
-    total_premarket_bars: int = 0
+    total_market_bars: int = 0
 
     def __post_init__(self):
-        self.dollar_volume = self.premarket_volume * self.current_price
-        self.premarket_range = self.premarket_high - self.premarket_low
+        self.dollar_volume = self.market_volume * self.current_price
+        self.market_range = self.market_high - self.market_low
 
 
-class PremarketTopGainersScanner:
-    """Main premarket top gainers scanner class."""
+class MarketOpenTopGainersScanner:
+    """Main market open top gainers scanner class."""
 
     def __init__(self, provider: str = "alpaca", account: str = "Bruce", environment: str = "paper",
                  verbose: bool = False):
         """
-        Initialize the premarket scanner.
+        Initialize the market open scanner.
 
         Args:
             provider: API provider (default: "alpaca")
@@ -123,7 +123,7 @@ class PremarketTopGainersScanner:
         self.call_times = []
 
         if self.verbose:
-            print(f"Initialized Premarket Scanner - Account: {account}, Environment: {environment}")
+            print(f"Initialized Market Open Scanner - Account: {account}, Environment: {environment}")
             current_et = datetime.now(self.et_tz)
             print(f"Current ET time: {current_et.strftime('%Y-%m-%d %H:%M:%S %Z')}")
 
@@ -143,8 +143,8 @@ class PremarketTopGainersScanner:
 
         self.call_times.append(current_time)
 
-    def is_premarket_hours(self) -> bool:
-        """Check if current time is during premarket hours (4:00 AM - 9:30 AM ET)."""
+    def is_market_hours(self) -> bool:
+        """Check if current time is during market hours (9:30 AM - 4:00 PM ET)."""
         current_et = datetime.now(self.et_tz)
         current_time = current_et.time()
         current_weekday = current_et.weekday()  # Monday = 0, Sunday = 6
@@ -153,12 +153,12 @@ class PremarketTopGainersScanner:
         if current_weekday >= 5:
             return False
 
-        # Check if between 4:00 AM and 9:30 AM ET
-        return self.premarket_start <= current_time < self.market_open
+        # Check if between 9:30 AM and 4:00 PM ET
+        return self.market_open <= current_time <= self.market_close
 
     def get_active_symbols(self, max_symbols: int = 1000, exchanges: Optional[List[str]] = None) -> List[str]:
         """
-        Get list of actively traded symbols suitable for premarket scanning.
+        Get list of actively traded symbols suitable for market scanning.
 
         Args:
             max_symbols: Maximum number of symbols to return
@@ -168,7 +168,7 @@ class PremarketTopGainersScanner:
             List of symbol strings
         """
         if self.verbose:
-            print(f"Fetching active symbols for premarket scanning...")
+            print(f"Fetching active symbols for market scanning...")
             if exchanges:
                 print(f"Filtering by exchanges: {', '.join(exchanges)}")
 
@@ -185,7 +185,7 @@ class PremarketTopGainersScanner:
                 symbols = [stock.symbol for stock in most_actives]
 
                 if self.verbose:
-                    print(f"Found {len(symbols)} active symbols for premarket scanning")
+                    print(f"Found {len(symbols)} active symbols for market scanning")
 
                 return symbols
             else:
@@ -195,8 +195,8 @@ class PremarketTopGainersScanner:
             if self.verbose:
                 print(f"Error fetching active symbols: {e}")
 
-        # Fallback to popular premarket trading symbols
-        premarket_favorites = [
+        # Fallback to popular market trading symbols
+        market_favorites = [
             'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'META', 'NFLX',
             'AMD', 'INTC', 'SPY', 'QQQ', 'IWM', 'BABA', 'DIS', 'PYPL',
             'ADBE', 'CRM', 'ORCL', 'UBER', 'LYFT', 'SNAP', 'ZOOM', 'DOCU',
@@ -206,8 +206,8 @@ class PremarketTopGainersScanner:
         ]
 
         if self.verbose:
-            print(f"Using premarket favorites: {len(premarket_favorites[:max_symbols])} symbols")
-        return premarket_favorites[:max_symbols]
+            print(f"Using market favorites: {len(market_favorites[:max_symbols])} symbols")
+        return market_favorites[:max_symbols]
 
     def _get_symbols_by_exchange(self, exchanges: List[str], max_symbols: int) -> List[str]:
         """Get symbols filtered by specific exchanges (mirrors alpaca_screener.py)."""
@@ -252,20 +252,20 @@ class PremarketTopGainersScanner:
                 print(f"Error filtering by exchange: {e}")
             return self.get_active_symbols(max_symbols, exchanges=None)
 
-    def find_last_market_close_data(self, bars_data: Dict[str, pd.DataFrame]) -> Optional[Dict]:
+    def find_market_open_data(self, bars_data: Dict[str, pd.DataFrame]) -> Optional[Dict]:
         """
-        Find the actual last market close bar (4:00 PM ET) from the collected data.
+        Find the actual market open bar (9:30 AM ET) from the collected data.
 
         Args:
-            bars_data: Dictionary of symbol -> DataFrame of 5-minute bars
+            bars_data: Dictionary of symbol -> DataFrame of 1-minute bars
 
         Returns:
-            Dictionary with close_timestamp and close_bars_dict, or None if not found
+            Dictionary with open_timestamp and open_bars_dict, or None if not found
         """
         if not bars_data:
             return None
 
-        # Get a representative symbol's data to find market close times
+        # Get a representative symbol's data to find market open times
         sample_symbol = next(iter(bars_data.keys()))
         sample_bars = bars_data[sample_symbol]
 
@@ -276,13 +276,11 @@ class PremarketTopGainersScanner:
         current_time = current_et.time()
         current_date = current_et.date()
 
-        # Find the most recent completed trading day
+        # Determine which trading day's market open to use
         target_date = current_date
 
-        # If market is still open today or it's after hours today, use yesterday
-        if (current_et.weekday() < 5 and
-            (current_time < self.market_close or
-             (current_time >= self.market_close and current_time < dt_time(20, 0)))):
+        # If it's before market open today, use yesterday's open
+        if (current_et.weekday() < 5 and current_time < self.market_open):
             target_date = current_date - timedelta(days=1)
 
         # Skip back to most recent weekday
@@ -290,16 +288,16 @@ class PremarketTopGainersScanner:
             target_date -= timedelta(days=1)
 
         if self.verbose:
-            print(f"Looking for market close on: {target_date}")
+            print(f"Looking for market open on: {target_date}")
 
-        # Look for the 4:00 PM ET bar on the target date across all symbols
-        target_close_time = self.et_tz.localize(
-            datetime.combine(target_date, self.market_close)
+        # Look for the 9:30 AM ET bar on the target date across all symbols
+        target_open_time = self.et_tz.localize(
+            datetime.combine(target_date, self.market_open)
         )
 
-        # Find bars closest to 4:00 PM ET (within 10 minutes)
-        close_bars_dict = {}
-        found_any_close = False
+        # Find bars closest to 9:30 AM ET (within 5 minutes)
+        open_bars_dict = {}
+        found_any_open = False
 
         for symbol, bars_df in bars_data.items():
             if bars_df.empty:
@@ -311,55 +309,55 @@ class PremarketTopGainersScanner:
             if target_date_bars.empty:
                 continue
 
-            # Find the bar closest to 4:00 PM ET
-            time_diffs = abs(target_date_bars.index - target_close_time)
+            # Find the bar closest to 9:30 AM ET
+            time_diffs = abs(target_date_bars.index - target_open_time)
             min_diff_idx = time_diffs.argmin()
             closest_idx = target_date_bars.index[min_diff_idx]
             closest_bar = target_date_bars.loc[closest_idx]
             closest_time = closest_idx
 
-            # Verify it's reasonably close to market close (within 10 minutes)
-            time_diff_minutes = abs((closest_time - target_close_time).total_seconds()) / 60
+            # Verify it's reasonably close to market open (within 5 minutes)
+            time_diff_minutes = abs((closest_time - target_open_time).total_seconds()) / 60
 
-            if time_diff_minutes <= 10:  # Within 10 minutes of 4:00 PM ET
-                close_bars_dict[symbol] = {
-                    'close_price': float(closest_bar['close']),
-                    'close_time': closest_time,
+            if time_diff_minutes <= 5:  # Within 5 minutes of 9:30 AM ET
+                open_bars_dict[symbol] = {
+                    'open_price': float(closest_bar['open']),
+                    'open_time': closest_time,
                     'bar_data': closest_bar
                 }
-                found_any_close = True
+                found_any_open = True
 
                 if self.verbose and symbol == sample_symbol:
-                    print(f"Found market close bar for {symbol}: {closest_time.strftime('%Y-%m-%d %H:%M:%S %Z')} "
-                          f"(${closest_bar['close']:.2f})")
+                    print(f"Found market open bar for {symbol}: {closest_time.strftime('%Y-%m-%d %H:%M:%S %Z')} "
+                          f"(${closest_bar['open']:.2f})")
 
-        if found_any_close:
+        if found_any_open:
             return {
-                'close_timestamp': target_close_time,
-                'close_bars_dict': close_bars_dict,
+                'open_timestamp': target_open_time,
+                'open_bars_dict': open_bars_dict,
                 'target_date': target_date
             }
 
         if self.verbose:
-            print("Could not find market close bars in data")
+            print("Could not find market open bars in data")
         return None
 
-    def collect_premarket_data(self, symbols: List[str], criteria: PremarketCriteria) -> Dict[str, Dict]:
+    def collect_market_data(self, symbols: List[str], criteria: MarketOpenCriteria) -> Dict[str, Dict]:
         """
-        Collect 5-minute bars for the last 7 days, then filter for premarket data.
+        Collect 1-minute bars for the last 3 days, then filter for market data.
 
         Args:
             symbols: List of stock symbols
-            criteria: Premarket screening criteria
+            criteria: Market open screening criteria
 
         Returns:
-            Dictionary mapping symbols to their premarket data
+            Dictionary mapping symbols to their market data
         """
         if self.verbose:
-            print(f"Collecting premarket data for {len(symbols)} symbols...")
+            print(f"Collecting market data for {len(symbols)} symbols...")
             print(f"Using {criteria.feed.upper()} feed with {criteria.lookback_days}-day lookback")
 
-        # Calculate date range (7 days back to capture last market close)
+        # Calculate date range (3 days back to capture market open)
         end_time = datetime.now(self.et_tz)
         start_time = end_time - timedelta(days=criteria.lookback_days)
 
@@ -378,15 +376,15 @@ class PremarketTopGainersScanner:
             self._rate_limit_check()
 
             try:
-                # Get 5-minute bars for each symbol individually
+                # Get 1-minute bars for each symbol individually
                 for symbol in batch_symbols:
                     try:
                         bars = self.client.get_bars(
                             symbol,  # Individual symbol request
-                            tradeapi.TimeFrame(5, tradeapi.TimeFrameUnit.Minute),  # 5-minute bars
+                            tradeapi.TimeFrame(1, tradeapi.TimeFrameUnit.Minute),  # 1-minute bars
                             start=start_time.strftime('%Y-%m-%d'),
                             end=end_time.strftime('%Y-%m-%d'),
-                            limit=5000,  # Large limit to capture all data
+                            limit=10000,  # Larger limit for 1-minute bars
                             feed=criteria.feed
                         )
 
@@ -427,110 +425,129 @@ class PremarketTopGainersScanner:
         if self.verbose:
             print(f"Successfully collected raw data for {len(all_bars_data)} symbols")
 
-        # Find the actual last market close data
-        market_close_data = self.find_last_market_close_data(all_bars_data)
-        if not market_close_data:
+        # Find the actual market open data
+        market_open_data = self.find_market_open_data(all_bars_data)
+        if not market_open_data:
             if self.verbose:
-                print("Could not determine last market close. Using fallback method.")
-            # Fallback: find the most recent completed trading day at 4 PM
+                print("Could not determine market open. Using fallback method.")
+            # Fallback: find the current or most recent trading day at 9:30 AM
             current_et = datetime.now(self.et_tz)
             target_date = current_et.date()
 
-            # If market is still open today or it's after hours today, use yesterday
-            if (current_et.weekday() < 5 and
-                (current_et.time() < self.market_close or
-                 (current_et.time() >= self.market_close and current_et.time() < dt_time(20, 0)))):
+            # If it's before market open today, use yesterday's open
+            if (current_et.weekday() < 5 and current_et.time() < self.market_open):
                 target_date = current_et.date() - timedelta(days=1)
 
             # Skip backwards to most recent weekday
             while target_date.weekday() >= 5:
                 target_date -= timedelta(days=1)
 
-            fallback_close_time = self.et_tz.localize(
-                datetime.combine(target_date, self.market_close)
+            fallback_open_time = self.et_tz.localize(
+                datetime.combine(target_date, self.market_open)
             )
 
             if self.verbose:
-                print(f"Using fallback market close: {fallback_close_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+                print(f"Using fallback market open: {fallback_open_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
 
-            # Create fallback close data using last available bars before fallback time
-            market_close_data = {
-                'close_timestamp': fallback_close_time,
-                'close_bars_dict': {},
+            # Create fallback open data using first available bars after fallback time
+            market_open_data = {
+                'open_timestamp': fallback_open_time,
+                'open_bars_dict': {},
                 'target_date': target_date
             }
 
             for symbol, bars_df in all_bars_data.items():
-                fallback_close_bars = bars_df[bars_df.index <= fallback_close_time]
-                if not fallback_close_bars.empty:
-                    last_bar = fallback_close_bars.iloc[-1]
-                    market_close_data['close_bars_dict'][symbol] = {
-                        'close_price': float(last_bar['close']),
-                        'close_time': fallback_close_bars.index[-1],
-                        'bar_data': last_bar
+                fallback_open_bars = bars_df[bars_df.index >= fallback_open_time]
+                if not fallback_open_bars.empty:
+                    first_bar = fallback_open_bars.iloc[0]
+                    market_open_data['open_bars_dict'][symbol] = {
+                        'open_price': float(first_bar['open']),
+                        'open_time': fallback_open_bars.index[0],
+                        'bar_data': first_bar
                     }
 
-        close_timestamp = market_close_data['close_timestamp']
-        close_bars_dict = market_close_data['close_bars_dict']
+        open_timestamp = market_open_data['open_timestamp']
+        open_bars_dict = market_open_data['open_bars_dict']
 
-        # Filter data to only include bars since market close
-        premarket_data = {}
+        # Determine end time for data filtering
+        current_et = datetime.now(self.et_tz)
+        if self.is_market_hours():
+            # During market hours, use current time
+            end_filter_time = current_et
+            if self.verbose:
+                print("Running during market hours - calculating gains to current time")
+        else:
+            # After market hours, use market close
+            target_date = market_open_data['target_date']
+            end_filter_time = self.et_tz.localize(
+                datetime.combine(target_date, self.market_close)
+            )
+            if self.verbose:
+                print("Running after market hours - calculating gains to market close")
+
+        # Filter data from market open to end time
+        market_data = {}
         for symbol, bars_df in all_bars_data.items():
-            # Skip symbols without close data
-            if symbol not in close_bars_dict:
+            # Skip symbols without open data
+            if symbol not in open_bars_dict:
                 continue
 
-            # Filter for bars after market close timestamp
-            premarket_bars = bars_df[bars_df.index > close_timestamp]
+            # Filter for bars from market open to end time
+            market_bars = bars_df[
+                (bars_df.index >= open_timestamp) &
+                (bars_df.index <= end_filter_time)
+            ]
 
-            if not premarket_bars.empty:
-                close_info = close_bars_dict[symbol]
-                premarket_data[symbol] = {
-                    'premarket_bars': premarket_bars,
-                    'previous_close': close_info['close_price'],
-                    'previous_close_time': close_info['close_time'],
-                    'last_market_close_ref': close_timestamp
+            if not market_bars.empty:
+                open_info = open_bars_dict[symbol]
+                market_data[symbol] = {
+                    'market_bars': market_bars,
+                    'market_open_price': open_info['open_price'],
+                    'market_open_time': open_info['open_time'],
+                    'market_open_ref': open_timestamp,
+                    'end_filter_time': end_filter_time
                 }
 
         if self.verbose:
-            print(f"Filtered to {len(premarket_data)} symbols with premarket activity")
-            if close_timestamp:
-                print(f"Reference market close: {close_timestamp.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+            print(f"Filtered to {len(market_data)} symbols with market activity")
+            if open_timestamp:
+                print(f"Reference market open: {open_timestamp.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+            print(f"End filter time: {end_filter_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
 
-        return premarket_data
+        return market_data
 
-    def calculate_top_gainers(self, premarket_data: Dict[str, Dict], criteria: PremarketCriteria) -> List[PremarketResult]:
+    def calculate_top_gainers(self, market_data: Dict[str, Dict], criteria: MarketOpenCriteria) -> List[MarketOpenResult]:
         """
-        Calculate top gainers from premarket data.
+        Calculate top gainers from market data.
 
         Args:
-            premarket_data: Dictionary of symbol -> premarket data
+            market_data: Dictionary of symbol -> market data
             criteria: Screening criteria
 
         Returns:
-            List of PremarketResult objects sorted by gain percentage
+            List of MarketOpenResult objects sorted by gain percentage
         """
         if self.verbose:
-            print(f"Calculating gains for {len(premarket_data)} symbols...")
+            print(f"Calculating gains for {len(market_data)} symbols...")
 
         results = []
 
-        for symbol, data in premarket_data.items():
+        for symbol, data in market_data.items():
             try:
-                premarket_bars = data['premarket_bars']
-                previous_close = data['previous_close']
-                previous_close_time = data['previous_close_time']
+                market_bars = data['market_bars']
+                market_open_price = data['market_open_price']
+                market_open_time = data['market_open_time']
 
-                if premarket_bars.empty:
+                if market_bars.empty:
                     continue
 
-                # Get current premarket metrics
-                current_bar = premarket_bars.iloc[-1]
+                # Get current market metrics
+                current_bar = market_bars.iloc[-1]
                 current_price = float(current_bar['close'])
-                current_timestamp = premarket_bars.index[-1]
+                current_timestamp = market_bars.index[-1]
 
                 # Calculate gain percentage
-                gain_percent = ((current_price - previous_close) / previous_close) * 100
+                gain_percent = ((current_price - market_open_price) / market_open_price) * 100
 
                 # Apply filters
                 if criteria.min_gain_percent and gain_percent < criteria.min_gain_percent:
@@ -542,27 +559,27 @@ class PremarketTopGainersScanner:
                 if criteria.max_price and current_price > criteria.max_price:
                     continue
 
-                # Calculate premarket aggregated metrics
-                premarket_volume = int(premarket_bars['volume'].sum())
-                premarket_high = float(premarket_bars['high'].max())
-                premarket_low = float(premarket_bars['low'].min())
+                # Calculate market aggregated metrics
+                market_volume = int(market_bars['volume'].sum())
+                market_high = float(market_bars['high'].max())
+                market_low = float(market_bars['low'].min())
 
-                if criteria.min_volume and premarket_volume < criteria.min_volume:
+                if criteria.min_volume and market_volume < criteria.min_volume:
                     continue
 
                 # Create result
-                result = PremarketResult(
+                result = MarketOpenResult(
                     symbol=symbol,
                     current_price=current_price,
-                    previous_close=previous_close,
+                    market_open_price=market_open_price,
                     gain_percent=gain_percent,
-                    premarket_volume=premarket_volume,
-                    premarket_high=premarket_high,
-                    premarket_low=premarket_low,
-                    premarket_range=premarket_high - premarket_low,
+                    market_volume=market_volume,
+                    market_high=market_high,
+                    market_low=market_low,
+                    market_range=market_high - market_low,
                     current_timestamp=current_timestamp,
-                    previous_close_timestamp=previous_close_time,
-                    total_premarket_bars=len(premarket_bars)
+                    market_open_timestamp=market_open_time,
+                    total_market_bars=len(market_bars)
                 )
 
                 results.append(result)
@@ -580,32 +597,32 @@ class PremarketTopGainersScanner:
             results = results[:criteria.top_gainers]
 
         if self.verbose:
-            print(f"Found {len(results)} qualifying premarket gainers")
+            print(f"Found {len(results)} qualifying market gainers")
             if results:
                 print(f"Top gainer: {results[0].symbol} (+{results[0].gain_percent:.2f}%)")
 
         return results
 
-    def scan_premarket_gainers(self, criteria: PremarketCriteria) -> List[PremarketResult]:
+    def scan_market_gainers(self, criteria: MarketOpenCriteria) -> List[MarketOpenResult]:
         """
-        Main scanning method for premarket top gainers.
+        Main scanning method for market open top gainers.
 
         Args:
             criteria: Screening criteria configuration
 
         Returns:
-            List of PremarketResult objects sorted by gain percentage
+            List of MarketOpenResult objects sorted by gain percentage
         """
         start_time = time.time()
 
         if self.verbose:
-            print("Starting premarket top gainers scan...")
+            print("Starting market open top gainers scan...")
             current_et = datetime.now(self.et_tz)
             print(f"Current time: {current_et.strftime('%H:%M:%S %Z')}")
-            if self.is_premarket_hours():
-                print("✓ Running during premarket hours (4:00-9:30 AM ET)")
+            if self.is_market_hours():
+                print("✓ Running during market hours (9:30 AM-4:00 PM ET)")
             else:
-                print("ℹ Running outside premarket hours - will find gains since last market close")
+                print("ℹ Running outside market hours - will find gains from market open to close")
 
         # Get symbols to analyze
         if criteria.specific_symbols:
@@ -616,27 +633,27 @@ class PremarketTopGainersScanner:
             symbols = self.get_active_symbols(criteria.max_symbols, criteria.exchanges)
 
         if not symbols:
-            print("No symbols found for premarket scanning")
+            print("No symbols found for market scanning")
             return []
 
-        # Collect premarket data
-        premarket_data = self.collect_premarket_data(symbols, criteria)
+        # Collect market data
+        market_data = self.collect_market_data(symbols, criteria)
 
-        if not premarket_data:
-            print("No premarket data collected")
+        if not market_data:
+            print("No market data collected")
             return []
 
         # Calculate top gainers
-        results = self.calculate_top_gainers(premarket_data, criteria)
+        results = self.calculate_top_gainers(market_data, criteria)
 
         end_time = time.time()
         if self.verbose:
-            print(f"Premarket scan completed in {end_time - start_time:.2f} seconds")
+            print(f"Market scan completed in {end_time - start_time:.2f} seconds")
 
         return results
 
-    def export_to_csv(self, results: List[PremarketResult], filename: str):
-        """Export premarket results to CSV file."""
+    def export_to_csv(self, results: List[MarketOpenResult], filename: str):
+        """Export market results to CSV file."""
         if not results:
             print("No results to export")
             return
@@ -644,16 +661,16 @@ class PremarketTopGainersScanner:
         # Auto-create directory structure
         if not filename.startswith('/'):
             today = datetime.now().strftime('%Y-%m-%d')
-            directory = f"./historical_data/{today}/premarket"
+            directory = f"./historical_data/{today}/market"
             os.makedirs(directory, exist_ok=True)
             if not filename.startswith(directory):
                 filename = os.path.join(directory, os.path.basename(filename))
 
         with open(filename, 'w', newline='') as csvfile:
             fieldnames = [
-                'symbol', 'current_price', 'previous_close', 'gain_percent',
-                'premarket_volume', 'premarket_high', 'premarket_low', 'premarket_range',
-                'dollar_volume', 'total_premarket_bars', 'current_timestamp'
+                'symbol', 'current_price', 'market_open_price', 'gain_percent',
+                'market_volume', 'market_high', 'market_low', 'market_range',
+                'dollar_volume', 'total_market_bars', 'current_timestamp'
             ]
 
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -663,22 +680,22 @@ class PremarketTopGainersScanner:
                 row = {
                     'symbol': result.symbol,
                     'current_price': result.current_price,
-                    'previous_close': result.previous_close,
+                    'market_open_price': result.market_open_price,
                     'gain_percent': result.gain_percent,
-                    'premarket_volume': result.premarket_volume,
-                    'premarket_high': result.premarket_high,
-                    'premarket_low': result.premarket_low,
-                    'premarket_range': result.premarket_range,
+                    'market_volume': result.market_volume,
+                    'market_high': result.market_high,
+                    'market_low': result.market_low,
+                    'market_range': result.market_range,
                     'dollar_volume': result.dollar_volume,
-                    'total_premarket_bars': result.total_premarket_bars,
+                    'total_market_bars': result.total_market_bars,
                     'current_timestamp': result.current_timestamp.isoformat()
                 }
                 writer.writerow(row)
 
         print(f"Results exported to {filename}")
 
-    def export_to_json(self, results: List[PremarketResult], filename: str, criteria: PremarketCriteria):
-        """Export premarket results to JSON file with metadata."""
+    def export_to_json(self, results: List[MarketOpenResult], filename: str, criteria: MarketOpenCriteria):
+        """Export market results to JSON file with metadata."""
         if not results:
             print("No results to export")
             return
@@ -686,7 +703,7 @@ class PremarketTopGainersScanner:
         # Auto-create directory structure
         if not filename.startswith('/'):
             today = datetime.now().strftime('%Y-%m-%d')
-            directory = f"./historical_data/{today}/premarket"
+            directory = f"./historical_data/{today}/market"
             os.makedirs(directory, exist_ok=True)
             if not filename.startswith(directory):
                 filename = os.path.join(directory, os.path.basename(filename))
@@ -694,12 +711,12 @@ class PremarketTopGainersScanner:
         export_data = {
             "scan_metadata": {
                 "timestamp": datetime.now(self.et_tz).isoformat(),
-                "scan_type": "premarket_top_gainers",
+                "scan_type": "market_open_top_gainers",
                 "total_symbols_scanned": criteria.max_symbols,
                 "results_count": len(results),
                 "account": self.account,
                 "environment": self.environment,
-                "is_premarket_hours": self.is_premarket_hours(),
+                "is_market_hours": self.is_market_hours(),
                 "criteria": {
                     "min_price": criteria.min_price,
                     "max_price": criteria.max_price,
@@ -717,16 +734,16 @@ class PremarketTopGainersScanner:
             result_dict = {
                 "symbol": result.symbol,
                 "current_price": result.current_price,
-                "previous_close": result.previous_close,
+                "market_open_price": result.market_open_price,
                 "gain_percent": result.gain_percent,
-                "premarket_volume": result.premarket_volume,
-                "premarket_high": result.premarket_high,
-                "premarket_low": result.premarket_low,
-                "premarket_range": result.premarket_range,
+                "market_volume": result.market_volume,
+                "market_high": result.market_high,
+                "market_low": result.market_low,
+                "market_range": result.market_range,
                 "dollar_volume": result.dollar_volume,
-                "total_premarket_bars": result.total_premarket_bars,
+                "total_market_bars": result.total_market_bars,
                 "current_timestamp": result.current_timestamp.isoformat(),
-                "previous_close_timestamp": result.previous_close_timestamp.isoformat()
+                "market_open_timestamp": result.market_open_timestamp.isoformat()
             }
             export_data["results"].append(result_dict)
 
@@ -736,59 +753,59 @@ class PremarketTopGainersScanner:
         print(f"Results exported to {filename}")
 
 
-def print_premarket_results(results: List[PremarketResult], criteria: PremarketCriteria):
-    """Print premarket results in a formatted table."""
+def print_market_results(results: List[MarketOpenResult], criteria: MarketOpenCriteria):
+    """Print market results in a formatted table."""
     if not results:
-        print("No premarket gainers found matching the criteria.")
+        print("No market gainers found matching the criteria.")
         return
 
     current_et = datetime.now(pytz.timezone('US/Eastern'))
 
-    print("\nPremarket Top Gainers Scanner Results")
+    print("\nMarket Open Top Gainers Scanner Results")
     print("=" * 80)
     print(f"Scan completed at: {current_et.strftime('%Y-%m-%d %H:%M:%S %Z')}")
-    print(f"Premarket gainers found: {len(results)} stocks")
+    print(f"Market gainers found: {len(results)} stocks")
     if criteria.top_gainers:
         print(f"Showing top {min(criteria.top_gainers, len(results))} gainers")
     print()
 
     # Print header
-    header = f"{'Symbol':<8} {'Current':<8} {'PrevClose':<10} {'Gain%':<8} {'PM Vol':<10} {'PM Range':<10} {'$Volume':<10}"
+    header = f"{'Symbol':<8} {'Current':<8} {'MarketOpen':<11} {'Gain%':<8} {'Mkt Vol':<10} {'Mkt Range':<10} {'$Volume':<10}"
     print(header)
     print("-" * len(header))
 
     # Print results (already sorted by gain percentage)
     for result in results:
-        volume_str = f"{result.premarket_volume/1e6:.1f}M" if result.premarket_volume >= 1e6 else f"{result.premarket_volume:,}"
+        volume_str = f"{result.market_volume/1e6:.1f}M" if result.market_volume >= 1e6 else f"{result.market_volume:,}"
         dollar_volume_str = f"${result.dollar_volume/1e6:.1f}M" if result.dollar_volume >= 1e6 else f"${result.dollar_volume/1e3:.1f}K"
-        range_str = f"${result.premarket_range:.2f}"
+        range_str = f"${result.market_range:.2f}"
 
-        print(f"{result.symbol:<8} ${result.current_price:<7.2f} ${result.previous_close:<9.2f} "
+        print(f"{result.symbol:<8} ${result.current_price:<7.2f} ${result.market_open_price:<10.2f} "
               f"{result.gain_percent:>+6.2f}% {volume_str:<10} {range_str:<10} {dollar_volume_str:<10}")
 
     # Summary statistics
     if results:
         avg_gain = sum(r.gain_percent for r in results) / len(results)
-        total_volume = sum(r.premarket_volume for r in results)
+        total_volume = sum(r.market_volume for r in results)
         print()
         print(f"Average gain: {avg_gain:.2f}%")
-        print(f"Total premarket volume: {total_volume/1e6:.1f}M shares")
+        print(f"Total market volume: {total_volume/1e6:.1f}M shares")
 
 
-def parse_premarket_args() -> argparse.Namespace:
-    """Parse command line arguments for the premarket scanner."""
+def parse_market_args() -> argparse.Namespace:
+    """Parse command line arguments for the market scanner."""
     parser = argparse.ArgumentParser(
-        description='Premarket Top Gainers Scanner - Find stocks gaining since last market close',
+        description='Market Open Top Gainers Scanner - Find stocks gaining since market open',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python premarket_top_gainers.py --verbose
-  python premarket_top_gainers.py --min-gain 2.0 --top-gainers 10
-  python premarket_top_gainers.py --exchanges NYSE NASDAQ --min-price 5.0 --max-price 40.0
-  python premarket_top_gainers.py --symbols AAPL TSLA NVDA --verbose
-  python premarket_top_gainers.py --exchanges NASDAQ AMEX --max-symbols 7000 --min-price 0.75 --max-price 40.00 --min-volume 50000 --top-gainers 20 --export-csv gainers_nasdaq_amex.csv --verbose
+  python market_open_top_gainers.py --verbose
+  python market_open_top_gainers.py --min-gain 2.0 --top-gainers 10
+  python market_open_top_gainers.py --exchanges NYSE NASDAQ --min-price 5.0 --max-price 40.0
+  python market_open_top_gainers.py --symbols AAPL TSLA NVDA --verbose
+  python market_open_top_gainers.py --exchanges NASDAQ AMEX --max-symbols 7000 --min-price 0.75 --max-price 40.00 --min-volume 50000 --top-gainers 20 --export-csv gainers_nasdaq_amex.csv --verbose
 
-Note: This scanner finds stocks gaining since the last market close and can run at any time of day
+Note: This scanner finds stocks gaining since market open and can run during market hours or after close
         """
     )
 
@@ -806,7 +823,7 @@ Note: This scanner finds stocks gaining since the last market close and can run 
     # Data source and limits
     parser.add_argument('--max-symbols', type=int, default=1000, help='Maximum symbols to analyze (default: 1000)')
     parser.add_argument('--feed', choices=['iex', 'sip'], default='sip', help='Data feed to use (default: sip)')
-    parser.add_argument('--lookback-days', type=int, default=7, help='Days to look back for last market close (default: 7)')
+    parser.add_argument('--lookback-days', type=int, default=3, help='Days to look back for market open (default: 3)')
 
     # Exchange filtering (NYSE, NASDAQ, and AMEX for safety)
     parser.add_argument('--exchanges', type=str, nargs='+', choices=['NYSE', 'NASDAQ', 'AMEX'],
@@ -829,11 +846,11 @@ Note: This scanner finds stocks gaining since the last market close and can run 
 
 
 def main():
-    """Main entry point for the premarket scanner."""
-    args = parse_premarket_args()
+    """Main entry point for the market scanner."""
+    args = parse_market_args()
 
     # Create screening criteria
-    criteria = PremarketCriteria(
+    criteria = MarketOpenCriteria(
         min_price=args.min_price,
         max_price=args.max_price,
         min_volume=args.min_volume,
@@ -848,7 +865,7 @@ def main():
     )
 
     # Initialize scanner
-    scanner = PremarketTopGainersScanner(
+    scanner = MarketOpenTopGainersScanner(
         provider=args.provider,
         account=args.account_name,
         environment=args.account,
@@ -856,11 +873,11 @@ def main():
     )
 
     try:
-        # Run premarket scan
-        results = scanner.scan_premarket_gainers(criteria)
+        # Run market scan
+        results = scanner.scan_market_gainers(criteria)
 
         # Display results
-        print_premarket_results(results, criteria)
+        print_market_results(results, criteria)
 
         # Export results if requested
         if args.export_csv:
@@ -870,9 +887,9 @@ def main():
             scanner.export_to_json(results, args.export_json, criteria)
 
     except KeyboardInterrupt:
-        print("\nPremarket scan interrupted by user")
+        print("\nMarket scan interrupted by user")
     except Exception as e:
-        print(f"Error during premarket scanning: {e}")
+        print(f"Error during market scanning: {e}")
         if args.verbose:
             import traceback
             traceback.print_exc()
