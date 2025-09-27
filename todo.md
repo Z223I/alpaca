@@ -145,23 +145,23 @@ Create program and connect to telegram polling to give a list of stocks that hav
 
 ### Config
 
-- [ ] claude --dangerously-skip-permissions
-- [ ] /login
-- [ ] /commit
-- [ ] Sync changes
-- [ ] /clear
-- [ ] git switch -c feature/momentum_alert
-- [ ] /clear
-- [ ] /read...
+- [X] claude --dangerously-skip-permissions
+- [X] /login
+- [X] /commit
+- [X] Sync changes
+- [X] /clear
+- [X] git switch -c feature/momentum_alert
+- [X] /clear
+- [X] /read...
 
 ### Spec File
 
-- [ ] VERY IMPORTANT. ULTRATHINK. Implement the instructions in specs/momentum_alert.md.
-- [ ] Nudge
-- [ ] /commit
-- [ ] Publish the branch
-- [ ] git switch master; merge current branch and verify that all changes are merged.
-- [ ] Sync changes
+- [X] VERY IMPORTANT. ULTRATHINK. Implement the instructions in specs/momentum_alert.md.
+- [X] Nudge
+- [X] /commit
+- [X] Publish the branch
+- [X] git switch master; merge current branch and verify that all changes are merged.
+- [X] Sync changes
 
 
 ## Market Open Top Gainers
