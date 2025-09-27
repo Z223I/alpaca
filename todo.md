@@ -141,11 +141,32 @@ Create program and connect to telegram polling to give a list of stocks that hav
 - [ ] Monitor 'premarket top gainers' for stocks that are in a squeeze.
 
 
+## Top Gainers Alerts
+
+### Config
+
+- [ ] claude --dangerously-skip-permissions
+- [ ] /login
+- [ ] /commit
+- [ ] Sync changes
+- [ ] /clear
+- [ ] git switch -c feature/momentum_alert
+- [ ] /clear
+- [ ] /read...
+
+### Spec File
+
+- [ ] VERY IMPORTANT. Think hard. Implement the instructions in specs/momentum_alert.md.
+- [ ] Nudge
+- [ ] /commit
+- [ ] Publish the branch
+- [ ] git switch master; merge current branch and verify that all changes are merged.
+- [ ] Sync changes
 
 
 ## Market Open Top Gainers
 
-- [ ] VERY IMPORTANT. THINK HARD.  Update molecules/telegram_polling.py: Any user can send the command 'market open top gainers' case insensitive. Respond to the command by running the Python script below.  The last line of the output will contain a filename of the form ./historical_data/{YYYY-MM-DD}/market/gainers_*.csv. Return the file contents to the user that sent the command. Add this to the /help command.  Use a timeout of 15 minutes.  This script takes a while to run.
+- [X] VERY IMPORTANT. THINK HARD.  Update molecules/telegram_polling.py: Any user can send the command 'market open top gainers' case insensitive. Respond to the command by running the Python script below.  The last line of the output will contain a filename of the form ./historical_data/{YYYY-MM-DD}/market/gainers_*.csv. Return the file contents to the user that sent the command. Add this to the /help command.  Use a timeout of 15 minutes.  This script takes a while to run.
 ```bash
 python code/market_open_top_gainers.py  --exchanges NASDAQ AMEX  --max-symbols 7000  --min-price 0.75  --max-price 40.00  --min-volume 50000 --top-gainers 20 --export-csv gainers_nasdaq_amex.csv --verbose
 ```
