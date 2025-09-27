@@ -136,7 +136,7 @@ else:
 ```python
 # ❌ WRONG - These will cause AttributeError
 bar.open   # Does not exist
-bar.high   # Does not exist 
+bar.high   # Does not exist
 bar.low    # Does not exist
 bar.close  # Does not exist
 bar.volume # Does not exist
@@ -144,7 +144,7 @@ bar.volume # Does not exist
 # ✅ CORRECT - Use single letters
 bar.o  # Open price
 bar.h  # High price
-bar.l  # Low price  
+bar.l  # Low price
 bar.c  # Close price
 bar.v  # Volume
 bar.t  # Timestamp
@@ -164,4 +164,8 @@ When developing new code or modifying existing code, always follow this checklis
 - **Conform to repo standards**: Follow existing code patterns, naming conventions, and architectural decisions
 - **Check linting compliance**: Run `~/miniconda3/envs/alpaca/bin/python -m flake8` on modified files
 - **Check for VS Code integration errors**: Use diagnostic tools to ensure no integration issues
-- **Test**: Write and run appropriate tests to verify functionality
+- **Test**: Write and run appropriate tests to verify
+
+## Reminders
+
+- If you update molecules/telegram_polling.py, remind me to restart molecules/telegram_polling.py before testing please.
