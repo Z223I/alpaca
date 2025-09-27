@@ -156,7 +156,7 @@ Create program and connect to telegram polling to give a list of stocks that hav
 
 ### Spec File
 
-- [ ] VERY IMPORTANT. Think hard. Implement the instructions in specs/momentum_alert.md.
+- [ ] VERY IMPORTANT. ULTRATHINK. Implement the instructions in specs/momentum_alert.md.
 - [ ] Nudge
 - [ ] /commit
 - [ ] Publish the branch

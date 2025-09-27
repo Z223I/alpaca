@@ -34,7 +34,7 @@ python code/alerts_watch.py
 
 Features:
 - Automatic market hours scheduling (Eastern Time)
-- Starts/stops all 5 alert processes automatically (including orb_alerts.py and vwap_bounce_alerts.py)
+- Starts/stops all 6 alert processes automatically (including orb_alerts.py, vwap_bounce_alerts.py, and momentum_alerts.py)
 - Process monitoring and restart on failures
 - Post-market analysis and Telegram summary to Bruce
 - Comprehensive logging
@@ -104,6 +104,51 @@ python3 code/vwap_bounce_alerts.py --test --verbose
 # Monitor specific date
 python3 code/vwap_bounce_alerts.py --date 2025-07-18 --verbose
 ```
+
+#### Momentum Alerts
+
+Monitors top gaining stocks from market open and generates momentum alerts based on VWAP and EMA9 criteria. The system automatically runs the market_open_top_gainers.py script every hour for 4 hours, then monitors the generated CSV for stocks that meet momentum criteria.
+
+```bash
+python3 code/momentum_alerts.py --verbose
+```
+
+**Features:**
+- Automated startup script execution (market_open_top_gainers.py)
+- CSV file monitoring for gainers_nasdaq_amex.csv
+- Every-minute stock monitoring with 30-minute data collection
+- VWAP and EMA9 filtering with dual momentum urgency checks
+- Telegram alerts sent directly to Bruce
+- Comprehensive logging and error handling
+
+**Manual Testing:**
+```bash
+# Test mode (no alerts sent)
+python3 code/momentum_alerts.py --test --verbose
+
+# Verbose mode for debugging
+python3 code/momentum_alerts.py --verbose
+```
+
+**Process Flow:**
+1. **Startup**: Runs market_open_top_gainers.py every hour for 4 hours with parameters:
+   - Exchanges: NASDAQ, AMEX
+   - Max symbols: 7000
+   - Price range: $0.75 - $40.00
+   - Min volume: 50,000
+   - Top gainers: 20
+   - Output: gainers_nasdaq_amex.csv
+
+2. **Monitoring**: Watches for CSV file creation in `./historical_data/{YYYY-MM-DD}/market/gainers_nasdaq_amex.csv`
+
+3. **Stock Analysis**: Every minute, collects 30 minutes of 1-minute candlesticks for each stock in the CSV
+
+4. **Momentum Alerts**: Only generates alerts for stocks meeting ALL criteria:
+   - Latest candlestick above VWAP
+   - Latest candlestick above EMA9
+   - Passes dual momentum urgency filter (both momentum and momentum_short must be green)
+
+5. **Telegram Integration**: Sends formatted alerts to Bruce with price, VWAP, EMA9, momentum metrics, and timestamps
 
 After market close
 

@@ -16,6 +16,7 @@ Managed Processes:
 - ORB Superduper Alerts
 - ORB Trade Execution
 - VWAP Bounce Alerts (Bounce pattern detection)
+- Momentum Alerts (Top gainers momentum monitoring)
 
 Post-Market Tasks:
 - ORB Alerts Summary
@@ -105,6 +106,12 @@ class AlertsWatchdog:
                 'args': ['--verbose'],
                 'python_cmd': 'python3',
                 'log_dir': 'vwap_bounce_alerts'
+            },
+            'momentum_alerts': {
+                'script': 'code/momentum_alerts.py',
+                'args': ['--verbose'],
+                'python_cmd': 'python3',
+                'log_dir': 'momentum_alerts'
             }
         }
 
@@ -968,6 +975,7 @@ class AlertsWatchdog:
                 "• Superduper alerts monitoring completed",
                 "• Trade execution monitoring completed",
                 "• VWAP bounce alerts monitoring completed",
+                "• Momentum alerts monitoring completed",
                 "• ORB analysis charts generated",
                 "• Alert summary processed",
                 "• PNL reports generated and sent individually",
@@ -978,6 +986,7 @@ class AlertsWatchdog:
                 f"• Superduper Alerts: logs/orb_superduper/",
                 f"• Trade Execution: logs/orb_trades/",
                 f"• VWAP Bounce Alerts: logs/vwap_bounce_alerts/",
+                f"• Momentum Alerts: logs/momentum_alerts/",
                 f"• Post-Market Analysis: logs/orb_alerts_summary/ & logs/orb_analysis/",
                 f"• PNL Reports: logs/pnl_reports/"
             ])
