@@ -141,7 +141,22 @@ Create program and connect to telegram polling to give a list of stocks that hav
 - [ ] Monitor 'premarket top gainers' for stocks that are in a squeeze.
 
 
-## Top Gainers Alerts
+## Orb Alerts Check If Halted Stocks Being Filtered.
+
+- [X] ULTRATHINK.  Review code/orb_alerts.py: It has code to check if a stock is halted but, it the code being used or is it dead code?
+
+
+## Momentum Alerts Updates
+
+- [ ] ULTRATHINK.  Update code/momentum_alerts.py:
+1) Update momentum and momentum short fields in the alert to reflect the appropriate signal light icon as defined in atoms/alerts/config.py;
+2) Mirror stock is halted logic in code/orb_alerts.py to create a Python script in ./atoms/api;
+3) Use the new ./atoms/api script to update the alert in code/momentum_alerts.py;
+3) After creating a momentum alert, save it to historical_data/{YYYY-MM-DD}/momentum_alerts/bullish/alert_{symbol}_{YYYY-MM-DD}_{hhmmss}.json
+4) After sending a momentum alert, save it to historical_data/{YYYY-MM-DD}/momentum_alerts_sent/bullish/alert_{symbol}_{YYYY-MM-DD}_{hhmmss}.json
+
+
+## Momentum Alerts
 
 ### Config
 

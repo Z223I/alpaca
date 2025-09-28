@@ -21,6 +21,7 @@ Usage:
 import asyncio
 import argparse
 import csv
+import json
 import logging
 import os
 import subprocess
@@ -37,6 +38,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import alpaca_trade_api as tradeapi
 from atoms.api.init_alpaca_client import init_alpaca_client
+from atoms.api.stock_halt_detector import is_stock_halted, get_halt_status_emoji
 from atoms.alerts.breakout_detector import BreakoutDetector
 from atoms.alerts.config import get_momentum_thresholds
 from atoms.telegram.telegram_post import TelegramPoster
@@ -67,6 +69,14 @@ class MomentumAlertsSystem:
         # Historical data directory path
         self.historical_data_dir = Path("historical_data") / self.today / "market"
         self.csv_file_path = self.historical_data_dir / "gainers_nasdaq_amex.csv"
+
+        # Momentum alerts data directories
+        self.momentum_alerts_dir = Path("historical_data") / self.today / "momentum_alerts" / "bullish"
+        self.momentum_alerts_sent_dir = Path("historical_data") / self.today / "momentum_alerts_sent" / "bullish"
+
+        # Create momentum alert directories
+        self.momentum_alerts_dir.mkdir(parents=True, exist_ok=True)
+        self.momentum_alerts_sent_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize Alpaca client for stock data
         self.historical_client = None
@@ -434,12 +444,20 @@ class MomentumAlertsSystem:
                 momentum = 0
                 momentum_short = 0
 
-            # Check urgency level using dual momentum
+            # Get momentum thresholds and signal light icons
             momentum_thresholds = get_momentum_thresholds()
+            momentum_emoji = momentum_thresholds.get_momentum_color_emoji(momentum)
+            momentum_short_emoji = momentum_thresholds.get_momentum_color_emoji(momentum_short)
+
+            # Check halt status
+            is_halted = is_stock_halted(data, symbol, self.logger)
+            halt_emoji = get_halt_status_emoji(is_halted)
+
+            # Check urgency level using dual momentum
             urgency = momentum_thresholds.get_urgency_level_dual(momentum, momentum_short)
 
             if urgency == 'filtered':
-                self.logger.debug(f"❌ {symbol}: Filtered by urgency level (momentum: {momentum:.2f}%, momentum_short: {momentum_short:.2f}%)")
+                self.logger.debug(f"❌ {symbol}: Filtered by urgency level (momentum: {momentum:.2f}% {momentum_emoji}, momentum_short: {momentum_short:.2f}% {momentum_short_emoji})")
                 return None
 
             # If we get here, all criteria are met
@@ -450,6 +468,10 @@ class MomentumAlertsSystem:
                 'ema_9': ema_9,
                 'momentum': momentum,
                 'momentum_short': momentum_short,
+                'momentum_emoji': momentum_emoji,
+                'momentum_short_emoji': momentum_short_emoji,
+                'is_halted': is_halted,
+                'halt_emoji': halt_emoji,
                 'urgency': urgency,
                 'timestamp': datetime.now(self.et_tz),
                 'indicators': indicators
@@ -457,7 +479,8 @@ class MomentumAlertsSystem:
 
             self.logger.info(f"✅ {symbol}: Momentum alert criteria met!")
             self.logger.info(f"   Price: ${current_price:.2f} | VWAP: ${current_vwap:.2f} | EMA9: ${ema_9:.2f}")
-            self.logger.info(f"   Momentum: {momentum:.2f}% | Momentum Short: {momentum_short:.2f}% | Urgency: {urgency}")
+            self.logger.info(f"   Momentum: {momentum:.2f}% {momentum_emoji} | Momentum Short: {momentum_short:.2f}% {momentum_short_emoji}")
+            self.logger.info(f"   Halt Status: {halt_emoji} | Urgency: {urgency}")
 
             return alert_data
 
@@ -479,6 +502,10 @@ class MomentumAlertsSystem:
             ema_9 = alert_data['ema_9']
             momentum = alert_data['momentum']
             momentum_short = alert_data['momentum_short']
+            momentum_emoji = alert_data['momentum_emoji']
+            momentum_short_emoji = alert_data['momentum_short_emoji']
+            is_halted = alert_data['is_halted']
+            halt_emoji = alert_data['halt_emoji']
             urgency = alert_data['urgency']
             timestamp = alert_data['timestamp']
 
@@ -489,8 +516,9 @@ class MomentumAlertsSystem:
                 f"💰 **Price:** ${current_price:.2f}",
                 f"📊 **VWAP:** ${vwap:.2f} ✅",
                 f"📈 **EMA9:** ${ema_9:.2f} ✅",
-                f"⚡ **Momentum:** {momentum:.2f}%",
-                f"⚡ **Momentum Short:** {momentum_short:.2f}%",
+                f"⚡ **Momentum:** {momentum:.2f}% {momentum_emoji}",
+                f"⚡ **Momentum Short:** {momentum_short:.2f}% {momentum_short_emoji}",
+                f"🚦 **Halt Status:** {halt_emoji}",
                 f"🎯 **Urgency:** {urgency.upper()}",
                 "",
                 f"⏰ **Time:** {timestamp.strftime('%H:%M:%S ET')}",
@@ -498,6 +526,9 @@ class MomentumAlertsSystem:
             ]
 
             message = "\n".join(message_parts)
+
+            # Save momentum alert to historical data
+            self._save_momentum_alert(alert_data, message)
 
             if self.test_mode:
                 self.logger.info(f"[TEST MODE] {message}")
@@ -507,6 +538,8 @@ class MomentumAlertsSystem:
 
                 if result['success']:
                     self.logger.info(f"✅ Momentum alert sent to Bruce for {symbol}")
+                    # Save sent alert to historical data
+                    self._save_momentum_alert_sent(alert_data, message)
                 else:
                     errors = result.get('errors', ['Unknown error'])
                     error_msg = ', '.join(errors) if isinstance(errors, list) else str(errors)
@@ -514,6 +547,96 @@ class MomentumAlertsSystem:
 
         except Exception as e:
             self.logger.error(f"❌ Error sending momentum alert: {e}")
+
+    def _save_momentum_alert(self, alert_data: Dict, message: str) -> None:
+        """
+        Save momentum alert to historical data structure.
+
+        Args:
+            alert_data: Alert data dictionary
+            message: Formatted alert message
+        """
+        try:
+            symbol = alert_data['symbol']
+            timestamp = alert_data['timestamp']
+
+            # Create filename with timestamp
+            filename = f"alert_{symbol}_{timestamp.strftime('%Y-%m-%d_%H%M%S')}.json"
+            filepath = self.momentum_alerts_dir / filename
+
+            # Convert alert data to serializable format
+            alert_json = {
+                'symbol': symbol,
+                'current_price': float(alert_data['current_price']),
+                'vwap': float(alert_data['vwap']),
+                'ema_9': float(alert_data['ema_9']),
+                'momentum': float(alert_data['momentum']),
+                'momentum_short': float(alert_data['momentum_short']),
+                'momentum_emoji': alert_data['momentum_emoji'],
+                'momentum_short_emoji': alert_data['momentum_short_emoji'],
+                'is_halted': alert_data['is_halted'],
+                'halt_emoji': alert_data['halt_emoji'],
+                'urgency': alert_data['urgency'],
+                'timestamp': timestamp.isoformat(),
+                'message': message,
+                'indicators': {k: float(v) if isinstance(v, (int, float)) else v
+                              for k, v in alert_data['indicators'].items() if v is not None}
+            }
+
+            # Save to JSON file
+            with open(filepath, 'w') as f:
+                json.dump(alert_json, f, indent=2)
+
+            self.logger.debug(f"📝 Saved momentum alert for {symbol} to {filename}")
+
+        except Exception as e:
+            self.logger.error(f"❌ Error saving momentum alert: {e}")
+
+    def _save_momentum_alert_sent(self, alert_data: Dict, message: str) -> None:
+        """
+        Save sent momentum alert to historical data structure.
+
+        Args:
+            alert_data: Alert data dictionary
+            message: Formatted alert message
+        """
+        try:
+            symbol = alert_data['symbol']
+            timestamp = alert_data['timestamp']
+
+            # Create filename with timestamp
+            filename = f"alert_{symbol}_{timestamp.strftime('%Y-%m-%d_%H%M%S')}.json"
+            filepath = self.momentum_alerts_sent_dir / filename
+
+            # Convert alert data to serializable format (same as save alert)
+            alert_json = {
+                'symbol': symbol,
+                'current_price': float(alert_data['current_price']),
+                'vwap': float(alert_data['vwap']),
+                'ema_9': float(alert_data['ema_9']),
+                'momentum': float(alert_data['momentum']),
+                'momentum_short': float(alert_data['momentum_short']),
+                'momentum_emoji': alert_data['momentum_emoji'],
+                'momentum_short_emoji': alert_data['momentum_short_emoji'],
+                'is_halted': alert_data['is_halted'],
+                'halt_emoji': alert_data['halt_emoji'],
+                'urgency': alert_data['urgency'],
+                'timestamp': timestamp.isoformat(),
+                'message': message,
+                'sent_to': 'bruce',
+                'sent_at': datetime.now(self.et_tz).isoformat(),
+                'indicators': {k: float(v) if isinstance(v, (int, float)) else v
+                              for k, v in alert_data['indicators'].items() if v is not None}
+            }
+
+            # Save to JSON file
+            with open(filepath, 'w') as f:
+                json.dump(alert_json, f, indent=2)
+
+            self.logger.debug(f"📝 Saved sent momentum alert for {symbol} to {filename}")
+
+        except Exception as e:
+            self.logger.error(f"❌ Error saving sent momentum alert: {e}")
 
     async def _stock_monitoring_loop(self):
         """Main stock monitoring loop - runs every minute."""
