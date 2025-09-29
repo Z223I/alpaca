@@ -135,10 +135,51 @@ Can the data from volume surge be saved, and then used for top gainers? Or, can 
 
 Create program and connect to telegram polling to give a list of stocks that have any type of alert. Sort by alert type give the time stamp.
 
+## Major Resistance
+
+Top of Profile Range
+
+```text
+============================================================
+VOLUME PROFILE ANALYSIS SUMMARY
+============================================================
+Configuration:
+  Time Per Profile: DAY
+  Price Mode: AUTOMATIC
+  Value Area %: 70.0%
+
+Results:
+  Total Profiles: 1
+  Time Range: 2025-09-29 04:00:00-04:00 to 2025-09-29 09:25:00-04:00
+  Average POC: $0.69
+  POC Range: $0.69 - 0.69
+  Avg Value Area Width: $0.15
+
+Latest Profile:
+  📅 Period: 2025-09-29 04:00:00-04:00 to 2025-09-29 09:25:00-04:00
+  🎯 Point of Control: $0.69
+  📊 Value Area: $0.59 - $0.74
+  📈 Profile Range: $0.45 - $0.77
+  📦 Total Volume: 43,584,867
+============================================================
+```
+
 
 ## Squeeze
 
 - [ ] Monitor 'premarket top gainers' for stocks that are in a squeeze.
+
+
+
+
+## Momentum Alerts Updates III
+
+- [ ] ULTRATHINK.  Update code/momentum_alerts.py: Momentum and Momentum Short have the same value in the momentum alert.  I doubt that that is correct.  The Momentum should be based on 20-minutes and Momentum Short based on 5-minutes.  Suggest a fix.
+- [ ] THINK HARD. Update code/momentum_alerts.py: Momentum and Momentum Short are to be normalized within there 20 and 5 minute time frames and then checked.
+- [ ] 5 and 20 must come from config.py.
+
+
+
 
 
 ## Orb Alerts Check If Halted Stocks Being Filtered.

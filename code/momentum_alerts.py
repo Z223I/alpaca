@@ -464,15 +464,65 @@ class MomentumAlertsSystem:
                 self.logger.debug(f"❌ {symbol}: Price ${current_price:.2f} below EMA9 ${ema_9:.2f}")
                 return None
 
-            # Calculate momentum values (placeholder - would need actual momentum calculation)
-            # For now, use simple price change as momentum
-            if len(data) >= 2:
+            # Calculate normalized momentum values - 20-minute vs 5-minute
+            momentum = 0
+            momentum_short = 0
+
+            # Initialize raw momentum values for tracking
+            raw_momentum_20 = 0
+            raw_momentum_5 = 0
+
+            # Calculate normalized 20-minute momentum
+            if len(data) >= 20:  # Need at least 20 bars for 20-minute analysis
+                # Get 20-minute data window
+                data_20min = data.iloc[-20:]
+
+                # Calculate raw momentum
+                price_20_min_ago = float(data_20min.iloc[0]['c'])
+                if price_20_min_ago > 0:
+                    raw_momentum_20 = ((current_price - price_20_min_ago) /
+                                        price_20_min_ago) * 100
+
+                # Calculate volatility normalization (1-minute returns std dev)
+                returns_20min = data_20min['c'].pct_change().dropna()
+                if len(returns_20min) > 1:
+                    volatility_20min = returns_20min.std() * 100
+                    # Normalize momentum by volatility (minimum threshold)
+                    momentum = (raw_momentum_20 / max(volatility_20min, 0.1))
+                else:
+                    momentum = raw_momentum_20  # Fallback to raw momentum
+            elif len(data) >= 2:  # Fallback if less than 20 minutes
+                earliest_price = float(data.iloc[0]['c'])
+                if earliest_price > 0:
+                    raw_momentum_20 = ((current_price - earliest_price) /
+                                        earliest_price) * 100
+                momentum = raw_momentum_20
+
+            # Calculate normalized 5-minute momentum
+            if len(data) >= 5:  # Need at least 5 bars for 5-minute analysis
+                # Get 5-minute data window
+                data_5min = data.iloc[-5:]
+
+                # Calculate raw momentum
+                price_5_min_ago = float(data_5min.iloc[0]['c'])
+                if price_5_min_ago > 0:
+                    raw_momentum_5 = ((current_price - price_5_min_ago) /
+                                       price_5_min_ago) * 100
+
+                # Calculate volatility normalization (1-minute returns std dev)
+                returns_5min = data_5min['c'].pct_change().dropna()
+                if len(returns_5min) > 1:
+                    volatility_5min = returns_5min.std() * 100
+                    # Normalize momentum by volatility (minimum threshold)
+                    momentum_short = (raw_momentum_5 / max(volatility_5min, 0.1))
+                else:
+                    momentum_short = raw_momentum_5  # Fallback to raw momentum
+            elif len(data) >= 2:  # Fallback if less than 5 minutes
                 prev_price = float(data.iloc[-2]['c'])
-                momentum = ((current_price - prev_price) / prev_price) * 100 if prev_price > 0 else 0
-                momentum_short = momentum  # Simplified for now
-            else:
-                momentum = 0
-                momentum_short = 0
+                if prev_price > 0:
+                    raw_momentum_5 = ((current_price - prev_price) /
+                                       prev_price) * 100
+                momentum_short = raw_momentum_5
 
             # Get momentum thresholds and signal light icons
             momentum_thresholds = get_momentum_thresholds()
@@ -498,6 +548,8 @@ class MomentumAlertsSystem:
                 'ema_9': ema_9,
                 'momentum': momentum,
                 'momentum_short': momentum_short,
+                'raw_momentum_20': raw_momentum_20,
+                'raw_momentum_5': raw_momentum_5,
                 'momentum_emoji': momentum_emoji,
                 'momentum_short_emoji': momentum_short_emoji,
                 'is_halted': is_halted,
@@ -509,7 +561,8 @@ class MomentumAlertsSystem:
 
             self.logger.info(f"✅ {symbol}: Momentum alert criteria met!")
             self.logger.info(f"   Price: ${current_price:.2f} | VWAP: ${current_vwap:.2f} | EMA9: ${ema_9:.2f}")
-            self.logger.info(f"   Momentum: {momentum:.2f}% {momentum_emoji} | Momentum Short: {momentum_short:.2f}% {momentum_short_emoji}")
+            self.logger.info(f"   Momentum (normalized): {momentum:.2f} {momentum_emoji} | Raw: {raw_momentum_20:.2f}%")
+            self.logger.info(f"   Momentum Short (normalized): {momentum_short:.2f} {momentum_short_emoji} | Raw: {raw_momentum_5:.2f}%")
             self.logger.info(f"   Halt Status: {halt_emoji} | Urgency: {urgency}")
 
             return alert_data
@@ -578,6 +631,35 @@ class MomentumAlertsSystem:
         except Exception as e:
             self.logger.error(f"❌ Error sending momentum alert: {e}")
 
+    def _serialize_indicators(self, indicators: Dict) -> Dict:
+        """
+        Serialize indicators dictionary to JSON-compatible format.
+
+        Args:
+            indicators: Dictionary containing indicator values
+
+        Returns:
+            JSON-serializable dictionary
+        """
+        serialized = {}
+        for k, v in indicators.items():
+            if v is None:
+                continue
+            elif hasattr(v, 'dtype'):  # numpy types
+                if 'bool' in str(v.dtype):
+                    serialized[k] = bool(v)
+                elif 'int' in str(v.dtype) or 'float' in str(v.dtype):
+                    serialized[k] = float(v)
+                else:
+                    serialized[k] = str(v)
+            elif isinstance(v, (int, float)):
+                serialized[k] = float(v)
+            elif isinstance(v, bool):
+                serialized[k] = bool(v)
+            else:
+                serialized[k] = str(v)
+        return serialized
+
     def _save_momentum_alert(self, alert_data: Dict, message: str) -> None:
         """
         Save momentum alert to historical data structure.
@@ -596,21 +678,22 @@ class MomentumAlertsSystem:
 
             # Convert alert data to serializable format
             alert_json = {
-                'symbol': symbol,
+                'symbol': str(symbol),
                 'current_price': float(alert_data['current_price']),
                 'vwap': float(alert_data['vwap']),
                 'ema_9': float(alert_data['ema_9']),
                 'momentum': float(alert_data['momentum']),
                 'momentum_short': float(alert_data['momentum_short']),
-                'momentum_emoji': alert_data['momentum_emoji'],
-                'momentum_short_emoji': alert_data['momentum_short_emoji'],
-                'is_halted': alert_data['is_halted'],
-                'halt_emoji': alert_data['halt_emoji'],
-                'urgency': alert_data['urgency'],
+                'raw_momentum_20': float(alert_data['raw_momentum_20']),
+                'raw_momentum_5': float(alert_data['raw_momentum_5']),
+                'momentum_emoji': str(alert_data['momentum_emoji']),
+                'momentum_short_emoji': str(alert_data['momentum_short_emoji']),
+                'is_halted': bool(alert_data['is_halted']),
+                'halt_emoji': str(alert_data['halt_emoji']),
+                'urgency': str(alert_data['urgency']),
                 'timestamp': timestamp.isoformat(),
-                'message': message,
-                'indicators': {k: float(v) if isinstance(v, (int, float)) else v
-                              for k, v in alert_data['indicators'].items() if v is not None}
+                'message': str(message),
+                'indicators': self._serialize_indicators(alert_data['indicators'])
             }
 
             # Save to JSON file
@@ -640,23 +723,24 @@ class MomentumAlertsSystem:
 
             # Convert alert data to serializable format (same as save alert)
             alert_json = {
-                'symbol': symbol,
+                'symbol': str(symbol),
                 'current_price': float(alert_data['current_price']),
                 'vwap': float(alert_data['vwap']),
                 'ema_9': float(alert_data['ema_9']),
                 'momentum': float(alert_data['momentum']),
                 'momentum_short': float(alert_data['momentum_short']),
-                'momentum_emoji': alert_data['momentum_emoji'],
-                'momentum_short_emoji': alert_data['momentum_short_emoji'],
-                'is_halted': alert_data['is_halted'],
-                'halt_emoji': alert_data['halt_emoji'],
-                'urgency': alert_data['urgency'],
+                'raw_momentum_20': float(alert_data['raw_momentum_20']),
+                'raw_momentum_5': float(alert_data['raw_momentum_5']),
+                'momentum_emoji': str(alert_data['momentum_emoji']),
+                'momentum_short_emoji': str(alert_data['momentum_short_emoji']),
+                'is_halted': bool(alert_data['is_halted']),
+                'halt_emoji': str(alert_data['halt_emoji']),
+                'urgency': str(alert_data['urgency']),
                 'timestamp': timestamp.isoformat(),
-                'message': message,
+                'message': str(message),
                 'sent_to': 'bruce',
                 'sent_at': datetime.now(self.et_tz).isoformat(),
-                'indicators': {k: float(v) if isinstance(v, (int, float)) else v
-                              for k, v in alert_data['indicators'].items() if v is not None}
+                'indicators': self._serialize_indicators(alert_data['indicators'])
             }
 
             # Save to JSON file

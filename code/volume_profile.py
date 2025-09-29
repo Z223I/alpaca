@@ -18,7 +18,7 @@ Key Features:
 """
 
 """
-Execution:
+Usage:
 python code/volume_profile.py --symbol BBAI --days 1 --timeframe 5Min --time-per-profile DAY --chart
 """
 
