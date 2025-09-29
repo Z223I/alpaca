@@ -261,29 +261,59 @@ class MomentumAlertsSystem:
 
     def _load_csv_symbols(self) -> List[str]:
         """
-        Load symbols from the gainers CSV file.
+        Load symbols from the gainers CSV file and additional data/{YYYYMMDD}.csv file.
 
         Returns:
-            List of symbols to monitor
+            List of unique symbols to monitor
         """
-        if not self.csv_file_path.exists():
-            return []
+        symbols = set()  # Use set to automatically handle uniqueness
 
-        try:
-            symbols = []
-            with open(self.csv_file_path, 'r') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    symbol = row.get('symbol', '').strip().upper()
-                    if symbol:
-                        symbols.append(symbol)
+        # Load from gainers CSV file
+        if self.csv_file_path.exists():
+            try:
+                with open(self.csv_file_path, 'r') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        symbol = row.get('symbol', '').strip().upper()
+                        if symbol:
+                            symbols.add(symbol)
 
-            self.logger.info(f"📊 Loaded {len(symbols)} symbols from CSV: {symbols[:10]}{'...' if len(symbols) > 10 else ''}")
-            return symbols
+                self.logger.info(f"📊 Loaded {len(symbols)} symbols from gainers CSV")
 
-        except Exception as e:
-            self.logger.error(f"❌ Error loading CSV file: {e}")
-            return []
+            except Exception as e:
+                self.logger.error(f"❌ Error loading gainers CSV file: {e}")
+
+        # Load from additional data/{YYYYMMDD}.csv file if it exists
+        compact_date = datetime.now(self.et_tz).strftime('%Y%m%d')  # YYYYMMDD format
+        data_csv_path = Path("data") / f"{compact_date}.csv"
+
+        if data_csv_path.exists():
+            try:
+                additional_count = 0
+                with open(data_csv_path, 'r') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        symbol = row.get('symbol', '').strip().upper()
+                        if symbol and symbol not in symbols:
+                            symbols.add(symbol)
+                            additional_count += 1
+
+                self.logger.info(f"📊 Added {additional_count} unique symbols from data CSV: {data_csv_path}")
+
+            except Exception as e:
+                self.logger.error(f"❌ Error loading data CSV file {data_csv_path}: {e}")
+        else:
+            self.logger.debug(f"📄 Data CSV file not found: {data_csv_path}")
+
+        # Convert set back to sorted list
+        symbols_list = sorted(list(symbols))
+
+        if symbols_list:
+            self.logger.info(f"📊 Total unique symbols to monitor: {len(symbols_list)} - {symbols_list[:10]}{'...' if len(symbols_list) > 10 else ''}")
+        else:
+            self.logger.warning("⚠️ No symbols found in any CSV files")
+
+        return symbols_list
 
     def _monitor_csv_file(self):
         """Monitor the CSV file for creation/updates."""
