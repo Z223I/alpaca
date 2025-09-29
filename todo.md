@@ -146,9 +146,14 @@ Create program and connect to telegram polling to give a list of stocks that hav
 - [X] ULTRATHINK.  Review code/orb_alerts.py: It has code to check if a stock is halted but, it the code being used or is it dead code?
 
 
+## Momentum Alerts Updates II
+
+- [X] THINK HARD.  Update code/momentum_alerts.py: Currently the scripts is getting a list of stocks from ./historical_data/{YYYY-MM-DD}/market/gainers_nasdaq_amex.csv.  Add to that list the stocks in data/{YYYMMDD}.csv if it exists and keep only unique symbols.
+
+
 ## Momentum Alerts Updates
 
-- [ ] ULTRATHINK.  Update code/momentum_alerts.py:
+- [X] ULTRATHINK.  Update code/momentum_alerts.py:
 1) Update momentum and momentum short fields in the alert to reflect the appropriate signal light icon as defined in atoms/alerts/config.py;
 2) Mirror stock is halted logic in code/orb_alerts.py to create a Python script in ./atoms/api;
 3) Use the new ./atoms/api script to update the alert in code/momentum_alerts.py;
