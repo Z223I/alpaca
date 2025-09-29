@@ -42,6 +42,7 @@ from atoms.api.stock_halt_detector import is_stock_halted, get_halt_status_emoji
 from atoms.alerts.breakout_detector import BreakoutDetector
 from atoms.alerts.config import get_momentum_thresholds
 from atoms.telegram.telegram_post import TelegramPoster
+from code.momentum_alerts_config import get_momentum_alerts_config
 
 
 class MomentumAlertsSystem:
@@ -92,6 +93,7 @@ class MomentumAlertsSystem:
         # Initialize components
         self.breakout_detector = BreakoutDetector()
         self.telegram_poster = TelegramPoster()
+        self.momentum_config = get_momentum_alerts_config()
 
         # Tracking
         self.monitored_symbols: Set[str] = set()
@@ -106,7 +108,10 @@ class MomentumAlertsSystem:
         self.logger.info(f"🔧 Momentum Alerts System initialized in {'TEST' if test_mode else 'LIVE'} mode")
         self.logger.info(f"📅 Monitoring date: {self.today}")
         self.logger.info(f"📁 CSV file path: {self.csv_file_path}")
-        self.logger.info(f"📊 Historical data client: {'Available' if self.historical_client else 'Not available'}")
+        self.logger.info(f"📊 Historical data client: "
+                         f"{'Available' if self.historical_client else 'Not available'}")
+        self.logger.info(f"⚙️ Momentum periods: {self.momentum_config.momentum_period}min / "
+                         f"{self.momentum_config.momentum_short_period}min")
 
     def _setup_logging(self, verbose: bool) -> logging.Logger:
         """Setup logging configuration with Eastern Time."""
@@ -464,7 +469,7 @@ class MomentumAlertsSystem:
                 self.logger.debug(f"❌ {symbol}: Price ${current_price:.2f} below EMA9 ${ema_9:.2f}")
                 return None
 
-            # Calculate normalized momentum values - 20-minute vs 5-minute
+            # Calculate time-normalized momentum values (momentum per minute)
             momentum = 0
             momentum_short = 0
 
@@ -472,57 +477,59 @@ class MomentumAlertsSystem:
             raw_momentum_20 = 0
             raw_momentum_5 = 0
 
-            # Calculate normalized 20-minute momentum
-            if len(data) >= 20:  # Need at least 20 bars for 20-minute analysis
-                # Get 20-minute data window
-                data_20min = data.iloc[-20:]
+            # Calculate time-based momentum (configurable period in minutes)
+            momentum_period_minutes = self.momentum_config.momentum_period
+            if len(data) >= 2:  # Need at least 2 data points
+                # Get current timestamp (latest data point)
+                current_timestamp = data.index[-1]
 
-                # Calculate raw momentum
-                price_20_min_ago = float(data_20min.iloc[0]['c'])
-                if price_20_min_ago > 0:
-                    raw_momentum_20 = ((current_price - price_20_min_ago) /
-                                        price_20_min_ago) * 100
+                # Calculate target timestamp (N minutes ago)
+                target_timestamp = current_timestamp - timedelta(
+                    minutes=momentum_period_minutes)
 
-                # Calculate volatility normalization (1-minute returns std dev)
-                returns_20min = data_20min['c'].pct_change().dropna()
-                if len(returns_20min) > 1:
-                    volatility_20min = returns_20min.std() * 100
-                    # Normalize momentum by volatility (minimum threshold)
-                    momentum = (raw_momentum_20 / max(volatility_20min, 0.1))
-                else:
-                    momentum = raw_momentum_20  # Fallback to raw momentum
-            elif len(data) >= 2:  # Fallback if less than 20 minutes
-                earliest_price = float(data.iloc[0]['c'])
-                if earliest_price > 0:
-                    raw_momentum_20 = ((current_price - earliest_price) /
-                                        earliest_price) * 100
-                momentum = raw_momentum_20
+                # Find the data point closest to target timestamp
+                # Use absolute difference to find closest match
+                time_diffs = abs(data.index - target_timestamp)
+                closest_idx = time_diffs.argmin()
 
-            # Calculate normalized 5-minute momentum
-            if len(data) >= 5:  # Need at least 5 bars for 5-minute analysis
-                # Get 5-minute data window
-                data_5min = data.iloc[-5:]
+                # Get price from closest timestamp to N minutes ago
+                price_period_ago = float(data.iloc[closest_idx]['c'])
+                actual_time_diff = ((current_timestamp - data.index[closest_idx])
+                                    .total_seconds() / 60)
 
-                # Calculate raw momentum
-                price_5_min_ago = float(data_5min.iloc[0]['c'])
-                if price_5_min_ago > 0:
-                    raw_momentum_5 = ((current_price - price_5_min_ago) /
-                                       price_5_min_ago) * 100
+                if price_period_ago > 0 and actual_time_diff > 0:
+                    raw_momentum_20 = ((current_price - price_period_ago) /
+                                       price_period_ago) * 100
+                    # Normalize by actual time diff (handles gaps)
+                    momentum = raw_momentum_20 / actual_time_diff
 
-                # Calculate volatility normalization (1-minute returns std dev)
-                returns_5min = data_5min['c'].pct_change().dropna()
-                if len(returns_5min) > 1:
-                    volatility_5min = returns_5min.std() * 100
-                    # Normalize momentum by volatility (minimum threshold)
-                    momentum_short = (raw_momentum_5 / max(volatility_5min, 0.1))
-                else:
-                    momentum_short = raw_momentum_5  # Fallback to raw momentum
-            elif len(data) >= 2:  # Fallback if less than 5 minutes
-                prev_price = float(data.iloc[-2]['c'])
-                if prev_price > 0:
-                    raw_momentum_5 = ((current_price - prev_price) /
-                                       prev_price) * 100
-                momentum_short = raw_momentum_5
+            # Calculate time-based short momentum (configurable period)
+            momentum_short_period_minutes = (
+                self.momentum_config.momentum_short_period)
+            if len(data) >= 2:  # Need at least 2 data points
+                # Get current timestamp (latest data point)
+                current_timestamp = data.index[-1]
+
+                # Calculate target timestamp (N minutes ago)
+                target_timestamp_short = current_timestamp - timedelta(
+                    minutes=momentum_short_period_minutes)
+
+                # Find the data point closest to target timestamp
+                # Use absolute difference to find closest match
+                time_diffs_short = abs(data.index - target_timestamp_short)
+                closest_idx_short = time_diffs_short.argmin()
+
+                # Get price from closest timestamp to N minutes ago
+                price_short_period_ago = float(data.iloc[closest_idx_short]['c'])
+                actual_time_diff_short = ((current_timestamp -
+                                           data.index[closest_idx_short])
+                                          .total_seconds() / 60)
+
+                if price_short_period_ago > 0 and actual_time_diff_short > 0:
+                    raw_momentum_5 = ((current_price - price_short_period_ago) /
+                                      price_short_period_ago) * 100
+                    # Normalize by actual time diff (handles gaps)
+                    momentum_short = raw_momentum_5 / actual_time_diff_short
 
             # Get momentum thresholds and signal light icons
             momentum_thresholds = get_momentum_thresholds()
@@ -537,7 +544,9 @@ class MomentumAlertsSystem:
             urgency = momentum_thresholds.get_urgency_level_dual(momentum, momentum_short)
 
             if urgency == 'filtered':
-                self.logger.debug(f"❌ {symbol}: Filtered by urgency level (momentum: {momentum:.2f}% {momentum_emoji}, momentum_short: {momentum_short:.2f}% {momentum_short_emoji})")
+                self.logger.debug(f"❌ {symbol}: Filtered by urgency level "
+                                  f"(momentum: {momentum:.2f}/min {momentum_emoji}, "
+                                  f"momentum_short: {momentum_short:.2f}/min {momentum_short_emoji})")
                 return None
 
             # If we get here, all criteria are met
@@ -550,6 +559,8 @@ class MomentumAlertsSystem:
                 'momentum_short': momentum_short,
                 'raw_momentum_20': raw_momentum_20,
                 'raw_momentum_5': raw_momentum_5,
+                'actual_time_diff': actual_time_diff if 'actual_time_diff' in locals() else 0,
+                'actual_time_diff_short': actual_time_diff_short if 'actual_time_diff_short' in locals() else 0,
                 'momentum_emoji': momentum_emoji,
                 'momentum_short_emoji': momentum_short_emoji,
                 'is_halted': is_halted,
@@ -561,8 +572,12 @@ class MomentumAlertsSystem:
 
             self.logger.info(f"✅ {symbol}: Momentum alert criteria met!")
             self.logger.info(f"   Price: ${current_price:.2f} | VWAP: ${current_vwap:.2f} | EMA9: ${ema_9:.2f}")
-            self.logger.info(f"   Momentum (normalized): {momentum:.2f} {momentum_emoji} | Raw: {raw_momentum_20:.2f}%")
-            self.logger.info(f"   Momentum Short (normalized): {momentum_short:.2f} {momentum_short_emoji} | Raw: {raw_momentum_5:.2f}%")
+
+            # Show actual time periods used (handles halts/gaps)
+            time_diff = actual_time_diff if 'actual_time_diff' in locals() else 0
+            time_diff_short = actual_time_diff_short if 'actual_time_diff_short' in locals() else 0
+            self.logger.info(f"   Momentum: {momentum:.2f}/min {momentum_emoji} | Raw: {raw_momentum_20:.2f}% ({time_diff:.1f}min)")
+            self.logger.info(f"   Momentum Short: {momentum_short:.2f}/min {momentum_short_emoji} | Raw: {raw_momentum_5:.2f}% ({time_diff_short:.1f}min)")
             self.logger.info(f"   Halt Status: {halt_emoji} | Urgency: {urgency}")
 
             return alert_data
@@ -686,6 +701,8 @@ class MomentumAlertsSystem:
                 'momentum_short': float(alert_data['momentum_short']),
                 'raw_momentum_20': float(alert_data['raw_momentum_20']),
                 'raw_momentum_5': float(alert_data['raw_momentum_5']),
+                'actual_time_diff': float(alert_data['actual_time_diff']),
+                'actual_time_diff_short': float(alert_data['actual_time_diff_short']),
                 'momentum_emoji': str(alert_data['momentum_emoji']),
                 'momentum_short_emoji': str(alert_data['momentum_short_emoji']),
                 'is_halted': bool(alert_data['is_halted']),
@@ -731,6 +748,8 @@ class MomentumAlertsSystem:
                 'momentum_short': float(alert_data['momentum_short']),
                 'raw_momentum_20': float(alert_data['raw_momentum_20']),
                 'raw_momentum_5': float(alert_data['raw_momentum_5']),
+                'actual_time_diff': float(alert_data['actual_time_diff']),
+                'actual_time_diff_short': float(alert_data['actual_time_diff_short']),
                 'momentum_emoji': str(alert_data['momentum_emoji']),
                 'momentum_short_emoji': str(alert_data['momentum_short_emoji']),
                 'is_halted': bool(alert_data['is_halted']),
