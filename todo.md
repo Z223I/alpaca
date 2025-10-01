@@ -181,9 +181,10 @@ Telegram polling : integrate volume profile and volume profile bulk.
 - [X] THINK HARD. Update code/momentum_alerts.py: Momentum = Momentum / 20; Momentum Short /= 5; Then check them against the threshold.
 - [X] THINK HARD. Create code/momentum_alerts_config.py: Move the constants 20 and 5 to this file in a dataclass; Find the Momentum threshold and create three constants Momentum Long, Momentum, and Momentum Short with that value. Use the dataclass in code/momentum_alerts.py.  Momentum long is not yet used but will be.
 - [X] THINK HARD. Update code/momentum_alerts.py: Review the Momentum and Momentum Short calculations.  They are to be based on minutes from the new config file.  I think they are based on the number of candlesticks.  If a stock is halted, there is not a candlestick.  Use the time please.
-- [ ] THINK HARD. Using the knowledge that a halted stock is missing data, update the is halted logic.
-
-- [ ] YCBD is halted but shown as not.  2025-09-29.
+- [X] THINK HARD. Using the knowledge that a halted stock is missing data, update the is halted logic.
+- [ ] THINK HARD. Update code/momentum_alerts.py: When sending the alerts on Telegram, do not mark them as urgent.
+- [ ] THINK HARD. Update code/momentum_alerts.py:
+- [ ] THINK HARD. Update code/momentum_alerts.py:
 
 Momentum alerts: Marked them not urgent and see if that eliminates the tone.
 
