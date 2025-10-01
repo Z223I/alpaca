@@ -184,19 +184,9 @@ Telegram polling : integrate volume profile and volume profile bulk.
 - [X] THINK HARD. Using the knowledge that a halted stock is missing data, update the is halted logic.
 - [X] THINK HARD. Update code/momentum_alerts.py: When sending the alerts on Telegram, do not mark them as urgent.
 - [X] THINK HARD. Update code/momentum_alerts.py: Use the stock volume and add a volume field to the momentum alert. Greater than 80,000 = green; less then 60,000 is a red light icon; otherwise yellow light icon.
-- [ ] THINK HARD. Update code/momentum_alerts.py:
-- [ ] THINK HARD. Update code/momentum_alerts.py:
-- [ ] THINK HARD. Update code/momentum_alerts.py:
-- [ ] THINK HARD. Update code/momentum_alerts.py:
-
-Momentum alerts: filter for volume above 80,000 per candlestick.
-
-Momentum alerts: I don’t think it’s pulling VWAP from the stock data. It may be calculating it.
-
-Momentum alerts: no Asterix W (warrant stocks)
-
-
-
+- [X] THINK HARD. Update code/momentum_alerts.py: The stock VWAP is being used.  It is to come from the stock data. No calculation required.
+- [X] THINK HARD. Update code/momentum_alerts.py: When collecting stock symbols, do not save warrants.  The end in a 'W'. Research stock warrant naming practices.
+- [X] THINK HARD. Update code/momentum_alerts.py: Do not include warrant stocks.
 
 
 ## Orb Alerts Check If Halted Stocks Being Filtered.

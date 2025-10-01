@@ -280,7 +280,7 @@ class MomentumAlertsSystem:
                     reader = csv.DictReader(f)
                     for row in reader:
                         symbol = row.get('symbol', '').strip().upper()
-                        if symbol:
+                        if symbol and not (len(symbol) == 5 and symbol.endswith('W')):  # Filter out 5-char warrants ending in W
                             symbols.add(symbol)
 
                 self.logger.info(f"📊 Loaded {len(symbols)} symbols from gainers CSV")
@@ -299,7 +299,7 @@ class MomentumAlertsSystem:
                     reader = csv.DictReader(f)
                     for row in reader:
                         symbol = row.get('symbol', '').strip().upper()
-                        if symbol and symbol not in symbols:
+                        if symbol and not (len(symbol) == 5 and symbol.endswith('W')) and symbol not in symbols:  # Filter out 5-char warrants ending in W
                             symbols.add(symbol)
                             additional_count += 1
 
@@ -389,7 +389,7 @@ class MomentumAlertsSystem:
                                 'c': float(bar.c),
                                 'v': int(bar.v),
                                 'timestamp': bar.t,
-                                'vwap': getattr(bar, 'vw', float(bar.c))  # Use VWAP if available, else close
+                                'vwap': getattr(bar, 'vw', None)  # Use VWAP from stock data only
                             }
                             bar_data.append(bar_dict)
 
@@ -402,10 +402,10 @@ class MomentumAlertsSystem:
                                 df.index = df.index.tz_localize('UTC')
                             df.index = df.index.tz_convert(self.et_tz)
 
-                            # Calculate VWAP if not properly available
+                            # Check if VWAP data is available from stock data
                             if 'vwap' not in df.columns or df['vwap'].isna().all():
-                                typical_price = (df['h'] + df['l'] + df['c']) / 3
-                                df['vwap'] = (typical_price * df['v']).cumsum() / df['v'].cumsum()
+                                self.logger.debug(f"⚠️ {symbol}: VWAP not available in stock data, skipping")
+                                continue
 
                             data_dict[symbol] = df
 
@@ -442,7 +442,7 @@ class MomentumAlertsSystem:
             # Get latest bar
             latest_bar = data.iloc[-1]
             current_price = float(latest_bar['c'])  # Use single letter attribute
-            current_vwap = float(latest_bar.get('vwap', latest_bar['c']))
+            current_vwap = float(latest_bar['vwap'])  # VWAP from stock data only
             current_volume = int(latest_bar['v'])  # Get current volume
 
             # Check VWAP criteria
