@@ -32,6 +32,10 @@ class MomentumAlertsConfig:
     min_data_points_required: int = 2        # Minimum data points
     volatility_floor: float = 0.1           # Minimum volatility
 
+    # Volume threshold constants for color coding
+    volume_high_threshold: int = 80000       # Green volume threshold
+    volume_low_threshold: int = 60000        # Red volume threshold
+
 
 # Default configuration instance
 DEFAULT_MOMENTUM_ALERTS_CONFIG = MomentumAlertsConfig()
@@ -69,3 +73,26 @@ def get_momentum_thresholds_values() -> tuple[float, float, float]:
     config = get_momentum_alerts_config()
     return (config.momentum_long_threshold, config.momentum_threshold,
             config.momentum_short_threshold)
+
+
+def get_volume_color_emoji(volume: int) -> str:
+    """
+    Get volume color emoji based on volume thresholds.
+
+    Args:
+        volume: Volume value to color code
+
+    Returns:
+        Color emoji string for the volume value
+        🟢 for high volume (>= 80,000)
+        🟡 for medium volume (60,000 - 79,999)
+        🔴 for low volume (< 60,000)
+    """
+    config = get_momentum_alerts_config()
+
+    if volume >= config.volume_high_threshold:
+        return "🟢"  # Green - high volume
+    elif volume >= config.volume_low_threshold:
+        return "🟡"  # Yellow - medium volume
+    else:
+        return "🔴"  # Red - low volume

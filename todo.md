@@ -182,11 +182,12 @@ Telegram polling : integrate volume profile and volume profile bulk.
 - [X] THINK HARD. Create code/momentum_alerts_config.py: Move the constants 20 and 5 to this file in a dataclass; Find the Momentum threshold and create three constants Momentum Long, Momentum, and Momentum Short with that value. Use the dataclass in code/momentum_alerts.py.  Momentum long is not yet used but will be.
 - [X] THINK HARD. Update code/momentum_alerts.py: Review the Momentum and Momentum Short calculations.  They are to be based on minutes from the new config file.  I think they are based on the number of candlesticks.  If a stock is halted, there is not a candlestick.  Use the time please.
 - [X] THINK HARD. Using the knowledge that a halted stock is missing data, update the is halted logic.
-- [ ] THINK HARD. Update code/momentum_alerts.py: When sending the alerts on Telegram, do not mark them as urgent.
+- [X] THINK HARD. Update code/momentum_alerts.py: When sending the alerts on Telegram, do not mark them as urgent.
+- [X] THINK HARD. Update code/momentum_alerts.py: Use the stock volume and add a volume field to the momentum alert. Greater than 80,000 = green; less then 60,000 is a red light icon; otherwise yellow light icon.
 - [ ] THINK HARD. Update code/momentum_alerts.py:
 - [ ] THINK HARD. Update code/momentum_alerts.py:
-
-Momentum alerts: Marked them not urgent and see if that eliminates the tone.
+- [ ] THINK HARD. Update code/momentum_alerts.py:
+- [ ] THINK HARD. Update code/momentum_alerts.py:
 
 Momentum alerts: filter for volume above 80,000 per candlestick.
 

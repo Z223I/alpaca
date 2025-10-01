@@ -42,7 +42,7 @@ from atoms.api.stock_halt_detector import is_stock_halted, get_halt_status_emoji
 from atoms.alerts.breakout_detector import BreakoutDetector
 from atoms.alerts.config import get_momentum_thresholds
 from atoms.telegram.telegram_post import TelegramPoster
-from code.momentum_alerts_config import get_momentum_alerts_config
+from code.momentum_alerts_config import get_momentum_alerts_config, get_volume_color_emoji
 
 
 class MomentumAlertsSystem:
@@ -443,6 +443,7 @@ class MomentumAlertsSystem:
             latest_bar = data.iloc[-1]
             current_price = float(latest_bar['c'])  # Use single letter attribute
             current_vwap = float(latest_bar.get('vwap', latest_bar['c']))
+            current_volume = int(latest_bar['v'])  # Get current volume
 
             # Check VWAP criteria
             if current_price < current_vwap:
@@ -540,6 +541,9 @@ class MomentumAlertsSystem:
             is_halted = is_stock_halted(data, symbol, self.logger)
             halt_emoji = get_halt_status_emoji(is_halted)
 
+            # Get volume color emoji
+            volume_emoji = get_volume_color_emoji(current_volume)
+
             # Check urgency level using dual momentum
             urgency = momentum_thresholds.get_urgency_level_dual(momentum, momentum_short)
 
@@ -565,6 +569,8 @@ class MomentumAlertsSystem:
                 'momentum_short_emoji': momentum_short_emoji,
                 'is_halted': is_halted,
                 'halt_emoji': halt_emoji,
+                'current_volume': current_volume,
+                'volume_emoji': volume_emoji,
                 'urgency': urgency,
                 'timestamp': datetime.now(self.et_tz),
                 'indicators': indicators
@@ -578,7 +584,7 @@ class MomentumAlertsSystem:
             time_diff_short = actual_time_diff_short if 'actual_time_diff_short' in locals() else 0
             self.logger.info(f"   Momentum: {momentum:.2f}/min {momentum_emoji} | Raw: {raw_momentum_20:.2f}% ({time_diff:.1f}min)")
             self.logger.info(f"   Momentum Short: {momentum_short:.2f}/min {momentum_short_emoji} | Raw: {raw_momentum_5:.2f}% ({time_diff_short:.1f}min)")
-            self.logger.info(f"   Halt Status: {halt_emoji} | Urgency: {urgency}")
+            self.logger.info(f"   Volume: {current_volume:,} {volume_emoji} | Halt Status: {halt_emoji} | Urgency: {urgency}")
 
             return alert_data
 
@@ -604,6 +610,8 @@ class MomentumAlertsSystem:
             momentum_short_emoji = alert_data['momentum_short_emoji']
             is_halted = alert_data['is_halted']
             halt_emoji = alert_data['halt_emoji']
+            current_volume = alert_data['current_volume']
+            volume_emoji = alert_data['volume_emoji']
             urgency = alert_data['urgency']
             timestamp = alert_data['timestamp']
 
@@ -616,6 +624,7 @@ class MomentumAlertsSystem:
                 f"📈 **EMA9:** ${ema_9:.2f} ✅",
                 f"⚡ **Momentum:** {momentum:.2f}% {momentum_emoji}",
                 f"⚡ **Momentum Short:** {momentum_short:.2f}% {momentum_short_emoji}",
+                f"📈 **Volume:** {current_volume:,} {volume_emoji}",
                 f"🚦 **Halt Status:** {halt_emoji}",
                 f"🎯 **Urgency:** {urgency.upper()}",
                 "",
@@ -632,7 +641,7 @@ class MomentumAlertsSystem:
                 self.logger.info(f"[TEST MODE] {message}")
             else:
                 # Send to Bruce
-                result = self.telegram_poster.send_message_to_user(message, "bruce", urgent=True)
+                result = self.telegram_poster.send_message_to_user(message, "bruce", urgent=False)
 
                 if result['success']:
                     self.logger.info(f"✅ Momentum alert sent to Bruce for {symbol}")
@@ -707,6 +716,8 @@ class MomentumAlertsSystem:
                 'momentum_short_emoji': str(alert_data['momentum_short_emoji']),
                 'is_halted': bool(alert_data['is_halted']),
                 'halt_emoji': str(alert_data['halt_emoji']),
+                'current_volume': int(alert_data['current_volume']),
+                'volume_emoji': str(alert_data['volume_emoji']),
                 'urgency': str(alert_data['urgency']),
                 'timestamp': timestamp.isoformat(),
                 'message': str(message),
@@ -754,6 +765,8 @@ class MomentumAlertsSystem:
                 'momentum_short_emoji': str(alert_data['momentum_short_emoji']),
                 'is_halted': bool(alert_data['is_halted']),
                 'halt_emoji': str(alert_data['halt_emoji']),
+                'current_volume': int(alert_data['current_volume']),
+                'volume_emoji': str(alert_data['volume_emoji']),
                 'urgency': str(alert_data['urgency']),
                 'timestamp': timestamp.isoformat(),
                 'message': str(message),
