@@ -284,7 +284,7 @@ DEFAULT_PLOTS_ROOT_DIR = PlotsRootDir(root_path=".")
 DEFAULT_DATA_ROOT_DIR = DataRootDir(root_path=".")
 DEFAULT_LOGS_ROOT_DIR = LogsRootDir(root_path=".")
 DEFAULT_HISTORICAL_ROOT_DIR = HistoricalRootDir(root_path=".")
-DEFAULT_PRICE_MOMENTUM_CONFIG = PriceMomentumConfig(momentum=MomentumThresholds(green_threshold=0.70), trend_analysis_timeframe_minutes=20)
+DEFAULT_PRICE_MOMENTUM_CONFIG = PriceMomentumConfig(momentum=MomentumThresholds(green_threshold=0.65), trend_analysis_timeframe_minutes=20)
 
 
 def get_plots_root_dir() -> PlotsRootDir:
