@@ -170,8 +170,38 @@ Latest Profile:
 - [ ] Monitor 'premarket top gainers' for stocks that are in a squeeze.
 
 
+
+
+
+
+Automatically send myself premarket top gainers and top gainers.
+
+Momentum alerts: dial them down.
+
+
+
 Telegram polling : integrate volume profile and volume profile bulk.
 
+## Automatic trading
+
+- [X] THINK HARD. Create code/configure_alpaca.py: it is to accepts args to modify code/alpaca_config.py.
+Here are the args to control what account-name and account get modified:
+  --account-name ACCOUNT_NAME
+                        Account name to use (default: Bruce)
+  --account ACCOUNT     Account environment to use: paper, live, cash (default: paper)
+These are the fields that can be modified:
+  auto_trade="no",
+  auto_amount=100,
+  trailing_percent=10.0,
+  take_profit_percent=12.0,
+  max_trades_per_day=1
+
+- [X] ULTRATHINK.  Update molecules/telegram_polling.py: Only Bruce can send the command 'configure alpaca' case insensitive. It can accept the same args as code/configure_alpaca.py. It is to run code/configure_alpaca.py with the matching args. Add command to help but only for Bruce.
+- [ ] THINK HARD. Review and update the polling script.  Telegram changes double hyphens. Accept single hyphens for the cli args.
+
+## Dial Down Momentum Alerts
+
+- [X] Update Momentum thresholds 0.70 -> 0.60.
 
 
 ## Momentum Alerts Updates III

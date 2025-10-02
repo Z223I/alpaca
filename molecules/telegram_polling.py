@@ -216,6 +216,9 @@ class TelegramPollingService:
             elif text.lower() == 'market open top gainers':
                 # Handle market open top gainers trigger word (any user)
                 self._handle_market_open_top_gainers_command(chat_id, username, first_name, last_name, text)
+            elif text.lower().startswith('configure alpaca'):
+                # Handle configure alpaca trigger word (Bruce only)
+                self._handle_configure_alpaca_command(chat_id, username, first_name, last_name, text)
             else:
                 # Handle non-command messages
                 self._handle_regular_message(chat_id, username, first_name, text)
@@ -372,7 +375,23 @@ market open top gainers - Find top 20 market open gaining stocks on NASDAQ/AMEX
             help_text += """
 
 🚨 Admin Commands (Bruce only):
-bam - Execute Bulk Account Manager (liquidate all auto-trade positions/orders)"""
+bam - Execute Bulk Account Manager (liquidate all auto-trade positions/orders)
+
+🔧 Configuration Management:
+configure alpaca - Modify Alpaca trading configuration parameters
+Usage: configure alpaca --account-name [NAME] --account [paper/live/cash] [options]
+
+Options:
+  --auto-trade [yes/no]
+  --auto-amount [NUMBER]
+  --trailing-percent [NUMBER]
+  --take-profit-percent [NUMBER]
+  --max-trades-per-day [NUMBER]
+  --dry-run (preview changes)
+
+Examples:
+  configure alpaca --account-name Bruce --account paper --auto-amount 5000
+  configure alpaca --account-name "Dale Wilson" --account live --auto-trade yes --dry-run"""
 
         # Add footer for all users
         help_text += """
@@ -677,6 +696,180 @@ the prior trading day results will be given.
         except Exception as e:
             self._log(f"Error parsing plot args: {e}", "ERROR")
             return None
+
+    def _parse_configure_alpaca_args(self, text: str) -> Optional[Dict]:
+        """Parse configure alpaca arguments from Telegram message."""
+        try:
+            # Expected format: "configure alpaca --account-name [NAME] --account [ACCOUNT] [options]"
+            # Normalize different dash characters to regular hyphens
+            normalized_text = text.replace('—', '-').replace('–', '-').replace('‐', '-')
+
+            # Use shlex to properly handle quoted strings
+            import shlex
+            try:
+                parts = shlex.split(normalized_text)
+            except ValueError:
+                # Fall back to simple split if shlex fails
+                parts = normalized_text.strip().split()
+
+            if len(parts) < 3:
+                return None
+
+            # Check for required format start
+            if parts[0].lower() != 'configure' or parts[1].lower() != 'alpaca':
+                return None
+
+            # Remove "configure alpaca" from the start
+            raw_args = parts[2:]
+
+            # Convert single hyphens to double hyphens for configure_alpaca.py compatibility
+            # This follows the same pattern as _parse_alpaca_args for consistency
+            converted_args = []
+            for part in raw_args:
+                if part.startswith('-') and not part.startswith('--'):
+                    # Check if this is a negative number (starts with - followed by digits)
+                    if len(part) > 1 and (part[1:].replace('.', '').isdigit()):
+                        # This is a negative number, keep as single hyphen
+                        converted_args.append(part)
+                    else:
+                        # Convert single hyphen to double hyphen
+                        converted_args.append('--' + part[1:])
+                elif part.startswith('--'):
+                    # Already double hyphen, keep as is
+                    converted_args.append(part)
+                else:
+                    # Non-hyphen arguments (values), keep original
+                    converted_args.append(part)
+
+            # Parse the converted arguments
+            configure_args = []
+            parsed_args = {}
+            i = 0
+
+            while i < len(converted_args):
+                arg = converted_args[i]
+
+                if arg == '--account-name' and i + 1 < len(converted_args):
+                    account_name = converted_args[i + 1]
+                    parsed_args['account_name'] = account_name
+                    configure_args.extend([arg, account_name])
+                    i += 2
+                elif arg == '--account' and i + 1 < len(converted_args):
+                    account = converted_args[i + 1]
+                    if account.lower() in ['paper', 'live', 'cash']:
+                        parsed_args['account'] = account.lower()
+                        configure_args.extend([arg, account.lower()])
+                    else:
+                        self._log(f"Invalid account type: {account}", "ERROR")
+                        return None
+                    i += 2
+                elif arg == '--auto-trade' and i + 1 < len(converted_args):
+                    auto_trade = converted_args[i + 1]
+                    if auto_trade.lower() in ['yes', 'no']:
+                        parsed_args['auto_trade'] = auto_trade.lower()
+                        configure_args.extend([arg, auto_trade.lower()])
+                    else:
+                        self._log(f"Invalid auto-trade value: {auto_trade}", "ERROR")
+                        return None
+                    i += 2
+                elif arg == '--auto-amount' and i + 1 < len(converted_args):
+                    try:
+                        auto_amount = int(converted_args[i + 1])
+                        parsed_args['auto_amount'] = auto_amount
+                        configure_args.extend([arg, str(auto_amount)])
+                        i += 2
+                    except ValueError:
+                        self._log(f"Invalid auto-amount value: {converted_args[i + 1]}", "ERROR")
+                        return None
+                elif arg == '--trailing-percent' and i + 1 < len(converted_args):
+                    try:
+                        trailing_percent = float(converted_args[i + 1])
+                        parsed_args['trailing_percent'] = trailing_percent
+                        configure_args.extend([arg, str(trailing_percent)])
+                        i += 2
+                    except ValueError:
+                        self._log(f"Invalid trailing-percent value: {converted_args[i + 1]}", "ERROR")
+                        return None
+                elif arg == '--take-profit-percent' and i + 1 < len(converted_args):
+                    try:
+                        take_profit_percent = float(converted_args[i + 1])
+                        parsed_args['take_profit_percent'] = take_profit_percent
+                        configure_args.extend([arg, str(take_profit_percent)])
+                        i += 2
+                    except ValueError:
+                        self._log(f"Invalid take-profit-percent value: {converted_args[i + 1]}", "ERROR")
+                        return None
+                elif arg == '--max-trades-per-day' and i + 1 < len(converted_args):
+                    try:
+                        max_trades = int(converted_args[i + 1])
+                        parsed_args['max_trades_per_day'] = max_trades
+                        configure_args.extend([arg, str(max_trades)])
+                        i += 2
+                    except ValueError:
+                        self._log(f"Invalid max-trades-per-day value: {converted_args[i + 1]}", "ERROR")
+                        return None
+                elif arg == '--dry-run':
+                    parsed_args['dry_run'] = True
+                    configure_args.append(arg)
+                    i += 1
+                else:
+                    self._log(f"Unknown argument: {arg}", "ERROR")
+                    return None
+
+            # Ensure at least one parameter besides account selection is provided
+            param_keys = ['auto_trade', 'auto_amount', 'trailing_percent', 'take_profit_percent', 'max_trades_per_day']
+            if not any(key in parsed_args for key in param_keys):
+                self._log("No configuration parameters provided", "ERROR")
+                return None
+
+            parsed_args['configure_args'] = configure_args
+            return parsed_args
+
+        except Exception as e:
+            self._log(f"Error parsing configure alpaca args: {e}", "ERROR")
+            return None
+
+    def _execute_configure_alpaca_command(self, args: List[str]) -> str:
+        """Execute configure_alpaca.py command and return output."""
+        try:
+            import subprocess
+
+            # Get project root directory
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            configure_script = os.path.join(project_root, 'code', 'configure_alpaca.py')
+
+            # Use conda environment python to execute the script
+            python_path = os.path.expanduser('~/miniconda3/envs/alpaca/bin/python')
+
+            # Build command
+            cmd = [python_path, configure_script] + args
+
+            # Execute command
+            result = subprocess.run(
+                cmd,
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
+            # Get output
+            output = result.stdout.strip()
+            error_output = result.stderr.strip()
+
+            if result.returncode == 0:
+                if output:
+                    return f"✅ Configuration updated successfully:\n```\n{output}\n```"
+                else:
+                    return "✅ Configuration updated successfully"
+            else:
+                error_msg = error_output if error_output else output
+                return f"❌ Configuration update failed (exit code: {result.returncode}):\n```\n{error_msg}\n```"
+
+        except subprocess.TimeoutExpired:
+            return "❌ Configuration command timed out after 30 seconds"
+        except Exception as e:
+            return f"❌ Error executing configuration command: {str(e)}"
 
     def _extract_plot_path(self, alpaca_output: str) -> Optional[str]:
         """Extract plot file path from alpaca.py output."""
@@ -1049,6 +1242,53 @@ the prior trading day results will be given.
         except Exception as e:
             self._log(f"Error handling market open top gainers command: {e}", "ERROR")
             self._send_response(chat_id, f"❌ Error executing market open top gainers command: {str(e)}")
+
+    def _handle_configure_alpaca_command(self, chat_id: str, username: str, first_name: str, last_name: str, text: str):
+        """Handle 'configure alpaca' command for configuration management (Bruce only)."""
+
+        # Check user authorization - only Bruce can use this command
+        if not self._is_authorized_user(username, first_name):
+            return  # Silently ignore unauthorized users
+
+        try:
+            display_name = f"{first_name} {last_name}".strip() or username or f"User_{chat_id[-4:]}"
+            self._log(f"🔧 Configure Alpaca command from {display_name}: {text}")
+
+            # Parse configure alpaca arguments from message
+            args = self._parse_configure_alpaca_args(text)
+            if not args:
+                error_msg = ("❌ Invalid configure alpaca command. Usage:\n"
+                             "configure alpaca --account-name [NAME] --account [paper/live/cash] [options]\n\n"
+                             "Options:\n"
+                             "  --auto-trade [yes/no]\n"
+                             "  --auto-amount [NUMBER]\n"
+                             "  --trailing-percent [NUMBER]\n"
+                             "  --take-profit-percent [NUMBER]\n"
+                             "  --max-trades-per-day [NUMBER]\n"
+                             "  --dry-run (preview changes)\n\n"
+                             "Examples:\n"
+                             "  configure alpaca --account-name Bruce --account paper --auto-amount 5000\n"
+                             "  configure alpaca --account-name \"Dale Wilson\" --account live --auto-trade yes --dry-run")
+                self._send_response(chat_id, error_msg)
+                return
+
+            # Send processing message
+            account_name = args.get('account_name', 'Bruce')
+            account = args.get('account', 'paper')
+            dry_run = args.get('dry_run', False)
+            action = "Preview" if dry_run else "Updating"
+
+            self._send_response(chat_id, f"🔧 {action} configuration for {account_name}/{account}...")
+
+            # Execute configure_alpaca.py command
+            result = self._execute_configure_alpaca_command(args['configure_args'])
+
+            # Send result back to Bruce
+            self._send_response(chat_id, result)
+
+        except Exception as e:
+            self._log(f"Error handling configure alpaca command: {e}", "ERROR")
+            self._send_response(chat_id, f"❌ Error executing configure alpaca command: {str(e)}")
 
     def _execute_premarket_top_gainers_command(self) -> str:
         """Execute premarket_top_gainers.py command and return output with CSV file contents."""
