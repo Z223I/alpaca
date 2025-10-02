@@ -23,10 +23,10 @@ class MomentumAlertsConfig:
     momentum_short_period: int = 5      # Short-term 5-minute momentum
 
     # Momentum threshold constants (per minute percentage values)
-    # Based on existing system green_threshold of 0.70
-    momentum_long_threshold: float = 0.70    # Future use - long-term threshold
-    momentum_threshold: float = 0.70         # Standard momentum threshold
-    momentum_short_threshold: float = 0.70   # Short-term momentum threshold
+    # Based on existing system green_threshold of 0.60
+    momentum_long_threshold: float = 0.60    # Future use - long-term threshold
+    momentum_threshold: float = 0.60         # Standard momentum threshold
+    momentum_short_threshold: float = 0.60   # Short-term momentum threshold
 
     # Additional configuration options
     min_data_points_required: int = 2        # Minimum data points
