@@ -40,9 +40,13 @@ import alpaca_trade_api as tradeapi
 from atoms.api.init_alpaca_client import init_alpaca_client
 from atoms.api.stock_halt_detector import is_stock_halted, get_halt_status_emoji
 from atoms.alerts.breakout_detector import BreakoutDetector
-from atoms.alerts.config import get_momentum_thresholds
+# Removed unused import: from atoms.alerts.config import get_momentum_thresholds
 from atoms.telegram.telegram_post import TelegramPoster
-from code.momentum_alerts_config import get_momentum_alerts_config, get_volume_color_emoji
+from code.momentum_alerts_config import (
+    get_momentum_alerts_config, get_volume_color_emoji,
+    get_momentum_standard_color_emoji, get_momentum_short_color_emoji,
+    get_urgency_level_dual
+)
 
 
 class MomentumAlertsSystem:
@@ -532,10 +536,9 @@ class MomentumAlertsSystem:
                     # Normalize by actual time diff (handles gaps)
                     momentum_short = raw_momentum_5 / actual_time_diff_short
 
-            # Get momentum thresholds and signal light icons
-            momentum_thresholds = get_momentum_thresholds()
-            momentum_emoji = momentum_thresholds.get_momentum_color_emoji(momentum)
-            momentum_short_emoji = momentum_thresholds.get_momentum_color_emoji(momentum_short)
+            # Get momentum signal light icons from momentum config
+            momentum_emoji = get_momentum_standard_color_emoji(momentum)
+            momentum_short_emoji = get_momentum_short_color_emoji(momentum_short)
 
             # Check halt status
             is_halted = is_stock_halted(data, symbol, self.logger)
@@ -545,7 +548,7 @@ class MomentumAlertsSystem:
             volume_emoji = get_volume_color_emoji(current_volume)
 
             # Check urgency level using dual momentum
-            urgency = momentum_thresholds.get_urgency_level_dual(momentum, momentum_short)
+            urgency = get_urgency_level_dual(momentum, momentum_short)
 
             if urgency == 'filtered':
                 self.logger.debug(f"❌ {symbol}: Filtered by urgency level "

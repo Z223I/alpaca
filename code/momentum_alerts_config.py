@@ -28,6 +28,12 @@ class MomentumAlertsConfig:
     momentum_threshold: float = 0.60         # Standard momentum threshold
     momentum_short_threshold: float = 0.60   # Short-term momentum threshold
 
+    # Momentum minimum threshold constants (per minute percentage values)
+    # Minimum values for momentum detection/filtering
+    momentum_long_minimum: float = 0.50      # Future use - long-term minimum
+    momentum_minimum: float = 0.50           # Standard momentum minimum
+    momentum_short_minimum: float = 0.50     # Short-term momentum minimum
+
     # Additional configuration options
     min_data_points_required: int = 2        # Minimum data points
     volatility_floor: float = 0.1           # Minimum volatility
@@ -73,6 +79,105 @@ def get_momentum_thresholds_values() -> tuple[float, float, float]:
     config = get_momentum_alerts_config()
     return (config.momentum_long_threshold, config.momentum_threshold,
             config.momentum_short_threshold)
+
+
+def get_momentum_minimums_values() -> tuple[float, float, float]:
+    """
+    Get momentum minimum threshold values in order: (long, standard, short).
+
+    Returns:
+        Tuple of (long_minimum, minimum, short_minimum)
+    """
+    config = get_momentum_alerts_config()
+    return (config.momentum_long_minimum, config.momentum_minimum,
+            config.momentum_short_minimum)
+
+
+def get_momentum_color_emoji(momentum: float, threshold: float, minimum: float) -> str:
+    """
+    Get momentum color emoji based on threshold and minimum values.
+
+    Args:
+        momentum: Momentum value to color code
+        threshold: High threshold for green light
+        minimum: Minimum threshold for yellow light
+
+    Returns:
+        Color emoji string for the momentum value
+        🟢 for high momentum (>= threshold)
+        🟡 for medium momentum (>= minimum but < threshold)
+        🔴 for low momentum (< minimum)
+    """
+    if momentum >= threshold:
+        return "🟢"  # Green - high momentum
+    elif momentum >= minimum:
+        return "🟡"  # Yellow - medium momentum
+    else:
+        return "🔴"  # Red - low momentum
+
+
+def get_momentum_standard_color_emoji(momentum: float) -> str:
+    """
+    Get standard momentum color emoji using standard thresholds.
+
+    Args:
+        momentum: Momentum value to color code
+
+    Returns:
+        Color emoji string for the momentum value
+    """
+    config = get_momentum_alerts_config()
+    return get_momentum_color_emoji(momentum, config.momentum_threshold, config.momentum_minimum)
+
+
+def get_momentum_long_color_emoji(momentum: float) -> str:
+    """
+    Get long-term momentum color emoji using long-term thresholds.
+
+    Args:
+        momentum: Momentum value to color code
+
+    Returns:
+        Color emoji string for the momentum value
+    """
+    config = get_momentum_alerts_config()
+    return get_momentum_color_emoji(momentum, config.momentum_long_threshold, config.momentum_long_minimum)
+
+
+def get_momentum_short_color_emoji(momentum: float) -> str:
+    """
+    Get short-term momentum color emoji using short-term thresholds.
+
+    Args:
+        momentum: Momentum value to color code
+
+    Returns:
+        Color emoji string for the momentum value
+    """
+    config = get_momentum_alerts_config()
+    return get_momentum_color_emoji(momentum, config.momentum_short_threshold, config.momentum_short_minimum)
+
+
+def get_urgency_level_dual(momentum: float, momentum_short: float) -> str:
+    """
+    Get urgency level for Telegram notifications requiring BOTH momentum indicators to be green.
+
+    Args:
+        momentum: Regular momentum value to evaluate
+        momentum_short: Short-term momentum value to evaluate
+
+    Returns:
+        'filtered' - If either momentum is red/yellow, don't send to Telegram
+        'urgent' - Only if BOTH momentums are green (>= threshold), urgent Telegram notification
+    """
+    config = get_momentum_alerts_config()
+
+    # Both momentum values must meet their respective thresholds for urgent notification
+    if (momentum < config.momentum_threshold or
+        momentum_short < config.momentum_short_threshold):
+        return 'filtered'
+    else:
+        return 'urgent'
 
 
 def get_volume_color_emoji(volume: int) -> str:
