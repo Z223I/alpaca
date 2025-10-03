@@ -191,6 +191,10 @@ Momentum alerts: VWAP is wrong
 
 Momentum alerts: BQ halted. On October 2. Momentum alert does not show it halted.  Look for a 90 second gap.
 
+## Send Top Gainers
+
+- [ ] THINK HARD.  Update code/momentum_alerts.py: After each time generating top gainers, send the file to 'bruce' using atoms/telegram/telegram_post.py.
+
 
 ## Super Duper Alert Threshold
 

@@ -237,7 +237,7 @@ class MomentumAlertsSystem:
                 next_run = self.startup_schedule[self.startup_runs_completed]
                 self.logger.info(f"⏰ Next startup script run scheduled for: {next_run.strftime('%H:%M:%S ET')}")
 
-    def _check_startup_processes(self):
+    async def _check_startup_processes(self):
         """Check the status of running startup processes."""
         completed_processes = []
 
@@ -250,6 +250,8 @@ class MomentumAlertsSystem:
 
                 if return_code == 0:
                     self.logger.info(f"✅ Startup script completed successfully (Runtime: {runtime})")
+                    # Send the generated top gainers file to Bruce
+                    await self._send_top_gainers_file_to_bruce()
                 else:
                     self.logger.error(f"❌ Startup script failed with return code {return_code} (Runtime: {runtime})")
 
@@ -266,6 +268,78 @@ class MomentumAlertsSystem:
         # Remove completed processes
         for process_id in completed_processes:
             del self.startup_processes[process_id]
+
+    async def _send_top_gainers_file_to_bruce(self):
+        """
+        Send the generated top gainers file information to Bruce via Telegram.
+        """
+        try:
+            # Check if the CSV file exists
+            if not self.csv_file_path.exists():
+                self.logger.warning(f"⚠️ Top gainers file not found: {self.csv_file_path}")
+                return
+
+            # Read the CSV file to get information
+            symbols = []
+            total_rows = 0
+
+            try:
+                with open(self.csv_file_path, 'r') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        symbol = row.get('symbol', '').strip().upper()
+                        if symbol:
+                            symbols.append(symbol)
+                        total_rows += 1
+
+                # Create summary message
+                file_time = datetime.fromtimestamp(self.csv_file_path.stat().st_mtime, self.et_tz)
+
+                message_parts = [
+                    "📊 **TOP GAINERS FILE GENERATED**",
+                    "",
+                    "📁 **File:** `gainers_nasdaq_amex.csv`",
+                    f"⏰ **Generated:** {file_time.strftime('%H:%M:%S ET')}",
+                    f"📅 **Date:** {file_time.strftime('%Y-%m-%d')}",
+                    f"📈 **Total Symbols:** {total_rows}",
+                    "",
+                    f"🔝 **Top Symbols:** {', '.join(symbols[:10])}{'...' if len(symbols) > 10 else ''}",
+                    "",
+                    f"📂 **Path:** `{self.csv_file_path}`"
+                ]
+
+                message = "\n".join(message_parts)
+
+                if self.test_mode:
+                    self.logger.info(f"[TEST MODE] Top gainers file notification: {message}")
+                else:
+                    # Send to Bruce
+                    result = self.telegram_poster.send_message_to_user(message, "bruce", urgent=False)
+
+                    if result['success']:
+                        self.logger.info("✅ Top gainers file notification sent to Bruce")
+                    else:
+                        errors = result.get('errors', ['Unknown error'])
+                        error_msg = ', '.join(errors) if isinstance(errors, list) else str(errors)
+                        self.logger.error(f"❌ Failed to send top gainers file notification to Bruce: {error_msg}")
+
+            except Exception as file_error:
+                self.logger.error(f"❌ Error reading top gainers file: {file_error}")
+
+                # Send basic notification even if file reading fails
+                basic_message = (
+                    "📊 **TOP GAINERS FILE GENERATED**\n\n"
+                    "📁 **File:** `gainers_nasdaq_amex.csv`\n"
+                    f"⏰ **Time:** {datetime.now(self.et_tz).strftime('%H:%M:%S ET')}\n"
+                    f"📂 **Path:** `{self.csv_file_path}`\n\n"
+                    "⚠️ **Note:** Could not read file contents for detailed summary"
+                )
+
+                if not self.test_mode:
+                    self.telegram_poster.send_message_to_user(basic_message, "bruce", urgent=False)
+
+        except Exception as e:
+            self.logger.error(f"❌ Error sending top gainers file notification: {e}")
 
     def _load_csv_symbols(self) -> List[str]:
         """
@@ -831,7 +905,7 @@ class MomentumAlertsSystem:
                     self._check_startup_schedule()
 
                     # Check startup processes
-                    self._check_startup_processes()
+                    await self._check_startup_processes()
 
                     # Monitor CSV file
                     self._monitor_csv_file()
