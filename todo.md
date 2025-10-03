@@ -182,6 +182,21 @@ Momentum alerts: dial them down.
 
 Telegram polling : integrate volume profile and volume profile bulk.
 
+
+
+
+Update market open top gainers to send list to Bruce
+
+Momentum alerts: VWAP is wrong
+
+Momentum alerts: BQ halted. On October 2. Momentum alert does not show it halted.  Look for a 90 second gap.
+
+
+## Super Duper Alert Threshold
+
+- [X] THINK HARD. Update atoms/alerts/config.py: trend_analysis_timeframe_minutes=20 -> 17.
+- [X] 0.75 -> 0.65 in config.py
+
 ## Automatic trading
 
 - [X] THINK HARD. Create code/configure_alpaca.py: it is to accepts args to modify code/alpaca_config.py.

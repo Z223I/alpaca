@@ -40,7 +40,6 @@ import alpaca_trade_api as tradeapi
 from atoms.api.init_alpaca_client import init_alpaca_client
 from atoms.api.stock_halt_detector import is_stock_halted, get_halt_status_emoji
 from atoms.alerts.breakout_detector import BreakoutDetector
-# Removed unused import: from atoms.alerts.config import get_momentum_thresholds
 from atoms.telegram.telegram_post import TelegramPoster
 from code.momentum_alerts_config import (
     get_momentum_alerts_config, get_volume_color_emoji,
