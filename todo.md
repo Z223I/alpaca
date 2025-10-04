@@ -189,6 +189,24 @@ Momentum alerts: VWAP is wrong
 
 Momentum alerts: BQ halted. On October 2. Momentum alert does not show it halted.  Look for a 90 second gap.
 
+
+
+
+## Momentum Normalized
+
+- [X] ULTRATHINK.  Update code/momentum_alerts.py: Update the Telegram message to display Momentum and Momentum Short as normalized per minute.  Show example.
+
+
+## Send Top Gainers Frequency Update
+
+- [X] THINK HARD.  Update code/momentum_alerts.py: The top gainers are currently generated once per hour for four hours.  Update the generate twice per hour for five hours.
+
+
+## Send Top Gainers Update
+
+- [X] THINK HARD.  Update code/momentum_alerts.py: After each time generating top gainers, the file name is sent to 'bruce' using atoms/telegram/telegram_post.py.  Update to send the file contents.
+
+
 ## Send Top Gainers
 
 - [X] THINK HARD.  Update code/momentum_alerts.py: After each time generating top gainers, send the file to 'bruce' using atoms/telegram/telegram_post.py.
