@@ -192,6 +192,29 @@ Momentum alerts: BQ halted. On October 2. Momentum alert does not show it halted
 
 
 
+## Symbol Polling
+
+### Config
+
+- [X] claude --dangerously-skip-permissions
+- [X] /login
+- [X] /commit
+- [X] Sync changes
+- [X] /clear
+- [X] git switch -c feature/symbol_polling
+- [X] /clear
+- [X] /read...
+
+### Spec File
+
+- [X] ULTRATHINK. Implement the instructions in specs/symbol_polling.md.
+- [X] Nudge
+- [X] /commit
+- [X] Publish the branch
+- [X] git switch master; merge current branch and verify that all changes are merged.
+- [X] Sync changes
+
+
 ## Momentum Normalized
 
 - [X] ULTRATHINK.  Update code/momentum_alerts.py: Update the Telegram message to display Momentum and Momentum Short as normalized per minute.  Show example.
