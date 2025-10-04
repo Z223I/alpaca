@@ -6,7 +6,7 @@ This system monitors stocks from the market open top gainers CSV and generates m
 based on VWAP and EMA9 criteria. It follows the specification in specs/momentum_alert.md.
 
 Process:
-1. Startup: Run market_open_top_gainers.py every hour for 4 hours
+1. Startup: Run market_open_top_gainers.py three times per hour for 5 hours
 2. Monitor: Watch for CSV file creation in ./historical_data/{YYYY-MM-DD}/market/gainers_nasdaq_amex.csv
 3. Stock monitoring: Every minute, collect 30 minutes of 1-minute candlesticks for each stock
 4. Momentum alerts: Check stocks above VWAP, above EMA9, and pass urgency filter
@@ -155,16 +155,28 @@ class MomentumAlertsSystem:
         return logger
 
     def _schedule_startup_runs(self):
-        """Schedule the startup script to run every hour for 4 hours."""
+        """Schedule the startup script to run three times per hour for 5 hours."""
         current_time = datetime.now(self.et_tz)
 
-        # Schedule runs starting from next hour, then every hour for 4 hours
-        for i in range(4):
-            # Start from next hour
-            scheduled_time = current_time.replace(minute=0, second=0, microsecond=0) + timedelta(hours=i+1)
-            self.startup_schedule.append(scheduled_time)
+        # Schedule runs three times per hour for 5 hours (15 total runs)
+        # Runs at :00, :20, and :40 minutes of each hour
+        for hour in range(5):
+            # Schedule run at top of hour (:00)
+            scheduled_time_00 = current_time.replace(minute=0, second=0, microsecond=0) + timedelta(hours=hour+1)
+            self.startup_schedule.append(scheduled_time_00)
 
-        self.logger.info(f"📅 Scheduled {len(self.startup_schedule)} startup script runs:")
+            # Schedule run at 20 minutes past hour (:20)
+            scheduled_time_20 = current_time.replace(minute=20, second=0, microsecond=0) + timedelta(hours=hour+1)
+            self.startup_schedule.append(scheduled_time_20)
+
+            # Schedule run at 40 minutes past hour (:40)
+            scheduled_time_40 = current_time.replace(minute=40, second=0, microsecond=0) + timedelta(hours=hour+1)
+            self.startup_schedule.append(scheduled_time_40)
+
+        # Sort the schedule to ensure chronological order
+        self.startup_schedule.sort()
+
+        self.logger.info(f"📅 Scheduled {len(self.startup_schedule)} startup script runs (three times per hour for 5 hours):")
         for i, scheduled_time in enumerate(self.startup_schedule, 1):
             self.logger.info(f"   Run {i}: {scheduled_time.strftime('%H:%M:%S ET')}")
 
@@ -260,6 +272,8 @@ class MomentumAlertsSystem:
                     stdout, stderr = process.communicate(timeout=1)
                     if stdout:
                         self.logger.debug(f"Startup script output: {stdout[-500:]}")  # Last 500 chars
+                    if stderr:
+                        self.logger.debug(f"Startup script stderr: {stderr[-500:]}")  # Last 500 chars
                 except Exception:
                     pass
 
@@ -271,7 +285,7 @@ class MomentumAlertsSystem:
 
     async def _send_top_gainers_file_to_bruce(self):
         """
-        Send the generated top gainers file information to Bruce via Telegram.
+        Send the generated top gainers file contents to Bruce via Telegram.
         """
         try:
             # Check if the CSV file exists
@@ -279,22 +293,23 @@ class MomentumAlertsSystem:
                 self.logger.warning(f"⚠️ Top gainers file not found: {self.csv_file_path}")
                 return
 
-            # Read the CSV file to get information
-            symbols = []
-            total_rows = 0
-
+            # Read the CSV file contents
             try:
                 with open(self.csv_file_path, 'r') as f:
-                    reader = csv.DictReader(f)
-                    for row in reader:
-                        symbol = row.get('symbol', '').strip().upper()
-                        if symbol:
-                            symbols.append(symbol)
-                        total_rows += 1
+                    file_contents = f.read().strip()
 
-                # Create summary message
+                if not file_contents:
+                    self.logger.warning(f"⚠️ Top gainers file is empty: {self.csv_file_path}")
+                    return
+
+                # Get file metadata
                 file_time = datetime.fromtimestamp(self.csv_file_path.stat().st_mtime, self.et_tz)
 
+                # Count rows (excluding header)
+                lines = file_contents.split('\n')
+                total_rows = len(lines) - 1 if len(lines) > 1 else 0
+
+                # Create message with file contents
                 message_parts = [
                     "📊 **TOP GAINERS FILE GENERATED**",
                     "",
@@ -303,7 +318,10 @@ class MomentumAlertsSystem:
                     f"📅 **Date:** {file_time.strftime('%Y-%m-%d')}",
                     f"📈 **Total Symbols:** {total_rows}",
                     "",
-                    f"🔝 **Top Symbols:** {', '.join(symbols[:10])}{'...' if len(symbols) > 10 else ''}",
+                    "📋 **File Contents:**",
+                    "```csv",
+                    file_contents,
+                    "```",
                     "",
                     f"📂 **Path:** `{self.csv_file_path}`"
                 ]
@@ -311,17 +329,17 @@ class MomentumAlertsSystem:
                 message = "\n".join(message_parts)
 
                 if self.test_mode:
-                    self.logger.info(f"[TEST MODE] Top gainers file notification: {message}")
+                    self.logger.info(f"[TEST MODE] Top gainers file contents: {len(file_contents)} characters")
                 else:
                     # Send to Bruce
                     result = self.telegram_poster.send_message_to_user(message, "bruce", urgent=False)
 
                     if result['success']:
-                        self.logger.info("✅ Top gainers file notification sent to Bruce")
+                        self.logger.info(f"✅ Top gainers file contents sent to Bruce ({len(file_contents)} characters)")
                     else:
                         errors = result.get('errors', ['Unknown error'])
                         error_msg = ', '.join(errors) if isinstance(errors, list) else str(errors)
-                        self.logger.error(f"❌ Failed to send top gainers file notification to Bruce: {error_msg}")
+                        self.logger.error(f"❌ Failed to send top gainers file contents to Bruce: {error_msg}")
 
             except Exception as file_error:
                 self.logger.error(f"❌ Error reading top gainers file: {file_error}")
@@ -332,14 +350,14 @@ class MomentumAlertsSystem:
                     "📁 **File:** `gainers_nasdaq_amex.csv`\n"
                     f"⏰ **Time:** {datetime.now(self.et_tz).strftime('%H:%M:%S ET')}\n"
                     f"📂 **Path:** `{self.csv_file_path}`\n\n"
-                    "⚠️ **Note:** Could not read file contents for detailed summary"
+                    "⚠️ **Note:** Could not read file contents for sending"
                 )
 
                 if not self.test_mode:
                     self.telegram_poster.send_message_to_user(basic_message, "bruce", urgent=False)
 
         except Exception as e:
-            self.logger.error(f"❌ Error sending top gainers file notification: {e}")
+            self.logger.error(f"❌ Error sending top gainers file contents: {e}")
 
     def _load_csv_symbols(self) -> List[str]:
         """
@@ -684,7 +702,6 @@ class MomentumAlertsSystem:
             momentum_short = alert_data['momentum_short']
             momentum_emoji = alert_data['momentum_emoji']
             momentum_short_emoji = alert_data['momentum_short_emoji']
-            is_halted = alert_data['is_halted']
             halt_emoji = alert_data['halt_emoji']
             current_volume = alert_data['current_volume']
             volume_emoji = alert_data['volume_emoji']
@@ -698,8 +715,8 @@ class MomentumAlertsSystem:
                 f"💰 **Price:** ${current_price:.2f}",
                 f"📊 **VWAP:** ${vwap:.2f} ✅",
                 f"📈 **EMA9:** ${ema_9:.2f} ✅",
-                f"⚡ **Momentum:** {momentum:.2f}% {momentum_emoji}",
-                f"⚡ **Momentum Short:** {momentum_short:.2f}% {momentum_short_emoji}",
+                f"⚡ **Momentum:** {momentum:.2f}%/min {momentum_emoji}",
+                f"⚡ **Momentum Short:** {momentum_short:.2f}%/min {momentum_short_emoji}",
                 f"📈 **Volume:** {current_volume:,} {volume_emoji}",
                 f"🚦 **Halt Status:** {halt_emoji}",
                 f"🎯 **Urgency:** {urgency.upper()}",
