@@ -194,11 +194,13 @@ Momentum alerts: BQ halted. On October 2. Momentum alert does not show it halted
 
 Raise minimum volume on market open top gainers
 
-Update market open top gainers. Save two decimal places.
+## Top Gainers Update
+
+- [ ] ULTRATHINK.  Update code/market_open_top_gainers.py: Before saving the CSV file or during, round all the float values to two decimal places.
 
 ## Momentum Alerts Filter Volume
 
-- [ ] ULTRATHINK. Update code/momentum_alerts.py to filter out low volume sent momentum alters.
+- [X] ULTRATHINK. Update code/momentum_alerts.py to filter out low volume sent momentum alters.
 Use code/momentum_alerts_config.py: volume_low_threshold
 
 
