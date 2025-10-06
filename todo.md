@@ -189,6 +189,27 @@ Momentum alerts: VWAP is wrong
 
 Momentum alerts: BQ halted. On October 2. Momentum alert does not show it halted.  Look for a 90 second gap.
 
+Include overnight gainers in Momentum Alerts.
+
+## Overnight Gainers
+
+- [ ] ULTRATHINK. Update molecules/telegram_polling.py: Update
+```python
+            cmd = [
+                python_path, premarket_script,
+                '--exchanges', 'NASDAQ', 'AMEX',
+                '--max-symbols', '7000',
+                '--min-price', '0.75',
+                '--max-price', '40.00',
+                '--min-volume', '50000',
+                '--top-gainers', '20',
+                '--export-csv', 'top_gainers_nasdaq_amex.csv',
+                '--verbose'
+            ]
+```
+min-volume 50000 -> 250000
+top-gainers 20 -> 40
+Also, update the /help command to match.
 
 
 ## Minimum Volume Increase

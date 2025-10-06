@@ -337,28 +337,28 @@ signal - Run oracle signal analysis to identify stocks near support levels
 📈 Volume Surge Scanner:
 volume surge - Run comprehensive volume surge analysis on NASDAQ/AMEX stocks
   • Scans up to 7,000 symbols
-  • Filters stocks $0.75-$40.00 with 50K+ volume
+  • Filters stocks $0.75-$40.00 with 250K+ volume
   • Identifies 5%+ price changes with 5x volume surge over 50 days
   • Returns detailed CSV results (may take up to 10 minutes)
 
 🚀 Top Gainers Scanner:
-top gainers - Find the top 20 gaining stocks on NASDAQ/AMEX exchanges
+top gainers - Find the top 40 gaining stocks on NASDAQ/AMEX exchanges
   • Scans up to 7,000 symbols
-  • Filters stocks $0.75-$40.00 with 50K+ volume
-  • Returns top 20 gainers with detailed metrics
+  • Filters stocks $0.75-$40.00 with 250K+ volume
+  • Returns top 40 gainers with detailed metrics
   • Returns formatted CSV results (may take up to 10 minutes)
 
 🌅 Premarket Top Gainers Scanner:
-premarket top gainers - Find top 20 premarket gaining stocks on NASDAQ/AMEX
+premarket top gainers - Find top 40 premarket gaining stocks on NASDAQ/AMEX
   • Scans up to 7,000 symbols for premarket activity
-  • Filters stocks $0.75-$40.00 with 50K+ volume
+  • Filters stocks $0.75-$40.00 with 250K+ volume
   • Analyzes 5-minute candles since last market close
   • Returns detailed premarket CSV results (may take up to 10 minutes)
 
 📈 Market Open Top Gainers Scanner:
-market open top gainers - Find top 20 market open gaining stocks on NASDAQ/AMEX
+market open top gainers - Find top 40 market open gaining stocks on NASDAQ/AMEX
   • Scans up to 7,000 symbols for market activity since open
-  • Filters stocks $0.75-$40.00 with 50K+ volume
+  • Filters stocks $0.75-$40.00 with 250K+ volume
   • Analyzes 1-minute candles from market open to current/close
   • Returns detailed market CSV results (may take up to 15 minutes)"""
 
@@ -1037,7 +1037,7 @@ the prior trading day results will be given.
                 '--max-symbols', '7000',
                 '--min-price', '0.75',
                 '--max-price', '40.00',
-                '--min-volume', '50000',
+                '--min-volume', '250000',
                 '--min-percent-change', '5.0',
                 '--surge-days', '50',
                 '--volume-surge', '5.0',
@@ -1127,8 +1127,8 @@ the prior trading day results will be given.
                 '--max-symbols', '7000',
                 '--min-price', '0.75',
                 '--max-price', '40.00',
-                '--min-volume', '50000',
-                '--top-gainers', '20',
+                '--min-volume', '250000',
+                '--top-gainers', '40',
                 '--export-csv', 'top_gainers_nasdaq_amex.csv',
                 '--verbose'
             ]
@@ -1302,8 +1302,8 @@ the prior trading day results will be given.
                 '--max-symbols', '7000',
                 '--min-price', '0.75',
                 '--max-price', '40.00',
-                '--min-volume', '50000',
-                '--top-gainers', '20',
+                '--min-volume', '250000',
+                '--top-gainers', '40',
                 '--export-csv', 'top_gainers_nasdaq_amex.csv',
                 '--verbose'
             ]
@@ -1390,8 +1390,8 @@ the prior trading day results will be given.
                 '--max-symbols', '7000',
                 '--min-price', '0.75',
                 '--max-price', '40.00',
-                '--min-volume', '50000',
-                '--top-gainers', '20',
+                '--min-volume', '250000',
+                '--top-gainers', '40',
                 '--export-csv', 'gainers_nasdaq_amex.csv',
                 '--verbose'
             ]
