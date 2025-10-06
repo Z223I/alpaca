@@ -191,8 +191,10 @@ Momentum alerts: BQ halted. On October 2. Momentum alert does not show it halted
 
 
 
+## Minimum Volume Increase
 
-Raise minimum volume on market open top gainers
+- [X] Raise minimum volume on market open top gainers
+
 
 ## Top Gainers Update
 
