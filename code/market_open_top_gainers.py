@@ -679,14 +679,14 @@ class MarketOpenTopGainersScanner:
             for result in results:
                 row = {
                     'symbol': result.symbol,
-                    'current_price': result.current_price,
-                    'market_open_price': result.market_open_price,
-                    'gain_percent': result.gain_percent,
+                    'current_price': round(result.current_price, 2),
+                    'market_open_price': round(result.market_open_price, 2),
+                    'gain_percent': round(result.gain_percent, 2),
                     'market_volume': result.market_volume,
-                    'market_high': result.market_high,
-                    'market_low': result.market_low,
-                    'market_range': result.market_range,
-                    'dollar_volume': result.dollar_volume,
+                    'market_high': round(result.market_high, 2),
+                    'market_low': round(result.market_low, 2),
+                    'market_range': round(result.market_range, 2),
+                    'dollar_volume': round(result.dollar_volume, 2),
                     'total_market_bars': result.total_market_bars,
                     'current_timestamp': result.current_timestamp.isoformat()
                 }
@@ -733,14 +733,14 @@ class MarketOpenTopGainersScanner:
         for result in results:
             result_dict = {
                 "symbol": result.symbol,
-                "current_price": result.current_price,
-                "market_open_price": result.market_open_price,
-                "gain_percent": result.gain_percent,
+                "current_price": round(result.current_price, 2),
+                "market_open_price": round(result.market_open_price, 2),
+                "gain_percent": round(result.gain_percent, 2),
                 "market_volume": result.market_volume,
-                "market_high": result.market_high,
-                "market_low": result.market_low,
-                "market_range": result.market_range,
-                "dollar_volume": result.dollar_volume,
+                "market_high": round(result.market_high, 2),
+                "market_low": round(result.market_low, 2),
+                "market_range": round(result.market_range, 2),
+                "dollar_volume": round(result.dollar_volume, 2),
                 "total_market_bars": result.total_market_bars,
                 "current_timestamp": result.current_timestamp.isoformat(),
                 "market_open_timestamp": result.market_open_timestamp.isoformat()
