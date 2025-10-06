@@ -190,6 +190,29 @@ Momentum alerts: VWAP is wrong
 Momentum alerts: BQ halted. On October 2. Momentum alert does not show it halted.  Look for a 90 second gap.
 
 
+## Test Symbol Polling
+
+- [ ] Run symbol_polling.py after 10 AM ET to see it run.
+- [ ] THINK HARD.  Update atoms/api/symbol_polling.py: The configuration should be available.
+python atoms/api/symbol_polling.py
+Warning: Could not load config file ("Configuration not found for alpaca/bruce/paper: 'bruce'"), falling back to environment variables
+Error initializing Alpaca client: ('Key ID must be given to access Alpaca trade API', ' (env: APCA_API_KEY_ID)')
+- [ ] THINK HARD.  Research Alpaca Trading API v2.  Then, fix
+Loaded 12 symbols from /home/wilsonb/dl/github.com/z223i/alpaca/data/20251006.csv
+Loaded 20 symbols from /home/wilsonb/dl/github.com/z223i/alpaca/historical_data/2025-10-03/market/gainers_nasdaq_amex.csv
+Error polling HUMA: 'REST' object has no attribute 'get_last_trade'
+Error polling FEMY: 'REST' object has no attribute 'get_last_trade'
+Error polling CRML: 'REST' object has no attribute 'get_last_trade'
+Error polling NIOBW: 'REST' object has no attribute 'get_last_trade'
+Error polling STAK: 'REST' object has no attribute 'get_last_trade'
+Error polling ACIU: 'REST' object has no attribute 'get_last_trade'
+- [ ] THINK HARD.  python atoms/api/symbol_polling.py --verbose should only load today's data.
+It should be waiting to the historical data to appear.
+Output:
+Loaded 12 symbols from /home/wilsonb/dl/github.com/z223i/alpaca/data/20251006.csv
+Loaded 20 symbols from /home/wilsonb/dl/github.com/z223i/alpaca/historical_data/2025-10-03/market/gainers_nasdaq_amex.csv
+
+
 
 
 ## Symbol Polling
@@ -207,12 +230,12 @@ Momentum alerts: BQ halted. On October 2. Momentum alert does not show it halted
 
 ### Spec File
 
-- [ ] ULTRATHINK. Implement the instructions in specs/symbol_polling.md.
-- [ ] Please put usage examples in the file docstring.
-- [ ] /commit
-- [ ] Publish the branch
-- [ ] run git switch master; merge current branch and verify that all changes are merged.
-- [ ] Sync changes
+- [X] ULTRATHINK. Implement the instructions in specs/symbol_polling.md.
+- [X] Please put usage examples in the file docstring.
+- [X] /commit
+- [X] Publish the branch
+- [X] run git switch master; merge current branch and verify that all changes are merged.
+- [X] Sync changes
 
 
 ## Momentum Normalized

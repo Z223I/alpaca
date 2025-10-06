@@ -16,9 +16,9 @@ Usage Examples:
     python atoms/api/symbol_polling.py --verbose
 
     # Different account configuration
-    python atoms/api/symbol_polling.py --account-name janice --account live
+    python atoms/api/symbol_polling.py --account-name Janice --account live
 
-    # Production usage with default settings (bruce/paper account)
+    # Production usage with default settings (Bruce/paper account)
     python atoms/api/symbol_polling.py
 
 Features:
@@ -37,6 +37,7 @@ import os
 import sys
 import csv
 import glob
+import datetime
 from typing import Set, List, Optional
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -77,23 +78,52 @@ class SymbolManager:
         self.historical_dir = os.path.join(project_root, 'historical_data')
 
     def get_latest_data_file(self) -> Optional[str]:
-        """Get the most recent data/{YYYYMMDD}.csv file."""
-        pattern = os.path.join(self.data_dir, '*.csv')
-        files = glob.glob(pattern)
-        if not files:
+        """Get data file based on mode: most recent in test mode, today only in normal mode."""
+        if self.test_mode:
+            # Test mode: Get the most recent data file available
+            pattern = os.path.join(self.data_dir, '*.csv')
+            files = glob.glob(pattern)
+            if not files:
+                return None
+            # Sort by filename (which contains date) and get the latest
+            return max(files)
+        else:
+            # Normal mode: Only use today's data file
+            today = datetime.date.today().strftime('%Y%m%d')
+            today_file = os.path.join(self.data_dir, f'{today}.csv')
+
+            if os.path.exists(today_file):
+                return today_file
+
+            # If today's file doesn't exist, return None (wait for it)
+            if self.verbose:
+                print(f"Waiting for today's data file: {today_file}")
             return None
-        # Sort by filename (which contains date) and get the latest
-        return max(files)
 
     def get_latest_gainers_file(self) -> Optional[str]:
-        """Get the most recent gainers file."""
-        pattern = os.path.join(self.historical_dir,
-                               '*/market/gainers_nasdaq_amex.csv')
-        files = glob.glob(pattern)
-        if not files:
+        """Get gainers file based on mode: most recent in test mode, today only in normal mode."""
+        if self.test_mode:
+            # Test mode: Get the most recent gainers file available
+            pattern = os.path.join(self.historical_dir,
+                                   '*/market/gainers_nasdaq_amex.csv')
+            files = glob.glob(pattern)
+            if not files:
+                return None
+            # Sort by path (which contains date) and get the latest
+            return max(files)
+        else:
+            # Normal mode: Only use today's gainers file
+            today = datetime.date.today().strftime('%Y-%m-%d')
+            today_pattern = os.path.join(self.historical_dir,
+                                         f'{today}/market/gainers_nasdaq_amex.csv')
+
+            if os.path.exists(today_pattern):
+                return today_pattern
+
+            # If today's file doesn't exist, return None (wait for it)
+            if self.verbose:
+                print(f"Waiting for today's gainers file: {today_pattern}")
             return None
-        # Sort by path (which contains date) and get the latest
-        return max(files)
 
     def load_symbols_from_data_file(self, file_path: str) -> Set[str]:
         """Load symbols from a data/{YYYYMMDD}.csv file."""
@@ -158,7 +188,7 @@ class SymbolManager:
 class PricePoller:
     """Handles price polling for symbols."""
 
-    def __init__(self, account_name='bruce', account='paper',
+    def __init__(self, account_name='Bruce', account='paper',
                  verbose=False, test_mode=False):
         self.account_name = account_name
         self.account = account
@@ -230,12 +260,14 @@ class PricePoller:
                     try:
                         if self.test_mode:
                             # In test mode, just simulate price data
-                            price = f"TEST_PRICE_{symbol}"
+                            price_display = f"TEST_PRICE_{symbol}"
                         else:
-                            trade = self.rest.get_last_trade(symbol)
+                            trade = self.rest.get_latest_trade(symbol)
                             price = trade.price
+                            # Format price to show minimum 2 decimal places
+                            price_display = f"{price:.2f}"
 
-                        self.send_alert("Price", f"{symbol}: {price}",
+                        self.send_alert("Price", f"{symbol}: {price_display}",
                                         "", [symbol])
 
                     except Exception as e:
@@ -270,9 +302,9 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description='Symbol Price Polling System')
 
-    parser.add_argument('--account-name', default='bruce',
+    parser.add_argument('--account-name', default='Bruce',
                         help='Account name for API credentials '
-                        '(default: bruce)')
+                        '(default: Bruce)')
     parser.add_argument('--account', default='paper',
                         help='Account type: paper, live, cash '
                         '(default: paper)')
@@ -305,7 +337,7 @@ def test_functionality():
         # Test with first few symbols
         test_symbols = list(symbols)[:3]
         for symbol in test_symbols:
-            poller.send_alert("Price", f"{symbol}: TEST_PRICE", "", [symbol])
+            poller.send_alert("Price", f"{symbol}: TEST_PRICE_{symbol}", "", [symbol])
 
     print("Functionality test completed successfully!")
 
