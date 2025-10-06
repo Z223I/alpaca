@@ -196,14 +196,15 @@ Raise minimum volume on market open top gainers
 
 Update market open top gainers. Save two decimal places.
 
-Update, momentum alerts: filter, red volume
+## Momentum Alerts Filter Volume
 
-Add momentum alerts to the plots in a different color.
+- [ ] ULTRATHINK. Update code/momentum_alerts.py to filter out low volume sent momentum alters.
+Use code/momentum_alerts_config.py: volume_low_threshold
 
 
 ## Plot Momentum Alerts Also
 
-- [ ] ULTRATHINK.  code/alpaca.py --plot currently generates stock charts to include sent superduper alerts.
+- [X] ULTRATHINK.  code/alpaca.py --plot currently generates stock charts to include sent superduper alerts.
 Please also plot momentum alerts but use a different color than the sent superduper alerts.
 The file path format is as follows:
 historical_data/YYYY-MM-DD/momentum_alerts_sent/bullish/alert_{symbol}_YYYY-MM-DD_*.json

@@ -26,7 +26,6 @@ import logging
 import os
 import subprocess
 import sys
-import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Set
@@ -539,6 +538,11 @@ class MomentumAlertsSystem:
             current_price = float(latest_bar['c'])  # Use single letter attribute
             current_vwap = float(latest_bar['vwap'])  # VWAP from stock data only
             current_volume = int(latest_bar['v'])  # Get current volume
+
+            # Filter out low volume alerts
+            if current_volume < self.momentum_config.volume_low_threshold:
+                self.logger.debug(f"❌ {symbol}: Volume {current_volume:,} below threshold {self.momentum_config.volume_low_threshold:,}")
+                return None
 
             # Check VWAP criteria
             if current_price < current_vwap:
