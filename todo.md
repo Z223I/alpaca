@@ -191,9 +191,15 @@ Momentum alerts: BQ halted. On October 2. Momentum alert does not show it halted
 
 Include overnight gainers in Momentum Alerts.
 
+
+## Overnight Gainers Integration
+
+- [ ] ULTRATHINK. Update code/momentum_alerts.py: The code is currently calling market open top gainers repeatedly.  Update the code to call volume surge scanner once at startup.  Use the args specified in molecules/telegram_polling.py /help command.  Add the stock symbols to the other stock symbols already being collected.
+
+
 ## Overnight Gainers
 
-- [ ] ULTRATHINK. Update molecules/telegram_polling.py: Update
+- [X] ULTRATHINK. Update molecules/telegram_polling.py: Update
 ```python
             cmd = [
                 python_path, premarket_script,

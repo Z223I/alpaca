@@ -81,6 +81,9 @@ class MomentumAlertsSystem:
         self.momentum_alerts_dir.mkdir(parents=True, exist_ok=True)
         self.momentum_alerts_sent_dir.mkdir(parents=True, exist_ok=True)
 
+        # Create volume surge directory
+        self.volume_surge_dir.mkdir(parents=True, exist_ok=True)
+
         # Initialize Alpaca client for stock data
         self.historical_client = None
         try:
@@ -102,6 +105,11 @@ class MomentumAlertsSystem:
         self.last_csv_check = None
         self.startup_runs_completed = 0
         self.startup_schedule = []  # List of scheduled startup times
+
+        # Volume surge data
+        self.volume_surge_dir = Path("historical_data") / self.today / "volume_surge"
+        self.volume_surge_csv_path = self.volume_surge_dir / "relative_volume_nasdaq_amex.csv"
+        self.volume_surge_completed = False
 
         # State
         self.running = False
@@ -260,11 +268,18 @@ class MomentumAlertsSystem:
                 runtime = datetime.now(self.et_tz) - process_info['start_time']
 
                 if return_code == 0:
-                    self.logger.info(f"✅ Startup script completed successfully (Runtime: {runtime})")
-                    # Send the generated top gainers file to Bruce
-                    await self._send_top_gainers_file_to_bruce()
+                    if process_id == 'volume_surge':
+                        self.logger.info(f"✅ Volume surge scanner completed successfully (Runtime: {runtime})")
+                        self.volume_surge_completed = True
+                    else:
+                        self.logger.info(f"✅ Startup script completed successfully (Runtime: {runtime})")
+                        # Send the generated top gainers file to Bruce
+                        await self._send_top_gainers_file_to_bruce()
                 else:
-                    self.logger.error(f"❌ Startup script failed with return code {return_code} (Runtime: {runtime})")
+                    if process_id == 'volume_surge':
+                        self.logger.error(f"❌ Volume surge scanner failed with return code {return_code} (Runtime: {runtime})")
+                    else:
+                        self.logger.error(f"❌ Startup script failed with return code {return_code} (Runtime: {runtime})")
 
                 # Log any output
                 try:
@@ -358,9 +373,63 @@ class MomentumAlertsSystem:
         except Exception as e:
             self.logger.error(f"❌ Error sending top gainers file contents: {e}")
 
+    async def _run_volume_surge_scanner(self) -> bool:
+        """
+        Run the volume surge scanner once at startup.
+
+        Returns:
+            True if scanner ran successfully, False otherwise
+        """
+        self.logger.info("📈 Running volume surge scanner at startup")
+
+        script_path = Path("code") / "alpaca_screener.py"
+        cmd = [
+            "~/miniconda3/envs/alpaca/bin/python",
+            str(script_path),
+            "--exchanges", "NASDAQ", "AMEX",
+            "--max-symbols", "7000",
+            "--min-price", "0.75",
+            "--max-price", "40.00",
+            "--min-volume", "250000",
+            "--min-percent-change", "5.0",
+            "--surge-days", "50",
+            "--volume-surge", "5.0",
+            "--export-csv", "relative_volume_nasdaq_amex.csv",
+            "--verbose"
+        ]
+
+        try:
+            # Expand the tilde in the Python path
+            cmd[0] = os.path.expanduser(cmd[0])
+
+            # Create process with logging
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                cwd=str(Path.cwd())
+            )
+
+            # Store process for monitoring
+            self.startup_processes['volume_surge'] = {
+                'process': process,
+                'start_time': datetime.now(self.et_tz),
+                'cmd': ' '.join(cmd)
+            }
+
+            self.logger.info(f"📈 Started volume surge scanner (PID: {process.pid})")
+            self.logger.info("🕒 Expected completion: up to 10 minutes")
+
+            return True
+
+        except Exception as e:
+            self.logger.error(f"❌ Failed to start volume surge scanner: {e}")
+            return False
+
     def _load_csv_symbols(self) -> List[str]:
         """
-        Load symbols from the gainers CSV file and additional data/{YYYYMMDD}.csv file.
+        Load symbols from the gainers CSV file, volume surge CSV file, and additional data/{YYYYMMDD}.csv file.
 
         Returns:
             List of unique symbols to monitor
@@ -381,6 +450,25 @@ class MomentumAlertsSystem:
 
             except Exception as e:
                 self.logger.error(f"❌ Error loading gainers CSV file: {e}")
+
+        # Load from volume surge CSV file if it exists
+        if self.volume_surge_csv_path.exists():
+            try:
+                volume_surge_count = 0
+                with open(self.volume_surge_csv_path, 'r') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        symbol = row.get('symbol', '').strip().upper()
+                        if symbol and not (len(symbol) == 5 and symbol.endswith('W')) and symbol not in symbols:  # Filter out 5-char warrants ending in W
+                            symbols.add(symbol)
+                            volume_surge_count += 1
+
+                self.logger.info(f"📈 Added {volume_surge_count} unique symbols from volume surge CSV: {self.volume_surge_csv_path}")
+
+            except Exception as e:
+                self.logger.error(f"❌ Error loading volume surge CSV file {self.volume_surge_csv_path}: {e}")
+        else:
+            self.logger.debug(f"📈 Volume surge CSV file not found: {self.volume_surge_csv_path}")
 
         # Load from additional data/{YYYYMMDD}.csv file if it exists
         compact_date = datetime.now(self.et_tz).strftime('%Y%m%d')  # YYYYMMDD format
@@ -913,6 +1001,9 @@ class MomentumAlertsSystem:
         self.running = True
 
         try:
+            # Run volume surge scanner once at startup
+            await self._run_volume_surge_scanner()
+
             # Schedule startup script runs
             self._schedule_startup_runs()
 
