@@ -300,8 +300,12 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
                     color = 'green'
                 elif alert_level == 'yellow':
                     color = 'gold'  # Use gold for better visibility than pure yellow
+                elif alert_level == 'momentum':
+                    color = 'blue'  # Blue color for momentum alerts (distinct from superduper alerts)
+                elif alert_type == 'momentum_bullish':
+                    color = 'blue'  # Blue color for momentum alerts
                 elif alert_type == 'vwap_bounce':
-                    color = 'blue'  # Blue color for VWAP bounce alerts (matches volume chart)
+                    color = 'cyan'  # Cyan color for VWAP bounce alerts (different from momentum)
                 else:
                     # Fallback to old logic if neither macd_score nor alert_level is available
                     color = 'green' if alert_type == 'bullish' else 'red'
@@ -328,6 +332,8 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
                 label_y = y_max - (y_max - y_min) * 0.05  # 5% from top
                 if alert_type == 'vwap_bounce':
                     alert_symbol = 'V'  # V for VWAP bounce
+                elif alert_type == 'momentum_bullish':
+                    alert_symbol = 'M'  # M for momentum alerts
                 else:
                     alert_symbol = '↑' if alert_type == 'bullish' else '↓'
 
@@ -343,7 +349,7 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
                 alert_count += 1
 
             if alert_count > 0:
-                print(f"Plotted {alert_count} sent superduper alerts for {symbol} (including out-of-market-hours alerts)")
+                print(f"Plotted {alert_count} alerts for {symbol} (superduper and momentum alerts, including out-of-market-hours)")
 
         # Add legend if any indicators were calculated
         if ema_success or ema20_success or vwap_success:

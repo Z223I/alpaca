@@ -39,7 +39,7 @@ class TelegramPollingService:
         self.poll_interval = 5  # seconds
         self.base_url = f"https://api.telegram.org/bot{self.config.BOT_TOKEN}"
 
-        # Command handlers
+        # Command handlers (only for slash commands)
         self.command_handlers = {
             '/start': self._handle_start,
             '/stop': self._handle_stop,
@@ -47,15 +47,7 @@ class TelegramPollingService:
             '/unsubscribe': self._handle_unsubscribe,
             '/status': self._handle_status,
             '/help': self._handle_help,
-            '/newbie': self._handle_newbie,
-            '57chevy': self._handle_alpaca_command,
-            'plot': self._handle_plot_command,
-            'bam': self._handle_bam_command,
-            'signal': self._handle_signal_command,
-            'volume surge': self._handle_volume_surge_command,
-            'top gainers': self._handle_top_gainers_command,
-            'premarket top gainers': self._handle_premarket_top_gainers_command,
-            'market open top gainers': self._handle_market_open_top_gainers_command
+            '/newbie': self._handle_newbie
         }
 
         # Authorized users for Alpaca commands

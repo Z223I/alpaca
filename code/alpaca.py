@@ -1604,6 +1604,90 @@ class AlpacaPrivate:
         
         return alerts
 
+    def _load_momentum_alerts_for_symbol(self, symbol: str, target_date: date) -> List[Dict[str, Any]]:
+        """
+        Load sent momentum alerts for a specific symbol and date.
+
+        Args:
+            symbol: Stock symbol to load alerts for
+            target_date: Date to load alerts for
+
+        Returns:
+            List of alert dictionaries with timestamp_dt, alert_type, and alert_level
+        """
+        alerts = []
+
+        try:
+            # Format date as YYYY-MM-DD for directory structure
+            date_str = target_date.strftime('%Y-%m-%d')
+            alerts_base_dir = os.path.join('historical_data', date_str, 'momentum_alerts_sent')
+
+            if not os.path.exists(alerts_base_dir):
+                print(f"No momentum alerts directory found for {target_date}")
+                return alerts
+
+            # Check bullish alert directory (momentum alerts are only bullish according to the path format)
+            alert_type_dir = os.path.join(alerts_base_dir, 'bullish')
+
+            if not os.path.exists(alert_type_dir):
+                print(f"No bullish momentum alerts directory found for {target_date}")
+                return alerts
+
+            # Look for momentum alert files matching the symbol
+            # Path format: alert_{symbol}_YYYY-MM-DD_*.json
+            alert_pattern = f"alert_{symbol}_{date_str}_*.json"
+            alert_files = glob.glob(os.path.join(alert_type_dir, alert_pattern))
+
+            for alert_file in alert_files:
+                try:
+                    with open(alert_file, 'r') as f:
+                        alert_data = json.load(f)
+
+                    # Add alert type and level for momentum alerts
+                    alert_data['alert_type'] = 'momentum_bullish'
+                    alert_data['alert_level'] = 'momentum'  # Different level for momentum alerts
+
+                    # Parse timestamp to datetime object
+                    if 'timestamp' in alert_data:
+                        timestamp_str = alert_data['timestamp']
+                        try:
+                            # Handle timezone format: convert -0400 to -04:00 for Python compatibility
+                            if timestamp_str.endswith(('-0400', '-0500')):
+                                timestamp_str = timestamp_str[:-2] + ':' + timestamp_str[-2:]
+
+                            # Parse the timestamp - momentum alerts are in ET timezone with offset
+                            alert_dt = datetime.fromisoformat(timestamp_str)
+                            alert_data['timestamp_dt'] = alert_dt
+
+                        except ValueError:
+                            # Fallback: try parsing without timezone, then localize to ET
+                            try:
+                                alert_dt = datetime.fromisoformat(timestamp_str.split('+')[0].split('-0400')[0].split('-0500')[0])
+                                # If timezone-naive, assume it's in ET timezone
+                                if alert_dt.tzinfo is None:
+                                    et_tz = pytz.timezone('America/New_York')
+                                    alert_dt = et_tz.localize(alert_dt)
+                                alert_data['timestamp_dt'] = alert_dt
+                            except ValueError:
+                                print(f"Warning: Could not parse timestamp in {alert_file}")
+                                continue
+
+                    alerts.append(alert_data)
+
+                except Exception as e:
+                    print(f"Warning: Error loading momentum alert file {alert_file}: {e}")
+                    continue
+
+            # Sort alerts by timestamp
+            alerts.sort(key=lambda x: x.get('timestamp_dt', datetime.min.replace(tzinfo=pytz.UTC)))
+
+            print(f"Loaded {len(alerts)} momentum alerts for {symbol} on {target_date}")
+
+        except Exception as e:
+            print(f"Error loading momentum alerts for {symbol} on {target_date}: {e}")
+
+        return alerts
+
     def _generate_plot(self, symbol: str, plot_date: Optional[str] = None) -> bool:
         """
         Generate candlestick chart with MACD for a symbol.
@@ -1680,12 +1764,18 @@ class AlpacaPrivate:
             date_str = target_date.strftime('%Y-%m-%d')  # Keep in YYYY-MM-DD format for config
 
             # Load superduper alerts for this symbol and date
-            alerts = self._load_superduper_alerts_for_symbol(symbol, target_date)
-            
+            superduper_alerts = self._load_superduper_alerts_for_symbol(symbol, target_date)
+
+            # Load momentum alerts for this symbol and date
+            momentum_alerts = self._load_momentum_alerts_for_symbol(symbol, target_date)
+
+            # Combine all alerts
+            all_alerts = superduper_alerts + momentum_alerts
+
             # Score alerts using MACD analysis
-            if alerts:
-                print(f"Scoring {len(alerts)} alerts using MACD analysis...")
-                alerts = score_alerts_with_macd(df, alerts)
+            if all_alerts:
+                print(f"Scoring {len(all_alerts)} alerts using MACD analysis...")
+                all_alerts = score_alerts_with_macd(df, all_alerts)
 
             # Generate chart using the chart generation atom with centralized plots directory
             output_dir = str(plots_config.get_plots_path())
@@ -1693,7 +1783,7 @@ class AlpacaPrivate:
                 df=df,
                 symbol=symbol,
                 output_dir=output_dir,  # Use centralized plots directory
-                alerts=alerts,  # Include loaded alerts
+                alerts=all_alerts,  # Include loaded alerts
                 verbose=True
             )
 
@@ -1704,20 +1794,30 @@ class AlpacaPrivate:
                 print(f"    • Price candlesticks with ORB levels, EMA(9), EMA(20), VWAP")
                 print(f"    • MACD indicators (12,26,9) with MACD line, Signal line, Histogram")
                 print(f"    • Volume data")
-                if alerts:
-                    # Count alerts by MACD score color
-                    colors = [alert.get('macd_score', {}).get('color', 'unknown') for alert in alerts]
-                    green_count = colors.count('green')
-                    yellow_count = colors.count('yellow')
-                    red_count = colors.count('red')
-                    
-                    print(f"    • {len(alerts)} superduper alert overlays with MACD scoring:")
-                    if green_count:
-                        print(f"      🟢 {green_count} GREEN (excellent MACD conditions)")
-                    if yellow_count:
-                        print(f"      🟡 {yellow_count} YELLOW (moderate MACD conditions)")
-                    if red_count:
-                        print(f"      🔴 {red_count} RED (poor MACD conditions)")
+                if all_alerts:
+                    # Count alerts by type
+                    superduper_count = len([alert for alert in all_alerts if alert.get('alert_type') in ['bullish', 'bearish']])
+                    momentum_count = len([alert for alert in all_alerts if alert.get('alert_type') == 'momentum_bullish'])
+
+                    print(f"    • {len(all_alerts)} alert overlays:")
+                    if superduper_count > 0:
+                        # Count superduper alerts by MACD score color
+                        superduper_alerts = [alert for alert in all_alerts if alert.get('alert_type') in ['bullish', 'bearish']]
+                        colors = [alert.get('macd_score', {}).get('color', 'unknown') for alert in superduper_alerts]
+                        green_count = colors.count('green')
+                        yellow_count = colors.count('yellow')
+                        red_count = colors.count('red')
+
+                        print(f"      🔸 {superduper_count} superduper alerts with MACD scoring:")
+                        if green_count:
+                            print(f"        🟢 {green_count} GREEN (excellent MACD conditions)")
+                        if yellow_count:
+                            print(f"        🟡 {yellow_count} YELLOW (moderate MACD conditions)")
+                        if red_count:
+                            print(f"        🔴 {red_count} RED (poor MACD conditions)")
+
+                    if momentum_count > 0:
+                        print(f"      🔹 {momentum_count} momentum alerts (blue indicators)")
                 return True
             else:
                 print("✗ Chart generation failed")

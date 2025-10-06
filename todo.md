@@ -190,14 +190,36 @@ Momentum alerts: VWAP is wrong
 Momentum alerts: BQ halted. On October 2. Momentum alert does not show it halted.  Look for a 90 second gap.
 
 
+
+
+Raise minimum volume on market open top gainers
+
+Update market open top gainers. Save two decimal places.
+
+Update, momentum alerts: filter, red volume
+
+Add momentum alerts to the plots in a different color.
+
+
+## Plot Momentum Alerts Also
+
+- [ ] ULTRATHINK.  code/alpaca.py --plot currently generates stock charts to include sent superduper alerts.
+Please also plot momentum alerts but use a different color than the sent superduper alerts.
+The file path format is as follows:
+historical_data/YYYY-MM-DD/momentum_alerts_sent/bullish/alert_{symbol}_YYYY-MM-DD_*.json
+
+## Plot Called Twice
+
+- [X] THINK HARD.  Update molecules/telegram_polling.py:  When the 'plot' command gets ran on Telegram, I receive two plots for the same symbol.  There should only be one.
+
 ## Test Symbol Polling
 
-- [ ] Run symbol_polling.py after 10 AM ET to see it run.
-- [ ] THINK HARD.  Update atoms/api/symbol_polling.py: The configuration should be available.
+- [X] Run symbol_polling.py after 10 AM ET to see it run.
+- [X] THINK HARD.  Update atoms/api/symbol_polling.py: The configuration should be available.
 python atoms/api/symbol_polling.py
 Warning: Could not load config file ("Configuration not found for alpaca/bruce/paper: 'bruce'"), falling back to environment variables
 Error initializing Alpaca client: ('Key ID must be given to access Alpaca trade API', ' (env: APCA_API_KEY_ID)')
-- [ ] THINK HARD.  Research Alpaca Trading API v2.  Then, fix
+- [X] THINK HARD.  Research Alpaca Trading API v2.  Then, fix
 Loaded 12 symbols from /home/wilsonb/dl/github.com/z223i/alpaca/data/20251006.csv
 Loaded 20 symbols from /home/wilsonb/dl/github.com/z223i/alpaca/historical_data/2025-10-03/market/gainers_nasdaq_amex.csv
 Error polling HUMA: 'REST' object has no attribute 'get_last_trade'
@@ -206,7 +228,7 @@ Error polling CRML: 'REST' object has no attribute 'get_last_trade'
 Error polling NIOBW: 'REST' object has no attribute 'get_last_trade'
 Error polling STAK: 'REST' object has no attribute 'get_last_trade'
 Error polling ACIU: 'REST' object has no attribute 'get_last_trade'
-- [ ] THINK HARD.  python atoms/api/symbol_polling.py --verbose should only load today's data.
+- [X] THINK HARD.  python atoms/api/symbol_polling.py --verbose should only load today's data.
 It should be waiting to the historical data to appear.
 Output:
 Loaded 12 symbols from /home/wilsonb/dl/github.com/z223i/alpaca/data/20251006.csv
