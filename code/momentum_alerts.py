@@ -197,7 +197,7 @@ class MomentumAlertsSystem:
             "--min-price", "0.75",
             "--max-price", "40.00",
             "--min-volume", "250000",
-            "--top-gainers", "20",
+            "--top-gainers", "40",
             "--export-csv", "gainers_nasdaq_amex.csv",
             "--verbose"
         ]
