@@ -189,8 +189,17 @@ Momentum alerts: VWAP is wrong
 
 Momentum alerts: BQ halted. On October 2. Momentum alert does not show it halted.  Look for a 90 second gap.
 
-Include overnight gainers in Momentum Alerts.
 
+
+
+EOD charts are missing Momentum Alerts.
+
+
+## Plot Momentum Alerts Update
+
+- [X] ULTRATHINK.  code/alpaca.py --plot currently generates stock charts to include sent superduper alerts
+and momentum alerts.  Momentum alerts are to use a different color than the sent superduper alerts.  Both colors are green.
+Please fix. Show me the chart for ONMD for 2025-10-06.
 
 ## Overnight Gainers Integration
 

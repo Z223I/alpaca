@@ -95,7 +95,7 @@ class ORB:
     def _load_alerts_for_symbol(self, symbol: str, target_date: date) -> List[Dict[str, Any]]:
         """
         Load alerts for a specific symbol and date. Loads sent superduper alerts or regular alerts based on plot_super_alerts setting.
-        Also loads VWAP bounce alerts and combines them.
+        Also loads VWAP bounce alerts and momentum alerts and combines them.
 
         Args:
             symbol: Stock symbol to load alerts for
@@ -113,7 +113,11 @@ class ORB:
         # Load and combine VWAP bounce alerts
         vwap_alerts = self._load_vwap_bounce_alerts_for_symbol(symbol, target_date)
         alerts.extend(vwap_alerts)
-        
+
+        # Load and combine momentum alerts
+        momentum_alerts = self._load_momentum_alerts_for_symbol(symbol, target_date)
+        alerts.extend(momentum_alerts)
+
         return alerts
 
     def _load_super_alerts_for_symbol(self, symbol: str, target_date: date) -> List[Dict[str, Any]]:
@@ -458,6 +462,98 @@ class ORB:
             
         except Exception as e:
             print(f"Error loading VWAP bounce alerts for {symbol} on {target_date}: {e}")
+            return alerts
+
+    def _load_momentum_alerts_for_symbol(self, symbol: str, target_date: date) -> List[Dict[str, Any]]:
+        """
+        Load sent momentum alerts for a specific symbol and date.
+
+        Args:
+            symbol: Stock symbol to load alerts for
+            target_date: Date to load alerts for
+
+        Returns:
+            List of alert dictionaries with timestamp_dt, alert_type, and alert_level
+        """
+        alerts = []
+
+        try:
+            # Format date as YYYY-MM-DD for directory structure
+            date_str = target_date.strftime('%Y-%m-%d')
+            alerts_base_dir = os.path.join('historical_data', date_str, 'momentum_alerts_sent')
+
+            if not os.path.exists(alerts_base_dir):
+                return alerts
+
+            # Check bullish alert directory (momentum alerts are only bullish according to the path format)
+            alert_type_dir = os.path.join(alerts_base_dir, 'bullish')
+
+            if not os.path.exists(alert_type_dir):
+                return alerts
+
+            # Look for momentum alert files matching the symbol
+            # Path format: alert_{symbol}_YYYY-MM-DD_*.json
+            alert_pattern = f"alert_{symbol}_{date_str}_*.json"
+            alert_files = glob.glob(os.path.join(alert_type_dir, alert_pattern))
+
+            for alert_file in alert_files:
+                try:
+                    with open(alert_file, 'r') as f:
+                        alert_data = json.load(f)
+
+                    # Add alert type and level for momentum alerts
+                    alert_data['alert_type'] = 'momentum_bullish'
+                    alert_data['alert_level'] = 'momentum'  # Different level for momentum alerts
+
+                    # Parse timestamp to datetime object
+                    if 'timestamp' in alert_data:
+                        timestamp_str = alert_data['timestamp']
+                        try:
+                            # Handle timezone format: convert -0400 to -04:00 for Python compatibility
+                            if timestamp_str.endswith(('-0400', '-0500')):
+                                timestamp_str = timestamp_str[:-2] + ':' + timestamp_str[-2:]
+
+                            # Parse timestamp with timezone
+                            alert_dt = datetime.fromisoformat(timestamp_str)
+
+                            # Convert to timezone-aware if naive
+                            if alert_dt.tzinfo is None:
+                                et_tz = pytz.timezone('America/New_York')
+                                alert_dt = et_tz.localize(alert_dt)
+
+                            alert_data['timestamp_dt'] = alert_dt
+
+                        except ValueError as e:
+                            print(f"Warning: Could not parse momentum alert timestamp '{timestamp_str}': {e}")
+                            # Skip alerts with invalid timestamps
+                            continue
+
+                    alerts.append(alert_data)
+
+                except Exception as e:
+                    print(f"Warning: Error loading momentum alert file {alert_file}: {e}")
+                    continue
+
+            # Sort momentum alerts by timestamp
+            def safe_sort_key(alert):
+                timestamp_dt = alert.get('timestamp_dt')
+                if timestamp_dt is None:
+                    return datetime.max.replace(tzinfo=pytz.UTC)
+                elif timestamp_dt.tzinfo is None:
+                    et_tz = pytz.timezone('America/New_York')
+                    return et_tz.localize(timestamp_dt)
+                else:
+                    return timestamp_dt
+
+            alerts.sort(key=safe_sort_key)
+
+            if alerts:
+                print(f"Loaded {len(alerts)} momentum alerts for {symbol}")
+
+            return alerts
+
+        except Exception as e:
+            print(f"Error loading momentum alerts for {symbol} on {target_date}: {e}")
             return alerts
 
     def _get_most_recent_csv(self) -> Optional[str]:

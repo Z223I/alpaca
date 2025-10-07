@@ -77,6 +77,9 @@ class MomentumAlertsSystem:
         self.momentum_alerts_dir = Path("historical_data") / self.today / "momentum_alerts" / "bullish"
         self.momentum_alerts_sent_dir = Path("historical_data") / self.today / "momentum_alerts_sent" / "bullish"
 
+        # Volume surge data directories
+        self.volume_surge_dir = Path("historical_data") / self.today / "volume_surge"
+
         # Create momentum alert directories
         self.momentum_alerts_dir.mkdir(parents=True, exist_ok=True)
         self.momentum_alerts_sent_dir.mkdir(parents=True, exist_ok=True)
@@ -107,7 +110,6 @@ class MomentumAlertsSystem:
         self.startup_schedule = []  # List of scheduled startup times
 
         # Volume surge data
-        self.volume_surge_dir = Path("historical_data") / self.today / "volume_surge"
         self.volume_surge_csv_path = self.volume_surge_dir / "relative_volume_nasdaq_amex.csv"
         self.volume_surge_completed = False
 
