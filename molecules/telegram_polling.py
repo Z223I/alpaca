@@ -323,11 +323,12 @@ Available Commands:
 /newbie - New trader welcome guide and tips
 
 📊 Chart Generation:
-plot -plot -symbol [TICKER] [-date YYYY-MM-DD] - Generate and send chart for any stock symbol
+plot -plot -symbol [TICKER] [-date YYYY-MM-DD] [-account-name NAME] [-account ENV] - Generate and send chart for any stock symbol
 Examples:
   • plot -plot -symbol AAPL
   • plot -plot -symbol TSLA -date 2025-08-15
-  • plot -plot -symbol MSFT
+  • plot -plot -symbol MSFT -account-name Bruce -account paper
+  • plot -plot -symbol NVDA -account-name "Dale Wilson" -account live
 
 Note: Use regular hyphens (-) in the command
 
@@ -447,8 +448,10 @@ the prior trading day results will be given.
             args = self._parse_plot_args(text)
             if not args:
                 error_msg = ("❌ Invalid plot command. Use: plot -plot -symbol [TICKER] "
-                             "[-date YYYY-MM-DD]\nExamples:\n  • plot -plot -symbol AAPL\n"
-                             "  • plot -plot -symbol AAPL -date 2025-08-15")
+                             "[-date YYYY-MM-DD] [-account-name NAME] [-account ENV]\nExamples:\n"
+                             "  • plot -plot -symbol AAPL\n"
+                             "  • plot -plot -symbol AAPL -date 2025-08-15\n"
+                             "  • plot -plot -symbol MSFT -account-name Bruce -account paper")
                 self._send_response(chat_id, error_msg)
                 return
 
@@ -638,12 +641,19 @@ the prior trading day results will be given.
     def _parse_plot_args(self, text: str) -> Optional[Dict]:
         """Parse plot arguments from Telegram message."""
         try:
-            # Expected format: "plot -plot -symbol [TICKER] [-date YYYY-MM-DD]" where TICKER is any stock symbol
+            # Expected format: "plot -plot -symbol [TICKER] [-date YYYY-MM-DD] [-account-name NAME] [-account ENV]"
             # Note: Telegram may convert hyphens to em dashes (—) or en dashes (–)
 
             # Normalize different dash characters to regular hyphens
             normalized_text = text.replace('—', '-').replace('–', '-').replace('‐', '-')
-            parts = normalized_text.strip().split()
+
+            # Use shlex to properly handle quoted strings (for account names with spaces)
+            import shlex
+            try:
+                parts = shlex.split(normalized_text)
+            except ValueError:
+                # Fall back to simple split if shlex fails
+                parts = normalized_text.strip().split()
 
             if len(parts) < 4:
                 return None
@@ -657,23 +667,40 @@ the prior trading day results will be given.
             # Build alpaca arguments: ['--plot', '--symbol', 'SYMBOL']
             alpaca_args = ['--plot', '--symbol', symbol]
 
-            # Check for optional date parameter
+            # Parse optional arguments
+            i = 4
             date_value = None
-            if len(parts) >= 6 and parts[4] == '-date':
-                date_value = parts[5]
-                # Validate date format (basic check for YYYY-MM-DD)
-                if len(date_value) == 10 and date_value.count('-') == 2:
-                    try:
-                        # Verify it's a valid date
-                        from datetime import datetime
-                        datetime.strptime(date_value, '%Y-%m-%d')
-                        alpaca_args.extend(['--date', date_value])
-                    except ValueError:
+            account_name = None
+            account = None
+
+            while i < len(parts):
+                if parts[i] == '-date' and i + 1 < len(parts):
+                    date_value = parts[i + 1]
+                    # Validate date format (basic check for YYYY-MM-DD)
+                    if len(date_value) == 10 and date_value.count('-') == 2:
+                        try:
+                            # Verify it's a valid date
+                            from datetime import datetime
+                            datetime.strptime(date_value, '%Y-%m-%d')
+                            alpaca_args.extend(['--date', date_value])
+                            i += 2
+                        except ValueError:
+                            self._log(f"Invalid date format: {date_value}", "ERROR")
+                            return None
+                    else:
                         self._log(f"Invalid date format: {date_value}", "ERROR")
                         return None
+                elif parts[i] in ['-account-name', '-account_name'] and i + 1 < len(parts):
+                    account_name = parts[i + 1]
+                    alpaca_args.extend(['--account-name', account_name])
+                    i += 2
+                elif parts[i] == '-account' and i + 1 < len(parts):
+                    account = parts[i + 1]
+                    alpaca_args.extend(['--account', account])
+                    i += 2
                 else:
-                    self._log(f"Invalid date format: {date_value}", "ERROR")
-                    return None
+                    # Unknown argument, skip
+                    i += 1
 
             result = {
                 'symbol': symbol,
@@ -682,6 +709,10 @@ the prior trading day results will be given.
 
             if date_value:
                 result['date'] = date_value
+            if account_name:
+                result['account_name'] = account_name
+            if account:
+                result['account'] = account
 
             return result
 

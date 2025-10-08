@@ -68,8 +68,8 @@ class ChartFromDataFrame:
             return False
         
         if len(self.df) < 26:
-            print(f"❌ Insufficient data for MACD calculation: {len(self.df)} < 26 periods")
-            return False
+            print(f"⚠ Warning: Insufficient data for MACD calculation: {len(self.df)} < 26 periods")
+            print("   Chart will be generated without MACD indicators")
         
         return True
 
@@ -148,20 +148,29 @@ class ChartFromDataFrame:
 
     def _print_data_summary(self) -> None:
         """Print summary of the data being used."""
-        print(f"Generating MACD chart for {self.symbol}...")
+        has_sufficient_macd_data = len(self.df) >= 26
+        chart_type = "chart with MACD" if has_sufficient_macd_data else "chart (MACD skipped)"
+        print(f"Generating {chart_type} for {self.symbol}...")
         print(f"Data summary:")
         print(f"  🕒 Time period: {len(self.df)} minutes")
         print(f"  📅 Date range: {self.df['timestamp'].min()} to {self.df['timestamp'].max()}")
         print(f"  💰 Price range: ${self.df['low'].min():.2f} - ${self.df['high'].max():.2f}")
         print(f"  📦 Volume range: {self.df['volume'].min():,} - {self.df['volume'].max():,}")
         print(f"  📦 Total volume: {self.df['volume'].sum():,} shares")
-        print(f"✅ Sufficient data for MACD calculation ({len(self.df)} periods)")
+        if has_sufficient_macd_data:
+            print(f"✅ Sufficient data for MACD calculation ({len(self.df)} periods)")
+        else:
+            print(f"⚠️ Insufficient data for MACD calculation ({len(self.df)} < 26 periods)")
 
     def _print_chart_features(self) -> None:
         """Print information about chart features."""
+        has_sufficient_macd_data = len(self.df) >= 26
         print(f"\nChart features:")
         print(f"  📈 Price chart: Candlesticks, ORB levels, EMA(9), EMA(20), VWAP")
-        print(f"  📊 MACD chart: MACD line, Signal line, Histogram (12,26,9)")
+        if has_sufficient_macd_data:
+            print(f"  📊 MACD chart: MACD line, Signal line, Histogram (12,26,9)")
+        else:
+            print(f"  📊 MACD chart: SKIPPED (insufficient data: {len(self.df)} < 26 periods)")
         print(f"  📊 Volume chart: Volume bars")
 
     def get_chart_path(self) -> str:

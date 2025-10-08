@@ -191,8 +191,14 @@ Momentum alerts: BQ halted. On October 2. Momentum alert does not show it halted
 
 
 
+## Plot Momentum Alerts Update
 
-EOD charts are missing Momentum Alerts.
+- [] ULTRATHINK.  Update code/alpaca.py --plot: It occasionally fails with "Insufficient data for MACD calculation...". Fix the code so that the plot gets generated.  You may leave the MACD section empty if there is an error.
+
+
+## EOD Charts
+
+- [X] EOD charts are missing Momentum Alerts.
 
 
 ## Plot Momentum Alerts Update

@@ -1755,9 +1755,11 @@ class AlpacaPrivate:
             df = pd.DataFrame(market_data)
             print(f"Retrieved {len(df)} minutes of data")
 
-            if len(df) < 26:  # Need at least 26 periods for MACD
-                print(f"✗ Insufficient data for MACD calculation: {len(df)} < 26 periods")
-                return False
+            # Check if we have sufficient data for MACD calculation
+            has_sufficient_macd_data = len(df) >= 26
+            if not has_sufficient_macd_data:
+                print(f"⚠ Warning: Insufficient data for MACD calculation: {len(df)} < 26 periods")
+                print("   Chart will be generated without MACD indicators")
 
             # Set up output directory using centralized plots configuration
             plots_config = get_plots_root_dir()
@@ -1772,10 +1774,12 @@ class AlpacaPrivate:
             # Combine all alerts
             all_alerts = superduper_alerts + momentum_alerts
 
-            # Score alerts using MACD analysis
-            if all_alerts:
+            # Score alerts using MACD analysis (only if we have sufficient data)
+            if all_alerts and has_sufficient_macd_data:
                 print(f"Scoring {len(all_alerts)} alerts using MACD analysis...")
                 all_alerts = score_alerts_with_macd(df, all_alerts)
+            elif all_alerts and not has_sufficient_macd_data:
+                print(f"Skipping MACD scoring for {len(all_alerts)} alerts (insufficient data)")
 
             # Generate chart using the chart generation atom with centralized plots directory
             output_dir = str(plots_config.get_plots_path())
@@ -1792,7 +1796,10 @@ class AlpacaPrivate:
                 print(f"✓ Chart generated successfully: {chart_path}")
                 print(f"  Chart includes:")
                 print(f"    • Price candlesticks with ORB levels, EMA(9), EMA(20), VWAP")
-                print(f"    • MACD indicators (12,26,9) with MACD line, Signal line, Histogram")
+                if has_sufficient_macd_data:
+                    print(f"    • MACD indicators (12,26,9) with MACD line, Signal line, Histogram")
+                else:
+                    print(f"    • MACD indicators: SKIPPED (insufficient data: {len(df)} < 26 periods)")
                 print(f"    • Volume data")
                 if all_alerts:
                     # Count alerts by type
