@@ -191,9 +191,19 @@ Momentum alerts: BQ halted. On October 2. Momentum alert does not show it halted
 
 
 
+
+Use volume profile bulk to produce M/R for momentum alerts.
+
+EOD charting needs to also plot momentum alerts.
+
+## Orb.py EOD Update
+
+- [ ] 
+
+
 ## Plot Momentum Alerts Update
 
-- [] ULTRATHINK.  Update code/alpaca.py --plot: It occasionally fails with "Insufficient data for MACD calculation...". Fix the code so that the plot gets generated.  You may leave the MACD section empty if there is an error.
+- [X] ULTRATHINK.  Update code/alpaca.py --plot: It occasionally fails with "Insufficient data for MACD calculation...". Fix the code so that the plot gets generated.  You may leave the MACD section empty if there is an error.
 
 
 ## EOD Charts
