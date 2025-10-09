@@ -34,13 +34,14 @@ class ORB:
     based on breakout patterns from opening range data.
     """
 
-    def __init__(self, plot_super_alerts: bool = True, use_iex: bool = False, opening_range_minutes: int = 15):
+    def __init__(self, plot_super_alerts: bool = True, use_iex: bool = False, opening_range_minutes: int = 15, target_date: Optional[date] = None):
         """Initialize the ORB class.
 
         Args:
             plot_super_alerts: If True, plot sent superduper alerts. If False, plot regular alerts.
             use_iex: If True, use IEX data feed. If False, use SIP data feed (default).
             opening_range_minutes: Opening range period in minutes (default: 15).
+            target_date: Specific date for analysis. If provided, skips CSV file selection.
         """
 
         # Get api key and secret from environment variables
@@ -63,6 +64,7 @@ class ORB:
         self.plot_super_alerts = plot_super_alerts
         self.use_iex = use_iex
         self.opening_range_minutes = opening_range_minutes
+        self.target_date = target_date
 
     def _is_valid_date_csv(self, filename: str) -> bool:
         """
@@ -556,6 +558,76 @@ class ORB:
             print(f"Error loading momentum alerts for {symbol} on {target_date}: {e}")
             return alerts
 
+    def _get_symbols_from_alerts(self, target_date: date) -> List[str]:
+        """
+        Extract unique stock symbols from alert files for a given date.
+
+        Scans both superduper alerts and momentum alerts directories:
+        - historical_data/YYYY-MM-DD/superduper_alerts_sent/bullish/green/superduper_alert_{symbol}_*.json
+        - historical_data/YYYY-MM-DD/momentum_alerts_sent/bullish/alert_{symbol}_*.json
+
+        Args:
+            target_date: Date to extract symbols for
+
+        Returns:
+            List of unique stock symbols found in alert files
+        """
+        symbols = set()
+
+        try:
+            # Format date as YYYY-MM-DD for directory structure
+            date_str = target_date.strftime('%Y-%m-%d')
+
+            # Check superduper alerts directory
+            superduper_dir = os.path.join('historical_data', date_str, 'superduper_alerts_sent', 'bullish', 'green')
+            if os.path.exists(superduper_dir):
+                # Look for superduper alert files
+                superduper_pattern = "superduper_alert_*_*.json"
+                superduper_files = glob.glob(os.path.join(superduper_dir, superduper_pattern))
+
+                for alert_file in superduper_files:
+                    filename = os.path.basename(alert_file)
+                    # Extract symbol from filename: superduper_alert_{symbol}_*.json
+                    if filename.startswith('superduper_alert_') and filename.endswith('.json'):
+                        parts = filename[17:-5]  # Remove 'superduper_alert_' prefix and '.json' suffix
+                        # Split by underscore and take first part as symbol
+                        if '_' in parts:
+                            symbol = parts.split('_')[0]
+                            if symbol:
+                                symbols.add(symbol.upper())
+
+            # Check momentum alerts directory
+            momentum_dir = os.path.join('historical_data', date_str, 'momentum_alerts_sent', 'bullish')
+            if os.path.exists(momentum_dir):
+                # Look for momentum alert files
+                momentum_pattern = f"alert_*_{date_str}_*.json"
+                momentum_files = glob.glob(os.path.join(momentum_dir, momentum_pattern))
+
+                for alert_file in momentum_files:
+                    filename = os.path.basename(alert_file)
+                    # Extract symbol from filename: alert_{symbol}_YYYY-MM-DD_*.json
+                    if filename.startswith('alert_') and filename.endswith('.json'):
+                        parts = filename[6:-5]  # Remove 'alert_' prefix and '.json' suffix
+                        # Split by underscore and take first part as symbol
+                        if '_' in parts:
+                            symbol = parts.split('_')[0]
+                            if symbol:
+                                symbols.add(symbol.upper())
+
+            symbols_list = sorted(list(symbols))
+
+            if symbols_list:
+                print(f"Found {len(symbols_list)} unique symbols from alert files for {target_date}")
+                print(f"Symbols: {symbols_list}")
+            else:
+                print(f"No symbols found in alert files for {target_date}")
+
+            return symbols_list
+
+        except Exception as e:
+            print(f"Error extracting symbols from alert files for {target_date}: {e}")
+            return []
+
     def _get_most_recent_csv(self) -> Optional[str]:
         """
         Get the most recent CSV file from the data directory.
@@ -807,37 +879,30 @@ class ORB:
 
     def _get_orb_market_data(self) -> bool:
         """
-        Get market data for symbols from CSV for normal market hours
+        Get market data for symbols from alert files for normal market hours
         (9:30 AM to 4:00 PM ET).
 
         Returns:
             True if successful, False otherwise
         """
-        if not self.csv_data:
-            print("No CSV data loaded.")
-            return False
+        # Determine target date for symbol extraction
+        et_tz = pytz.timezone('America/New_York')
+        target_date = (self.csv_date if self.csv_date
+                       else datetime.now(et_tz).date())
 
         try:
-            # Extract symbols from CSV data
-            symbols = []
-            for row in self.csv_data:
-                if 'symbol' in row and row['symbol']:
-                    symbols.append(row['symbol'])
-                elif 'Symbol' in row and row['Symbol']:
-                    symbols.append(row['Symbol'])
+            # Extract symbols from alert files
+            symbols = self._get_symbols_from_alerts(target_date)
 
             if not symbols:
-                print("No symbols found in CSV data.")
+                print(f"No symbols found in alert files for {target_date}.")
                 return False
 
             print(f"Getting market data for {len(symbols)} symbols: "
                   f"{symbols[:5]}{'...' if len(symbols) > 5 else ''}")
 
-            # Use date from CSV filename with normal market hours
+            # Use determined date with normal market hours
             # (9:30 AM to 4:00 PM ET) - start from premarket to get opening range data
-            et_tz = pytz.timezone('America/New_York')
-            target_date = (self.csv_date if self.csv_date
-                           else datetime.now(et_tz).date())
 
             start_time = datetime.combine(target_date, time(4, 0),
                                           tzinfo=et_tz)  # Start from premarket
@@ -1615,31 +1680,24 @@ class ORB:
     def _generate_candle_charts(self) -> bool:
         """
         Generate candlestick charts with volume for each stock symbol.
-        Always fetches fresh, complete market data from 9:30 AM to 4:00 PM ET 
+        Always fetches fresh, complete market data from 9:30 AM to 4:00 PM ET
         for accurate charting instead of using potentially incomplete stored data.
 
         Returns:
             True if successful, False otherwise
         """
-        if not self.csv_data:
-            print("No CSV data available for charting.")
-            return False
+        # Determine target date for symbol extraction
+        et_tz = pytz.timezone('America/New_York')
+        target_date = (self.csv_date if self.csv_date
+                       else datetime.now(et_tz).date())
 
         try:
-            # Extract symbols from CSV data
-            symbols = []
-            for row in self.csv_data:
-                if 'symbol' in row and row['symbol']:
-                    symbols.append(row['symbol'])
-                elif 'Symbol' in row and row['Symbol']:
-                    symbols.append(row['Symbol'])
+            # Extract symbols from alert files
+            symbols = self._get_symbols_from_alerts(target_date)
 
             if not symbols:
-                print("No symbols found in CSV data.")
+                print(f"No symbols found in alert files for {target_date}.")
                 return False
-
-            # Remove duplicates and sort
-            symbols = sorted(list(set(symbols)))
 
             print(f"\nGenerating candlestick charts for {len(symbols)} symbols...")
             print("Fetching fresh market data from 9:30 AM to 4:00 PM ET for complete charts...")
@@ -1650,9 +1708,6 @@ class ORB:
 
             # Set up time range for complete market data (9:30 AM to 4:00 PM ET)
             # Start from premarket (4:00 AM) to ensure we get opening range data
-            et_tz = pytz.timezone('America/New_York')
-            target_date = (self.csv_date if self.csv_date 
-                           else datetime.now(et_tz).date())
 
             start_time = datetime.combine(target_date, time(4, 0), tzinfo=et_tz)  # Start from premarket
             end_time = datetime.combine(target_date, time(16, 0), tzinfo=et_tz)
@@ -1732,12 +1787,10 @@ class ORB:
                         coverage = (actual_duration / session_duration) * 100 if session_duration > 0 else 0
                         print(f"Session coverage: {coverage:.1f}% ({len(symbol_df)} of ~{session_duration:.0f} possible minutes)")
 
-                    # Load alerts for this symbol if csv_date is available
-                    alerts = []
-                    if self.csv_date:
-                        alerts = self._load_alerts_for_symbol(symbol, self.csv_date)
-                        if alerts:
-                            print(f"Loaded {len(alerts)} {alert_type_name} for {symbol}")
+                    # Load alerts for this symbol
+                    alerts = self._load_alerts_for_symbol(symbol, target_date)
+                    if alerts:
+                        print(f"Loaded {len(alerts)} {alert_type_name} for {symbol}")
 
                     # Generate chart with fresh data and alerts
                     if plot_candle_chart(symbol_df, symbol, plots_dir, alerts):
@@ -1816,19 +1869,13 @@ class ORB:
                     print(f"Warning: No data in CSV file {filename}")
                     continue
 
-                # Extract symbols from CSV data
-                symbols = []
-                for row in csv_data:
-                    if 'symbol' in row and row['symbol']:
-                        symbols.append(row['symbol'])
-                    elif 'Symbol' in row and row['Symbol']:
-                        symbols.append(row['Symbol'])
+                # Extract symbols from alert files for this date
+                symbols = self._get_symbols_from_alerts(file_date)
 
                 if not symbols:
-                    print(f"No symbols found in {filename}")
+                    print(f"No symbols found in alert files for {file_date}")
                     continue
 
-                symbols = list(set(symbols))  # Remove duplicates
                 print(f"Found {len(symbols)} symbols: {symbols[:5]}{'...' if len(symbols) > 5 else ''}")
 
                 # Get market data for this date
@@ -1961,11 +2008,17 @@ class ORB:
         print("Single-date analysis mode (with chart generation)")
         print(f"Opening range period: {self.opening_range_minutes} minutes")
 
-        success = self._load_and_process_csv_data()
+        # If target_date is provided, skip CSV selection and use the specified date
+        if self.target_date:
+            print(f"Using specified date: {self.target_date}")
+            self.csv_date = self.target_date
+            success = True
+        else:
+            success = self._load_and_process_csv_data()
 
-        if not success:
-            print("Failed to load and process CSV data.")
-            return False
+            if not success:
+                print("Failed to load and process CSV data.")
+                return False
 
         # Generate candlestick charts for all symbols
         # This now fetches fresh, complete market data directly
@@ -2034,6 +2087,12 @@ def parse_arguments():
         help="Opening range period in minutes (default: 15)"
     )
 
+    parser.add_argument(
+        "--date",
+        type=str,
+        help="Specific date for analysis (YYYY-MM-DD format). Skips CSV file selection prompt."
+    )
+
     return parser.parse_args()
 
 
@@ -2049,6 +2108,12 @@ def main():
         # Validate date arguments
         start_date = None
         end_date = None
+        target_date = None
+
+        # Check for conflicting arguments
+        if args.date and (args.start or args.end):
+            print("Error: --date cannot be used with --start and --end")
+            sys.exit(1)
 
         if args.start or args.end:
             if not (args.start and args.end):
@@ -2068,14 +2133,23 @@ def main():
                 print("Please use YYYY-MM-DD format")
                 sys.exit(1)
 
+        if args.date:
+            try:
+                target_date = datetime.strptime(args.date, '%Y-%m-%d').date()
+            except ValueError as e:
+                print(f"Error parsing date: {e}")
+                print("Please use YYYY-MM-DD format")
+                sys.exit(1)
+
         # Determine whether to plot sent superduper alerts or regular alerts
         plot_super_alerts = not args.plot_alerts  # Default is True (sent superduper alerts)
 
         # Create and run ORB analysis
         orb = ORB(
-            plot_super_alerts=plot_super_alerts, 
+            plot_super_alerts=plot_super_alerts,
             use_iex=args.use_iex,
-            opening_range_minutes=args.opening_range
+            opening_range_minutes=args.opening_range,
+            target_date=target_date
         )
 
         alert_type = "sent superduper alerts" if plot_super_alerts else "regular alerts"
@@ -2087,6 +2161,12 @@ def main():
             print(f"Analysis will plot {alert_type}")
             print(f"Using {feed_type} data feed")
             print("Note: Charts will NOT be generated in multi-date mode")
+        elif target_date:
+            print(f"Single-date ORB analysis for {target_date}")
+            print(f"Opening range period: {args.opening_range} minutes")
+            print(f"Analysis will plot {alert_type}")
+            print(f"Using {feed_type} data feed")
+            print("Note: CSV file selection will be skipped")
         else:
             print(f"Single-date ORB analysis")
             print(f"Opening range period: {args.opening_range} minutes")

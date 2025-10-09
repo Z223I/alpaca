@@ -39,8 +39,8 @@ class MomentumAlertsConfig:
     volatility_floor: float = 0.1           # Minimum volatility
 
     # Volume threshold constants for color coding
-    volume_high_threshold: int = 80000       # Green volume threshold
-    volume_low_threshold: int = 60000        # Red volume threshold
+    volume_high_threshold: int = 250000       # Green volume threshold
+    volume_low_threshold: int = 80000        # Red volume threshold
 
 
 # Default configuration instance

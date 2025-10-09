@@ -147,3 +147,6 @@ historical_data/
 
 # Alpaca configuration file (contains credentials)
 code/alpaca_config.py
+
+# Plot output directory
+plots/

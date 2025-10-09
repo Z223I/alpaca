@@ -194,11 +194,12 @@ Momentum alerts: BQ halted. On October 2. Momentum alert does not show it halted
 
 Use volume profile bulk to produce M/R for momentum alerts.
 
-EOD charting needs to also plot momentum alerts.
+
 
 ## Orb.py EOD Update
 
-- [ ] 
+- [X] Where is code/orb.py getting the list of stock symbols to plot?
+- [X] ULTRATHINK. Update code/orb.py.  Replace the current process collecting the stock symbols.  Update that process to collect the unique stock symbols from historical_data/YYYY-MM-DD/superduper_alerts_sent/bullish/green/superduper_alert_{symbol}_*.json and historical_data/YYYY-MM-DD/momentum_alerts_sent/bullish/alert_{symbol}_*.json.
 
 
 ## Plot Momentum Alerts Update
