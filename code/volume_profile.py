@@ -711,6 +711,10 @@ class VolumeProfile:
 
 def main():
     """Main entry point for volume profile analysis"""
+    # Calculate default output directory with today's date in ET
+    today_et = datetime.now(pytz.timezone('America/New_York'))
+    default_output_dir = f'./historical_data/{today_et.strftime("%Y-%m-%d")}'
+
     parser = argparse.ArgumentParser(description='Volume Profile Analysis - ToS Script Conversion')
     parser.add_argument('--symbol', type=str, required=True, help='Stock symbol to analyze')
     parser.add_argument('--days', type=int, default=5, help='Number of days of data to analyze')
@@ -726,8 +730,8 @@ def main():
                        help='Custom price increment (when using CUSTOM mode)')
     parser.add_argument('--value-area-percent', type=float, default=70.0,
                        help='Value area percentage (default: 70)')
-    parser.add_argument('--output-dir', type=str, default='volume_profile_output',
-                       help='Output directory for results')
+    parser.add_argument('--output-dir', type=str, default=default_output_dir,
+                       help='Output directory for results (default: ./historical_data/YYYY-MM-DD)')
     parser.add_argument('--chart', action='store_true',
                        help='Generate volume profile chart')
 
