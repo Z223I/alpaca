@@ -19,7 +19,8 @@ Key Features:
 
 """
 Usage:
-python code/volume_profile.py --symbol BBAI --days 1 --timeframe 5Min --time-per-profile DAY --chart
+python code/volume_profile.py --symbol BBAI --days 1 --timeframe 5Min \
+    --time-per-profile DAY --chart
 """
 
 import os
@@ -176,10 +177,13 @@ class VolumeProfile:
         Load data from pandas DataFrame
 
         Args:
-            df: DataFrame with columns ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+            df: DataFrame with columns ['timestamp', 'open', 'high', 'low',
+                'close', 'volume']
         """
-        required_columns = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
-        missing_columns = [col for col in required_columns if col not in df.columns]
+        required_columns = ['timestamp', 'open', 'high', 'low', 'close',
+                            'volume']
+        missing_columns = [col for col in required_columns
+                          if col not in df.columns]
 
         if missing_columns:
             raise ValueError(f"Missing required columns: {missing_columns}")
@@ -213,11 +217,13 @@ class VolumeProfile:
 
         elif self.time_per_profile == TimePerProfile.MINUTE:
             # Group by minute
-            return ((timestamps - timestamps.iloc[0]).dt.total_seconds() // 60).astype(int)
+            return ((timestamps - timestamps.iloc[0]).dt.total_seconds() //
+                    60).astype(int)
 
         elif self.time_per_profile == TimePerProfile.HOUR:
             # Group by hour
-            return ((timestamps - timestamps.iloc[0]).dt.total_seconds() // 3600).astype(int)
+            return ((timestamps - timestamps.iloc[0]).dt.total_seconds() //
+                    3600).astype(int)
 
         elif self.time_per_profile == TimePerProfile.DAY:
             # Group by trading day
@@ -232,7 +238,8 @@ class VolumeProfile:
 
         elif self.time_per_profile == TimePerProfile.MONTH:
             # Group by month
-            return (timestamps.dt.year - timestamps.iloc[0].year) * 12 + (timestamps.dt.month - timestamps.iloc[0].month)
+            return ((timestamps.dt.year - timestamps.iloc[0].year) * 12 +
+                    (timestamps.dt.month - timestamps.iloc[0].month))
 
         elif self.time_per_profile == TimePerProfile.BAR:
             # Group by bar number
@@ -258,17 +265,21 @@ class VolumeProfile:
         if self.price_per_row_height_mode == PricePerRowHeightMode.CUSTOM:
             price_increment = self.custom_row_height
         elif self.price_per_row_height_mode == PricePerRowHeightMode.TICKSIZE:
-            # Simplified tick size calculation - could be enhanced with actual instrument tick sizes
+            # Simplified tick size calculation - could be enhanced with actual
+            # instrument tick sizes
             price_increment = 0.01 if max_price < 100 else 0.05
         else:  # AUTOMATIC
             # Automatic calculation based on price range
             price_range = max_price - min_price
-            num_levels = min(100, max(10, int(price_range * 100)))  # Aim for reasonable number of levels
+            # Aim for reasonable number of levels
+            num_levels = min(100, max(10, int(price_range * 100)))
             price_increment = price_range / num_levels
 
-        return np.arange(min_price, max_price + price_increment, price_increment)
+        return np.arange(min_price, max_price + price_increment,
+                         price_increment)
 
-    def _calculate_volume_at_price(self, group_data: pd.DataFrame, price_levels: np.ndarray) -> Dict[float, float]:
+    def _calculate_volume_at_price(self, group_data: pd.DataFrame,
+                                   price_levels: np.ndarray) -> Dict[float, float]:
         """
         Calculate volume distribution at each price level for a time period
 
@@ -287,7 +298,8 @@ class VolumeProfile:
             bar_volume = row['volume']
 
             # Find price levels within this bar's range
-            relevant_levels = price_levels[(price_levels >= bar_low) & (price_levels <= bar_high)]
+            relevant_levels = price_levels[(price_levels >= bar_low) &
+                                          (price_levels <= bar_high)]
 
             if len(relevant_levels) > 0:
                 # Distribute volume evenly across price levels within the bar
@@ -310,9 +322,11 @@ class VolumeProfile:
         if not volume_at_price:
             return 0.0
 
-        return max(volume_at_price.keys(), key=lambda price: volume_at_price[price])
+        return max(volume_at_price.keys(),
+                   key=lambda price: volume_at_price[price])
 
-    def _calculate_value_area(self, volume_at_price: Dict[float, float]) -> Tuple[float, float]:
+    def _calculate_value_area(self, volume_at_price: Dict[float, float]
+                              ) -> Tuple[float, float]:
         """
         Calculate Value Area (price range containing specified percentage of volume)
 
@@ -326,7 +340,8 @@ class VolumeProfile:
             return 0.0, 0.0
 
         # Sort by volume descending
-        sorted_by_volume = sorted(volume_at_price.items(), key=lambda x: x[1], reverse=True)
+        sorted_by_volume = sorted(volume_at_price.items(),
+                                 key=lambda x: x[1], reverse=True)
 
         total_volume = sum(volume_at_price.values())
         target_volume = total_volume * (self.value_area_percent / 100.0)
@@ -351,7 +366,8 @@ class VolumeProfile:
         Calculate volume profiles for all time periods
         """
         if self.data is None:
-            raise ValueError("No data loaded. Use load_data_from_alpaca() or load_data_from_dataframe() first.")
+            raise ValueError("No data loaded. Use load_data_from_alpaca() or "
+                           "load_data_from_dataframe() first.")
 
         # Calculate period groups
         period_groups = self._calculate_period_groups()
@@ -428,10 +444,16 @@ class VolumeProfile:
 
         return {
             'total_profiles': len(self.volume_profiles),
-            'time_range': f"{self.volume_profiles[0]['start_time']} to {self.volume_profiles[-1]['end_time']}",
+            'time_range': (f"{self.volume_profiles[0]['start_time']} to "
+                          f"{self.volume_profiles[-1]['end_time']}"),
             'avg_poc': np.mean(self.poc_values) if self.poc_values else 0,
-            'poc_range': f"{min(self.poc_values):.2f} - {max(self.poc_values):.2f}" if self.poc_values else "N/A",
-            'avg_value_area_width': np.mean([va_h - va_l for va_h, va_l in zip(self.value_area_high, self.value_area_low)]) if self.value_area_high else 0
+            'poc_range': (f"{min(self.poc_values):.2f} - "
+                         f"{max(self.poc_values):.2f}"
+                         if self.poc_values else "N/A"),
+            'avg_value_area_width': (
+                np.mean([va_h - va_l for va_h, va_l in
+                        zip(self.value_area_high, self.value_area_low)])
+                if self.value_area_high else 0)
         }
 
     def print_profile_summary(self):
@@ -446,12 +468,12 @@ class VolumeProfile:
         print("=" * 60)
         print("VOLUME PROFILE ANALYSIS SUMMARY")
         print("=" * 60)
-        print(f"Configuration:")
+        print("Configuration:")
         print(f"  Time Per Profile: {self.time_per_profile.value}")
         print(f"  Price Mode: {self.price_per_row_height_mode.value}")
         print(f"  Value Area %: {self.value_area_percent}%")
         print()
-        print(f"Results:")
+        print("Results:")
         print(f"  Total Profiles: {summary['total_profiles']}")
         print(f"  Time Range: {summary['time_range']}")
         print(f"  Average POC: ${summary['avg_poc']:.2f}")
@@ -461,14 +483,19 @@ class VolumeProfile:
         if latest:
             print()
             print("Latest Profile:")
-            print(f"  📅 Period: {latest['start_time']} to {latest['end_time']}")
-            print(f"  🎯 Point of Control: ${latest['point_of_control']:.2f}")
-            print(f"  📊 Value Area: ${latest['value_area_low']:.2f} - ${latest['value_area_high']:.2f}")
-            print(f"  📈 Profile Range: ${latest['profile_low']:.2f} - ${latest['profile_high']:.2f}")
+            print(f"  📅 Period: {latest['start_time']} to "
+                  f"{latest['end_time']}")
+            print(f"  🎯 Point of Control: "
+                  f"${latest['point_of_control']:.2f}")
+            print(f"  📊 Value Area: ${latest['value_area_low']:.2f} - "
+                  f"${latest['value_area_high']:.2f}")
+            print(f"  📈 Profile Range: ${latest['profile_low']:.2f} - "
+                  f"${latest['profile_high']:.2f}")
             print(f"  📦 Total Volume: {latest['total_volume']:,.0f}")
         print("=" * 60)
 
-    def generate_chart(self, symbol: str, output_dir: str = 'volume_profile_output') -> bool:
+    def generate_chart(self, symbol: str,
+                       output_dir: str = 'volume_profile_output') -> bool:
         """
         Generate volume profile chart with price and volume data
 
@@ -488,8 +515,9 @@ class VolumeProfile:
             os.makedirs(output_dir, exist_ok=True)
 
             # Create the chart
-            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10),
-                                         gridspec_kw={'height_ratios': [3, 1]})
+            fig, (ax1, ax2) = plt.subplots(
+                2, 1, figsize=(14, 10),
+                gridspec_kw={'height_ratios': [3, 1]})
 
             # Prepare data for candlestick chart - ensure ET timezone
             timestamps = pd.to_datetime(self.data['timestamp'])
@@ -515,16 +543,19 @@ class VolumeProfile:
 
                 # Draw the wick (high-low line)
                 ax1.plot([timestamps.iloc[i], timestamps.iloc[i]],
-                        [lows.iloc[i], highs.iloc[i]],
-                        color='black', linewidth=0.5)
+                         [lows.iloc[i], highs.iloc[i]],
+                         color='black', linewidth=0.5)
 
                 # Draw the body (open-close rectangle)
                 body_height = abs(closes.iloc[i] - opens.iloc[i])
                 body_bottom = min(opens.iloc[i], closes.iloc[i])
 
-                rect = Rectangle((mdates.date2num(timestamps.iloc[i]) - 0.0003, body_bottom),
-                               0.0006, body_height,
-                               facecolor=color, alpha=0.7, edgecolor='black', linewidth=0.5)
+                rect = Rectangle(
+                    (mdates.date2num(timestamps.iloc[i]) - 0.0003,
+                     body_bottom),
+                    0.0006, body_height,
+                    facecolor=color, alpha=0.7, edgecolor='black',
+                    linewidth=0.5)
                 ax1.add_patch(rect)
 
             # Plot volume profile data
@@ -534,14 +565,17 @@ class VolumeProfile:
                 prices = list(volume_data.keys())
                 volumes_at_price = list(volume_data.values())
 
-                # Create volume profile bars on the right side of the chart
+                # Create volume profile bars on the right side of chart
                 max_volume = max(volumes_at_price) if volumes_at_price else 1
-                price_range = max(prices) - min(prices) if len(prices) > 1 else 1
-                bar_width_factor = price_range * 0.60  # Scale bars to 60% of price range (4x wider)
+                price_range = (max(prices) - min(prices)
+                              if len(prices) > 1 else 1)
+                # Scale bars to 60% of price range (4x wider)
+                bar_width_factor = price_range * 0.60
 
                 # Get chart x-axis limits for positioning volume bars
                 xlims = ax1.get_xlim()
-                x_position = xlims[1] - (xlims[1] - xlims[0]) * 0.07  # 7% from right edge
+                # 7% from right edge
+                x_position = xlims[1] - (xlims[1] - xlims[0]) * 0.07
 
                 for price, volume in volume_data.items():
                     if volume > 0:
@@ -552,7 +586,7 @@ class VolumeProfile:
                             color = 'blue'  # POC in blue
                             alpha = 0.8
                         elif (latest_profile['value_area_low'] <= price <=
-                              latest_profile['value_area_high']):
+                                latest_profile['value_area_high']):
                             color = 'orange'  # Value area in orange
                             alpha = 0.6
                         else:
@@ -560,56 +594,62 @@ class VolumeProfile:
                             alpha = 0.4
 
                         # Draw horizontal volume bar
-                        bar_rect = Rectangle((x_position, price - 0.01),
-                                           bar_width, 0.02,
-                                           facecolor=color, alpha=alpha,
-                                           edgecolor='black', linewidth=0.3)
+                        bar_rect = Rectangle(
+                            (x_position, price - 0.01),
+                            bar_width, 0.02,
+                            facecolor=color, alpha=alpha,
+                            edgecolor='black', linewidth=0.3)
                         ax1.add_patch(bar_rect)
 
                 # Plot POC line
                 poc_price = latest_profile['point_of_control']
                 ax1.axhline(y=poc_price, color='blue', linestyle='-',
-                           linewidth=2, alpha=0.8, label=f'POC: ${poc_price:.2f}')
+                            linewidth=2, alpha=0.8,
+                            label=f'POC: ${poc_price:.2f}')
 
                 # Plot Value Area lines
                 va_high = latest_profile['value_area_high']
                 va_low = latest_profile['value_area_low']
                 ax1.axhline(y=va_high, color='orange', linestyle='--',
-                           linewidth=1.5, alpha=0.7,
-                           label=f'VA High: ${va_high:.2f}')
+                            linewidth=1.5, alpha=0.7,
+                            label=f'VA High: ${va_high:.2f}')
                 ax1.axhline(y=va_low, color='orange', linestyle='--',
-                           linewidth=1.5, alpha=0.7,
-                           label=f'VA Low: ${va_low:.2f}')
+                            linewidth=1.5, alpha=0.7,
+                            label=f'VA Low: ${va_low:.2f}')
 
             # Configure main chart
             ax1.set_title(f'{symbol} - Volume Profile Analysis\n'
-                         f'Time Period: {self.time_per_profile.value} | '
-                         f'Value Area: {self.value_area_percent}%',
-                         fontsize=14, fontweight='bold')
+                          f'Time Period: {self.time_per_profile.value} | '
+                          f'Value Area: {self.value_area_percent}%',
+                          fontsize=14, fontweight='bold')
             ax1.set_ylabel('Price ($)', fontsize=12)
             ax1.grid(True, alpha=0.3)
             ax1.legend(loc='upper left')
 
             # Format x-axis for timestamps with dates in ET timezone
-            ax1.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M', tz=et_tz))
+            ax1.xaxis.set_major_formatter(
+                mdates.DateFormatter('%m/%d %H:%M', tz=et_tz))
             ax1.xaxis.set_major_locator(mdates.HourLocator(interval=2))
             plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45)
 
             # Plot volume bars on bottom subplot
             bar_colors = ['green' if c >= o else 'red'
-                         for c, o in zip(closes, opens)]
-            ax2.bar(timestamps, volumes, color=bar_colors, alpha=0.7, width=0.0006)
+                          for c, o in zip(closes, opens)]
+            ax2.bar(timestamps, volumes, color=bar_colors, alpha=0.7,
+                   width=0.0006)
             ax2.set_ylabel('Volume', fontsize=12)
             ax2.set_xlabel('Time (ET)', fontsize=12)
             ax2.grid(True, alpha=0.3)
 
             # Format volume axis
             ax2.yaxis.set_major_formatter(FuncFormatter(
-                lambda x, p: f'{x/1e6:.1f}M' if x >= 1e6 else f'{x/1e3:.0f}K'))
+                lambda x, p: (f'{x/1e6:.1f}M' if x >= 1e6
+                             else f'{x/1e3:.0f}K')))
 
             # Sync x-axes
             ax2.set_xlim(ax1.get_xlim())
-            ax2.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M', tz=et_tz))
+            ax2.xaxis.set_major_formatter(
+                mdates.DateFormatter('%m/%d %H:%M', tz=et_tz))
             ax2.xaxis.set_major_locator(mdates.HourLocator(interval=2))
             plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45)
 
@@ -618,7 +658,8 @@ class VolumeProfile:
 
             # Generate filename with timestamp
             chart_date = timestamps.iloc[0].date()
-            filename = f"{symbol}_volume_profile_{chart_date.strftime('%Y%m%d')}.png"
+            filename = (f"{symbol}_volume_profile_"
+                       f"{chart_date.strftime('%Y%m%d')}.png")
             filepath = os.path.join(output_dir, filename)
 
             plt.savefig(filepath, dpi=300, bbox_inches='tight')
@@ -627,7 +668,8 @@ class VolumeProfile:
             print(f"📊 Volume profile chart saved: {filepath}")
 
             # Save JSON data with same naming convention
-            json_filename = f"{symbol}_volume_profile_{chart_date.strftime('%Y%m%d')}.json"
+            json_filename = (f"{symbol}_volume_profile_"
+                            f"{chart_date.strftime('%Y%m%d')}.json")
             json_filepath = os.path.join(output_dir, json_filename)
 
             if self._save_json_output(json_filepath, symbol):
@@ -680,7 +722,9 @@ class VolumeProfile:
                     "profile_high": profile["profile_high"],
                     "profile_low": profile["profile_low"],
                     "total_volume": profile["total_volume"],
-                    "volume_at_price": {str(price): volume for price, volume in profile["volume_at_price"].items()}
+                    "volume_at_price": {str(price): volume
+                                        for price, volume in
+                                        profile["volume_at_price"].items()}
                 }
                 output_data["profiles"].append(profile_data)
 
@@ -713,25 +757,35 @@ def main():
     """Main entry point for volume profile analysis"""
     # Calculate default output directory with today's date in ET
     today_et = datetime.now(pytz.timezone('America/New_York'))
-    default_output_dir = f'./historical_data/{today_et.strftime("%Y-%m-%d")}'
+    default_output_dir = (f'./historical_data/'
+                         f'{today_et.strftime("%Y-%m-%d")}/'
+                         f'volume_profile_output')
 
-    parser = argparse.ArgumentParser(description='Volume Profile Analysis - ToS Script Conversion')
-    parser.add_argument('--symbol', type=str, required=True, help='Stock symbol to analyze')
-    parser.add_argument('--days', type=int, default=5, help='Number of days of data to analyze')
-    parser.add_argument('--timeframe', type=str, default='1Min', choices=['1Min', '5Min', '15Min', '1Hour', '1Day'],
+    parser = argparse.ArgumentParser(
+        description='Volume Profile Analysis - ToS Script Conversion')
+    parser.add_argument('--symbol', type=str, required=True,
+                       help='Stock symbol to analyze')
+    parser.add_argument('--days', type=int, default=5,
+                       help='Number of days of data to analyze')
+    parser.add_argument('--timeframe', type=str, default='1Min',
+                       choices=['1Min', '5Min', '15Min', '1Hour', '1Day'],
                        help='Data timeframe')
     parser.add_argument('--time-per-profile', type=str, default='DAY',
-                       choices=['CHART', 'MINUTE', 'HOUR', 'DAY', 'WEEK', 'MONTH', 'BAR'],
+                       choices=['CHART', 'MINUTE', 'HOUR', 'DAY', 'WEEK',
+                               'MONTH', 'BAR'],
                        help='Time aggregation for profiles')
     parser.add_argument('--price-mode', type=str, default='AUTOMATIC',
                        choices=['AUTOMATIC', 'TICKSIZE', 'CUSTOM'],
                        help='Price level calculation mode')
     parser.add_argument('--custom-height', type=float, default=1.0,
-                       help='Custom price increment (when using CUSTOM mode)')
+                       help='Custom price increment (when using CUSTOM '
+                            'mode)')
     parser.add_argument('--value-area-percent', type=float, default=70.0,
                        help='Value area percentage (default: 70)')
     parser.add_argument('--output-dir', type=str, default=default_output_dir,
-                       help='Output directory for results (default: ./historical_data/YYYY-MM-DD)')
+                       help='Output directory for results (default: '
+                            './historical_data/YYYY-MM-DD/'
+                            'volume_profile_output)')
     parser.add_argument('--chart', action='store_true',
                        help='Generate volume profile chart')
 
@@ -760,7 +814,8 @@ def main():
     )
 
     try:
-        print(f"Loading {args.days} days of {args.timeframe} data for {args.symbol}...")
+        print(f"Loading {args.days} days of {args.timeframe} data for "
+              f"{args.symbol}...")
         vp.load_data_from_alpaca(
             symbol=args.symbol,
             timeframe=timeframe,
@@ -779,7 +834,8 @@ def main():
             print("\nGenerating volume profile chart...")
             chart_success = vp.generate_chart(args.symbol, args.output_dir)
             if not chart_success:
-                print("⚠️  Chart generation failed, but analysis completed successfully")
+                print("⚠️  Chart generation failed, but analysis completed "
+                      "successfully")
 
         return 0
 
