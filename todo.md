@@ -195,6 +195,40 @@ Momentum alerts: BQ halted. On October 2. Momentum alert does not show it halted
 Use volume profile bulk to produce M/R for momentum alerts.
 
 
+Need an alert for when a symbol hits a price. Maybe use symbol polling.  Use that in conjunction with volume profile to get the prices. Or do that one separately.
+
+Plot, major resistance, using alpaca – – plot
+
+Up the volume on the scanners
+
+Real time charts. At a bar for the ratio of selling versus buying. Buying to the right. have L2 and time and sales.
+
+
+
+
+
+## Chart Major Resistance
+
+### Config
+
+- [ ] claude --dangerously-skip-permissions
+- [ ] /login
+- [ ] /commit
+- [ ] Sync changes
+- [ ] /clear
+- [ ] run git switch -c feature/major_resistance
+- [ ] /clear
+- [ ] /read...
+
+### Spec File
+
+- [ ] ULTRATHINK. Implement the instructions in specs/major_resistance.md.
+- [ ] Please put usage examples in the file docstring.
+- [ ] /commit
+- [ ] Publish the branch
+- [ ] run git switch master; merge current branch and verify that all changes are merged.
+- [ ] Sync changes
+
 
 ## Orb.py EOD Update
 
