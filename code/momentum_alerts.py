@@ -591,6 +591,14 @@ class MomentumAlertsSystem:
                                 self.logger.debug(f"⚠️ {symbol}: VWAP not available in stock data, skipping")
                                 continue
 
+                            # CRITICAL: Verify the latest bar has valid VWAP from stock data
+                            latest_vwap = df.iloc[-1]['vwap']
+                            if pd.isna(latest_vwap) or latest_vwap is None:
+                                self.logger.debug(f"⚠️ {symbol}: Latest bar missing VWAP from stock data, skipping")
+                                continue
+
+                            self.logger.debug(f"✅ {symbol}: Using VWAP from stock data (vw attribute): ${latest_vwap:.2f}")
+
                             data_dict[symbol] = df
 
                             self.logger.debug(f"📊 Collected {len(df)} bars for {symbol}")
@@ -626,8 +634,16 @@ class MomentumAlertsSystem:
             # Get latest bar
             latest_bar = data.iloc[-1]
             current_price = float(latest_bar['c'])  # Use single letter attribute
-            current_vwap = float(latest_bar['vwap'])  # VWAP from stock data only
+
+            # CRITICAL: Validate VWAP from stock data before using
+            if pd.isna(latest_bar['vwap']) or latest_bar['vwap'] is None:
+                self.logger.debug(f"❌ {symbol}: VWAP from stock data is invalid")
+                return None
+
+            current_vwap = float(latest_bar['vwap'])  # VWAP from stock data (bar.vw attribute)
             current_volume = int(latest_bar['v'])  # Get current volume
+
+            self.logger.debug(f"📊 {symbol}: Using VWAP from stock data: ${current_vwap:.2f}")
 
             # Filter out low volume alerts
             if current_volume < self.momentum_config.volume_low_threshold:
@@ -765,7 +781,7 @@ class MomentumAlertsSystem:
             }
 
             self.logger.info(f"✅ {symbol}: Momentum alert criteria met!")
-            self.logger.info(f"   Price: ${current_price:.2f} | VWAP: ${current_vwap:.2f} | EMA9: ${ema_9:.2f}")
+            self.logger.info(f"   Price: ${current_price:.2f} | VWAP: ${current_vwap:.2f} (from stock data) | EMA9: ${ema_9:.2f}")
 
             # Show actual time periods used (handles halts/gaps)
             time_diff = actual_time_diff if 'actual_time_diff' in locals() else 0
@@ -802,12 +818,12 @@ class MomentumAlertsSystem:
             urgency = alert_data['urgency']
             timestamp = alert_data['timestamp']
 
-            # Create alert message
+            # Create alert message (VWAP is from stock data, not calculated)
             message_parts = [
                 f"🚀 **MOMENTUM ALERT - {symbol}**",
                 "",
                 f"💰 **Price:** ${current_price:.2f}",
-                f"📊 **VWAP:** ${vwap:.2f} ✅",
+                f"📊 **VWAP (Stock Data):** ${vwap:.2f} ✅",
                 f"📈 **EMA9:** ${ema_9:.2f} ✅",
                 f"⚡ **Momentum:** {momentum:.2f}%/min {momentum_emoji}",
                 f"⚡ **Momentum Short:** {momentum_short:.2f}%/min {momentum_short_emoji}",
