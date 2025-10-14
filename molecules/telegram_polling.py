@@ -35,9 +35,16 @@ class TelegramPollingService:
         self.config = TelegramConfig()
         self.image_sender = TelegramImageSender()
         self.running = False
-        self.last_update_id = 0
         self.poll_interval = 5  # seconds
         self.base_url = f"https://api.telegram.org/bot{self.config.BOT_TOKEN}"
+
+        # Persistence file for last_update_id
+        self.state_file = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'data',
+            'telegram_polling_state.json'
+        )
+        self.last_update_id = self._load_last_update_id()
 
         # Command handlers (only for slash commands)
         self.command_handlers = {
@@ -61,6 +68,33 @@ class TelegramPollingService:
         """Handle shutdown signals gracefully."""
         print(f"\n🛑 Received signal {signum}, shutting down gracefully...")
         self.running = False
+        self._save_last_update_id()
+
+    def _load_last_update_id(self) -> int:
+        """Load the last update ID from persistent storage."""
+        try:
+            if os.path.exists(self.state_file):
+                with open(self.state_file, 'r') as f:
+                    state = json.load(f)
+                    last_id = state.get('last_update_id', 0)
+                    self._log(f"📥 Loaded last_update_id: {last_id} from {self.state_file}")
+                    return last_id
+        except Exception as e:
+            self._log(f"⚠️ Failed to load last_update_id: {e}", "WARN")
+        return 0
+
+    def _save_last_update_id(self):
+        """Save the last update ID to persistent storage."""
+        try:
+            # Ensure data directory exists
+            os.makedirs(os.path.dirname(self.state_file), exist_ok=True)
+
+            state = {'last_update_id': self.last_update_id}
+            with open(self.state_file, 'w') as f:
+                json.dump(state, f)
+            self._log(f"💾 Saved last_update_id: {self.last_update_id}")
+        except Exception as e:
+            self._log(f"⚠️ Failed to save last_update_id: {e}", "WARN")
 
     def _log(self, message: str, level: str = "INFO"):
         """Log message with timestamp."""
@@ -143,6 +177,8 @@ class TelegramPollingService:
                     for update in updates:
                         self._process_update(update)
                         self.last_update_id = max(self.last_update_id, update.get('update_id', 0))
+                        # Save after each update to prevent reprocessing on restart
+                        self._save_last_update_id()
                 else:
                     self._log(f"API error: {result.get('description')}", "ERROR")
             else:
@@ -1546,31 +1582,114 @@ the prior trading day results will be given.
             # If formatting fails, return original content
             return csv_content
 
-    def _send_response(self, chat_id: str, message: str):
-        """Send a response message to a specific chat."""
-        try:
-            url = f"{self.base_url}/sendMessage"
-            payload = {
-                'chat_id': chat_id,
-                'text': message,
-                'parse_mode': 'Markdown'
-            }
+    def _split_message(self, message: str, max_length: int = 4096) -> List[str]:
+        """Split a large message into smaller chunks that fit Telegram's limits.
 
-            response = requests.post(url, json=payload, timeout=30)
+        Telegram's message limit is 4096 characters. We split on code block boundaries
+        when possible to maintain formatting.
+        """
+        if len(message) <= max_length:
+            return [message]
 
-            if response.status_code == 200:
-                result = response.json()
-                if result.get('ok'):
-                    return True
+        chunks = []
+        current_chunk = ""
+        lines = message.split('\n')
+        in_code_block = False
+        code_block_marker = "```"
+
+        for line in lines:
+            # Track if we're entering/exiting a code block
+            if line.strip().startswith(code_block_marker):
+                in_code_block = not in_code_block
+
+            # Check if adding this line would exceed the limit
+            potential_chunk = current_chunk + line + '\n'
+
+            if len(potential_chunk) > max_length:
+                # Close code block if we're in one
+                if in_code_block and not current_chunk.strip().endswith(code_block_marker):
+                    current_chunk += code_block_marker + '\n'
+                    in_code_block = False
+
+                # Save current chunk
+                if current_chunk:
+                    chunks.append(current_chunk.rstrip())
+
+                # Start new chunk
+                current_chunk = ""
+
+                # If we closed a code block, reopen it in the new chunk
+                if line.strip().startswith(code_block_marker):
+                    in_code_block = True
+                    current_chunk = line + '\n'
                 else:
-                    self._log(f"Failed to send response: {result.get('description')}", "ERROR")
+                    # If line itself is too long, we need to split it
+                    if len(line) > max_length - 10:  # Leave room for code block markers
+                        # Split the line into smaller parts
+                        for i in range(0, len(line), max_length - 10):
+                            chunk_part = line[i:i + max_length - 10]
+                            chunks.append(chunk_part)
+                    else:
+                        current_chunk = line + '\n'
             else:
-                self._log(f"HTTP error sending response: {response.status_code}", "ERROR")
+                current_chunk = potential_chunk
+
+        # Add remaining content
+        if current_chunk:
+            # Close code block if still open
+            if in_code_block and not current_chunk.strip().endswith(code_block_marker):
+                current_chunk += code_block_marker
+            chunks.append(current_chunk.rstrip())
+
+        return chunks
+
+    def _send_response(self, chat_id: str, message: str):
+        """Send a response message to a specific chat.
+
+        Automatically splits large messages into multiple parts if needed.
+        """
+        try:
+            # Split message if it's too large
+            message_chunks = self._split_message(message)
+
+            if len(message_chunks) > 1:
+                self._log(f"📨 Splitting large message into {len(message_chunks)} parts")
+
+            # Send each chunk
+            for i, chunk in enumerate(message_chunks):
+                # Add part indicator if message was split
+                if len(message_chunks) > 1:
+                    chunk_with_indicator = f"[Part {i+1}/{len(message_chunks)}]\n\n{chunk}"
+                else:
+                    chunk_with_indicator = chunk
+
+                url = f"{self.base_url}/sendMessage"
+                payload = {
+                    'chat_id': chat_id,
+                    'text': chunk_with_indicator,
+                    'parse_mode': 'Markdown'
+                }
+
+                response = requests.post(url, json=payload, timeout=30)
+
+                if response.status_code == 200:
+                    result = response.json()
+                    if not result.get('ok'):
+                        self._log(f"Failed to send response part {i+1}: {result.get('description')}", "ERROR")
+                        return False
+                else:
+                    self._log(f"HTTP error sending response part {i+1}: {response.status_code}", "ERROR")
+                    return False
+
+                # Small delay between chunks to avoid rate limiting
+                if i < len(message_chunks) - 1:
+                    time.sleep(0.5)
+
+            return True
 
         except Exception as e:
             self._log(f"Error sending response: {e}", "ERROR")
-
-        return False
+            return False
 
 
 def main():

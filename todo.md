@@ -201,7 +201,7 @@ Plot, major resistance, using alpaca – – plot
 
 Up the volume on the scanners
 
-Real time charts. At a bar for the ratio of selling versus buying. Buying to the right. have L2 and time and sales.
+Real time charts. Add a bar for the ratio of selling versus buying. Buying to the right. have L2 and time and sales.
 
 
 
