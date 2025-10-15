@@ -656,8 +656,9 @@ class VolumeProfile:
             # Adjust layout and save
             plt.tight_layout()
 
-            # Generate filename with timestamp
-            chart_date = timestamps.iloc[0].date()
+            # Generate filename with today's date in ET
+            today_et = datetime.now(pytz.timezone('America/New_York'))
+            chart_date = today_et.date()
             filename = (f"{symbol}_volume_profile_"
                        f"{chart_date.strftime('%Y%m%d')}.png")
             filepath = os.path.join(output_dir, filename)
