@@ -6,7 +6,7 @@ This system monitors stocks from the market open top gainers CSV and generates m
 based on VWAP and EMA9 criteria. It follows the specification in specs/momentum_alert.md.
 
 Process:
-1. Startup: Run market_open_top_gainers.py three times per hour for 5 hours
+1. Startup: Run market_open_top_gainers.py starting at 9:40 ET, then every 20 minutes for 5 hours
 2. Monitor: Watch for CSV file creation in ./historical_data/{YYYY-MM-DD}/market/gainers_nasdaq_amex.csv
 3. Stock monitoring: Every minute, collect 30 minutes of 1-minute candlesticks for each stock
 4. Momentum alerts: Check stocks above VWAP, above EMA9, and pass urgency filter
@@ -164,28 +164,30 @@ class MomentumAlertsSystem:
         return logger
 
     def _schedule_startup_runs(self):
-        """Schedule the startup script to run three times per hour for 5 hours."""
+        """Schedule the startup script to run starting at 9:40 ET, then every 20 minutes for 5 hours."""
         current_time = datetime.now(self.et_tz)
 
-        # Schedule runs three times per hour for 5 hours (15 total runs)
-        # Runs at :00, :20, and :40 minutes of each hour
-        for hour in range(5):
-            # Schedule run at top of hour (:00)
-            scheduled_time_00 = current_time.replace(minute=0, second=0, microsecond=0) + timedelta(hours=hour+1)
-            self.startup_schedule.append(scheduled_time_00)
+        # First run at 9:40 ET (10 minutes after market open)
+        first_run = current_time.replace(hour=9, minute=40, second=0, microsecond=0)
 
-            # Schedule run at 20 minutes past hour (:20)
-            scheduled_time_20 = current_time.replace(minute=20, second=0, microsecond=0) + timedelta(hours=hour+1)
-            self.startup_schedule.append(scheduled_time_20)
+        # If we've already passed 9:40 today, start from the next 20-minute interval
+        if current_time >= first_run:
+            # Calculate minutes since 9:40
+            minutes_since_940 = (current_time.hour - 9) * 60 + (current_time.minute - 40)
+            # Round up to next 20-minute interval
+            intervals_to_skip = (minutes_since_940 // 20) + 1
+            first_run = first_run + timedelta(minutes=intervals_to_skip * 20)
 
-            # Schedule run at 40 minutes past hour (:40)
-            scheduled_time_40 = current_time.replace(minute=40, second=0, microsecond=0) + timedelta(hours=hour+1)
-            self.startup_schedule.append(scheduled_time_40)
+        # Schedule runs every 20 minutes starting from first_run
+        # Continue for approximately 5 hours (15 runs total: 9:40, 10:00, 10:20, 10:40, 11:00, 11:20, 11:40, 12:00, 12:20, 12:40, 13:00, 13:20, 13:40, 14:00, 14:20)
+        for i in range(15):
+            scheduled_time = first_run + timedelta(minutes=i * 20)
+            self.startup_schedule.append(scheduled_time)
 
         # Sort the schedule to ensure chronological order
         self.startup_schedule.sort()
 
-        self.logger.info(f"📅 Scheduled {len(self.startup_schedule)} startup script runs (three times per hour for 5 hours):")
+        self.logger.info(f"📅 Scheduled {len(self.startup_schedule)} startup script runs (every 20 minutes starting at 9:40 ET):")
         for i, scheduled_time in enumerate(self.startup_schedule, 1):
             self.logger.info(f"   Run {i}: {scheduled_time.strftime('%H:%M:%S ET')}")
 
