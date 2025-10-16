@@ -23,7 +23,7 @@ class ChartFromDataFrame:
     Generate candlestick charts with MACD from DataFrame data.
     """
 
-    def __init__(self, df: pd.DataFrame, symbol: Optional[str] = None, output_dir: str = 'chart_output', alerts: Optional[List] = None):
+    def __init__(self, df: pd.DataFrame, symbol: Optional[str] = None, output_dir: str = 'chart_output', alerts: Optional[List] = None, major_resistance: Optional[List[float]] = None):
         """
         Initialize the chart generator with DataFrame data.
 
@@ -32,11 +32,13 @@ class ChartFromDataFrame:
             symbol: Stock symbol name (will be extracted from df if not provided)
             output_dir: Directory to save the chart (default: 'chart_output')
             alerts: Optional list of alert dictionaries
+            major_resistance: Optional list of major resistance price levels from volume profile
         """
         self.df = df.copy()
         self.symbol = symbol
         self.output_dir = output_dir
         self.alerts = alerts or []
+        self.major_resistance = major_resistance or []
         
         # Validate DataFrame
         if not self._validate_dataframe():
@@ -119,7 +121,7 @@ class ChartFromDataFrame:
         
         try:
             # Generate the chart using the existing plot_candle_chart function
-            success = plot_candle_chart(self.df, self.symbol, self.output_dir, self.alerts)
+            success = plot_candle_chart(self.df, self.symbol, self.output_dir, self.alerts, self.major_resistance)
             
             if success:
                 # Determine the chart path
@@ -186,8 +188,9 @@ class ChartFromDataFrame:
 
 
 # Convenience function for quick chart generation
-def generate_chart_from_dataframe(df: pd.DataFrame, symbol: Optional[str] = None, 
+def generate_chart_from_dataframe(df: pd.DataFrame, symbol: Optional[str] = None,
                                  output_dir: str = 'chart_output', alerts: Optional[List] = None,
+                                 major_resistance: Optional[List[float]] = None,
                                  verbose: bool = True) -> bool:
     """
     Convenience function to generate a chart from a DataFrame.
@@ -197,13 +200,14 @@ def generate_chart_from_dataframe(df: pd.DataFrame, symbol: Optional[str] = None
         symbol: Stock symbol (optional, will be extracted from df)
         output_dir: Output directory for chart
         alerts: Optional list of alerts
+        major_resistance: Optional list of major resistance price levels
         verbose: Print detailed information
 
     Returns:
         True if successful, False otherwise
     """
     try:
-        chart_generator = ChartFromDataFrame(df, symbol, output_dir, alerts)
+        chart_generator = ChartFromDataFrame(df, symbol, output_dir, alerts, major_resistance)
         return chart_generator.generate_chart(verbose=verbose)
     except Exception as e:
         if verbose:

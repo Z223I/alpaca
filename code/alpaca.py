@@ -36,6 +36,7 @@ from atoms.display.generate_chart_from_df import generate_chart_from_dataframe
 from atoms.utils.macd_alert_scorer import score_alerts_with_macd, MACDAlertScorer
 from atoms.utils.calculate_macd import calculate_macd
 from atoms.utils.delay import delay
+from atoms.utils.extract_major_resistance import extract_major_resistance
 from atoms.api.parse_args import parse_args
 from atoms.telegram.telegram_post import TelegramPoster
 
@@ -1781,6 +1782,41 @@ class AlpacaPrivate:
             elif all_alerts and not has_sufficient_macd_data:
                 print(f"Skipping MACD scoring for {len(all_alerts)} alerts (insufficient data)")
 
+            # Execute volume profile analysis to generate resistance levels
+            print(f"Generating volume profile for {symbol}...")
+            volume_profile_cmd = [
+                sys.executable,
+                "code/volume_profile.py",
+                "--symbol", symbol,
+                "--days", "1",
+                "--timeframe", "5Min",
+                "--time-per-profile", "DAY",
+                "--chart"  # Generate chart and JSON output
+            ]
+            try:
+                result = subprocess.run(
+                    volume_profile_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=60
+                )
+                if result.returncode == 0:
+                    print("✓ Volume profile generated successfully")
+                    # Show last few lines for JSON path
+                    lines = result.stdout.strip().split('\n')
+                    for line in lines[-3:]:
+                        if 'Volume profile' in line or 'saved:' in line:
+                            print(f"  {line}")
+                else:
+                    print(f"⚠ Volume profile had issues: {result.stderr}")
+            except subprocess.TimeoutExpired:
+                print("⚠ Volume profile generation timed out")
+            except Exception as e:
+                print(f"⚠ Error generating volume profile: {e}")
+
+            # Extract major resistance levels from volume profile
+            major_resistance = extract_major_resistance(symbol, target_date)
+
             # Generate chart using the chart generation atom with centralized plots directory
             output_dir = str(plots_config.get_plots_path())
             success = generate_chart_from_dataframe(
@@ -1788,6 +1824,7 @@ class AlpacaPrivate:
                 symbol=symbol,
                 output_dir=output_dir,  # Use centralized plots directory
                 alerts=all_alerts,  # Include loaded alerts
+                major_resistance=major_resistance,  # Include major resistance levels
                 verbose=True
             )
 
@@ -1796,6 +1833,8 @@ class AlpacaPrivate:
                 print(f"✓ Chart generated successfully: {chart_path}")
                 print(f"  Chart includes:")
                 print(f"    • Price candlesticks with ORB levels, EMA(9), EMA(20), VWAP")
+                if major_resistance:
+                    print(f"    • Major resistance level: ${major_resistance[0]:.2f}")
                 if has_sufficient_macd_data:
                     print(f"    • MACD indicators (12,26,9) with MACD line, Signal line, Histogram")
                 else:

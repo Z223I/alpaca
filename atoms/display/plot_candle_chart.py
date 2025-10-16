@@ -19,7 +19,7 @@ from ..utils.calculate_vwap import calculate_vwap_typical
 from ..utils.calculate_macd import calculate_macd
 
 
-def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', alerts: Optional[List] = None) -> bool:
+def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', alerts: Optional[List] = None, major_resistance: Optional[List[float]] = None) -> bool:
     """
     Create a candlestick chart with volume and ORB rectangle for a single stock symbol.
 
@@ -28,6 +28,7 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
         symbol: Stock symbol name
         output_dir: Directory to save the chart
         alerts: Optional list of alert dictionaries with timestamp_dt, alert_type, and alert_level
+        major_resistance: Optional list of major resistance price levels from volume profile
 
     Returns:
         True if successful, False otherwise
@@ -219,8 +220,17 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
 
         # Add VWAP line if calculation was successful
         if vwap_success:
-            ax1.plot(symbol_data['timestamp'], vwap_values, 
+            ax1.plot(symbol_data['timestamp'], vwap_values,
                     color='purple', linewidth=2, alpha=0.8, label='VWAP')
+
+        # Add major resistance line if provided (highest level)
+        if major_resistance and len(major_resistance) > 0:
+            for resistance_level in major_resistance:
+                ax1.axhline(y=resistance_level, color='lime', linestyle='-',
+                           linewidth=2, alpha=0.7,
+                           label=f'Major Resistance: ${resistance_level:.2f}')
+            print(f"Plotted major resistance level: "
+                  f"${major_resistance[0]:.2f}")
 
         # Setup secondary Y axis for price/ORB high ratio if ORB high is available
         if orb_high is not None and orb_high > 0:
