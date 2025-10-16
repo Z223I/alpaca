@@ -75,7 +75,7 @@ class AlpacaPrivate:
 
         # Parse arguments
         self.args = parse_args(userArgs)
-        
+
         # Set account configuration from command line arguments
         self.account_name = self.args.account_name
         self.account = self.args.account
@@ -98,7 +98,7 @@ class AlpacaPrivate:
         self._setup_logging()
 
         self.active_orders = []
-        
+
         # First trade tracking and position monitoring
         self._first_trade_completed = False
         self._monitoring_process = None
@@ -112,27 +112,27 @@ class AlpacaPrivate:
         """
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         log_filename = f"logs/alpaca/trading_operations_{timestamp}.log"
-        
+
         # Create logger for this instance
         self.logger = logging.getLogger(f'alpaca_trading_{timestamp}')
         self.logger.setLevel(logging.INFO)
-        
+
         # Prevent duplicate handlers if logger already exists
         if not self.logger.handlers:
             # Create file handler
             file_handler = logging.FileHandler(log_filename)
             file_handler.setLevel(logging.INFO)
-            
+
             # Create formatter
             formatter = logging.Formatter(
                 '%(asctime)s - %(levelname)s - %(message)s',
                 datefmt='%Y-%m-%d %H:%M:%S'
             )
             file_handler.setFormatter(formatter)
-            
+
             # Add handler to logger
             self.logger.addHandler(file_handler)
-        
+
         self.logger.info("=" * 80)
         self.logger.info("NEW TRADING SESSION STARTED")
         self.logger.info(f"Account: {getattr(self, 'account_name', 'Unknown')}")
@@ -143,7 +143,7 @@ class AlpacaPrivate:
     def _log_and_print(self, message: str, level: str = 'INFO') -> None:
         """
         Log message to file and print to console.
-        
+
         Args:
             message: Message to log and print
             level: Log level (INFO, WARNING, ERROR)
@@ -341,8 +341,8 @@ class AlpacaPrivate:
 
         # Execute trailing sell with the filled quantity
         sell_order = self._sell_trailing(
-            symbol=symbol, 
-            quantity=filled_qty, 
+            symbol=symbol,
+            quantity=filled_qty,
             trailing_percent=trailing_percent,
             submit_order=True  # Always submit if we got this far
         )
@@ -395,14 +395,14 @@ class AlpacaPrivate:
                 estimated_qty = round(amount / market_price)
             else:
                 estimated_qty = self._calculateQuantity(market_price, "_buy_market_trailing_sell_take_profit_percent")
-            
+
             self._log_and_print(f"\n[DRY RUN] Simulating complete workflow:")
             self._log_and_print(f"  1. Buy Order: Would fill {estimated_qty} shares @ ${market_price:.2f}")
             self._log_and_print(f"  2. Trailing Sell: Would place trailing sell order (default {trailing_percent or 7.5}%)")
             self._log_and_print(f"  3. Trailing Sell Polling: Would monitor for acceptance/rejection")
             self._log_and_print(f"  4. Take Profit: Would place take profit order at {take_profit_percent}% above fill price")
             self._log_and_print(f"  5. Take Profit Polling: Would monitor for acceptance/rejection")
-            
+
             # Show what the take profit order would look like
             self._log_and_print(f"\n[DRY RUN] Take profit order simulation:")
             self._take_profit_percent(
@@ -432,7 +432,7 @@ class AlpacaPrivate:
         # Step 3: Extract filled quantity and average fill price
         filled_qty = int(final_order.filled_qty) if hasattr(final_order, 'filled_qty') else int(final_order.qty)
         filled_avg_price = float(final_order.filled_avg_price) if hasattr(final_order, 'filled_avg_price') and final_order.filled_avg_price else None
-        
+
         self._log_and_print(f"✅ STEP 2: Buy order filled: {filled_qty} shares")
         if filled_avg_price:
             self._log_and_print(f"  Average fill price: ${filled_avg_price:.2f}")
@@ -442,8 +442,8 @@ class AlpacaPrivate:
         # Step 4: Execute trailing sell with the filled quantity
         self._log_and_print(f"🚀 STEP 3: Executing trailing sell order for {filled_qty} shares...")
         sell_order = self._sell_trailing(
-            symbol=symbol, 
-            quantity=filled_qty, 
+            symbol=symbol,
+            quantity=filled_qty,
             trailing_percent=trailing_percent,
             submit_order=True  # Always submit if we got this far
         )
@@ -460,7 +460,7 @@ class AlpacaPrivate:
         # Step 5: Poll trailing sell order status
         self._log_and_print(f"\n🔍 STEP 3: Polling Trailing Sell Order Status ---")
         final_sell_order = self._poll_order_status(sell_order.id, timeout_seconds=30)
-        
+
         if final_sell_order is None:
             self._log_and_print("✗ STEP 3: Trailing sell order polling failed or timeout", 'ERROR')
             sell_status = "polling_failed"
@@ -495,7 +495,7 @@ class AlpacaPrivate:
         # Step 7: Poll take profit order status
         self._log_and_print(f"\n🔍 STEP 4: Polling Take Profit Order Status ---")
         final_take_profit_order = self._poll_order_status(take_profit_order.id, timeout_seconds=30)
-        
+
         if final_take_profit_order is None:
             self._log_and_print("✗ STEP 4: Take profit order polling failed or timeout", 'ERROR')
             take_profit_status = "polling_failed"
@@ -511,7 +511,7 @@ class AlpacaPrivate:
         self._log_and_print(f"✅ Buy Order: FILLED ({filled_qty} shares @ ${filled_avg_price:.2f})")
         self._log_and_print(f"{'✅' if sell_status == 'success' else '❌'} Trailing Sell: {sell_status.upper()}")
         self._log_and_print(f"{'✅' if take_profit_status == 'success' else '❌'} Take Profit: {take_profit_status.upper()}")
-        
+
         overall_success = sell_status == "success" and take_profit_status == "success"
         if overall_success:
             self._log_and_print("✅ ALL ORDERS COMPLETED SUCCESSFULLY!")
@@ -1273,7 +1273,7 @@ class AlpacaPrivate:
         """
         Execute a take profit order at a percentage above the current market price.
 
-        This method creates a limit sell order at a calculated price based on the 
+        This method creates a limit sell order at a calculated price based on the
         current market price plus the specified percentage.
 
         Args:
@@ -1518,52 +1518,52 @@ class AlpacaPrivate:
     def _load_superduper_alerts_for_symbol(self, symbol: str, target_date: date) -> List[Dict[str, Any]]:
         """
         Load sent superduper alerts for a specific symbol and date.
-        
+
         Args:
             symbol: Stock symbol to load alerts for
             target_date: Date to load alerts for
-            
+
         Returns:
             List of alert dictionaries with timestamp_dt, alert_type, and alert_level
         """
         alerts = []
-        
+
         try:
             # Format date as YYYY-MM-DD for directory structure
             date_str = target_date.strftime('%Y-%m-%d')
             alerts_base_dir = os.path.join('historical_data', date_str, 'superduper_alerts_sent')
-            
+
             if not os.path.exists(alerts_base_dir):
                 print(f"No superduper alerts directory found for {target_date}")
                 return alerts
-            
+
             # Check both bullish and bearish alert directories
             for alert_type in ['bullish', 'bearish']:
                 alert_type_dir = os.path.join(alerts_base_dir, alert_type)
-                
+
                 if not os.path.exists(alert_type_dir):
                     continue
-                
+
                 # Check both yellow and green alert levels
                 for alert_level in ['yellow', 'green']:
                     alert_level_dir = os.path.join(alert_type_dir, alert_level)
-                    
+
                     if not os.path.exists(alert_level_dir):
                         continue
-                    
+
                     # Look for superduper alert files matching the symbol
                     alert_pattern = f"superduper_alert_{symbol}_*.json"
                     alert_files = glob.glob(os.path.join(alert_level_dir, alert_pattern))
-                    
+
                     for alert_file in alert_files:
                         try:
                             with open(alert_file, 'r') as f:
                                 alert_data = json.load(f)
-                            
+
                             # Add alert type and level
                             alert_data['alert_type'] = alert_type
                             alert_data['alert_level'] = alert_level
-                            
+
                             # Parse timestamp to datetime object
                             if 'timestamp' in alert_data:
                                 timestamp_str = alert_data['timestamp']
@@ -1571,11 +1571,11 @@ class AlpacaPrivate:
                                     # Handle timezone format: convert -0400 to -04:00 for Python compatibility
                                     if timestamp_str.endswith(('-0400', '-0500')):
                                         timestamp_str = timestamp_str[:-2] + ':' + timestamp_str[-2:]
-                                    
+
                                     # Parse the timestamp - super alerts are in ET timezone with offset
                                     alert_dt = datetime.fromisoformat(timestamp_str)
                                     alert_data['timestamp_dt'] = alert_dt
-                                    
+
                                 except ValueError:
                                     # Fallback: try parsing without timezone, then localize to ET
                                     try:
@@ -1588,21 +1588,21 @@ class AlpacaPrivate:
                                     except ValueError:
                                         print(f"Warning: Could not parse timestamp in {alert_file}")
                                         continue
-                            
+
                             alerts.append(alert_data)
-                            
+
                         except Exception as e:
                             print(f"Warning: Error loading superduper alert file {alert_file}: {e}")
                             continue
-            
+
             # Sort alerts by timestamp
             alerts.sort(key=lambda x: x.get('timestamp_dt', datetime.min.replace(tzinfo=pytz.UTC)))
-            
+
             print(f"Loaded {len(alerts)} superduper alerts for {symbol} on {target_date}")
-            
+
         except Exception as e:
             print(f"Error loading superduper alerts for {symbol} on {target_date}: {e}")
-        
+
         return alerts
 
     def _load_momentum_alerts_for_symbol(self, symbol: str, target_date: date) -> List[Dict[str, Any]]:
@@ -1721,7 +1721,7 @@ class AlpacaPrivate:
                 # Format as RFC3339 with proper timezone format
                 start_str = start_time.strftime('%Y-%m-%dT%H:%M:%S') + start_time.strftime('%z')[:3] + ':' + start_time.strftime('%z')[3:]
                 end_str = end_time.strftime('%Y-%m-%dT%H:%M:%S') + end_time.strftime('%z')[:3] + ':' + end_time.strftime('%z')[3:]
-                
+
                 bars = self.api.get_bars(
                     symbol,
                     tradeapi.TimeFrame.Minute,
@@ -1789,7 +1789,7 @@ class AlpacaPrivate:
                 "code/volume_profile.py",
                 "--symbol", symbol,
                 "--days", "1",
-                "--timeframe", "5Min",
+                "--timeframe", "1Min",
                 "--time-per-profile", "DAY",
                 "--chart"  # Generate chart and JSON output
             ]
@@ -1876,24 +1876,24 @@ class AlpacaPrivate:
     def _isFirstTradeOfDay(self) -> bool:
         """
         Check if position monitoring has already been started today.
-        
+
         Returns:
             True if this is the first trade and monitoring hasn't started today
         """
         current_date = datetime.now(pytz.timezone('America/New_York')).date()
-        
+
         # Reset tracking if it's a new day
         if current_date != self._today_date:
             self._today_date = current_date
             self._first_trade_completed = False
             self._monitoring_started_today = False
-            
+
         return not self._monitoring_started_today
 
     def _startPositionMonitoring(self) -> bool:
         """
         Start position monitoring as a separate subprocess.
-        
+
         Returns:
             True if monitoring was started successfully, False otherwise
         """
@@ -1902,13 +1902,13 @@ class AlpacaPrivate:
             if self._monitoring_process and self._monitoring_process.poll() is None:
                 print("✓ Position monitoring already running")
                 return True
-                
+
             print("🚀 Starting automatic position monitoring...")
-            
+
             # Build command to start position monitoring
             python_path = sys.executable
             script_path = os.path.abspath(__file__)
-            
+
             monitor_cmd = [
                 python_path,
                 script_path,
@@ -1916,9 +1916,9 @@ class AlpacaPrivate:
                 "--account-name", self.account_name,
                 "--account", self.account
             ]
-            
+
             print(f"Command: {' '.join(monitor_cmd)}")
-            
+
             # Start monitoring as subprocess
             self._monitoring_process = subprocess.Popen(
                 monitor_cmd,
@@ -1926,10 +1926,10 @@ class AlpacaPrivate:
                 stderr=subprocess.PIPE,
                 start_new_session=True  # Detach from parent process
             )
-            
+
             # Give it a moment to start
             time.sleep(2)
-            
+
             # Check if process started successfully
             if self._monitoring_process.poll() is None:
                 self._monitoring_started_today = True
@@ -1945,7 +1945,7 @@ class AlpacaPrivate:
                 print(f"STDERR: {stderr.decode()[:200]}...")
                 self._monitoring_process = None
                 return False
-                
+
         except Exception as e:
             print(f"✗ Error starting position monitoring: {str(e)}")
             self._monitoring_process = None
@@ -1954,7 +1954,7 @@ class AlpacaPrivate:
     def _onTradeExecuted(self, trade_result: Any, operation: str) -> None:
         """
         Called after a successful trade execution to trigger monitoring if needed.
-        
+
         Args:
             trade_result: Result from trade execution
             operation: Description of the operation performed
@@ -1963,12 +1963,12 @@ class AlpacaPrivate:
             if trade_result and self._isFirstTradeOfDay():
                 print(f"🎯 First trade of the day executed: {operation}")
                 print("🔄 Automatically starting position monitoring...")
-                
+
                 if self._startPositionMonitoring():
                     print("✅ Position monitoring is now active")
                 else:
                     print("⚠️ Failed to start position monitoring - please start manually")
-                    
+
         except Exception as e:
             print(f"⚠️ Error in post-trade monitoring setup: {str(e)}")
 
@@ -1981,7 +1981,7 @@ class AlpacaPrivate:
             if self._monitoring_process and self._monitoring_process.poll() is None:
                 print("🛑 Cleaning up position monitoring process...")
                 self._monitoring_process.terminate()
-                
+
                 # Give it a few seconds to terminate gracefully
                 try:
                     self._monitoring_process.wait(timeout=5)
@@ -1991,7 +1991,7 @@ class AlpacaPrivate:
                     self._monitoring_process.kill()
                     self._monitoring_process.wait()
                     print("✅ Position monitoring process killed")
-                    
+
                 self._monitoring_process = None
         except Exception as e:
             print(f"⚠️ Error cleaning up monitoring process: {str(e)}")
@@ -1999,7 +1999,7 @@ class AlpacaPrivate:
     def _sendTelegramLiquidationNotification(self, symbol: str, reason: str, macd_details: Dict[str, Any]) -> None:
         """
         Send Telegram notification when a position is liquidated.
-        
+
         Args:
             symbol: Stock symbol that was liquidated
             reason: Reason for liquidation
@@ -2008,10 +2008,10 @@ class AlpacaPrivate:
         try:
             # Use account name directly for Telegram username
             account_holder = self.account_name
-            
+
             # Format the notification message
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            
+
             message = f"""🚨 POSITION LIQUIDATED 🚨
 
 Account: {self.account_name} ({account_holder})
@@ -2028,7 +2028,7 @@ MACD Details:
 • Score: {macd_details.get('score', 'N/A')}/4 ({macd_details.get('color', 'N/A').upper()})
 
 This position was automatically liquidated due to poor MACD conditions."""
-            
+
             # Send notification to the specific account holder
             telegram_poster = TelegramPoster()
             result = telegram_poster.send_message_to_user(
@@ -2036,19 +2036,19 @@ This position was automatically liquidated due to poor MACD conditions."""
                 username=account_holder,
                 urgent=True  # Mark as urgent for liquidation alerts
             )
-            
+
             if result['success']:
                 print(f"    ✓ Telegram notification sent to {account_holder}")
             else:
                 print(f"    ⚠️  Failed to send Telegram notification to {account_holder}: {result['errors']}")
-                
+
         except Exception as e:
             print(f"    ⚠️  Error sending Telegram notification: {str(e)}")
 
     def _sendTelegramLiquidationFailureNotification(self, symbol: str, reason: str, macd_details: Dict[str, Any]) -> None:
         """
         Send Telegram notification when a position liquidation fails.
-        
+
         Args:
             symbol: Stock symbol that failed to liquidate
             reason: Reason for attempted liquidation
@@ -2057,10 +2057,10 @@ This position was automatically liquidated due to poor MACD conditions."""
         try:
             # Use account name directly for Telegram username
             account_holder = self.account_name
-            
+
             # Format the failure notification message
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            
+
             message = f"""⚠️ LIQUIDATION FAILED ⚠️
 
 Account: {self.account_name} ({account_holder})
@@ -2080,7 +2080,7 @@ MACD Details (indicating poor conditions):
 
 ⚠️ MANUAL INTERVENTION REQUIRED ⚠️
 The system attempted to liquidate this position due to poor MACD conditions but the liquidation failed. Please review the position manually and take appropriate action."""
-            
+
             # Send notification to the specific account holder
             telegram_poster = TelegramPoster()
             result = telegram_poster.send_message_to_user(
@@ -2088,50 +2088,50 @@ The system attempted to liquidate this position due to poor MACD conditions but 
                 username=account_holder,
                 urgent=True  # Mark as urgent for failed liquidation alerts
             )
-            
+
             if result['success']:
                 print(f"    ✓ Telegram failure notification sent to {account_holder}")
             else:
                 print(f"    ⚠️  Failed to send Telegram failure notification to {account_holder}: {result['errors']}")
-                
+
         except Exception as e:
             print(f"    ⚠️  Error sending Telegram failure notification: {str(e)}")
 
     def _sendHourlyPositionReport(self, positions, current_time) -> None:
         """
         Send hourly position report via Telegram.
-        
+
         Args:
             positions: List of current positions
             current_time: Current datetime with ET timezone
         """
         try:
             account_holder = self.account_name
-            
+
             # Create position summary
             position_summary = []
             total_market_value = 0
-            
+
             for pos in positions:
                 shares = int(pos.qty)
                 market_value = float(pos.market_value)
                 current_price = float(pos.current_price)
                 unrealized_pnl = float(pos.unrealized_pnl)
                 unrealized_pnl_pct = float(pos.unrealized_plpc) * 100
-                
+
                 total_market_value += market_value
-                
+
                 pnl_emoji = "📈" if unrealized_pnl >= 0 else "📉"
-                
+
                 position_summary.append(
                     f"• {pos.symbol}: {shares:,} shares @ ${current_price:.2f}\n"
                     f"  Value: ${market_value:,.2f} {pnl_emoji} ${unrealized_pnl:+.2f} ({unrealized_pnl_pct:+.1f}%)"
                 )
-            
+
             # Format the report message
             time_str = current_time.strftime('%Y-%m-%d %H:%M:%S ET')
             current_minute = current_time.minute
-            
+
             # Determine if this is top of hour or bottom of hour report
             if current_minute <= 2:
                 report_type = "Top of Hour"
@@ -2141,7 +2141,7 @@ The system attempted to liquidate this position due to poor MACD conditions but 
                 report_type = "Top of Hour (Next)"
             else:
                 report_type = "Position"  # fallback
-            
+
             message = f"""📊 {report_type} Position Report 📊
 
 Account: {self.account_name}
@@ -2156,7 +2156,7 @@ Total Portfolio Value: ${total_market_value:,.2f}
 
 Monitor Status: ✅ Active
 Next Report: {"Top of hour" if current_minute >= 28 else "Bottom of hour"} ({("00" if current_minute >= 28 else "30")})"""
-            
+
             # Send notification
             telegram_poster = TelegramPoster()
             result = telegram_poster.send_message_to_user(
@@ -2164,12 +2164,12 @@ Next Report: {"Top of hour" if current_minute >= 28 else "Bottom of hour"} ({("0
                 username=account_holder,
                 urgent=False
             )
-            
+
             if result['success']:
                 print(f"    ✓ {report_type} position report sent to {account_holder}")
             else:
                 print(f"    ⚠️  Failed to send position report to {account_holder}: {result['errors']}")
-                
+
         except Exception as e:
             print(f"    ⚠️  Error sending hourly position report: {str(e)}")
 
@@ -2181,19 +2181,19 @@ Next Report: {"Top of hour" if current_minute >= 28 else "Bottom of hour"} ({("0
             positions = get_positions(self.api, self.account_name, self.account)
             if not positions:
                 return
-            
+
             account_holder = self.account_name
             closed_positions = []
             failed_positions = []
-            
+
             print(f"Attempting to close {len(positions)} positions...")
-            
+
             for pos in positions:
                 symbol = pos.symbol
                 shares = int(pos.qty)
                 side = "sell" if shares > 0 else "buy"
                 quantity = abs(shares)
-                
+
                 try:
                     # Close the position
                     result = self._liquidate_position(symbol=symbol, submit_order=True)
@@ -2203,11 +2203,11 @@ Next Report: {"Top of hour" if current_minute >= 28 else "Bottom of hour"} ({("0
                     else:
                         failed_positions.append(f"{symbol} ({shares:,} shares)")
                         print(f"    ✗ Failed to close position in {symbol}")
-                        
+
                 except Exception as e:
                     failed_positions.append(f"{symbol} ({shares:,} shares) - Error: {str(e)}")
                     print(f"    ✗ Error closing {symbol}: {str(e)}")
-            
+
             # Calculate daily PNL after position closures
             pnl_section = ""
             try:
@@ -2221,19 +2221,19 @@ Next Report: {"Top of hour" if current_minute >= 28 else "Bottom of hour"} ({("0
                     api_key = os.getenv('ALPACA_API_KEY')
                     secret_key = os.getenv('ALPACA_SECRET_KEY')
                     base_url = os.getenv('ALPACA_BASE_URL', 'https://paper-api.alpaca.markets')
-                
+
                 pnl_client = AlpacaDailyPnL(api_key, secret_key, base_url, self.account_name, self.account)
                 pnl_result = pnl_client.calculate_daily_pnl()
-                
+
                 if pnl_result:
                     # Extract PNL information for Telegram message
                     daily_pnl = pnl_result.get('daily_pnl', 0)
                     daily_pnl_pct = pnl_result.get('daily_pnl_percentage', 0)
                     current_equity = pnl_result.get('current_equity', 0)
                     starting_equity = pnl_result.get('starting_equity', 0)
-                    
+
                     pnl_emoji = "📈" if daily_pnl >= 0 else "📉"
-                    
+
                     pnl_section = f"""
 📊 Daily PNL Summary:
 • Daily P&L: {pnl_emoji} ${daily_pnl:+,.2f} ({daily_pnl_pct:+.2f}%)
@@ -2243,26 +2243,26 @@ Next Report: {"Top of hour" if current_minute >= 28 else "Bottom of hour"} ({("0
                 else:
                     pnl_section = "\n⚠️ PNL calculation unavailable"
                     print("⚠️ PNL calculation returned no data")
-                    
+
             except Exception as e:
                 pnl_section = f"\n❌ PNL calculation failed: {str(e)}"
                 print(f"❌ Error calculating PNL: {str(e)}")
-            
+
             # Send Telegram notification about position closures
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            
+
             success_section = ""
             if closed_positions:
                 success_section = f"""
 ✅ Successfully Closed ({len(closed_positions)}):
 {chr(10).join(f'• {pos}' for pos in closed_positions)}"""
-            
+
             failure_section = ""
             if failed_positions:
                 failure_section = f"""
 ❌ Failed to Close ({len(failed_positions)}):
 {chr(10).join(f'• {pos}' for pos in failed_positions)}"""
-            
+
             message = f"""🚨 ALL POSITIONS CLOSED - Market Close Time 🚨
 
 Account: {self.account_name}
@@ -2272,19 +2272,19 @@ Environment: {self.account}
 Reason: Automatic closure at 15:40 ET{success_section}{failure_section}{pnl_section}
 
 Monitor Status: 🔄 Shutting down after position closure"""
-            
+
             telegram_poster = TelegramPoster()
             result = telegram_poster.send_message_to_user(
                 message=message,
                 username=account_holder,
                 urgent=True
             )
-            
+
             if result['success']:
                 print(f"    ✓ Position closure notification sent to {account_holder}")
             else:
                 print(f"    ⚠️  Failed to send closure notification to {account_holder}: {result['errors']}")
-                
+
         except Exception as e:
             print(f"    ⚠️  Error in _closeAllPositions: {str(e)}")
 
@@ -2295,7 +2295,7 @@ Monitor Status: 🔄 Shutting down after position closure"""
         try:
             account_holder = self.account_name
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            
+
             message = f"""🏁 POSITION MONITOR SHUTDOWN 🏁
 
 Account: {self.account_name}
@@ -2306,33 +2306,33 @@ Reason: All positions closed
 Status: ✅ Monitor stopped automatically
 
 No further position monitoring will occur until restarted."""
-            
+
             telegram_poster = TelegramPoster()
             result = telegram_poster.send_message_to_user(
                 message=message,
                 username=account_holder,
                 urgent=False
             )
-            
+
             if result['success']:
                 print(f"    ✓ Monitor shutdown notification sent to {account_holder}")
             else:
                 print(f"    ⚠️  Failed to send shutdown notification to {account_holder}: {result['errors']}")
-                
+
         except Exception as e:
             print(f"    ⚠️  Error sending shutdown notification: {str(e)}")
 
     def _monitorPositions(self) -> None:
         """
         Monitor positions continuously with enhanced features:
-        
+
         1. Polls positions every minute
         2. Sends hourly Telegram position reports (top and bottom of hour)
         3. Calculates MACD and scores it for each position
         4. Liquidates position if MACD score is red
         5. Closes all positions at 15:40 ET and sends notification
         6. Shuts down monitor when all positions are closed
-        
+
         The polling continues until all positions are closed or stopped manually.
         """
         print("Starting enhanced position monitoring...")
@@ -2343,16 +2343,16 @@ No further position monitoring will occur until restarted."""
         print("- Auto-close all positions at 15:40 ET")
         print("- Auto-shutdown when all positions closed")
         print("=" * 60)
-        
+
         macd_scorer = MACDAlertScorer()
         et_tz = pytz.timezone('America/New_York')
         last_hour_report = None
-        
+
         try:
             while True:
                 try:
                     current_et = datetime.now(et_tz)
-                    
+
                     # Check if it's time to close all positions (15:40 ET)
                     if current_et.hour == 15 and current_et.minute >= 40:
                         positions = get_positions(self.api, self.account_name, self.account)
@@ -2361,14 +2361,14 @@ No further position monitoring will occur until restarted."""
                             self._closeAllPositions()
                             print("Monitor shutting down - All positions closed at market close time")
                             break
-                    
+
                     # Get current positions
                     positions = get_positions(self.api, self.account_name, self.account)
-                    
+
                     # Check if all positions are closed - shutdown monitor
                     if not positions:
                         print(f"[{current_et.strftime('%Y-%m-%d %H:%M:%S ET')}] No positions found")
-                        
+
                         # Send shutdown notification if we had positions before
                         if hasattr(self, '_had_positions'):
                             self._sendTelegramShutdownNotification()
@@ -2377,21 +2377,21 @@ No further position monitoring will occur until restarted."""
                     else:
                         # Mark that we have positions
                         self._had_positions = True
-                        
+
                         # Create a list of unique stock symbols
                         unique_symbols = list(set(pos.symbol for pos in positions))
-                        
+
                         print(f"[{current_et.strftime('%Y-%m-%d %H:%M:%S ET')}] Monitoring {len(unique_symbols)} symbols: {', '.join(unique_symbols)}")
-                        
+
                         # Send position reports twice per hour (top and bottom of hour)
                         current_hour = current_et.hour
                         current_minute = current_et.minute
-                        
+
                         # Check for reports at top of hour (minute 0 ±2) and bottom of hour (minute 30 ±2)
                         is_top_of_hour = current_minute <= 2
                         is_bottom_of_hour = 28 <= current_minute <= 32
                         is_next_hour_prep = current_minute >= 58
-                        
+
                         if is_top_of_hour or is_bottom_of_hour or is_next_hour_prep:
                             # Create unique identifier for each report time
                             if is_top_of_hour:
@@ -2404,12 +2404,12 @@ No further position monitoring will occur until restarted."""
                                 # Next hour prep: use (next_hour) * 100 (e.g., 14:58 -> 1500 for 15:00)
                                 next_hour = (current_hour + 1) % 24
                                 report_id = next_hour * 100
-                            
+
                             # Only send if we haven't sent this specific report already
                             if last_hour_report != report_id:
                                 self._sendHourlyPositionReport(positions, current_et)
                                 last_hour_report = report_id
-                        
+
                         # Process each unique symbol for MACD analysis
                         for symbol in unique_symbols:
                             try:
@@ -2417,13 +2417,13 @@ No further position monitoring will occur until restarted."""
                             except Exception as e:
                                 print(f"  ✗ Error processing {symbol}: {str(e)}")
                                 continue
-                    
+
                     print(f"  Next check in 60 seconds...")
                     print("-" * 40)
-                    
+
                     # Wait for 60 seconds (1 minute polling period)
                     time.sleep(60)
-                    
+
                 except KeyboardInterrupt:
                     print("\nReceived Ctrl+C. Stopping position monitoring...")
                     break
@@ -2432,34 +2432,34 @@ No further position monitoring will occur until restarted."""
                     print("  Waiting 60 seconds before retry...")
                     time.sleep(60)
                     continue
-                    
+
         except KeyboardInterrupt:
             print("\nPosition monitoring stopped by user.")
         except Exception as e:
             print(f"✗ Critical error in position monitoring: {str(e)}")
-            
+
     def _processSymbolForMonitoring(self, symbol: str, macd_scorer: MACDAlertScorer) -> None:
         """
         Process a single symbol for MACD analysis and potential liquidation.
-        
+
         Args:
             symbol: Stock symbol to analyze
             macd_scorer: MACD scorer instance
         """
         print(f"  Processing {symbol}...")
-        
+
         # Collect sufficient data for MACD calculation (need at least 26 periods for default MACD)
         try:
             # Get market data for the last 50 minutes to ensure we have enough data
             et_tz = pytz.timezone('America/New_York')
             end_time = datetime.now(et_tz)
             start_time = end_time - pd.Timedelta(minutes=50)
-            
+
             # Fetch market data using Alpaca API
             # Format as RFC3339 with proper timezone format
             start_str = start_time.strftime('%Y-%m-%dT%H:%M:%S') + start_time.strftime('%z')[:3] + ':' + start_time.strftime('%z')[3:]
             end_str = end_time.strftime('%Y-%m-%dT%H:%M:%S') + end_time.strftime('%z')[:3] + ':' + end_time.strftime('%z')[3:]
-            
+
             bars = self.api.get_bars(
                 symbol,
                 tradeapi.TimeFrame.Minute,
@@ -2468,11 +2468,11 @@ No further position monitoring will occur until restarted."""
                 limit=1000,
                 feed='iex'
             )
-            
+
             if not bars or len(bars) < 26:
                 print(f"    ⚠️  Insufficient market data for {symbol} ({len(bars) if bars else 0} bars, need ≥26)")
                 return
-            
+
             # Convert bars to DataFrame
             market_data = []
             for bar in bars:
@@ -2486,9 +2486,9 @@ No further position monitoring will occur until restarted."""
                     'symbol': symbol
                 }
                 market_data.append(bar_data)
-            
+
             df = pd.DataFrame(market_data)
-            
+
             # Calculate MACD
             macd_success, macd_values = calculate_macd(
                 df,
@@ -2497,49 +2497,49 @@ No further position monitoring will occur until restarted."""
                 signal_length=9,
                 source='close'
             )
-            
+
             if not macd_success:
                 print(f"    ✗ MACD calculation failed for {symbol}")
                 return
-            
+
             # Use the most recent timestamp for scoring
             current_time = datetime.now(et_tz)
-            
+
             # Analyze MACD conditions
             macd_analysis = macd_scorer.calculate_macd_conditions(df, current_time)
-            
+
             if not macd_analysis.get('is_valid', False):
                 print(f"    ✗ MACD analysis failed for {symbol}: {macd_analysis.get('error', 'Unknown error')}")
                 return
-            
+
             # Score the MACD conditions
             score_result = macd_scorer.score_alert(macd_analysis)
-            
+
             # Get current price and MACD values for display
             current_price = float(df.iloc[-1]['close'])
             macd_line = macd_analysis['macd_line']
             signal_line = macd_analysis['signal_line']
             histogram = macd_analysis['histogram']
-            
+
             # Display analysis results
             color_emoji = {'green': '🟢', 'yellow': '🟡', 'red': '🔴'}
             emoji = color_emoji.get(score_result['color'], '❓')
-            
+
             print(f"    {emoji} {symbol}: Price=${current_price:.2f}, MACD={macd_line:.3f}, "
                   f"Signal={signal_line:.3f}, Histogram={histogram:.3f}")
             print(f"    MACD Score: {score_result['color'].upper()} ({score_result['score']}/4) - "
                   f"{score_result['confidence']} confidence")
-            
+
             # If MACD score is red, liquidate the position
             if score_result['color'] == 'red':
                 print(f"    🚨 LIQUIDATING {symbol} - MACD score is RED")
                 print(f"    Reason: {score_result['reasoning']}")
-                
+
                 liquidation_result = self._liquidate_position(
                     symbol=symbol,
                     submit_order=True  # Actually execute the liquidation
                 )
-                
+
                 # Prepare MACD details for notification
                 macd_details = {
                     'macd_line': macd_line,
@@ -2548,10 +2548,10 @@ No further position monitoring will occur until restarted."""
                     'score': score_result['score'],
                     'color': score_result['color']
                 }
-                
+
                 if liquidation_result:
                     print(f"    ✓ Successfully liquidated position in {symbol}")
-                    
+
                     # Send Telegram notification for successful liquidation
                     self._sendTelegramLiquidationNotification(
                         symbol=symbol,
@@ -2560,7 +2560,7 @@ No further position monitoring will occur until restarted."""
                     )
                 else:
                     print(f"    ✗ Failed to liquidate position in {symbol}")
-                    
+
                     # Send Telegram notification for failed liquidation
                     self._sendTelegramLiquidationFailureNotification(
                         symbol=symbol,

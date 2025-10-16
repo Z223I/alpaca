@@ -195,9 +195,8 @@ Momentum alerts: BQ halted. On October 2. Momentum alert does not show it halted
 Use volume profile bulk to produce M/R for momentum alerts.
 
 
-Need an alert for when a symbol hits a price. Maybe use symbol polling.  Use that in conjunction with volume profile to get the prices. Or do that one separately.
+Need an alert for when a symbol hits a price. Maybe use symbol polling.  Use that in conjunction with volume profile to get the prices. Or do that one separately. Need alert when symbol is approaching M/R or do automatically.
 
-Plot, major resistance, using alpaca – – plot
 
 Up the volume on the scanners
 
@@ -205,30 +204,33 @@ Real time charts. Add a bar for the ratio of selling versus buying. Buying to th
 
 
 
+## Momentum Update
+
+- [ ] THINK HARD. Update code/momentum_alerts.py: The code is currently calling market open top gainers repeatedly.  Update the code to call market open top gainers starting at 9:40 ET instead of 10:00 ET.
 
 
 ## Chart Major Resistance
 
 ### Config
 
-- [ ] claude --dangerously-skip-permissions
-- [ ] /login
-- [ ] /commit
-- [ ] Sync changes
-- [ ] /clear
-- [ ] run git switch -c feature/major_resistance
-- [ ] /clear
-- [ ] /read...
+- [X] claude --dangerously-skip-permissions
+- [X] /login
+- [X] /commit
+- [X] Sync changes
+- [X] /clear
+- [X] run git switch -c feature/major_resistance
+- [X] /clear
+- [X] /read...
 
 ### Spec File
 
-- [ ] ULTRATHINK. Implement the instructions in specs/major_resistance.md.
-- [ ] Update to only plot the highest major resistance. 
+- [X] ULTRATHINK. Implement the instructions in specs/major_resistance.md.
+- [X] Update to only plot the highest major resistance.
 - [-] Please put usage examples in the file docstring.
-- [ ] /commit
-- [ ] Publish the branch
-- [ ] run git switch master; merge current branch and verify that all changes are merged.
-- [ ] Sync changes
+- [X] /commit
+- [X] Publish the branch
+- [X] run git switch master; merge current branch and verify that all changes are merged.
+- [X] Sync changes
 
 
 ## Orb.py EOD Update
