@@ -223,7 +223,8 @@ Real time charts. Add a bar for the ratio of selling versus buying. Buying to th
 ### Spec File
 
 - [ ] ULTRATHINK. Implement the instructions in specs/major_resistance.md.
-- [ ] Please put usage examples in the file docstring.
+- [ ] Update to only plot the highest major resistance. 
+- [-] Please put usage examples in the file docstring.
 - [ ] /commit
 - [ ] Publish the branch
 - [ ] run git switch master; merge current branch and verify that all changes are merged.
