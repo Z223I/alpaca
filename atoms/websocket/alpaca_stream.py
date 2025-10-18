@@ -31,17 +31,21 @@ class StreamState(Enum):
 
 @dataclass
 class MarketData:
-    """Market data point from websocket stream."""
+    """Market data point from websocket stream.
+
+    All timestamps are timezone-naive Eastern Time (ET).
+    Volume is measured in individual shares (1 share = 1, NOT thousands).
+    """
     symbol: str
-    timestamp: datetime
-    price: float
-    volume: int
-    high: float
-    low: float
-    close: float
-    trade_count: int
-    vwap: float
-    open: Optional[float] = None
+    timestamp: datetime  # Timezone-naive Eastern Time
+    price: float  # Close price
+    volume: int  # Number of shares traded (individual shares, not thousands)
+    high: float  # High price during bar interval
+    low: float  # Low price during bar interval
+    close: float  # Close price
+    trade_count: int  # Number of trades in bar interval
+    vwap: float  # Volume-weighted average price
+    open: Optional[float] = None  # Open price
 
 
 class AlpacaStreamClient:

@@ -203,10 +203,40 @@ Up the volume on the scanners
 Real time charts. Add a bar for the ratio of selling versus buying. Buying to the right. have L2 and time and sales.
 
 
+## Chart Major Resistance
+
+### Config
+
+- [ ] claude --dangerously-skip-permissions
+- [ ] /login
+- [ ] /commit
+- [ ] Sync changes
+- [ ] /clear
+- [ ] run git switch -c feature/symbol_polling_update
+- [ ] /clear
+- [ ] /read...
+
+### Spec File
+
+- [ ] THINK HARD. Research Alpaca Trading API version 2: Is there a way to obtain Level 2 data for "time and sales"?
+- [ ] Review atoms/api/symbol_polling.py: Does it use the WebSocket subscription?
+- [ ] THINK HARD.  Please updat the script to use the WebSocket subscription.
+- [ ] Did you update the file docstring?  Make sure the README file is mentioned in the file docstring.
+- [ ] THINK HARD.  Time is always to be ET.  Not local.  Also, retrieve the time of the sale from the WebSocket if possible.  Is the date available?
+- [ ] THINK HARD. Add --symbol arg.  When parsing the arg convert to uppercase.  If --symbol, do not read symbols from the files.
+- [ ] What is the units for volume? 1 or 1000.
+- [-] ULTRATHINK. Implement the instructions in specs/major_resistance.md.
+- [ ] Nudge.
+- [-] Please put usage examples in the file docstring.
+- [ ] /commit
+- [ ] Publish the branch
+- [ ] run git switch master; merge current branch and verify that all changes are merged.
+- [ ] Sync changes
+
 
 ## Momentum Update
 
-- [ ] THINK HARD. Update code/momentum_alerts.py: The code is currently calling market open top gainers repeatedly.  Update the code to call market open top gainers starting at 9:40 ET instead of 10:00 ET.
+- [X] THINK HARD. Update code/momentum_alerts.py: The code is currently calling market open top gainers repeatedly.  Update the code to call market open top gainers starting at 9:40 ET instead of 10:00 ET.
 
 
 ## Chart Major Resistance
