@@ -75,6 +75,15 @@ python atoms/api/symbol_polling.py --test
 
 # Different account configuration
 python atoms/api/symbol_polling.py --account-name Dale --account live
+
+# Save market data to CSV files (periodic saves every 60 seconds)
+python atoms/api/symbol_polling.py --symbol AAPL,TSLA --save --verbose
+
+# Save data while monitoring from files
+python atoms/api/symbol_polling.py --save --verbose
+
+# Test mode with data saving (simulated data)
+python atoms/api/symbol_polling.py --symbol AAPL --test --save --verbose
 ```
 
 ### Command Line Arguments
@@ -85,6 +94,7 @@ python atoms/api/symbol_polling.py --account-name Dale --account live
 - `--test` - Test mode with simulated WebSocket data
 - `--date YYYYMMDD` - Use historical data from specific date (e.g., 20251017). If not specified, uses today's date.
 - `--symbol SYMBOL` - Monitor specific symbol(s). Comma-separated for multiple (e.g., `AAPL,GOOGL,MSFT`). Symbols are automatically converted to uppercase. **When specified, symbols are NOT loaded from CSV files.**
+- `--save` - Save stock data to CSV files in `historical_data/{symbol}/YYYY-MM-DD.csv`. Data is saved periodically (every 60 seconds) to avoid excessive I/O operations.
 
 ## Technical Details
 
@@ -201,12 +211,66 @@ python atoms/api/symbol_polling.py --symbol AAPL --verbose
 
 **Note:** When `--symbol` is specified, `--date` has no effect on symbol loading (since files are not read). However, `--date` may still be useful for other date-dependent features.
 
+### Data Persistence (`--save`)
+
+Use the `--save` flag to automatically save all received market data to CSV files:
+
+```bash
+# Save data while monitoring specific symbols
+python atoms/api/symbol_polling.py --symbol AAPL,TSLA --save --verbose
+
+# Save data from file-based symbol lists
+python atoms/api/symbol_polling.py --save --verbose
+
+# Test mode with data saving
+python atoms/api/symbol_polling.py --test --save --verbose
+```
+
+**File Structure:**
+- Path: `historical_data/{symbol}/YYYY-MM-DD.csv`
+- Example: `historical_data/AAPL/2025-10-17.csv`
+- Directories are created automatically as needed
+
+**CSV Format:**
+```csv
+timestamp,price,volume,high,low,open,close,vwap,trade_count
+2025-10-17 09:30:00,178.25,1500,178.30,178.20,178.22,178.25,178.24,15
+2025-10-17 09:31:00,178.50,2300,178.55,178.25,178.25,178.50,178.42,23
+```
+
+**How it works:**
+- **Periodic Saving**: Data is saved every 60 seconds (not on every trade)
+  - Reduces file I/O operations
+  - Prevents file corruption from excessive writes
+  - Balances data safety with performance
+- **Buffering**: Incoming market data is buffered in memory
+- **Append Mode**: Data is appended to existing files (no overwrites)
+- **Headers**: CSV headers are written only when creating new files
+- **Final Save**: All remaining buffered data is saved when stopping (Ctrl+C)
+- **Date Determination**: Uses the bar's timestamp date (not current system date)
+  - Ensures correct file placement for overnight/extended hours trading
+
+**Use Cases:**
+- Building historical trade databases
+- Backtesting with real intraday data
+- Volume/price pattern analysis
+- Creating training datasets for ML models
+- Archiving daily trading activity
+
+**Important Notes:**
+- Data format matches Alpaca's bar data structure
+- All timestamps are in Eastern Time (ET)
+- Volume is in individual shares (not thousands)
+- Files are symbol-specific for easier analysis
+- Works in both live and test modes
+
 ### Async Architecture
 
 The system uses Python `asyncio` for concurrent operations:
 - **Main loop**: WebSocket message processing
 - **Update loop**: Symbol list monitoring
 - **File watcher**: Background file system monitoring
+- **Save loop**: Periodic data persistence (when `--save` is enabled)
 
 All operations run concurrently without blocking.
 
@@ -273,5 +337,7 @@ TRADE: RPGL | Price: $467.63 | Volume: 6490 | Time: 13:41:23
 Potential improvements:
 - Add quote subscriptions (bid/ask data)
 - Support for trade-level data (message type "t" instead of "b")
-- Database storage for historical time & sales
+- Database storage for historical time & sales (in addition to CSV)
 - Alert triggers based on volume/price patterns
+- Configurable save interval (currently fixed at 60 seconds)
+- Data compression for saved CSV files (gzip)

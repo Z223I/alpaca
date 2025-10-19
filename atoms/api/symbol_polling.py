@@ -40,6 +40,12 @@ Usage Examples:
     # Production usage with default settings (Bruce/paper account)
     python atoms/api/symbol_polling.py
 
+    # Save market data to CSV files (periodic saves every 60 seconds)
+    python atoms/api/symbol_polling.py --symbol AAPL,TSLA --save --verbose
+
+    # Save data while monitoring from files
+    python atoms/api/symbol_polling.py --save --verbose
+
 Features:
     - Loads symbols from data/{YYYYMMDD}.csv files
     - Monitors gainers_nasdaq_amex.csv for real-time updates
@@ -49,6 +55,7 @@ Features:
     - Automatic subscription updates when symbol list changes
     - Sub-second latency for price updates
     - Async/await architecture for efficient concurrent operations
+    - Optional CSV data persistence with --save flag (periodic saves every 60s)
 
 Architecture:
     - Uses AlpacaStreamClient from atoms/websocket/alpaca_stream.py
@@ -266,12 +273,14 @@ class PricePoller:
     """Handles real-time price monitoring using WebSocket streams."""
 
     def __init__(self, account_name='Bruce', account='paper',
-                 verbose=False, test_mode=False, target_date=None, symbols_override=None):
+                 verbose=False, test_mode=False, target_date=None, symbols_override=None,
+                 save_data=False):
         self.account_name = account_name
         self.account = account
         self.verbose = verbose
         self.test_mode = test_mode
         self.target_date = target_date
+        self.save_data = save_data
         self.symbol_manager = SymbolManager(test_mode=test_mode,
                                             verbose=verbose,
                                             target_date=target_date,
@@ -280,6 +289,9 @@ class PricePoller:
         self.running = False
         self.observer = None
         self.current_symbols = set()
+
+        # Data buffering for periodic saves
+        self.data_buffer = {}  # {symbol: [list of data rows]}
 
         # Initialize WebSocket stream client
         if not test_mode:
@@ -339,6 +351,96 @@ class PricePoller:
         except Exception as e:
             print(f"Warning: Could not setup file monitoring: {e}")
 
+    def save_buffered_data(self):
+        """
+        Save buffered data to CSV files.
+
+        Data is saved to historical_data/{symbol}/YYYY-MM-DD.csv
+        Files are created with headers if they don't exist, otherwise data is appended.
+        """
+        if not self.save_data or not self.data_buffer:
+            return
+
+        saved_count = 0
+        for symbol, data_rows in self.data_buffer.items():
+            if not data_rows:
+                continue
+
+            try:
+                # Use the first row's timestamp to determine the date
+                # All rows should be from the same date in practice
+                first_timestamp = data_rows[0]['timestamp']
+
+                # Handle both datetime objects and strings
+                if isinstance(first_timestamp, datetime.datetime):
+                    date_str = first_timestamp.strftime('%Y-%m-%d')
+                else:
+                    # String format: "YYYY-MM-DD HH:MM:SS"
+                    date_str = first_timestamp.split(' ')[0]
+
+                # Create directory path: historical_data/{symbol}/
+                symbol_dir = os.path.join(project_root, 'historical_data', symbol)
+                os.makedirs(symbol_dir, exist_ok=True)
+
+                # File path: historical_data/{symbol}/YYYY-MM-DD.csv
+                file_path = os.path.join(symbol_dir, f'{date_str}.csv')
+
+                # Check if file exists to determine if we need to write headers
+                file_exists = os.path.exists(file_path)
+
+                # Write to CSV
+                with open(file_path, 'a', newline='') as f:
+                    fieldnames = ['timestamp', 'price', 'volume', 'high', 'low',
+                                  'open', 'close', 'vwap', 'trade_count']
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+
+                    # Write header only if file doesn't exist
+                    if not file_exists:
+                        writer.writeheader()
+
+                    # Normalize timestamps to strings before writing
+                    normalized_rows = []
+                    for row in data_rows:
+                        normalized_row = row.copy()
+                        if isinstance(row['timestamp'], datetime.datetime):
+                            normalized_row['timestamp'] = row['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
+                        normalized_rows.append(normalized_row)
+
+                    # Write all buffered rows
+                    writer.writerows(normalized_rows)
+
+                saved_count += len(data_rows)
+
+                if self.verbose:
+                    print(f"Saved {len(data_rows)} rows for {symbol} to {file_path}")
+
+            except Exception as e:
+                print(f"Error saving data for {symbol}: {e}")
+
+        # Clear the buffer after saving
+        self.data_buffer.clear()
+
+        if self.verbose and saved_count > 0:
+            print(f"Total saved: {saved_count} data points")
+
+    async def periodic_save_task(self):
+        """
+        Periodically save buffered data every 60 seconds.
+
+        This reduces I/O operations while ensuring data is not lost.
+        """
+        save_interval = 60  # seconds
+
+        while self.running:
+            await asyncio.sleep(save_interval)
+
+            if self.data_buffer:
+                if self.verbose:
+                    total_rows = sum(len(rows) for rows in self.data_buffer.values())
+                    print(f"Saving {total_rows} buffered data points...")
+
+                self.save_buffered_data()
+
     def handle_market_data(self, data: MarketData):
         """
         Handle incoming market data from WebSocket stream.
@@ -360,6 +462,26 @@ class PricePoller:
         # Volume is displayed as individual shares (not thousands)
         print(f"TRADE: {data.symbol} | Price: ${price_display} | "
               f"Volume: {data.volume:,} | Time: {time_display}")
+
+        # Buffer data for periodic saving if --save is enabled
+        if self.save_data:
+            if data.symbol not in self.data_buffer:
+                self.data_buffer[data.symbol] = []
+
+            # Create row dictionary matching CSV fieldnames
+            row = {
+                'timestamp': data.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                'price': data.price,
+                'volume': data.volume,
+                'high': data.high,
+                'low': data.low,
+                'open': data.open if data.open is not None else data.price,
+                'close': data.close,
+                'vwap': data.vwap,
+                'trade_count': data.trade_count
+            }
+
+            self.data_buffer[data.symbol].append(row)
 
     async def update_subscriptions(self):
         """Monitor symbol list and update WebSocket subscriptions when changed."""
@@ -424,12 +546,20 @@ class PricePoller:
 
             if self.verbose:
                 print(f"WebSocket streaming started for {len(symbols)} symbols")
+                if self.save_data:
+                    print(f"Data saving enabled: historical_data/{{symbol}}/YYYY-MM-DD.csv (every 60s)")
 
-            # Run subscription updater and listener concurrently
-            await asyncio.gather(
+            # Run subscription updater, listener, and periodic saver concurrently
+            tasks = [
                 self.update_subscriptions(),
                 self.stream_client.listen()
-            )
+            ]
+
+            # Add periodic save task if --save is enabled
+            if self.save_data:
+                tasks.append(self.periodic_save_task())
+
+            await asyncio.gather(*tasks)
 
         except Exception as e:
             print(f"Error in WebSocket stream: {e}")
@@ -452,6 +582,13 @@ class PricePoller:
 
         print(f"TEST MODE: Simulating WebSocket stream for {len(symbols)} symbols")
         print(f"First 5 symbols: {list(symbols)[:5]}")
+        if self.save_data:
+            print(f"Data saving enabled: historical_data/{{symbol}}/YYYY-MM-DD.csv (every 60s)")
+
+        # Start periodic save task if --save is enabled
+        save_task = None
+        if self.save_data:
+            save_task = asyncio.create_task(self.periodic_save_task())
 
         # Simulate real-time updates
         while self.running:
@@ -463,9 +600,34 @@ class PricePoller:
 
                 price = random.uniform(50, 500)
                 volume = random.randint(100, 10000)
+                high = price + random.uniform(0, 5)
+                low = price - random.uniform(0, 5)
+                open_price = price + random.uniform(-2, 2)
+                close = price
+                vwap = price + random.uniform(-1, 1)
+                trade_count = random.randint(1, 100)
 
                 print(f"TRADE: {symbol} | Price: ${price:.2f} | "
                       f"Volume: {volume} | Time: {time_display}")
+
+                # Buffer data for periodic saving if --save is enabled
+                if self.save_data:
+                    if symbol not in self.data_buffer:
+                        self.data_buffer[symbol] = []
+
+                    row = {
+                        'timestamp': timestamp_et,  # Store as datetime object for save_buffered_data
+                        'price': price,
+                        'volume': volume,
+                        'high': high,
+                        'low': low,
+                        'open': open_price,
+                        'close': close,
+                        'vwap': vwap,
+                        'trade_count': trade_count
+                    }
+
+                    self.data_buffer[symbol].append(row)
 
             await asyncio.sleep(2)
 
@@ -474,6 +636,14 @@ class PricePoller:
             if new_symbols != symbols:
                 print(f"\nSymbol list updated: {len(symbols)} -> {len(new_symbols)} symbols")
                 symbols = new_symbols
+
+        # Cancel the save task if it was created
+        if save_task:
+            save_task.cancel()
+            try:
+                await save_task
+            except asyncio.CancelledError:
+                pass
 
     async def run(self):
         """Start the price monitoring system."""
@@ -487,6 +657,14 @@ class PricePoller:
     async def stop(self):
         """Stop the WebSocket streaming and file monitoring."""
         self.running = False
+
+        # Save any remaining buffered data before stopping
+        if self.save_data and self.data_buffer:
+            if self.verbose:
+                total_rows = sum(len(rows) for rows in self.data_buffer.values())
+                print(f"Saving final {total_rows} buffered data points...")
+            self.save_buffered_data()
+
         if self.stream_client:
             await self.stream_client.disconnect()
         if self.observer:
@@ -517,6 +695,9 @@ def parse_args():
                         '(e.g., AAPL or AAPL,GOOGL,MSFT - NO SPACES, or use quotes: "AAPL, GOOGL, MSFT"). '
                         'Symbols are automatically converted to uppercase. '
                         'When specified, symbols are NOT read from files.')
+    parser.add_argument('--save', action='store_true',
+                        help='Save stock data to CSV files in historical_data/{symbol}/YYYY-MM-DD.csv. '
+                        'Data is saved periodically (every 60 seconds) to avoid excessive I/O.')
 
     return parser.parse_args()
 
@@ -581,7 +762,8 @@ async def main_async():
         verbose=args.verbose,
         test_mode=args.test,
         target_date=args.date,
-        symbols_override=symbols_override
+        symbols_override=symbols_override,
+        save_data=args.save
     )
 
     try:

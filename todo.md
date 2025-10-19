@@ -203,35 +203,41 @@ Up the volume on the scanners
 Real time charts. Add a bar for the ratio of selling versus buying. Buying to the right. have L2 and time and sales.
 
 
-## Chart Major Resistance
+## Symbol Polling Update II
+
+- [ ] THINK HARD. Update atoms/api/symbol_polling.py:  Add --save arg. When --save is present, save the stock data on a per symbol basis in a csv file
+using the path historical_data/{symbol}/YYYY-MM-DD.csv.  You choose if it is best to save the data continuously or periodically.
+
+
+## Symbol Polling Update
 
 ### Config
 
-- [ ] claude --dangerously-skip-permissions
-- [ ] /login
-- [ ] /commit
-- [ ] Sync changes
-- [ ] /clear
-- [ ] run git switch -c feature/symbol_polling_update
-- [ ] /clear
-- [ ] /read...
+- [X] claude --dangerously-skip-permissions
+- [X] /login
+- [X] /commit
+- [X] Sync changes
+- [X] /clear
+- [X] run git switch -c feature/symbol_polling_update
+- [X] /clear
+- [X] /read...
 
 ### Spec File
 
-- [ ] THINK HARD. Research Alpaca Trading API version 2: Is there a way to obtain Level 2 data for "time and sales"?
-- [ ] Review atoms/api/symbol_polling.py: Does it use the WebSocket subscription?
-- [ ] THINK HARD.  Please updat the script to use the WebSocket subscription.
-- [ ] Did you update the file docstring?  Make sure the README file is mentioned in the file docstring.
-- [ ] THINK HARD.  Time is always to be ET.  Not local.  Also, retrieve the time of the sale from the WebSocket if possible.  Is the date available?
-- [ ] THINK HARD. Add --symbol arg.  When parsing the arg convert to uppercase.  If --symbol, do not read symbols from the files.
-- [ ] What is the units for volume? 1 or 1000.
+- [X] THINK HARD. Research Alpaca Trading API version 2: Is there a way to obtain Level 2 data for "time and sales"?
+- [X] Review atoms/api/symbol_polling.py: Does it use the WebSocket subscription?
+- [X] THINK HARD.  Please updat the script to use the WebSocket subscription.
+- [X] Did you update the file docstring?  Make sure the README file is mentioned in the file docstring.
+- [X] THINK HARD.  Time is always to be ET.  Not local.  Also, retrieve the time of the sale from the WebSocket if possible.  Is the date available?
+- [X] THINK HARD. Add --symbol arg.  When parsing the arg convert to uppercase.  If --symbol, do not read symbols from the files.
+- [X] What is the units for volume? 1 or 1000.
 - [-] ULTRATHINK. Implement the instructions in specs/major_resistance.md.
-- [ ] Nudge.
+- [X] Nudge.
 - [-] Please put usage examples in the file docstring.
-- [ ] /commit
-- [ ] Publish the branch
-- [ ] run git switch master; merge current branch and verify that all changes are merged.
-- [ ] Sync changes
+- [X] /commit
+- [X] Publish the branch
+- [X] run git switch master; merge current branch and verify that all changes are merged.
+- [X] Sync changes
 
 
 ## Momentum Update
@@ -318,7 +324,7 @@ Also, update the /help command to match.
 
 ## Top Gainers Update
 
-- [ ] ULTRATHINK.  Update code/market_open_top_gainers.py: Before saving the CSV file or during, round all the float values to two decimal places.
+- [X] ULTRATHINK.  Update code/market_open_top_gainers.py: Before saving the CSV file or during, round all the float values to two decimal places.
 
 ## Momentum Alerts Filter Volume
 
@@ -425,7 +431,7 @@ These are the fields that can be modified:
   max_trades_per_day=1
 
 - [X] ULTRATHINK.  Update molecules/telegram_polling.py: Only Bruce can send the command 'configure alpaca' case insensitive. It can accept the same args as code/configure_alpaca.py. It is to run code/configure_alpaca.py with the matching args. Add command to help but only for Bruce.
-- [ ] THINK HARD. Review and update the polling script.  Telegram changes double hyphens. Accept single hyphens for the cli args.
+- [X] THINK HARD. Review and update the polling script.  Telegram changes double hyphens. Accept single hyphens for the cli args.
 
 ## Dial Down Momentum Alerts
 
