@@ -205,8 +205,9 @@ Real time charts. Add a bar for the ratio of selling versus buying. Buying to th
 
 ## Symbol Polling Update II
 
-- [ ] THINK HARD. Update atoms/api/symbol_polling.py:  Add --save arg. When --save is present, save the stock data on a per symbol basis in a csv file
+- [X] THINK HARD. Update atoms/api/symbol_polling.py:  Add --save arg. When --save is present, save the stock data on a per symbol basis in a csv file
 using the path historical_data/{symbol}/YYYY-MM-DD.csv.  You choose if it is best to save the data continuously or periodically.
+- [X] Update the .md file and the file docstring.
 
 
 ## Symbol Polling Update
