@@ -32,6 +32,7 @@ from atoms.display.print_cash import print_cash
 from atoms.display.print_orders import print_active_orders
 from atoms.display.print_positions import print_positions
 from atoms.display.print_quote import print_quote
+from atoms.display.print_top_movers import print_top_movers
 from atoms.display.generate_chart_from_df import generate_chart_from_dataframe
 from atoms.utils.macd_alert_scorer import score_alerts_with_macd, MACDAlertScorer
 from atoms.utils.calculate_macd import calculate_macd
@@ -2626,7 +2627,7 @@ No further position monitoring will occur until restarted."""
                 return 1
 
         # Handle display-only arguments
-        display_args = [self.args.positions, self.args.cash, self.args.active_order]
+        display_args = [self.args.positions, self.args.cash, self.args.active_order, self.args.top_gainers]
         if any(display_args):
             # Only show requested information
             if self.args.positions:
@@ -2635,6 +2636,10 @@ No further position monitoring will occur until restarted."""
                 print_cash(self.api, self.account_name, self.account)
             if self.args.active_order:
                 print_active_orders(self.api)
+            if self.args.top_gainers:
+                success = print_top_movers(self.api, 'stocks', self.account_name, self.account)
+                if not success:
+                    return 1
             return 0  # Exit early for display-only operations
 
         # Default behavior: show all information for other operations
