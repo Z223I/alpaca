@@ -84,6 +84,8 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
                       help='Display active orders only')
     parser.add_argument('--top-gainers', action='store_true',
                       help='Display top market gainers and losers')
+    parser.add_argument('--limit', type=int, required=False,
+                      help='Number of results to return for --top-gainers (default: 10)')
 
     # PNL report argument
     parser.add_argument('--PNL', action='store_true',
@@ -273,12 +275,19 @@ def parse_args(userArgs: Optional[List[str]]) -> argparse.Namespace:
         if args.take_profit_percent <= 0:
             parser.error("--take-profit-percent must be greater than 0")
 
+    # Validate limit argument
+    if args.limit is not None:
+        if not args.top_gainers:
+            parser.error("--limit can only be used with --top-gainers")
+        if args.limit <= 0:
+            parser.error("--limit must be greater than 0")
+
     # Validate display-only arguments
     display_args = [args.positions, args.cash, args.active_order, args.top_gainers]
     if any(display_args):
-        # Check if any non-display arguments are present (excluding account configuration)
+        # Check if any non-display arguments are present (excluding account configuration and limit)
         for arg_name, arg_value in vars(args).items():
-            if arg_name not in ['positions', 'cash', 'active_order', 'top_gainers', 'account_name', 'account']:
+            if arg_name not in ['positions', 'cash', 'active_order', 'top_gainers', 'limit', 'account_name', 'account']:
                 # Check if argument has been set to non-default value
                 if isinstance(arg_value, bool) and arg_value:
                     parser.error("Display-only arguments (--positions, --cash, --active-order, --top-gainers) cannot be combined with other operations")

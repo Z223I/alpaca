@@ -378,12 +378,11 @@ volume surge - Run comprehensive volume surge analysis on NASDAQ/AMEX stocks
   • Identifies 5%+ price changes with 5x volume surge over 50 days
   • Returns detailed CSV results (may take up to 10 minutes)
 
-🚀 Top Gainers Scanner:
-top gainers - Find the top 40 gaining stocks on NASDAQ/AMEX exchanges
-  • Scans up to 7,000 symbols
-  • Filters stocks $0.75-$40.00 with 250K+ volume
-  • Returns top 40 gainers with detailed metrics
-  • Returns formatted CSV results (may take up to 10 minutes)
+🚀 Top Gainers:
+top gainers - Display top 40 market gainers from Alpaca
+  • Shows top 40 gaining stocks with price, change, and % change
+  • Real-time data from Alpaca's market screener API
+  • Results returned instantly (under 1 minute)
 
 🌅 Premarket Top Gainers Scanner:
 premarket top gainers - Find top 40 premarket gaining stocks on NASDAQ/AMEX
@@ -616,17 +615,17 @@ the prior trading day results will be given.
             self._send_response(chat_id, f"❌ Error executing volume surge command: {str(e)}")
 
     def _handle_top_gainers_command(self, chat_id: str, username: str, first_name: str, last_name: str, text: str):
-        """Handle 'top gainers' command to run alpaca_screener.py."""
+        """Handle 'top gainers' command to run alpaca.py --top-gainers --limit 40."""
         try:
             display_name = f"{first_name} {last_name}".strip() or username or f"User_{chat_id[-4:]}"
             self._log(f"🚀 Top gainers command from {display_name}: {text}")
 
             # Send processing message
-            message = "🚀 Running top gainers scanner... This may take up to 10 minutes."
+            message = "🚀 Fetching top 40 gainers and losers from Alpaca..."
             self._send_response(chat_id, message)
 
-            # Execute alpaca_screener.py script
-            result = self._execute_top_gainers_command()
+            # Execute alpaca.py --top-gainers --limit 40
+            result = self._execute_alpaca_top_gainers_command()
 
             # Send result back to user
             self._send_response(chat_id, result)
@@ -1083,6 +1082,52 @@ the prior trading day results will be given.
             return "❌ Oracle Signal command timed out after 60 seconds"
         except Exception as e:
             return f"❌ Error executing Oracle Signal command: {str(e)}"
+
+    def _execute_alpaca_top_gainers_command(self) -> str:
+        """Execute code/alpaca.py --top-gainers --limit 40 and return output."""
+        try:
+            import subprocess
+
+            # Get project root directory
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            alpaca_script = os.path.join(project_root, 'code', 'alpaca.py')
+
+            # Use conda environment python to execute the script
+            python_path = os.path.expanduser('~/miniconda3/envs/alpaca/bin/python')
+
+            # Build command: alpaca.py --top-gainers --limit 40
+            cmd = [
+                python_path, alpaca_script,
+                '--top-gainers',
+                '--limit', '40'
+            ]
+
+            # Execute command with 60 second timeout
+            result = subprocess.run(
+                cmd,
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+
+            # Get output
+            output = result.stdout.strip()
+            error_output = result.stderr.strip()
+
+            if result.returncode == 0:
+                if output:
+                    return f"🚀 Top Gainers (Top 40):\n```\n{output}\n```"
+                else:
+                    return "🚀 Top Gainers executed successfully (no output)"
+            else:
+                error_msg = error_output if error_output else output
+                return f"❌ Top Gainers failed (exit code: {result.returncode}):\n```\n{error_msg}\n```"
+
+        except subprocess.TimeoutExpired:
+            return "❌ Top Gainers command timed out after 60 seconds"
+        except Exception as e:
+            return f"❌ Error executing Top Gainers command: {str(e)}"
 
     def _execute_volume_surge_command(self) -> str:
         """Execute alpaca_screener.py command and return output with CSV file contents."""

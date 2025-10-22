@@ -2637,7 +2637,8 @@ No further position monitoring will occur until restarted."""
             if self.args.active_order:
                 print_active_orders(self.api)
             if self.args.top_gainers:
-                success = print_top_movers(self.api, 'stocks', self.account_name, self.account)
+                top = self.args.limit if self.args.limit else 10
+                success = print_top_movers(self.api, 'stocks', top, self.account_name, self.account)
                 if not success:
                     return 1
             return 0  # Exit early for display-only operations

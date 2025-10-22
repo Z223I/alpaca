@@ -10,7 +10,7 @@ from typing import Any, Dict, Optional
 from .api_error_handler import handle_requests_api_error
 
 
-def get_top_movers(api_client: Any, market_type: str = 'stocks',
+def get_top_movers(api_client: Any, market_type: str = 'stocks', top: int = 10,
                    account_name: str = None, environment: str = None) -> Optional[Dict]:
     """
     Get top market movers (gainers and losers) from Alpaca screener API.
@@ -18,6 +18,7 @@ def get_top_movers(api_client: Any, market_type: str = 'stocks',
     Args:
         api_client: Alpaca API client instance
         market_type: Market type - 'stocks' or 'crypto' (default: 'stocks')
+        top: Number of top movers to return (default: 10)
         account_name: Account name for debugging context (optional)
         environment: Environment for debugging context (optional)
 
@@ -53,8 +54,13 @@ def get_top_movers(api_client: Any, market_type: str = 'stocks',
             "APCA-API-SECRET-KEY": api_secret
         }
 
+        # Set up query parameters
+        params = {
+            "top": top
+        }
+
         # Make the API request
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url, headers=headers, params=params, timeout=10)
 
         # Handle errors using the centralized error handler
         if response.status_code != 200:
