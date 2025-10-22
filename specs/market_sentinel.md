@@ -1,4 +1,4 @@
-# Market Sentinal
+# Market Sentinel
 
 ## High Level Requirements
 
@@ -7,14 +7,14 @@ You will be using Python and Flask to be compatible with GoDaddy websites.  I wi
 
 ## Mid Level Requirements
 
-Create ./public_html/index.html to be the "Market Sentinal" web interface.
+Create ./public_html/index.html to be the "Market Sentinel" web interface.
 
 Use ONLY standard GoDaddy directories:
   - public_html/
   - cgi-bin/ (Using atoms/molecules directory structure.)
   - logs/
 
-Create README_market_sentinal.md and keep meaningful notes to yourself about this project.  We will be building this project in steps.
+Create README_market_sentinel.md and keep meaningful notes to yourself about this project.  We will be building this project in steps.
 
 Any Alpaca related code that is an atom is to go into ./cgi-bin/atoms/api.  Existing code is in ./atoms/api.
 
@@ -48,12 +48,32 @@ Test.
 
 Create index.html
 
-### Create "Sentinal" Panel
+### Create "Sentinel" Panel
 
-Create a "Sentinal" panel.
+Create a "Sentinel" panel.
 
 Columns:
 Symbol, "% Gain from Close", "% Gain from Open", "% Vol Surge", "News"
+
+#### Symbol
+
+Use symbols from historical_data/YYYY-MM-DD/premarket/gainers_nasdaq_amex.csv. This file is static for the day.
+Header:
+symbol,current_price,previous_close,gain_percent,premarket_volume,premarket_high,premarket_low,premarket_range,dollar_volume,total_premarket_bars,current_timestamp
+
+Also use the symbols from historical_data/YYYY-MM-DD/scanner/relative_volume_nasdaq_amex.csv. This file changes throughout the day.
+Use a file watchdog to detect changes.
+Header:
+symbol,price,volume,percent_change,dollar_volume,day_range,timestamp,trades,avg_volume_5d,avg_range_5d,volume_surge_detected,volume_surge_ratio
+
+If it exists, also use data/YYYYMMDD.csv.
+Header:
+Symbol,Signal,Long Delta,Resistance,Max,Last,%Chg,Volume,Float,Mkt Cap
+
+
+#### News
+
+This is a tri-state button or checkbox.  Values "Yes", "No", "Unk".  Defaults to "Unk" for unknown.
 
 
 Top gainers since last close

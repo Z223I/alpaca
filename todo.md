@@ -203,6 +203,14 @@ Up the volume on the scanners
 Real time charts. Add a bar for the ratio of selling versus buying. Buying to the right. have L2 and time and sales.
 
 
+
+## Top Gainers
+
+- [X] top gainers as an atom
+- [ ] ULTRATHINK. Update molecules/telegram_polling.py:  Add a new command "Top Gainers" case insensitive.  Call code/alpaca.py --top-gainers --limit 40.  Add the new command to the /help documentation.
+- [ ] Update the atom to only display the top gainers.  I do not want to see the top losers.
+
+
 ## Symbol Polling Update II
 
 - [X] THINK HARD. Update atoms/api/symbol_polling.py:  Add --save arg. When --save is present, save the stock data on a per symbol basis in a csv file
