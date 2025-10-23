@@ -10,7 +10,7 @@ Process:
 2. Monitor: Watch for CSV file creation in ./historical_data/{YYYY-MM-DD}/market/gainers_nasdaq_amex.csv
 3. Stock monitoring: Every minute, collect 30 minutes of 1-minute candlesticks for each stock
 4. Momentum alerts: Check stocks above VWAP, above EMA9, and pass urgency filter
-5. Integration: Send alerts to Bruce via Telegram
+5. Integration: Send alerts to all users with momentum_alerts=true via Telegram
 
 Usage:
     python3 code/momentum_alerts.py
@@ -40,6 +40,7 @@ from atoms.api.init_alpaca_client import init_alpaca_client
 from atoms.api.stock_halt_detector import is_stock_halted, get_halt_status_emoji
 from atoms.alerts.breakout_detector import BreakoutDetector
 from atoms.telegram.telegram_post import TelegramPoster
+from atoms.telegram.user_manager import UserManager
 from code.momentum_alerts_config import (
     get_momentum_alerts_config, get_volume_color_emoji,
     get_momentum_standard_color_emoji, get_momentum_short_color_emoji,
@@ -101,6 +102,7 @@ class MomentumAlertsSystem:
         # Initialize components
         self.breakout_detector = BreakoutDetector()
         self.telegram_poster = TelegramPoster()
+        self.user_manager = UserManager()
         self.momentum_config = get_momentum_alerts_config()
 
         # Tracking
@@ -800,7 +802,7 @@ class MomentumAlertsSystem:
 
     async def _send_momentum_alert(self, alert_data: Dict):
         """
-        Send momentum alert to Bruce via Telegram.
+        Send momentum alert to all users with momentum_alerts=true via Telegram.
 
         Args:
             alert_data: Alert information dictionary
@@ -845,17 +847,53 @@ class MomentumAlertsSystem:
             if self.test_mode:
                 self.logger.info(f"[TEST MODE] {message}")
             else:
-                # Send to Bruce
-                result = self.telegram_poster.send_message_to_user(message, "bruce", urgent=False)
+                # Get all users with momentum_alerts=true
+                momentum_users = self.user_manager.get_momentum_alert_users()
 
-                if result['success']:
-                    self.logger.info(f"✅ Momentum alert sent to Bruce for {symbol}")
-                    # Save sent alert to historical data
-                    self._save_momentum_alert_sent(alert_data, message)
-                else:
-                    errors = result.get('errors', ['Unknown error'])
-                    error_msg = ', '.join(errors) if isinstance(errors, list) else str(errors)
-                    self.logger.error(f"❌ Failed to send momentum alert to Bruce for {symbol}: {error_msg}")
+                if not momentum_users:
+                    self.logger.warning(
+                        f"⚠️ No users with momentum_alerts=true "
+                        f"found for {symbol}")
+                    return
+
+                # Send to all momentum alert users
+                sent_count = 0
+                failed_count = 0
+                sent_to_users = []
+
+                for user in momentum_users:
+                    username = user.get('username', 'Unknown')
+                    result = self.telegram_poster.send_message_to_user(
+                        message, username, urgent=False)
+
+                    if result['success']:
+                        sent_count += 1
+                        sent_to_users.append(username)
+                        self.logger.info(
+                            f"✅ Momentum alert sent to {username} "
+                            f"for {symbol}")
+                    else:
+                        failed_count += 1
+                        errors = result.get('errors', ['Unknown error'])
+                        error_msg = ', '.join(errors) if isinstance(
+                            errors, list) else str(errors)
+                        self.logger.error(
+                            f"❌ Failed to send momentum alert to "
+                            f"{username} for {symbol}: {error_msg}")
+
+                # Log summary
+                if sent_count > 0:
+                    self.logger.info(
+                        f"📨 Momentum alert sent to {sent_count} user(s) "
+                        f"for {symbol}: {', '.join(sent_to_users)}")
+                    # Save sent alert to historical data with all recipients
+                    self._save_momentum_alert_sent(
+                        alert_data, message, sent_to_users)
+
+                if failed_count > 0:
+                    self.logger.warning(
+                        f"⚠️ Failed to send to {failed_count} user(s) "
+                        f"for {symbol}")
 
         except Exception as e:
             self.logger.error(f"❌ Error sending momentum alert: {e}")
@@ -938,13 +976,16 @@ class MomentumAlertsSystem:
         except Exception as e:
             self.logger.error(f"❌ Error saving momentum alert: {e}")
 
-    def _save_momentum_alert_sent(self, alert_data: Dict, message: str) -> None:
+    def _save_momentum_alert_sent(
+            self, alert_data: Dict, message: str,
+            sent_to_users: List[str]) -> None:
         """
         Save sent momentum alert to historical data structure.
 
         Args:
             alert_data: Alert data dictionary
             message: Formatted alert message
+            sent_to_users: List of usernames that received the alert
         """
         try:
             symbol = alert_data['symbol']
@@ -975,7 +1016,7 @@ class MomentumAlertsSystem:
                 'urgency': str(alert_data['urgency']),
                 'timestamp': timestamp.isoformat(),
                 'message': str(message),
-                'sent_to': 'bruce',
+                'sent_to': sent_to_users,
                 'sent_at': datetime.now(self.et_tz).isoformat(),
                 'indicators': self._serialize_indicators(alert_data['indicators'])
             }

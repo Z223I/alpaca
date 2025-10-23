@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import List, Dict, Optional
 from .config import TelegramConfig
 
+
 class UserManager:
     """Manages Telegram users from CSV file."""
 
@@ -47,9 +48,9 @@ class UserManager:
                     chat_id = row.get('chat_id', '').strip()
 
                     # Skip comment lines, empty rows, and header duplicates
-                    if (not chat_id or 
-                        chat_id.startswith('#') or 
-                        chat_id == 'chat_id'):
+                    if (not chat_id or
+                            chat_id.startswith('#') or
+                            chat_id == 'chat_id'):
                         continue
 
                     # Only include enabled users
@@ -72,22 +73,68 @@ class UserManager:
     def get_user_by_username(self, username: str) -> Optional[Dict[str, str]]:
         """
         Find a user by username (case-insensitive).
-        
+
         Args:
             username: Username to search for
-            
+
         Returns:
             User dict if found and enabled, None otherwise
         """
         if not username:
             return None
-            
+
         users = self.get_active_users()
         for user in users:
             user_name = user.get('username', '').strip()
             if user_name.lower() == username.lower():
                 return user
         return None
+
+    def get_momentum_alert_users(self) -> List[Dict[str, str]]:
+        """
+        Return list of enabled users who have momentum_alerts=true.
+
+        Returns:
+            List of user dicts with momentum_alerts enabled
+        """
+        users = []
+
+        if not os.path.exists(self.csv_path):
+            print(f"CSV file does not exist: {self.csv_path}")
+            return users
+
+        try:
+            with open(self.csv_path, 'r', encoding='utf-8') as file:
+                reader = csv.DictReader(file)
+                for row in reader:
+                    chat_id = row.get('chat_id', '').strip()
+
+                    # Skip comment lines, empty rows, and header duplicates
+                    if (not chat_id or
+                            chat_id.startswith('#') or
+                            chat_id == 'chat_id'):
+                        continue
+
+                    # Only include enabled users with momentum_alerts=true
+                    enabled = row.get('enabled', '').strip().lower()
+                    momentum_alerts = row.get(
+                        'momentum_alerts', '').strip().lower()
+
+                    if enabled == 'true' and momentum_alerts == 'true':
+                        user = {
+                            'chat_id': chat_id,
+                            'username': row.get('username', '').strip(),
+                            'notes': row.get('notes', '').strip(),
+                            'momentum_alerts': momentum_alerts
+                        }
+                        users.append(user)
+
+        except Exception as e:
+            print(f"Error reading momentum alert users from CSV: {e}")
+            import traceback
+            traceback.print_exc()
+
+        return users
 
     def add_user(self, chat_id: str, username: str = "", enabled: bool = True, notes: str = "") -> bool:
         """Add new user to CSV file."""
@@ -171,7 +218,10 @@ class UserManager:
         """Write all users back to CSV."""
         with open(self.csv_path, 'w', newline='', encoding='utf-8') as file:
             if users:
-                fieldnames = ['chat_id', 'username', 'enabled', 'created_date', 'notes']
+                fieldnames = [
+                    'chat_id', 'username', 'enabled',
+                    'created_date', 'notes', 'momentum_alerts'
+                ]
                 writer = csv.DictWriter(file, fieldnames=fieldnames)
                 writer.writeheader()
                 writer.writerows(users)
