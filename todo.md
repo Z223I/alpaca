@@ -203,12 +203,22 @@ Up the volume on the scanners
 Real time charts. Add a bar for the ratio of selling versus buying. Buying to the right. have L2 and time and sales.
 
 
+## Momentum Alerts - % Gain
+
+- [X] ULTRATHINK.  Review code/momentum_alerts.py:  When retrieving the symbols from market open top gainers, also retrieve the market open stock price for each symbol.  Add the market open price to the momentum alert.  Also, add percent gain since market open to the momentum alert.
+- [X] ULTRATHINK.  For symbols that do not have market open price available, use code/alpaca.py.
+
+## Publish Momentum Alerts
+
+- [X] THINK HARD.  Update .telegram_users.csv: add a new field momentum_alerts=false. Set Bruce and "Lucille Wang" to true.
+- [X] THINK HARD.  Update code/momentum_alerts.py: Instead of sending momentum alerts to Bruce, send them to all users in .telegram_users.csv where momentum_alerts=true.
+
 
 ## Top Gainers
 
 - [X] top gainers as an atom
-- [ ] ULTRATHINK. Update molecules/telegram_polling.py:  Add a new command "Top Gainers" case insensitive.  Call code/alpaca.py --top-gainers --limit 40.  Add the new command to the /help documentation.
-- [ ] Update the atom to only display the top gainers.  I do not want to see the top losers.
+- [X] ULTRATHINK. Update molecules/telegram_polling.py:  Add a new command "Top Gainers" case insensitive.  Call code/alpaca.py --top-gainers --limit 40.  Add the new command to the /help documentation.
+- [X] Update the atom to only display the top gainers.  I do not want to see the top losers.
 
 
 ## Symbol Polling Update II
