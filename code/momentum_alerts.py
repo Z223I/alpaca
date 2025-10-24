@@ -26,7 +26,7 @@ import logging
 import os
 import subprocess
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time as dt_time
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 import pandas as pd
@@ -105,8 +105,8 @@ class MomentumAlertsSystem:
         self.user_manager = UserManager()
         self.momentum_config = get_momentum_alerts_config()
 
-        # Tracking
-        self.monitored_symbols: Set[str] = set()
+        # Tracking - store dict with symbol metadata including market_open_price
+        self.monitored_symbols: Dict[str, Dict] = {}
         self.last_csv_check = None
         self.startup_runs_completed = 0
         self.startup_schedule = []  # List of scheduled startup times
@@ -433,14 +433,95 @@ class MomentumAlertsSystem:
             self.logger.error(f"❌ Failed to start volume surge scanner: {e}")
             return False
 
-    def _load_csv_symbols(self) -> List[str]:
+    def _get_market_open_price(self, symbol: str) -> Optional[float]:
+        """
+        Get the market open price (9:30 AM ET) for a symbol using Alpaca API.
+
+        Args:
+            symbol: Stock symbol
+
+        Returns:
+            Market open price if found, None otherwise
+        """
+        if not self.historical_client:
+            return None
+
+        try:
+            # Get today's date in ET
+            current_et = datetime.now(self.et_tz)
+            today = current_et.date()
+
+            # If before market open, use previous trading day
+            market_open_time = dt_time(9, 30)  # 9:30 AM
+            if current_et.time() < market_open_time:
+                today = today - timedelta(days=1)
+
+            # Skip backwards to most recent weekday
+            while today.weekday() >= 5:  # Skip weekends
+                today = today - timedelta(days=1)
+
+            # Create target time for market open (9:30 AM ET)
+            market_open_datetime = self.et_tz.localize(
+                datetime.combine(today, market_open_time)
+            )
+
+            # Get bars from 9:25 AM to 9:35 AM ET (10 minute window around market open)
+            start_time = market_open_datetime - timedelta(minutes=5)
+            end_time = market_open_datetime + timedelta(minutes=5)
+
+            # Fetch 1-minute bars
+            bars = self.historical_client.get_bars(
+                symbol,
+                tradeapi.TimeFrame(1, tradeapi.TimeFrameUnit.Minute),
+                start=start_time.astimezone(pytz.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                end=end_time.astimezone(pytz.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                limit=20,
+                feed='sip'
+            )
+
+            if not bars or len(bars) == 0:
+                self.logger.debug(f"⚠️ No bars found for {symbol} around market open")
+                return None
+
+            # Find the bar closest to 9:30 AM ET
+            closest_bar = None
+            min_time_diff = None
+
+            for bar in bars:
+                bar_time = bar.t
+                if bar_time.tzinfo is None:
+                    bar_time = pytz.UTC.localize(bar_time)
+                bar_time_et = bar_time.astimezone(self.et_tz)
+
+                time_diff = abs((bar_time_et - market_open_datetime).total_seconds())
+
+                if min_time_diff is None or time_diff < min_time_diff:
+                    min_time_diff = time_diff
+                    closest_bar = bar
+
+            if closest_bar and min_time_diff <= 300:  # Within 5 minutes
+                market_open_price = float(closest_bar.o)
+                self.logger.debug(
+                    f"✅ {symbol}: Retrieved market open price ${market_open_price:.2f} "
+                    f"from Alpaca API")
+                return market_open_price
+            else:
+                self.logger.debug(
+                    f"⚠️ {symbol}: No bar found within 5 minutes of market open")
+                return None
+
+        except Exception as e:
+            self.logger.debug(f"⚠️ Error fetching market open price for {symbol}: {e}")
+            return None
+
+    def _load_csv_symbols(self) -> Dict[str, Dict]:
         """
         Load symbols from the gainers CSV file, volume surge CSV file, and additional data/{YYYYMMDD}.csv file.
 
         Returns:
-            List of unique symbols to monitor
+            Dictionary mapping symbols to their metadata (including market_open_price)
         """
-        symbols = set()  # Use set to automatically handle uniqueness
+        symbols_dict = {}  # Use dict to store symbol metadata
 
         # Load from gainers CSV file
         if self.csv_file_path.exists():
@@ -450,9 +531,14 @@ class MomentumAlertsSystem:
                     for row in reader:
                         symbol = row.get('symbol', '').strip().upper()
                         if symbol and not (len(symbol) == 5 and symbol.endswith('W')):  # Filter out 5-char warrants ending in W
-                            symbols.add(symbol)
+                            # Store symbol with market open price from CSV
+                            market_open_price = row.get('market_open_price', None)
+                            symbols_dict[symbol] = {
+                                'source': 'gainers_csv',
+                                'market_open_price': float(market_open_price) if market_open_price else None
+                            }
 
-                self.logger.info(f"📊 Loaded {len(symbols)} symbols from gainers CSV")
+                self.logger.info(f"📊 Loaded {len(symbols_dict)} symbols from gainers CSV")
 
             except Exception as e:
                 self.logger.error(f"❌ Error loading gainers CSV file: {e}")
@@ -465,8 +551,12 @@ class MomentumAlertsSystem:
                     reader = csv.DictReader(f)
                     for row in reader:
                         symbol = row.get('symbol', '').strip().upper()
-                        if symbol and not (len(symbol) == 5 and symbol.endswith('W')) and symbol not in symbols:  # Filter out 5-char warrants ending in W
-                            symbols.add(symbol)
+                        if symbol and not (len(symbol) == 5 and symbol.endswith('W')) and symbol not in symbols_dict:  # Filter out 5-char warrants ending in W
+                            # Store symbol without market open price (volume surge CSV doesn't have it)
+                            symbols_dict[symbol] = {
+                                'source': 'volume_surge_csv',
+                                'market_open_price': None
+                            }
                             volume_surge_count += 1
 
                 self.logger.info(f"📈 Added {volume_surge_count} unique symbols from volume surge CSV: {self.volume_surge_csv_path}")
@@ -487,8 +577,12 @@ class MomentumAlertsSystem:
                     reader = csv.DictReader(f)
                     for row in reader:
                         symbol = row.get('symbol', '').strip().upper()
-                        if symbol and not (len(symbol) == 5 and symbol.endswith('W')) and symbol not in symbols:  # Filter out 5-char warrants ending in W
-                            symbols.add(symbol)
+                        if symbol and not (len(symbol) == 5 and symbol.endswith('W')) and symbol not in symbols_dict:  # Filter out 5-char warrants ending in W
+                            # Store symbol without market open price (data CSV may not have it)
+                            symbols_dict[symbol] = {
+                                'source': 'data_csv',
+                                'market_open_price': None
+                            }
                             additional_count += 1
 
                 self.logger.info(f"📊 Added {additional_count} unique symbols from data CSV: {data_csv_path}")
@@ -498,15 +592,43 @@ class MomentumAlertsSystem:
         else:
             self.logger.debug(f"📄 Data CSV file not found: {data_csv_path}")
 
-        # Convert set back to sorted list
-        symbols_list = sorted(list(symbols))
+        # Fetch market open prices for symbols that don't have them
+        if symbols_dict and self.historical_client:
+            symbols_without_price = [
+                symbol for symbol, metadata in symbols_dict.items()
+                if metadata.get('market_open_price') is None
+            ]
 
-        if symbols_list:
-            self.logger.info(f"📊 Total unique symbols to monitor: {len(symbols_list)} - {symbols_list[:10]}{'...' if len(symbols_list) > 10 else ''}")
+            if symbols_without_price:
+                self.logger.info(
+                    f"📊 Fetching market open prices for {len(symbols_without_price)} symbols "
+                    f"from Alpaca API...")
+
+                fetch_count = 0
+                for symbol in symbols_without_price:
+                    market_open_price = self._get_market_open_price(symbol)
+                    if market_open_price is not None:
+                        symbols_dict[symbol]['market_open_price'] = market_open_price
+                        fetch_count += 1
+
+                self.logger.info(
+                    f"✅ Successfully fetched market open prices for {fetch_count}/{len(symbols_without_price)} symbols")
+
+        # Return dictionary with symbol metadata
+        if symbols_dict:
+            symbols_list = sorted(list(symbols_dict.keys()))
+            symbols_with_price = sum(
+                1 for metadata in symbols_dict.values()
+                if metadata.get('market_open_price') is not None
+            )
+            self.logger.info(
+                f"📊 Total unique symbols to monitor: {len(symbols_dict)} "
+                f"({symbols_with_price} with market open price) - "
+                f"{symbols_list[:10]}{'...' if len(symbols_list) > 10 else ''}")
         else:
             self.logger.warning("⚠️ No symbols found in any CSV files")
 
-        return symbols_list
+        return symbols_dict
 
     def _monitor_csv_file(self):
         """Monitor the CSV file for creation/updates."""
@@ -522,16 +644,19 @@ class MomentumAlertsSystem:
                 self.logger.info(f"📁 CSV file detected/updated: {file_mtime.strftime('%H:%M:%S ET')}")
 
         if should_reload:
-            new_symbols = set(self._load_csv_symbols())
-            added_symbols = new_symbols - self.monitored_symbols
-            removed_symbols = self.monitored_symbols - new_symbols
+            new_symbols_dict = self._load_csv_symbols()
+            new_symbols = set(new_symbols_dict.keys())
+            current_symbols = set(self.monitored_symbols.keys())
+
+            added_symbols = new_symbols - current_symbols
+            removed_symbols = current_symbols - new_symbols
 
             if added_symbols:
                 self.logger.info(f"➕ Added symbols: {sorted(added_symbols)}")
             if removed_symbols:
                 self.logger.info(f"➖ Removed symbols: {sorted(removed_symbols)}")
 
-            self.monitored_symbols = new_symbols
+            self.monitored_symbols = new_symbols_dict
 
     async def _collect_stock_data(self, symbols: List[str]) -> Dict[str, pd.DataFrame]:
         """
@@ -620,13 +745,14 @@ class MomentumAlertsSystem:
             self.logger.error(f"❌ Error collecting stock data: {e}")
             return {}
 
-    def _check_momentum_criteria(self, symbol: str, data: pd.DataFrame) -> Optional[Dict]:
+    def _check_momentum_criteria(self, symbol: str, data: pd.DataFrame, market_open_price: Optional[float] = None) -> Optional[Dict]:
         """
         Check if a stock meets momentum alert criteria.
 
         Args:
             symbol: Stock symbol
             data: DataFrame with OHLCV data
+            market_open_price: Market open price from CSV (if available)
 
         Returns:
             Alert data dictionary if criteria met, None otherwise
@@ -761,10 +887,21 @@ class MomentumAlertsSystem:
                                   f"momentum_short: {momentum_short:.2f}/min {momentum_short_emoji})")
                 return None
 
+            # Calculate percent gain since market open (if market_open_price is available)
+            percent_gain_since_market_open = None
+            if market_open_price is not None and market_open_price > 0:
+                percent_gain_since_market_open = (
+                    (current_price - market_open_price) / market_open_price) * 100
+                self.logger.debug(
+                    f"📊 {symbol}: Market open: ${market_open_price:.2f}, "
+                    f"Gain since open: {percent_gain_since_market_open:+.2f}%")
+
             # If we get here, all criteria are met
             alert_data = {
                 'symbol': symbol,
                 'current_price': current_price,
+                'market_open_price': market_open_price,
+                'percent_gain_since_market_open': percent_gain_since_market_open,
                 'vwap': current_vwap,
                 'ema_9': ema_9,
                 'momentum': momentum,
@@ -810,6 +947,8 @@ class MomentumAlertsSystem:
         try:
             symbol = alert_data['symbol']
             current_price = alert_data['current_price']
+            market_open_price = alert_data.get('market_open_price')
+            percent_gain_since_market_open = alert_data.get('percent_gain_since_market_open')
             vwap = alert_data['vwap']
             ema_9 = alert_data['ema_9']
             momentum = alert_data['momentum']
@@ -827,6 +966,17 @@ class MomentumAlertsSystem:
                 f"🚀 **MOMENTUM ALERT - {symbol}**",
                 "",
                 f"💰 **Price:** ${current_price:.2f}",
+            ]
+
+            # Add market open price and gain if available
+            if market_open_price is not None and percent_gain_since_market_open is not None:
+                message_parts.extend([
+                    f"🌅 **Market Open:** ${market_open_price:.2f}",
+                    f"📈 **Gain Since Open:** {percent_gain_since_market_open:+.2f}%",
+                ])
+
+            # Add the rest of the alert info
+            message_parts.extend([
                 f"📊 **VWAP (Stock Data):** ${vwap:.2f} ✅",
                 f"📈 **EMA9:** ${ema_9:.2f} ✅",
                 f"⚡ **Momentum:** {momentum:.2f}%/min {momentum_emoji}",
@@ -837,7 +987,7 @@ class MomentumAlertsSystem:
                 "",
                 f"⏰ **Time:** {timestamp.strftime('%H:%M:%S ET')}",
                 f"📅 **Date:** {timestamp.strftime('%Y-%m-%d')}"
-            ]
+            ])
 
             message = "\n".join(message_parts)
 
@@ -944,9 +1094,14 @@ class MomentumAlertsSystem:
             filepath = self.momentum_alerts_dir / filename
 
             # Convert alert data to serializable format
+            market_open = alert_data.get('market_open_price')
+            percent_gain = alert_data.get('percent_gain_since_market_open')
+
             alert_json = {
                 'symbol': str(symbol),
                 'current_price': float(alert_data['current_price']),
+                'market_open_price': float(market_open) if market_open is not None else None,
+                'percent_gain_since_market_open': float(percent_gain) if percent_gain is not None else None,
                 'vwap': float(alert_data['vwap']),
                 'ema_9': float(alert_data['ema_9']),
                 'momentum': float(alert_data['momentum']),
@@ -996,9 +1151,14 @@ class MomentumAlertsSystem:
             filepath = self.momentum_alerts_sent_dir / filename
 
             # Convert alert data to serializable format (same as save alert)
+            market_open = alert_data.get('market_open_price')
+            percent_gain = alert_data.get('percent_gain_since_market_open')
+
             alert_json = {
                 'symbol': str(symbol),
                 'current_price': float(alert_data['current_price']),
+                'market_open_price': float(market_open) if market_open is not None else None,
+                'percent_gain_since_market_open': float(percent_gain) if percent_gain is not None else None,
                 'vwap': float(alert_data['vwap']),
                 'ema_9': float(alert_data['ema_9']),
                 'momentum': float(alert_data['momentum']),
@@ -1038,13 +1198,17 @@ class MomentumAlertsSystem:
                     self.logger.debug(f"🔍 Monitoring {len(self.monitored_symbols)} symbols for momentum alerts")
 
                     # Collect stock data for all monitored symbols
-                    symbols_list = list(self.monitored_symbols)
+                    symbols_list = list(self.monitored_symbols.keys())
                     stock_data = await self._collect_stock_data(symbols_list)
 
                     # Check each symbol for momentum alerts
                     for symbol in symbols_list:
                         if symbol in stock_data:
-                            alert_data = self._check_momentum_criteria(symbol, stock_data[symbol])
+                            # Get market open price for this symbol
+                            symbol_metadata = self.monitored_symbols.get(symbol, {})
+                            market_open_price = symbol_metadata.get('market_open_price')
+
+                            alert_data = self._check_momentum_criteria(symbol, stock_data[symbol], market_open_price)
                             if alert_data:
                                 await self._send_momentum_alert(alert_data)
 
