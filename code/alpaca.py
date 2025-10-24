@@ -1833,7 +1833,8 @@ class AlpacaPrivate:
                 chart_path = plots_config.get_chart_file_path(date_str, symbol)
                 print(f"✓ Chart generated successfully: {chart_path}")
                 print(f"  Chart includes:")
-                print(f"    • Price candlesticks with ORB levels, EMA(9), EMA(20), VWAP")
+                print("    • Price candlesticks with ORB levels, "
+                      "EMA(9), EMA(21), EMA(34), EMA(50), VWAP")
                 if major_resistance:
                     print(f"    • Major resistance level: ${major_resistance[0]:.2f}")
                 if has_sufficient_macd_data:

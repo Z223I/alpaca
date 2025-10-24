@@ -168,7 +168,8 @@ class ChartFromDataFrame:
         """Print information about chart features."""
         has_sufficient_macd_data = len(self.df) >= 26
         print(f"\nChart features:")
-        print(f"  📈 Price chart: Candlesticks, ORB levels, EMA(9), EMA(20), VWAP")
+        print("  📈 Price chart: Candlesticks, ORB levels, "
+              "EMA(9), EMA(21), EMA(34), EMA(50), VWAP")
         if has_sufficient_macd_data:
             print(f"  📊 MACD chart: MACD line, Signal line, Histogram (12,26,9)")
         else:

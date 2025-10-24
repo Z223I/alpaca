@@ -119,8 +119,14 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
         # Calculate EMA (9-period) using typical price (HLC/3)
         ema_success, ema_values = calculate_ema(symbol_data, period=9)
 
-        # Calculate EMA (20-period) using typical price (HLC/3)
-        ema20_success, ema20_values = calculate_ema(symbol_data, period=20)
+        # Calculate EMA (21-period) using typical price (HLC/3)
+        ema21_success, ema21_values = calculate_ema(symbol_data, period=21)
+
+        # Calculate EMA (34-period) using typical price (HLC/3)
+        ema34_success, ema34_values = calculate_ema(symbol_data, period=34)
+
+        # Calculate EMA (50-period) using typical price (HLC/3)
+        ema50_success, ema50_values = calculate_ema(symbol_data, period=50)
 
         # Calculate VWAP using typical price (HLC/3)
         vwap_success, vwap_values = calculate_vwap_typical(symbol_data)
@@ -210,13 +216,23 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
 
         # Add EMA line if calculation was successful
         if ema_success:
-            ax1.plot(symbol_data['timestamp'], ema_values, 
-                    color='blue', linewidth=2, alpha=0.8, label='EMA(9)')
+            ax1.plot(symbol_data['timestamp'], ema_values,
+                     color='blue', linewidth=2, alpha=0.8, label='EMA(9)')
 
-        # Add EMA20 line if calculation was successful
-        if ema20_success:
-            ax1.plot(symbol_data['timestamp'], ema20_values, 
-                    color='orange', linewidth=2, alpha=0.8, label='EMA(20)')
+        # Add EMA21 line if calculation was successful
+        if ema21_success:
+            ax1.plot(symbol_data['timestamp'], ema21_values,
+                     color='orange', linewidth=2, alpha=0.8, label='EMA(21)')
+
+        # Add EMA34 line if calculation was successful
+        if ema34_success:
+            ax1.plot(symbol_data['timestamp'], ema34_values,
+                    color='cyan', linewidth=2, alpha=0.8, label='EMA(34)')
+
+        # Add EMA50 line if calculation was successful
+        if ema50_success:
+            ax1.plot(symbol_data['timestamp'], ema50_values,
+                    color='brown', linewidth=2, alpha=0.8, label='EMA(50)')
 
         # Add VWAP line if calculation was successful
         if vwap_success:
@@ -364,7 +380,8 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
                 print(f"Plotted {alert_count} alerts for {symbol} (superduper and momentum alerts, including out-of-market-hours)")
 
         # Add legend if any indicators were calculated
-        if ema_success or ema20_success or vwap_success:
+        if (ema_success or ema21_success or ema34_success or ema50_success or
+                vwap_success):
             # Determine legend position based on price trend
             # If closing price is higher than opening price, put legend at bottom right
             # Otherwise, put it at top right to avoid overlapping with rising prices
