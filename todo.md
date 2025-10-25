@@ -203,6 +203,19 @@ Up the volume on the scanners
 Real time charts. Add a bar for the ratio of selling versus buying. Buying to the right. have L2 and time and sales.
 
 
+
+Create MACD alerts.  Add that to momentum alerts and then use or.  Only use if in the top five or 10 top gainers. Otherwise there will be too much noise.  It’ll be necessary to store the number for the top gainer.  Look for the MACD atom. Include the number of consecutive green bars in the alert.  Once on the list always on the list until the program is restarted. Do not include symbols that end in a W.
+
+
+## Update Top Gainers
+
+- [ ] Update the various top gainers from $40-$100
+
+
+## EMA 21, 34, 50
+
+- [X] ULTRATHINK. Update code/alpaca.py --plot to also plot EMA 21, 34, 50.  It already plots EMA 9.
+
 ## Momentum Alerts - % Gain
 
 - [X] ULTRATHINK.  Review code/momentum_alerts.py:  When retrieving the symbols from market open top gainers, also retrieve the market open stock price for each symbol.  Add the market open price to the momentum alert.  Also, add percent gain since market open to the momentum alert.
