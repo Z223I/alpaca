@@ -30,7 +30,7 @@ Test.
 On startup, run the following script. It can take up to 20 minutes for the script to complete. Run this script every hour for four hours.
 
 """ bash
-python code/market_open_top_gainers.py  --exchanges NASDAQ AMEX  --max-symbols 7000  --min-price 0.75  --max-price 40.00  --min-volume 50000 --top-gainers 20 --export-csv gainers_nasdaq_amex.csv --verbose
+python code/market_open_top_gainers.py  --exchanges NASDAQ AMEX  --max-symbols 7000  --min-price 0.75  --max-price 100.00  --min-volume 50000 --top-gainers 20 --export-csv gainers_nasdaq_amex.csv --verbose
 """
 
 ### Main Loop

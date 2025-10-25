@@ -209,7 +209,7 @@ class MomentumAlertsSystem:
             "--exchanges", "NASDAQ", "AMEX",
             "--max-symbols", "7000",
             "--min-price", "0.75",
-            "--max-price", "40.00",
+            "--max-price", "100.00",
             "--min-volume", "250000",
             "--top-gainers", "40",
             "--export-csv", "gainers_nasdaq_amex.csv",
@@ -395,7 +395,7 @@ class MomentumAlertsSystem:
             "--exchanges", "NASDAQ", "AMEX",
             "--max-symbols", "7000",
             "--min-price", "0.75",
-            "--max-price", "40.00",
+            "--max-price", "100.00",
             "--min-volume", "250000",
             "--min-percent-change", "5.0",
             "--surge-days", "50",
@@ -518,32 +518,44 @@ class MomentumAlertsSystem:
         """
         Load symbols from the gainers CSV file, volume surge CSV file, and additional data/{YYYYMMDD}.csv file.
 
+        Limits to first 5 symbols from each source that don't end in 'W'.
+        Tracks source with boolean fields: from_gainers, from_volume_surge, oracle.
+
         Returns:
             Dictionary mapping symbols to their metadata (including market_open_price)
         """
         symbols_dict = {}  # Use dict to store symbol metadata
 
-        # Load from gainers CSV file
+        # Load from gainers CSV file - keep first 5 symbols that don't end in 'W'
         if self.csv_file_path.exists():
             try:
+                gainers_count = 0
                 with open(self.csv_file_path, 'r') as f:
                     reader = csv.DictReader(f)
                     for row in reader:
                         symbol = row.get('symbol', '').strip().upper()
-                        if symbol and not (len(symbol) == 5 and symbol.endswith('W')):  # Filter out 5-char warrants ending in W
-                            # Store symbol with market open price from CSV
-                            market_open_price = row.get('market_open_price', None)
-                            symbols_dict[symbol] = {
-                                'source': 'gainers_csv',
-                                'market_open_price': float(market_open_price) if market_open_price else None
-                            }
+                        # Filter: must have symbol and not end in 'W'
+                        if symbol and not symbol.endswith('W'):
+                            if gainers_count < 5:  # Only keep first 5
+                                # Store symbol with market open price from CSV
+                                market_open_price = row.get('market_open_price', None)
+                                symbols_dict[symbol] = {
+                                    'source': 'gainers_csv',
+                                    'market_open_price': float(market_open_price) if market_open_price else None,
+                                    'from_gainers': True,
+                                    'from_volume_surge': False,
+                                    'oracle': False
+                                }
+                                gainers_count += 1
+                            else:
+                                break  # Stop after first 5
 
-                self.logger.info(f"📊 Loaded {len(symbols_dict)} symbols from gainers CSV")
+                self.logger.info(f"📊 Loaded {gainers_count} symbols from gainers CSV (first 5 non-W symbols)")
 
             except Exception as e:
                 self.logger.error(f"❌ Error loading gainers CSV file: {e}")
 
-        # Load from volume surge CSV file if it exists
+        # Load from volume surge CSV file - keep first 5 symbols that don't end in 'W'
         if self.volume_surge_csv_path.exists():
             try:
                 volume_surge_count = 0
@@ -551,22 +563,29 @@ class MomentumAlertsSystem:
                     reader = csv.DictReader(f)
                     for row in reader:
                         symbol = row.get('symbol', '').strip().upper()
-                        if symbol and not (len(symbol) == 5 and symbol.endswith('W')) and symbol not in symbols_dict:  # Filter out 5-char warrants ending in W
-                            # Store symbol without market open price (volume surge CSV doesn't have it)
-                            symbols_dict[symbol] = {
-                                'source': 'volume_surge_csv',
-                                'market_open_price': None
-                            }
-                            volume_surge_count += 1
+                        # Filter: must have symbol, not end in 'W', and not already in dict
+                        if symbol and not symbol.endswith('W') and symbol not in symbols_dict:
+                            if volume_surge_count < 5:  # Only keep first 5
+                                # Store symbol without market open price (volume surge CSV doesn't have it)
+                                symbols_dict[symbol] = {
+                                    'source': 'volume_surge_csv',
+                                    'market_open_price': None,
+                                    'from_gainers': False,
+                                    'from_volume_surge': True,
+                                    'oracle': False
+                                }
+                                volume_surge_count += 1
+                            else:
+                                break  # Stop after first 5
 
-                self.logger.info(f"📈 Added {volume_surge_count} unique symbols from volume surge CSV: {self.volume_surge_csv_path}")
+                self.logger.info(f"📈 Added {volume_surge_count} unique symbols from volume surge CSV (first 5 non-W symbols): {self.volume_surge_csv_path}")
 
             except Exception as e:
                 self.logger.error(f"❌ Error loading volume surge CSV file {self.volume_surge_csv_path}: {e}")
         else:
             self.logger.debug(f"📈 Volume surge CSV file not found: {self.volume_surge_csv_path}")
 
-        # Load from additional data/{YYYYMMDD}.csv file if it exists
+        # Load from additional data/{YYYYMMDD}.csv file - all symbols (Oracle source)
         compact_date = datetime.now(self.et_tz).strftime('%Y%m%d')  # YYYYMMDD format
         data_csv_path = Path("data") / f"{compact_date}.csv"
 
@@ -577,15 +596,19 @@ class MomentumAlertsSystem:
                     reader = csv.DictReader(f)
                     for row in reader:
                         symbol = row.get('symbol', '').strip().upper()
-                        if symbol and not (len(symbol) == 5 and symbol.endswith('W')) and symbol not in symbols_dict:  # Filter out 5-char warrants ending in W
+                        # Filter: must have symbol, not end in 'W', and not already in dict
+                        if symbol and not symbol.endswith('W') and symbol not in symbols_dict:
                             # Store symbol without market open price (data CSV may not have it)
                             symbols_dict[symbol] = {
                                 'source': 'data_csv',
-                                'market_open_price': None
+                                'market_open_price': None,
+                                'from_gainers': False,
+                                'from_volume_surge': False,
+                                'oracle': True
                             }
                             additional_count += 1
 
-                self.logger.info(f"📊 Added {additional_count} unique symbols from data CSV: {data_csv_path}")
+                self.logger.info(f"📊 Added {additional_count} unique symbols from data CSV (Oracle source): {data_csv_path}")
 
             except Exception as e:
                 self.logger.error(f"❌ Error loading data CSV file {data_csv_path}: {e}")
@@ -745,18 +768,26 @@ class MomentumAlertsSystem:
             self.logger.error(f"❌ Error collecting stock data: {e}")
             return {}
 
-    def _check_momentum_criteria(self, symbol: str, data: pd.DataFrame, market_open_price: Optional[float] = None) -> Optional[Dict]:
+    def _check_momentum_criteria(self, symbol: str, data: pd.DataFrame, symbol_metadata: Optional[Dict] = None) -> Optional[Dict]:
         """
         Check if a stock meets momentum alert criteria.
 
         Args:
             symbol: Stock symbol
             data: DataFrame with OHLCV data
-            market_open_price: Market open price from CSV (if available)
+            symbol_metadata: Symbol metadata dict containing market_open_price and boolean source fields
 
         Returns:
             Alert data dictionary if criteria met, None otherwise
         """
+        # Extract metadata fields
+        if symbol_metadata is None:
+            symbol_metadata = {}
+
+        market_open_price = symbol_metadata.get('market_open_price')
+        from_gainers = symbol_metadata.get('from_gainers', False)
+        from_volume_surge = symbol_metadata.get('from_volume_surge', False)
+        oracle = symbol_metadata.get('oracle', False)
         if data.empty or len(data) < 9:  # Need at least 9 bars for EMA9
             return None
 
@@ -918,7 +949,10 @@ class MomentumAlertsSystem:
                 'volume_emoji': volume_emoji,
                 'urgency': urgency,
                 'timestamp': datetime.now(self.et_tz),
-                'indicators': indicators
+                'indicators': indicators,
+                'from_gainers': from_gainers,
+                'from_volume_surge': from_volume_surge,
+                'oracle': oracle
             }
 
             self.logger.info(f"✅ {symbol}: Momentum alert criteria met!")
@@ -1119,7 +1153,10 @@ class MomentumAlertsSystem:
                 'urgency': str(alert_data['urgency']),
                 'timestamp': timestamp.isoformat(),
                 'message': str(message),
-                'indicators': self._serialize_indicators(alert_data['indicators'])
+                'indicators': self._serialize_indicators(alert_data['indicators']),
+                'from_gainers': bool(alert_data.get('from_gainers', False)),
+                'from_volume_surge': bool(alert_data.get('from_volume_surge', False)),
+                'oracle': bool(alert_data.get('oracle', False))
             }
 
             # Save to JSON file
@@ -1178,7 +1215,10 @@ class MomentumAlertsSystem:
                 'message': str(message),
                 'sent_to': sent_to_users,
                 'sent_at': datetime.now(self.et_tz).isoformat(),
-                'indicators': self._serialize_indicators(alert_data['indicators'])
+                'indicators': self._serialize_indicators(alert_data['indicators']),
+                'from_gainers': bool(alert_data.get('from_gainers', False)),
+                'from_volume_surge': bool(alert_data.get('from_volume_surge', False)),
+                'oracle': bool(alert_data.get('oracle', False))
             }
 
             # Save to JSON file
@@ -1204,11 +1244,10 @@ class MomentumAlertsSystem:
                     # Check each symbol for momentum alerts
                     for symbol in symbols_list:
                         if symbol in stock_data:
-                            # Get market open price for this symbol
+                            # Get symbol metadata (includes market_open_price and boolean source fields)
                             symbol_metadata = self.monitored_symbols.get(symbol, {})
-                            market_open_price = symbol_metadata.get('market_open_price')
 
-                            alert_data = self._check_momentum_criteria(symbol, stock_data[symbol], market_open_price)
+                            alert_data = self._check_momentum_criteria(symbol, stock_data[symbol], symbol_metadata)
                             if alert_data:
                                 await self._send_momentum_alert(alert_data)
 

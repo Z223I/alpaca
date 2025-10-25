@@ -203,13 +203,17 @@ Up the volume on the scanners
 Real time charts. Add a bar for the ratio of selling versus buying. Buying to the right. have L2 and time and sales.
 
 
+## MACD alerts
 
-Create MACD alerts.  Add that to momentum alerts and then use or.  Only use if in the top five or 10 top gainers. Otherwise there will be too much noise.  It’ll be necessary to store the number for the top gainer.  Look for the MACD atom. Include the number of consecutive green bars in the alert.  Once on the list always on the list until the program is restarted. Do not include symbols that end in a W.
+- [ ] Create MACD alerts.  Add that to momentum alerts and then use or.  Only use if in the top three or four top gainers. Otherwise there will be too much noise.  It’ll be necessary to store the number for the top gainer.  Look for the MACD atom. Include the number of consecutive green bars in the alert.  Once on the list always on the list until the program is restarted. Do not include symbols that end in a W.
 
+## Update Momentum Alerts
+
+- [ ] ULTRATHINK. Update code/momentum_alerts.py: When collecting symbols from the two scripts that are called, leave the execution of the script the same but only keep the first five symbols from each list that do not end in a "W". When saving the symbols, have separate boolean fields indicating what list from which they came.  Also, have an addition boolean field called "Oracle" to use for the symbols that came from the ./data dir.  Add all the of these new fields to the momentum alerts.
 
 ## Update Top Gainers
 
-- [ ] Update the various top gainers from $40-$100
+- [X] Update code/momentum_alerts.py: Update '"--max-price", "40.00"' to use 100.00.  Update any related docs.
 
 
 ## EMA 21, 34, 50
