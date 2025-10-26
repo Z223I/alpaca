@@ -207,9 +207,20 @@ Real time charts. Add a bar for the ratio of selling versus buying. Buying to th
 
 - [ ] Create MACD alerts.  Add that to momentum alerts and then use or.  Only use if in the top three or four top gainers. Otherwise there will be too much noise.  It’ll be necessary to store the number for the top gainer.  Look for the MACD atom. Include the number of consecutive green bars in the alert.  Once on the list always on the list until the program is restarted. Do not include symbols that end in a W.
 
+
 ## Update Momentum Alerts
 
-- [ ] ULTRATHINK. Update code/momentum_alerts.py: When collecting symbols from the two scripts that are called, leave the execution of the script the same but only keep the first five symbols from each list that do not end in a "W". When saving the symbols, have separate boolean fields indicating what list from which they came.  Also, have an addition boolean field called "Oracle" to use for the symbols that came from the ./data dir.  Add all the of these new fields to the momentum alerts.
+- [X] ULTRATHINK. Update code/momentum_alerts.py: When collecting symbols from the two scripts that are called, leave the execution of the script the same but only keep the first five symbols from each list that do not end in a "W". When saving the symbols, have separate boolean fields indicating what list from which they came.  Also, have an addition boolean field called "Oracle" to use for the symbols that came from the ./data dir.  Add all the of these new fields to the momentum alerts.
+- [ ] ULTRATHINK. Update code/momentum_alerts.py: After each time collecting symbols, call
+```bash
+code/alpaca_screener.py --symbols {symbol list} --export-csv symbol_list.csv
+```
+Then read historical_data/YYYY-MM-DD/scanner/symbol_list.csv and obtain the fields volume_surge_detected,volume_surge_ratio per symbol.
+Include these new fields in the momentum alerts in a new "Volume" section and call them "Surge Detected", and "Surge Ratio".
+- [ ] THINK HARD.  Update code/momentum_alerts.py: There is already "Momentum" and "Momentum Short" fields that use values from a config file to calculate percent gain per minute.  Add a new value to the config file for squeeze duration = 10. Add a new field "Squeezing" after "Momentum Short".  Display a green checkmark if the percent gain per minute is >= 1%. Pick another emoji if false.
+
+- [ ] ULTRATHINK.  Create an atom in ./atoms/api to use polygon.io to retrieve shares_outstanding, float_shares, market_cap.  If that fails, use Yahoo Finance to retrieve the information. Update code/momentum_alerts.py: When collecting the symbols, save those fields. Create a new section in the momentum alerts above the timestamp at the end of the alert and include the fields "Shares Outstanding", "Float Shares", and "Market Cap". Pick an appropriate name for the section.
+
 
 ## Update Top Gainers
 

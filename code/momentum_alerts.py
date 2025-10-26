@@ -38,13 +38,14 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import alpaca_trade_api as tradeapi
 from atoms.api.init_alpaca_client import init_alpaca_client
 from atoms.api.stock_halt_detector import is_stock_halted, get_halt_status_emoji
+from atoms.api.fundamental_data import FundamentalDataFetcher
 from atoms.alerts.breakout_detector import BreakoutDetector
 from atoms.telegram.telegram_post import TelegramPoster
 from atoms.telegram.user_manager import UserManager
 from code.momentum_alerts_config import (
     get_momentum_alerts_config, get_volume_color_emoji,
     get_momentum_standard_color_emoji, get_momentum_short_color_emoji,
-    get_urgency_level_dual
+    get_urgency_level_dual, get_squeeze_emoji
 )
 
 
@@ -104,6 +105,7 @@ class MomentumAlertsSystem:
         self.telegram_poster = TelegramPoster()
         self.user_manager = UserManager()
         self.momentum_config = get_momentum_alerts_config()
+        self.fundamental_fetcher = FundamentalDataFetcher(verbose=verbose)
 
         # Tracking - store dict with symbol metadata including market_open_price
         self.monitored_symbols: Dict[str, Dict] = {}
@@ -114,6 +116,11 @@ class MomentumAlertsSystem:
         # Volume surge data
         self.volume_surge_csv_path = self.volume_surge_dir / "relative_volume_nasdaq_amex.csv"
         self.volume_surge_completed = False
+
+        # Scanner data directory
+        self.scanner_dir = Path("historical_data") / self.today / "scanner"
+        self.scanner_dir.mkdir(parents=True, exist_ok=True)
+        self.symbol_list_csv_path = self.scanner_dir / "symbol_list.csv"
 
         # State
         self.running = False
@@ -433,6 +440,160 @@ class MomentumAlertsSystem:
             self.logger.error(f"❌ Failed to start volume surge scanner: {e}")
             return False
 
+    def _run_symbol_volume_screener(self, symbols: List[str]) -> bool:
+        """
+        Run the alpaca screener for collected symbols to get volume surge data.
+
+        Args:
+            symbols: List of symbols to analyze
+
+        Returns:
+            True if screener ran successfully, False otherwise
+        """
+        if not symbols:
+            self.logger.debug("⚠️ No symbols provided to volume screener")
+            return False
+
+        self.logger.info(f"📊 Running volume screener for {len(symbols)} symbols")
+
+        script_path = Path("code") / "alpaca_screener.py"
+
+        # Build command with symbol list
+        cmd = [
+            "~/miniconda3/envs/alpaca/bin/python",
+            str(script_path),
+            "--symbols"
+        ]
+        cmd.extend(symbols)
+        cmd.extend([
+            "--volume-surge", "2.0",
+            "--surge-days", "50",
+            "--export-csv", "symbol_list.csv",
+            "--verbose"
+        ])
+
+        try:
+            # Expand the tilde in the Python path
+            cmd[0] = os.path.expanduser(cmd[0])
+
+            # Run synchronously with timeout
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=300,  # 5 minute timeout
+                cwd=str(Path.cwd())
+            )
+
+            if result.returncode == 0:
+                self.logger.info(f"✅ Volume screener completed successfully for {len(symbols)} symbols")
+                return True
+            else:
+                self.logger.warning(f"⚠️ Volume screener completed with return code {result.returncode}")
+                if self.verbose:
+                    self.logger.debug(f"Output: {result.stdout[-500:]}")
+                return False
+
+        except subprocess.TimeoutExpired:
+            self.logger.error(f"❌ Volume screener timed out after 5 minutes")
+            return False
+        except Exception as e:
+            self.logger.error(f"❌ Failed to run volume screener: {e}")
+            return False
+
+    def _load_symbol_volume_data(self) -> Dict[str, Dict]:
+        """
+        Load volume surge data from symbol_list.csv.
+
+        Returns:
+            Dictionary mapping symbols to volume surge data
+        """
+        volume_data = {}
+
+        if not self.symbol_list_csv_path.exists():
+            self.logger.debug(f"⚠️ Symbol list CSV not found: {self.symbol_list_csv_path}")
+            return volume_data
+
+        try:
+            with open(self.symbol_list_csv_path, 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    symbol = row.get('symbol', '').strip().upper()
+                    if symbol:
+                        volume_surge_detected = row.get('volume_surge_detected', 'False').strip()
+                        volume_surge_ratio = row.get('volume_surge_ratio', '')
+
+                        # Convert volume_surge_detected to boolean
+                        detected = volume_surge_detected.lower() in ('true', '1', 'yes')
+
+                        # Convert volume_surge_ratio to float if available
+                        ratio = None
+                        if volume_surge_ratio and volume_surge_ratio.strip():
+                            try:
+                                ratio = float(volume_surge_ratio)
+                            except ValueError:
+                                pass
+
+                        volume_data[symbol] = {
+                            'volume_surge_detected': detected,
+                            'volume_surge_ratio': ratio
+                        }
+
+            self.logger.info(f"📊 Loaded volume surge data for {len(volume_data)} symbols from {self.symbol_list_csv_path}")
+
+        except Exception as e:
+            self.logger.error(f"❌ Error loading symbol volume data: {e}")
+
+        return volume_data
+
+    def _fetch_fundamental_data(self, symbols: List[str]) -> Dict[str, Dict]:
+        """
+        Fetch fundamental data for symbols.
+
+        Args:
+            symbols: List of symbols to fetch fundamental data for
+
+        Returns:
+            Dictionary mapping symbols to fundamental data
+        """
+        fundamental_data = {}
+
+        if not symbols:
+            return fundamental_data
+
+        self.logger.info(f"📊 Fetching fundamental data for {len(symbols)} symbols...")
+
+        for symbol in symbols:
+            try:
+                data = self.fundamental_fetcher.get_fundamental_data(symbol)
+
+                # Only store if we got valid data
+                if data and data.get('source') != 'none':
+                    fundamental_data[symbol] = data
+
+                    if self.verbose:
+                        shares_str = f"{data['shares_outstanding']:,}" if data['shares_outstanding'] else "N/A"
+                        float_str = f"{data['float_shares']:,}" if data['float_shares'] else "N/A"
+                        cap_str = f"${data['market_cap']:,}" if data['market_cap'] else "N/A"
+                        self.logger.debug(
+                            f"  {symbol}: Shares: {shares_str} | Float: {float_str} | "
+                            f"Cap: {cap_str} | Source: {data['source']}")
+
+            except Exception as e:
+                self.logger.debug(f"⚠️ Error fetching fundamental data for {symbol}: {e}")
+                continue
+
+        if fundamental_data:
+            self.logger.info(
+                f"✅ Retrieved fundamental data for {len(fundamental_data)}/{len(symbols)} symbols")
+        else:
+            self.logger.warning(
+                "⚠️ No fundamental data retrieved. Configure POLYGON_API_KEY in .env "
+                "or install yfinance library")
+
+        return fundamental_data
+
     def _get_market_open_price(self, symbol: str) -> Optional[float]:
         """
         Get the market open price (9:30 AM ET) for a symbol using Alpaca API.
@@ -637,6 +798,67 @@ class MomentumAlertsSystem:
                 self.logger.info(
                     f"✅ Successfully fetched market open prices for {fetch_count}/{len(symbols_without_price)} symbols")
 
+        # Run volume screener for collected symbols to get volume surge data
+        if symbols_dict:
+            symbols_list = sorted(list(symbols_dict.keys()))
+            self.logger.info(f"📊 Running volume screener for {len(symbols_list)} collected symbols...")
+
+            # Call alpaca_screener.py with the collected symbols
+            screener_success = self._run_symbol_volume_screener(symbols_list)
+
+            if screener_success:
+                # Load volume surge data from the generated CSV
+                volume_data = self._load_symbol_volume_data()
+
+                # Merge volume data into symbol metadata
+                if volume_data:
+                    for symbol, vol_data in volume_data.items():
+                        if symbol in symbols_dict:
+                            symbols_dict[symbol]['volume_surge_detected'] = vol_data.get('volume_surge_detected', False)
+                            symbols_dict[symbol]['volume_surge_ratio'] = vol_data.get('volume_surge_ratio', None)
+                        else:
+                            self.logger.debug(f"⚠️ Volume data found for {symbol} but symbol not in monitored list")
+
+                    # Log statistics
+                    surge_count = sum(
+                        1 for metadata in symbols_dict.values()
+                        if metadata.get('volume_surge_detected', False)
+                    )
+                    self.logger.info(
+                        f"✅ Volume surge data integrated: {surge_count}/{len(symbols_dict)} symbols have surge detected")
+                else:
+                    self.logger.warning("⚠️ No volume surge data loaded from screener CSV")
+            else:
+                self.logger.warning("⚠️ Volume screener failed, proceeding without volume surge data")
+
+            # Fetch fundamental data for collected symbols
+            self.logger.info(f"📊 Fetching fundamental data for {len(symbols_list)} symbols...")
+            fundamental_data = self._fetch_fundamental_data(symbols_list)
+
+            # Merge fundamental data into symbol metadata
+            if fundamental_data:
+                for symbol, fund_data in fundamental_data.items():
+                    if symbol in symbols_dict:
+                        symbols_dict[symbol]['shares_outstanding'] = fund_data.get('shares_outstanding')
+                        symbols_dict[symbol]['float_shares'] = fund_data.get('float_shares')
+                        symbols_dict[symbol]['market_cap'] = fund_data.get('market_cap')
+                        symbols_dict[symbol]['fundamental_source'] = fund_data.get('source')
+
+                # Log statistics
+                fund_count = sum(
+                    1 for metadata in symbols_dict.values()
+                    if metadata.get('shares_outstanding') is not None
+                )
+                self.logger.info(
+                    f"✅ Fundamental data integrated: {fund_count}/{len(symbols_dict)} symbols have fundamental data")
+            else:
+                # Set None values for all symbols
+                for symbol in symbols_dict:
+                    symbols_dict[symbol]['shares_outstanding'] = None
+                    symbols_dict[symbol]['float_shares'] = None
+                    symbols_dict[symbol]['market_cap'] = None
+                    symbols_dict[symbol]['fundamental_source'] = 'none'
+
         # Return dictionary with symbol metadata
         if symbols_dict:
             symbols_list = sorted(list(symbols_dict.keys()))
@@ -788,6 +1010,12 @@ class MomentumAlertsSystem:
         from_gainers = symbol_metadata.get('from_gainers', False)
         from_volume_surge = symbol_metadata.get('from_volume_surge', False)
         oracle = symbol_metadata.get('oracle', False)
+        volume_surge_detected = symbol_metadata.get('volume_surge_detected', False)
+        volume_surge_ratio = symbol_metadata.get('volume_surge_ratio', None)
+        shares_outstanding = symbol_metadata.get('shares_outstanding')
+        float_shares = symbol_metadata.get('float_shares')
+        market_cap = symbol_metadata.get('market_cap')
+        fundamental_source = symbol_metadata.get('fundamental_source', 'none')
         if data.empty or len(data) < 9:  # Need at least 9 bars for EMA9
             return None
 
@@ -898,9 +1126,40 @@ class MomentumAlertsSystem:
                     # Normalize by actual time diff (handles gaps)
                     momentum_short = raw_momentum_5 / actual_time_diff_short
 
+            # Calculate squeeze momentum (configurable period)
+            momentum_squeeze = 0
+            raw_momentum_squeeze = 0
+            actual_time_diff_squeeze = 0
+            squeeze_period_minutes = self.momentum_config.squeeze_duration
+            if len(data) >= 2:  # Need at least 2 data points
+                # Get current timestamp (latest data point)
+                current_timestamp = data.index[-1]
+
+                # Calculate target timestamp (N minutes ago)
+                target_timestamp_squeeze = current_timestamp - timedelta(
+                    minutes=squeeze_period_minutes)
+
+                # Find the data point closest to target timestamp
+                # Use absolute difference to find closest match
+                time_diffs_squeeze = abs(data.index - target_timestamp_squeeze)
+                closest_idx_squeeze = time_diffs_squeeze.argmin()
+
+                # Get price from closest timestamp to N minutes ago
+                price_squeeze_period_ago = float(data.iloc[closest_idx_squeeze]['c'])
+                actual_time_diff_squeeze = ((current_timestamp -
+                                             data.index[closest_idx_squeeze])
+                                            .total_seconds() / 60)
+
+                if price_squeeze_period_ago > 0 and actual_time_diff_squeeze > 0:
+                    raw_momentum_squeeze = ((current_price - price_squeeze_period_ago) /
+                                            price_squeeze_period_ago) * 100
+                    # Normalize by actual time diff (handles gaps)
+                    momentum_squeeze = raw_momentum_squeeze / actual_time_diff_squeeze
+
             # Get momentum signal light icons from momentum config
             momentum_emoji = get_momentum_standard_color_emoji(momentum)
             momentum_short_emoji = get_momentum_short_color_emoji(momentum_short)
+            squeeze_emoji = get_squeeze_emoji(momentum_squeeze)
 
             # Check halt status
             is_halted = is_stock_halted(data, symbol, self.logger)
@@ -937,12 +1196,16 @@ class MomentumAlertsSystem:
                 'ema_9': ema_9,
                 'momentum': momentum,
                 'momentum_short': momentum_short,
+                'momentum_squeeze': momentum_squeeze,
                 'raw_momentum_20': raw_momentum_20,
                 'raw_momentum_5': raw_momentum_5,
+                'raw_momentum_squeeze': raw_momentum_squeeze,
                 'actual_time_diff': actual_time_diff if 'actual_time_diff' in locals() else 0,
                 'actual_time_diff_short': actual_time_diff_short if 'actual_time_diff_short' in locals() else 0,
+                'actual_time_diff_squeeze': actual_time_diff_squeeze,
                 'momentum_emoji': momentum_emoji,
                 'momentum_short_emoji': momentum_short_emoji,
+                'squeeze_emoji': squeeze_emoji,
                 'is_halted': is_halted,
                 'halt_emoji': halt_emoji,
                 'current_volume': current_volume,
@@ -952,7 +1215,13 @@ class MomentumAlertsSystem:
                 'indicators': indicators,
                 'from_gainers': from_gainers,
                 'from_volume_surge': from_volume_surge,
-                'oracle': oracle
+                'oracle': oracle,
+                'volume_surge_detected': volume_surge_detected,
+                'volume_surge_ratio': volume_surge_ratio,
+                'shares_outstanding': shares_outstanding,
+                'float_shares': float_shares,
+                'market_cap': market_cap,
+                'fundamental_source': fundamental_source
             }
 
             self.logger.info(f"✅ {symbol}: Momentum alert criteria met!")
@@ -963,6 +1232,7 @@ class MomentumAlertsSystem:
             time_diff_short = actual_time_diff_short if 'actual_time_diff_short' in locals() else 0
             self.logger.info(f"   Momentum: {momentum:.2f}/min {momentum_emoji} | Raw: {raw_momentum_20:.2f}% ({time_diff:.1f}min)")
             self.logger.info(f"   Momentum Short: {momentum_short:.2f}/min {momentum_short_emoji} | Raw: {raw_momentum_5:.2f}% ({time_diff_short:.1f}min)")
+            self.logger.info(f"   Squeezing: {momentum_squeeze:.2f}/min {squeeze_emoji} | Raw: {raw_momentum_squeeze:.2f}% ({actual_time_diff_squeeze:.1f}min)")
             self.logger.info(f"   Volume: {current_volume:,} {volume_emoji} | Halt Status: {halt_emoji} | Urgency: {urgency}")
 
             return alert_data
@@ -987,13 +1257,21 @@ class MomentumAlertsSystem:
             ema_9 = alert_data['ema_9']
             momentum = alert_data['momentum']
             momentum_short = alert_data['momentum_short']
+            momentum_squeeze = alert_data['momentum_squeeze']
             momentum_emoji = alert_data['momentum_emoji']
             momentum_short_emoji = alert_data['momentum_short_emoji']
+            squeeze_emoji = alert_data['squeeze_emoji']
             halt_emoji = alert_data['halt_emoji']
             current_volume = alert_data['current_volume']
             volume_emoji = alert_data['volume_emoji']
             urgency = alert_data['urgency']
             timestamp = alert_data['timestamp']
+            volume_surge_detected = alert_data.get('volume_surge_detected', False)
+            volume_surge_ratio = alert_data.get('volume_surge_ratio', None)
+            shares_outstanding = alert_data.get('shares_outstanding')
+            float_shares = alert_data.get('float_shares')
+            market_cap = alert_data.get('market_cap')
+            fundamental_source = alert_data.get('fundamental_source', 'none')
 
             # Create alert message (VWAP is from stock data, not calculated)
             message_parts = [
@@ -1015,9 +1293,66 @@ class MomentumAlertsSystem:
                 f"📈 **EMA9:** ${ema_9:.2f} ✅",
                 f"⚡ **Momentum:** {momentum:.2f}%/min {momentum_emoji}",
                 f"⚡ **Momentum Short:** {momentum_short:.2f}%/min {momentum_short_emoji}",
+                f"🔥 **Squeezing:** {momentum_squeeze:.2f}%/min {squeeze_emoji}",
                 f"📈 **Volume:** {current_volume:,} {volume_emoji}",
                 f"🚦 **Halt Status:** {halt_emoji}",
                 f"🎯 **Urgency:** {urgency.upper()}",
+                "",
+            ])
+
+            # Add Volume section with surge data
+            message_parts.append("**📊 Volume:**")
+            surge_detected_text = "✅ Yes" if volume_surge_detected else "❌ No"
+            message_parts.append(f"   • **Surge Detected:** {surge_detected_text}")
+            if volume_surge_ratio is not None:
+                message_parts.append(f"   • **Surge Ratio:** {volume_surge_ratio:.2f}x")
+            else:
+                message_parts.append(f"   • **Surge Ratio:** N/A")
+
+            # Add Fundamentals section
+            message_parts.extend([
+                "",
+                "**📈 Fundamentals:**"
+            ])
+
+            # Format shares outstanding
+            if shares_outstanding is not None:
+                if shares_outstanding >= 1_000_000_000:
+                    shares_str = f"{shares_outstanding / 1_000_000_000:.2f}B"
+                elif shares_outstanding >= 1_000_000:
+                    shares_str = f"{shares_outstanding / 1_000_000:.2f}M"
+                else:
+                    shares_str = f"{shares_outstanding:,.0f}"
+                message_parts.append(f"   • **Shares Outstanding:** {shares_str}")
+            else:
+                message_parts.append(f"   • **Shares Outstanding:** N/A")
+
+            # Format float shares
+            if float_shares is not None:
+                if float_shares >= 1_000_000_000:
+                    float_str = f"{float_shares / 1_000_000_000:.2f}B"
+                elif float_shares >= 1_000_000:
+                    float_str = f"{float_shares / 1_000_000:.2f}M"
+                else:
+                    float_str = f"{float_shares:,.0f}"
+                message_parts.append(f"   • **Float Shares:** {float_str}")
+            else:
+                message_parts.append(f"   • **Float Shares:** N/A")
+
+            # Format market cap
+            if market_cap is not None:
+                if market_cap >= 1_000_000_000:
+                    cap_str = f"${market_cap / 1_000_000_000:.2f}B"
+                elif market_cap >= 1_000_000:
+                    cap_str = f"${market_cap / 1_000_000:.2f}M"
+                else:
+                    cap_str = f"${market_cap:,.0f}"
+                message_parts.append(f"   • **Market Cap:** {cap_str}")
+            else:
+                message_parts.append(f"   • **Market Cap:** N/A")
+
+            # Add timestamp
+            message_parts.extend([
                 "",
                 f"⏰ **Time:** {timestamp.strftime('%H:%M:%S ET')}",
                 f"📅 **Date:** {timestamp.strftime('%Y-%m-%d')}"
@@ -1140,12 +1475,16 @@ class MomentumAlertsSystem:
                 'ema_9': float(alert_data['ema_9']),
                 'momentum': float(alert_data['momentum']),
                 'momentum_short': float(alert_data['momentum_short']),
+                'momentum_squeeze': float(alert_data['momentum_squeeze']),
                 'raw_momentum_20': float(alert_data['raw_momentum_20']),
                 'raw_momentum_5': float(alert_data['raw_momentum_5']),
+                'raw_momentum_squeeze': float(alert_data['raw_momentum_squeeze']),
                 'actual_time_diff': float(alert_data['actual_time_diff']),
                 'actual_time_diff_short': float(alert_data['actual_time_diff_short']),
+                'actual_time_diff_squeeze': float(alert_data['actual_time_diff_squeeze']),
                 'momentum_emoji': str(alert_data['momentum_emoji']),
                 'momentum_short_emoji': str(alert_data['momentum_short_emoji']),
+                'squeeze_emoji': str(alert_data['squeeze_emoji']),
                 'is_halted': bool(alert_data['is_halted']),
                 'halt_emoji': str(alert_data['halt_emoji']),
                 'current_volume': int(alert_data['current_volume']),
@@ -1156,7 +1495,13 @@ class MomentumAlertsSystem:
                 'indicators': self._serialize_indicators(alert_data['indicators']),
                 'from_gainers': bool(alert_data.get('from_gainers', False)),
                 'from_volume_surge': bool(alert_data.get('from_volume_surge', False)),
-                'oracle': bool(alert_data.get('oracle', False))
+                'oracle': bool(alert_data.get('oracle', False)),
+                'volume_surge_detected': bool(alert_data.get('volume_surge_detected', False)),
+                'volume_surge_ratio': float(alert_data['volume_surge_ratio']) if alert_data.get('volume_surge_ratio') is not None else None,
+                'shares_outstanding': float(alert_data['shares_outstanding']) if alert_data.get('shares_outstanding') is not None else None,
+                'float_shares': float(alert_data['float_shares']) if alert_data.get('float_shares') is not None else None,
+                'market_cap': float(alert_data['market_cap']) if alert_data.get('market_cap') is not None else None,
+                'fundamental_source': str(alert_data.get('fundamental_source', 'none'))
             }
 
             # Save to JSON file
@@ -1200,12 +1545,16 @@ class MomentumAlertsSystem:
                 'ema_9': float(alert_data['ema_9']),
                 'momentum': float(alert_data['momentum']),
                 'momentum_short': float(alert_data['momentum_short']),
+                'momentum_squeeze': float(alert_data['momentum_squeeze']),
                 'raw_momentum_20': float(alert_data['raw_momentum_20']),
                 'raw_momentum_5': float(alert_data['raw_momentum_5']),
+                'raw_momentum_squeeze': float(alert_data['raw_momentum_squeeze']),
                 'actual_time_diff': float(alert_data['actual_time_diff']),
                 'actual_time_diff_short': float(alert_data['actual_time_diff_short']),
+                'actual_time_diff_squeeze': float(alert_data['actual_time_diff_squeeze']),
                 'momentum_emoji': str(alert_data['momentum_emoji']),
                 'momentum_short_emoji': str(alert_data['momentum_short_emoji']),
+                'squeeze_emoji': str(alert_data['squeeze_emoji']),
                 'is_halted': bool(alert_data['is_halted']),
                 'halt_emoji': str(alert_data['halt_emoji']),
                 'current_volume': int(alert_data['current_volume']),
@@ -1218,7 +1567,13 @@ class MomentumAlertsSystem:
                 'indicators': self._serialize_indicators(alert_data['indicators']),
                 'from_gainers': bool(alert_data.get('from_gainers', False)),
                 'from_volume_surge': bool(alert_data.get('from_volume_surge', False)),
-                'oracle': bool(alert_data.get('oracle', False))
+                'oracle': bool(alert_data.get('oracle', False)),
+                'volume_surge_detected': bool(alert_data.get('volume_surge_detected', False)),
+                'volume_surge_ratio': float(alert_data['volume_surge_ratio']) if alert_data.get('volume_surge_ratio') is not None else None,
+                'shares_outstanding': float(alert_data['shares_outstanding']) if alert_data.get('shares_outstanding') is not None else None,
+                'float_shares': float(alert_data['float_shares']) if alert_data.get('float_shares') is not None else None,
+                'market_cap': float(alert_data['market_cap']) if alert_data.get('market_cap') is not None else None,
+                'fundamental_source': str(alert_data.get('fundamental_source', 'none'))
             }
 
             # Save to JSON file

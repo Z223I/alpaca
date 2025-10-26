@@ -21,6 +21,7 @@ class MomentumAlertsConfig:
     momentum_long_period: int = 60      # Future use - long-term momentum
     momentum_period: int = 15           # Standard 20-minute momentum
     momentum_short_period: int = 5      # Short-term 5-minute momentum
+    squeeze_duration: int = 10          # Squeeze detection period
 
     # Momentum threshold constants (per minute percentage values)
     # Based on existing system green_threshold of 0.60
@@ -201,3 +202,21 @@ def get_volume_color_emoji(volume: int) -> str:
         return "🟡"  # Yellow - medium volume
     else:
         return "🔴"  # Red - low volume
+
+
+def get_squeeze_emoji(momentum_per_minute: float) -> str:
+    """
+    Get squeeze indicator emoji based on momentum per minute.
+
+    Args:
+        momentum_per_minute: Momentum value (percent per minute)
+
+    Returns:
+        Emoji string for squeeze indicator
+        ✅ for squeezing (>= 1.0% per minute)
+        ⏸️ for not squeezing (< 1.0% per minute)
+    """
+    if momentum_per_minute >= 1.0:
+        return "✅"  # Squeezing - high momentum
+    else:
+        return "⏸️"  # Not squeezing
