@@ -1351,6 +1351,28 @@ class MomentumAlertsSystem:
             else:
                 message_parts.append(f"   • **Market Cap:** N/A")
 
+            # Add Sources section with green/red light indicators
+            from_gainers = alert_data.get('from_gainers', False)
+            from_volume_surge = alert_data.get('from_volume_surge', False)
+            oracle = alert_data.get('oracle', False)
+
+            message_parts.extend([
+                "",
+                "**🔍 Sources:**"
+            ])
+
+            # Gainers source indicator
+            gainers_indicator = "🟢" if from_gainers else "🔴"
+            message_parts.append(f"   • **Top Gainers:** {gainers_indicator}")
+
+            # Volume surge source indicator
+            volume_indicator = "🟢" if from_volume_surge else "🔴"
+            message_parts.append(f"   • **Volume Surge:** {volume_indicator}")
+
+            # Oracle source indicator
+            oracle_indicator = "🟢" if oracle else "🔴"
+            message_parts.append(f"   • **Oracle:** {oracle_indicator}")
+
             # Add timestamp
             message_parts.extend([
                 "",
