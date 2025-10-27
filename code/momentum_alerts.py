@@ -466,8 +466,8 @@ class MomentumAlertsSystem:
         ]
         cmd.extend(symbols)
         cmd.extend([
-            "--volume-surge", "2.0",
             "--surge-days", "50",
+            "--volume-surge", "5.0",
             "--export-csv", "symbol_list.csv",
             "--verbose"
         ])
