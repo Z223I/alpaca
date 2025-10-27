@@ -110,7 +110,7 @@ class AlpacaStreamClient:
 
             self.websocket = await websockets.connect(
                 self.websocket_url,
-                timeout=self.timeout
+                open_timeout=self.timeout
             )
 
             self.state = StreamState.CONNECTED
