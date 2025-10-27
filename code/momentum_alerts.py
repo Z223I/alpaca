@@ -990,7 +990,78 @@ class MomentumAlertsSystem:
             self.logger.error(f"❌ Error collecting stock data: {e}")
             return {}
 
-    def _check_momentum_criteria(self, symbol: str, data: pd.DataFrame, symbol_metadata: Optional[Dict] = None) -> Optional[Dict]:
+    async def _collect_hourly_volume_data(self, symbols: List[str]) -> Dict[str, int]:
+        """
+        Collect 1-hour candlesticks from 04:00 ET to now and sum volume for float rotation.
+
+        Args:
+            symbols: List of symbols to collect hourly volume for
+
+        Returns:
+            Dictionary mapping symbols to their total volume since 04:00 ET
+        """
+        if not symbols or not self.historical_client:
+            return {}
+
+        try:
+            volume_dict = {}
+
+            # Calculate time range (04:00 ET today to now)
+            current_et = datetime.now(self.et_tz)
+
+            # Start at 04:00 ET today
+            start_time = current_et.replace(hour=4, minute=0, second=0, microsecond=0)
+
+            # If current time is before 04:00 ET, use yesterday's 04:00 ET
+            if current_et.hour < 4:
+                start_time = start_time - timedelta(days=1)
+
+            end_time = current_et
+
+            self.logger.debug(f"📊 Fetching hourly volume from {start_time.strftime('%H:%M ET')} to {end_time.strftime('%H:%M ET')}")
+
+            # Collect hourly data for each symbol
+            for symbol in symbols:
+                try:
+                    # Fetch 1-hour bars
+                    bars = self.historical_client.get_bars(
+                        symbol,
+                        tradeapi.TimeFrame(1, tradeapi.TimeFrameUnit.Hour),  # 1-hour bars
+                        start=start_time.astimezone(pytz.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                        end=end_time.astimezone(pytz.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                        limit=100,  # Up to 100 hours
+                        feed='sip'
+                    )
+
+                    if bars and len(bars) > 0:
+                        # Sum volume from all hourly bars
+                        total_volume = 0
+                        bar_count = 0
+
+                        for bar in bars:
+                            total_volume += int(bar.v)
+                            bar_count += 1
+
+                        volume_dict[symbol] = total_volume
+
+                        self.logger.debug(
+                            f"📊 {symbol}: Summed {bar_count} hourly bars "
+                            f"(04:00 ET to now) = {total_volume:,} volume")
+
+                except Exception as symbol_error:
+                    self.logger.debug(f"⚠️ Error collecting hourly volume for {symbol}: {symbol_error}")
+                    continue
+
+            if volume_dict:
+                self.logger.debug(f"📊 Collected hourly volume for {len(volume_dict)} symbols")
+
+            return volume_dict
+
+        except Exception as e:
+            self.logger.error(f"❌ Error collecting hourly volume data: {e}")
+            return {}
+
+    def _check_momentum_criteria(self, symbol: str, data: pd.DataFrame, symbol_metadata: Optional[Dict] = None, hourly_volume: Optional[int] = None) -> Optional[Dict]:
         """
         Check if a stock meets momentum alert criteria.
 
@@ -998,6 +1069,7 @@ class MomentumAlertsSystem:
             symbol: Stock symbol
             data: DataFrame with OHLCV data
             symbol_metadata: Symbol metadata dict containing market_open_price and boolean source fields
+            hourly_volume: Total volume from 1-hour bars (04:00 ET to now) for float rotation
 
         Returns:
             Alert data dictionary if criteria met, None otherwise
@@ -1031,6 +1103,25 @@ class MomentumAlertsSystem:
 
             current_vwap = float(latest_bar['vwap'])  # VWAP from stock data (bar.vw attribute)
             current_volume = int(latest_bar['v'])  # Get current volume
+
+            # Calculate float rotation using hourly volume data (04:00 ET to now)
+            # Float Rotation = Total Volume (hourly bars from 04:00 ET) / Float Shares
+            total_volume_since_0400 = None
+            float_rotation = None
+            float_rotation_percent = None
+
+            if float_shares and float_shares > 0 and hourly_volume is not None:
+                # Use hourly volume sum from 04:00 ET
+                total_volume_since_0400 = hourly_volume
+
+                # Calculate float rotation as a ratio
+                float_rotation = total_volume_since_0400 / float_shares
+                float_rotation_percent = float_rotation * 100
+
+                self.logger.debug(
+                    f"📊 {symbol}: Volume since 04:00 ET: {total_volume_since_0400:,} | "
+                    f"Float: {float_shares:,} | "
+                    f"Float Rotation: {float_rotation:.4f}x ({float_rotation_percent:.2f}%)")
 
             self.logger.debug(f"📊 {symbol}: Using VWAP from stock data: ${current_vwap:.2f}")
 
@@ -1221,7 +1312,10 @@ class MomentumAlertsSystem:
                 'shares_outstanding': shares_outstanding,
                 'float_shares': float_shares,
                 'market_cap': market_cap,
-                'fundamental_source': fundamental_source
+                'fundamental_source': fundamental_source,
+                'total_volume_since_0400': total_volume_since_0400,
+                'float_rotation': float_rotation,
+                'float_rotation_percent': float_rotation_percent
             }
 
             self.logger.info(f"✅ {symbol}: Momentum alert criteria met!")
@@ -1272,6 +1366,9 @@ class MomentumAlertsSystem:
             float_shares = alert_data.get('float_shares')
             market_cap = alert_data.get('market_cap')
             fundamental_source = alert_data.get('fundamental_source', 'none')
+            total_volume_since_0400 = alert_data.get('total_volume_since_0400')
+            float_rotation = alert_data.get('float_rotation')
+            float_rotation_percent = alert_data.get('float_rotation_percent')
 
             # Create alert message (VWAP is from stock data, not calculated)
             message_parts = [
@@ -1308,6 +1405,13 @@ class MomentumAlertsSystem:
                 message_parts.append(f"   • **Surge Ratio:** {volume_surge_ratio:.2f}x")
             else:
                 message_parts.append(f"   • **Surge Ratio:** N/A")
+
+            # Add float rotation data (calculated from hourly bars since 04:00 ET)
+            if float_rotation is not None and total_volume_since_0400 is not None:
+                message_parts.append(f"   • **Volume (since 04:00 ET):** {total_volume_since_0400:,}")
+                message_parts.append(f"   • **Float Rotation:** {float_rotation:.4f}x ({float_rotation_percent:.2f}%)")
+            else:
+                message_parts.append(f"   • **Float Rotation:** N/A")
 
             # Add Fundamentals section
             message_parts.extend([
@@ -1523,7 +1627,10 @@ class MomentumAlertsSystem:
                 'shares_outstanding': float(alert_data['shares_outstanding']) if alert_data.get('shares_outstanding') is not None else None,
                 'float_shares': float(alert_data['float_shares']) if alert_data.get('float_shares') is not None else None,
                 'market_cap': float(alert_data['market_cap']) if alert_data.get('market_cap') is not None else None,
-                'fundamental_source': str(alert_data.get('fundamental_source', 'none'))
+                'fundamental_source': str(alert_data.get('fundamental_source', 'none')),
+                'total_volume_since_0400': int(alert_data['total_volume_since_0400']) if alert_data.get('total_volume_since_0400') is not None else None,
+                'float_rotation': float(alert_data['float_rotation']) if alert_data.get('float_rotation') is not None else None,
+                'float_rotation_percent': float(alert_data['float_rotation_percent']) if alert_data.get('float_rotation_percent') is not None else None
             }
 
             # Save to JSON file
@@ -1595,7 +1702,10 @@ class MomentumAlertsSystem:
                 'shares_outstanding': float(alert_data['shares_outstanding']) if alert_data.get('shares_outstanding') is not None else None,
                 'float_shares': float(alert_data['float_shares']) if alert_data.get('float_shares') is not None else None,
                 'market_cap': float(alert_data['market_cap']) if alert_data.get('market_cap') is not None else None,
-                'fundamental_source': str(alert_data.get('fundamental_source', 'none'))
+                'fundamental_source': str(alert_data.get('fundamental_source', 'none')),
+                'total_volume_since_0400': int(alert_data['total_volume_since_0400']) if alert_data.get('total_volume_since_0400') is not None else None,
+                'float_rotation': float(alert_data['float_rotation']) if alert_data.get('float_rotation') is not None else None,
+                'float_rotation_percent': float(alert_data['float_rotation_percent']) if alert_data.get('float_rotation_percent') is not None else None
             }
 
             # Save to JSON file
@@ -1618,13 +1728,19 @@ class MomentumAlertsSystem:
                     symbols_list = list(self.monitored_symbols.keys())
                     stock_data = await self._collect_stock_data(symbols_list)
 
+                    # Collect hourly volume data (04:00 ET to now) for float rotation
+                    hourly_volume_data = await self._collect_hourly_volume_data(symbols_list)
+
                     # Check each symbol for momentum alerts
                     for symbol in symbols_list:
                         if symbol in stock_data:
                             # Get symbol metadata (includes market_open_price and boolean source fields)
                             symbol_metadata = self.monitored_symbols.get(symbol, {})
 
-                            alert_data = self._check_momentum_criteria(symbol, stock_data[symbol], symbol_metadata)
+                            # Get hourly volume for this symbol (if available)
+                            hourly_volume = hourly_volume_data.get(symbol)
+
+                            alert_data = self._check_momentum_criteria(symbol, stock_data[symbol], symbol_metadata, hourly_volume)
                             if alert_data:
                                 await self._send_momentum_alert(alert_data)
 
