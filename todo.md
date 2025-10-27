@@ -219,7 +219,7 @@ Then read historical_data/YYYY-MM-DD/scanner/symbol_list.csv and obtain the fiel
 Include these new fields in the momentum alerts in a new "Volume" section and call them "Surge Detected", and "Surge Ratio".
 - [X] THINK HARD.  Update code/momentum_alerts.py: There is already "Momentum" and "Momentum Short" fields that use values from a config file to calculate percent gain per minute.  Add a new value to the config file for squeeze duration = 10. Add a new field "Squeezing" after "Momentum Short".  Display a green checkmark if the percent gain per minute is >= 1%. Pick another emoji if false.
 - [X] ULTRATHINK.  Create an atom in ./atoms/api to use polygon.io to retrieve shares_outstanding, float_shares, market_cap.  If that fails, use Yahoo Finance to retrieve the information. Update code/momentum_alerts.py: When collecting the symbols, save those fields. Create a new section in the momentum alerts above the timestamp at the end of the alert and include the fields "Shares Outstanding", "Float Shares", and "Market Cap". Pick an appropriate name for the section.
-- [ ] THINK HARD.  Update code/momentum_alerts.py: Update
+- [X] THINK HARD.  Update code/momentum_alerts.py: Update
 ```bash
 code/alpaca_screener.py --symbols {symbol list} --export-csv symbol_list.csv
 ```
@@ -227,11 +227,8 @@ to
 ```bash
 code/alpaca_screener.py --symbols {symbol list} --surge-days 50  --volume-surge 5.0 --export-csv symbol_list.csv
 ```
-
-
-
-
-- [ ] Float Rotation
+- [X] ULTRATHINK. Research Alpaca Trading API v2 and see if there is a way to obtain float rotation for stocks.
+- [X] ULTRATHINK. The float rotation is being calculated on the last 30 minutes of data.  Instead use code/alpaca.py to retrieve one hour candlesticks starting at 0400 ET and sum the volume from those.
 
 ## Update Top Gainers
 
