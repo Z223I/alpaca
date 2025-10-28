@@ -12,10 +12,15 @@ import os
 import re
 import signal
 import sys
+import tempfile
 import time
 from datetime import datetime
 from typing import Dict, List, Optional
 
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
+import matplotlib.pyplot as plt
+import pandas as pd
 import requests
 
 # Add project root to path
@@ -607,8 +612,37 @@ the prior trading day results will be given.
             # Execute alpaca_screener.py script
             result = self._execute_volume_surge_command()
 
-            # Send result back to user
-            self._send_response(chat_id, result)
+            # Check if result contains an image
+            if result.startswith("IMAGE:"):
+                # Extract image path and caption
+                parts = result.split(":", 2)
+                if len(parts) == 3:
+                    image_path = parts[1]
+                    caption = parts[2]
+
+                    # Send the image
+                    success = self.image_sender._send_image_to_chat(
+                        chat_id=chat_id,
+                        image_path=image_path,
+                        caption=caption,
+                        urgent=False
+                    )
+
+                    if success:
+                        self._log(f"✅ Volume surge table image sent to {display_name}")
+                        # Clean up temporary image file
+                        try:
+                            os.remove(image_path)
+                            self._log(f"🗑️ Cleaned up temporary image: {image_path}")
+                        except Exception as e:
+                            self._log(f"⚠️ Failed to clean up image {image_path}: {e}", "WARN")
+                    else:
+                        self._send_response(chat_id, "❌ Failed to send table image")
+                else:
+                    self._send_response(chat_id, result)
+            else:
+                # Send result back to user as text
+                self._send_response(chat_id, result)
 
         except Exception as e:
             self._log(f"Error handling volume surge command: {e}", "ERROR")
@@ -627,8 +661,37 @@ the prior trading day results will be given.
             # Execute alpaca.py --top-gainers --limit 40
             result = self._execute_alpaca_top_gainers_command()
 
-            # Send result back to user
-            self._send_response(chat_id, result)
+            # Check if result contains an image
+            if result.startswith("IMAGE:"):
+                # Extract image path and caption
+                parts = result.split(":", 2)
+                if len(parts) == 3:
+                    image_path = parts[1]
+                    caption = parts[2]
+
+                    # Send the image
+                    success = self.image_sender._send_image_to_chat(
+                        chat_id=chat_id,
+                        image_path=image_path,
+                        caption=caption,
+                        urgent=False
+                    )
+
+                    if success:
+                        self._log(f"✅ Top gainers table image sent to {display_name}")
+                        # Clean up temporary image file
+                        try:
+                            os.remove(image_path)
+                            self._log(f"🗑️ Cleaned up temporary image: {image_path}")
+                        except Exception as e:
+                            self._log(f"⚠️ Failed to clean up image {image_path}: {e}", "WARN")
+                    else:
+                        self._send_response(chat_id, "❌ Failed to send table image")
+                else:
+                    self._send_response(chat_id, result)
+            else:
+                # Send result back to user as text
+                self._send_response(chat_id, result)
 
         except Exception as e:
             self._log(f"Error handling top gainers command: {e}", "ERROR")
@@ -1084,7 +1147,7 @@ the prior trading day results will be given.
             return f"❌ Error executing Oracle Signal command: {str(e)}"
 
     def _execute_alpaca_top_gainers_command(self) -> str:
-        """Execute code/alpaca.py --top-gainers --limit 40 and return output."""
+        """Execute code/alpaca.py --top-gainers --limit 40 and return output as image."""
         try:
             import subprocess
 
@@ -1117,7 +1180,28 @@ the prior trading day results will be given.
 
             if result.returncode == 0:
                 if output:
-                    return f"🚀 Top Gainers (Top 40):\n```\n{output}\n```"
+                    # Parse the output to CSV
+                    csv_content = self._parse_top_gainers_to_csv(output)
+
+                    if csv_content:
+                        # Format CSV to 3 decimal places
+                        formatted_csv = self._format_csv_decimals(csv_content, decimal_places=3)
+
+                        # Create table image from CSV
+                        image_path = self._create_csv_table_image(
+                            formatted_csv,
+                            title="Top Gainers (Top 40)"
+                        )
+
+                        if image_path:
+                            # Image created successfully
+                            return f"IMAGE:{image_path}:🚀 Top Gainers (Top 40)"
+                        else:
+                            # Fallback to text if image creation failed
+                            return f"🚀 Top Gainers (Top 40):\n```\n{output}\n```"
+                    else:
+                        # Fallback to text if parsing failed
+                        return f"🚀 Top Gainers (Top 40):\n```\n{output}\n```"
                 else:
                     return "🚀 Top Gainers executed successfully (no output)"
             else:
@@ -1133,7 +1217,6 @@ the prior trading day results will be given.
         """Execute alpaca_screener.py command and return output with CSV file contents."""
         try:
             import subprocess
-            import glob
 
             # Get project root directory
             project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -1196,10 +1279,20 @@ the prior trading day results will be given.
                         # Format CSV content to 3 decimal places
                         formatted_csv = self._format_csv_decimals(csv_content, decimal_places=3)
 
-                        # Return the CSV content
-                        return (f"📈 Volume Surge Scanner Results:\n\n"
-                                f"📄 **File:** `{csv_file_path}`\n\n"
-                                f"```csv\n{formatted_csv}\n```")
+                        # Create table image from CSV
+                        image_path = self._create_csv_table_image(
+                            formatted_csv,
+                            title="Volume Surge Scanner Results"
+                        )
+
+                        if image_path:
+                            # Image created successfully - return special marker for image sending
+                            return f"IMAGE:{image_path}:📈 Volume Surge Scanner Results - File: {csv_file_path}"
+                        else:
+                            # Fallback to text if image creation failed
+                            return (f"📈 Volume Surge Scanner Results:\n\n"
+                                    f"📄 **File:** `{csv_file_path}`\n\n"
+                                    f"```csv\n{formatted_csv}\n```")
 
                     except FileNotFoundError:
                         return (f"📈 Scanner completed successfully but CSV file not found "
@@ -1223,7 +1316,6 @@ the prior trading day results will be given.
         """Execute alpaca_screener.py command for top gainers and return output with CSV file contents."""
         try:
             import subprocess
-            import glob
 
             # Get project root directory
             project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -1320,8 +1412,37 @@ the prior trading day results will be given.
             # Execute premarket_top_gainers.py script
             result = self._execute_premarket_top_gainers_command()
 
-            # Send result back to user
-            self._send_response(chat_id, result)
+            # Check if result contains an image
+            if result.startswith("IMAGE:"):
+                # Extract image path and caption
+                parts = result.split(":", 2)
+                if len(parts) == 3:
+                    image_path = parts[1]
+                    caption = parts[2]
+
+                    # Send the image
+                    success = self.image_sender._send_image_to_chat(
+                        chat_id=chat_id,
+                        image_path=image_path,
+                        caption=caption,
+                        urgent=False
+                    )
+
+                    if success:
+                        self._log(f"✅ Premarket top gainers table image sent to {display_name}")
+                        # Clean up temporary image file
+                        try:
+                            os.remove(image_path)
+                            self._log(f"🗑️ Cleaned up temporary image: {image_path}")
+                        except Exception as e:
+                            self._log(f"⚠️ Failed to clean up image {image_path}: {e}", "WARN")
+                    else:
+                        self._send_response(chat_id, "❌ Failed to send table image")
+                else:
+                    self._send_response(chat_id, result)
+            else:
+                # Send result back to user as text
+                self._send_response(chat_id, result)
 
         except Exception as e:
             self._log(f"Error handling premarket top gainers command: {e}", "ERROR")
@@ -1340,8 +1461,37 @@ the prior trading day results will be given.
             # Execute market_open_top_gainers.py script
             result = self._execute_market_open_top_gainers_command()
 
-            # Send result back to user
-            self._send_response(chat_id, result)
+            # Check if result contains an image
+            if result.startswith("IMAGE:"):
+                # Extract image path and caption
+                parts = result.split(":", 2)
+                if len(parts) == 3:
+                    image_path = parts[1]
+                    caption = parts[2]
+
+                    # Send the image
+                    success = self.image_sender._send_image_to_chat(
+                        chat_id=chat_id,
+                        image_path=image_path,
+                        caption=caption,
+                        urgent=False
+                    )
+
+                    if success:
+                        self._log(f"✅ Market open top gainers table image sent to {display_name}")
+                        # Clean up temporary image file
+                        try:
+                            os.remove(image_path)
+                            self._log(f"🗑️ Cleaned up temporary image: {image_path}")
+                        except Exception as e:
+                            self._log(f"⚠️ Failed to clean up image {image_path}: {e}", "WARN")
+                    else:
+                        self._send_response(chat_id, "❌ Failed to send table image")
+                else:
+                    self._send_response(chat_id, result)
+            else:
+                # Send result back to user as text
+                self._send_response(chat_id, result)
 
         except Exception as e:
             self._log(f"Error handling market open top gainers command: {e}", "ERROR")
@@ -1398,7 +1548,6 @@ the prior trading day results will be given.
         """Execute premarket_top_gainers.py command and return output with CSV file contents."""
         try:
             import subprocess
-            import glob
 
             # Get project root directory
             project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -1459,10 +1608,20 @@ the prior trading day results will be given.
                         # Format CSV content to 3 decimal places
                         formatted_csv = self._format_csv_decimals(csv_content, decimal_places=3)
 
-                        # Return the CSV content
-                        return (f"🌅 Premarket Top Gainers Scanner Results:\n\n"
-                                f"📄 **File:** `{csv_file_path}`\n\n"
-                                f"```csv\n{formatted_csv}\n```")
+                        # Create table image from CSV
+                        image_path = self._create_csv_table_image(
+                            formatted_csv,
+                            title="Premarket Top Gainers Scanner Results"
+                        )
+
+                        if image_path:
+                            # Image created successfully - return special marker for image sending
+                            return f"IMAGE:{image_path}:🌅 Premarket Top Gainers Scanner Results - File: {csv_file_path}"
+                        else:
+                            # Fallback to text if image creation failed
+                            return (f"🌅 Premarket Top Gainers Scanner Results:\n\n"
+                                    f"📄 **File:** `{csv_file_path}`\n\n"
+                                    f"```csv\n{formatted_csv}\n```")
 
                     except FileNotFoundError:
                         return (f"🌅 Scanner completed successfully but CSV file not found "
@@ -1486,7 +1645,6 @@ the prior trading day results will be given.
         """Execute market_open_top_gainers.py command and return output with CSV file contents."""
         try:
             import subprocess
-            import glob
 
             # Get project root directory
             project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -1547,10 +1705,20 @@ the prior trading day results will be given.
                         # Format CSV content to 3 decimal places
                         formatted_csv = self._format_csv_decimals(csv_content, decimal_places=3)
 
-                        # Return the CSV content
-                        return (f"📈 Market Open Top Gainers Scanner Results:\n\n"
-                                f"📄 **File:** `{csv_file_path}`\n\n"
-                                f"```csv\n{formatted_csv}\n```")
+                        # Create table image from CSV
+                        image_path = self._create_csv_table_image(
+                            formatted_csv,
+                            title="Market Open Top Gainers Scanner Results"
+                        )
+
+                        if image_path:
+                            # Image created successfully - return special marker for image sending
+                            return f"IMAGE:{image_path}:📈 Market Open Top Gainers Scanner Results - File: {csv_file_path}"
+                        else:
+                            # Fallback to text if image creation failed
+                            return (f"📈 Market Open Top Gainers Scanner Results:\n\n"
+                                    f"📄 **File:** `{csv_file_path}`\n\n"
+                                    f"```csv\n{formatted_csv}\n```")
 
                     except FileNotFoundError:
                         return (f"📈 Scanner completed successfully but CSV file not found "
@@ -1575,14 +1743,14 @@ the prior trading day results will be given.
         try:
             import csv
             import io
-            
+
             # Parse CSV content
             csv_reader = csv.reader(io.StringIO(csv_content))
             rows = list(csv_reader)
-            
+
             if not rows:
                 return csv_content
-            
+
             # Process each row
             formatted_rows = []
             for i, row in enumerate(rows):
@@ -1613,19 +1781,179 @@ the prior trading day results will be given.
                         except (ValueError, TypeError):
                             # Not a number, keep original
                             formatted_cell = cell
-                        
+
                         formatted_row.append(formatted_cell)
                     formatted_rows.append(formatted_row)
-            
+
             # Convert back to CSV string
             output = io.StringIO()
             csv_writer = csv.writer(output)
             csv_writer.writerows(formatted_rows)
             return output.getvalue().strip()
-            
-        except Exception as e:
+
+        except Exception:
             # If formatting fails, return original content
             return csv_content
+
+    def _parse_top_gainers_to_csv(self, output: str) -> Optional[str]:
+        """Parse alpaca.py --top-gainers output and convert to CSV format.
+
+        Args:
+            output: Text output from alpaca.py --top-gainers
+
+        Returns:
+            CSV content as string, or None if parsing fails
+        """
+        try:
+            lines = output.split('\n')
+            csv_rows = []
+
+            # Find the header line and data lines
+            in_data_section = False
+            for line in lines:
+                line = line.strip()
+
+                # Skip empty lines and separators
+                if not line or line.startswith('=') or line.startswith('-'):
+                    continue
+
+                # Skip title line
+                if 'TOP GAINERS' in line.upper():
+                    continue
+
+                # Skip last updated line
+                if 'Last Updated:' in line:
+                    continue
+
+                # Look for header line
+                if 'Rank' in line and 'Symbol' in line:
+                    # This is the header
+                    csv_rows.append(['Rank', 'Symbol', 'Price', 'Change', '% Change'])
+                    in_data_section = True
+                    continue
+
+                # Parse data lines
+                if in_data_section:
+                    # Expected format: "1      VSEEW      $0.11        $0.08            244.06%"
+                    parts = line.split()
+                    if len(parts) >= 5:
+                        rank = parts[0]
+                        symbol = parts[1]
+                        price = parts[2].replace('$', '')
+                        change = parts[3].replace('$', '')
+                        pct_change = parts[4].replace('%', '')
+
+                        csv_rows.append([rank, symbol, price, change, pct_change])
+
+            if len(csv_rows) <= 1:  # Only header or no data
+                self._log("No data rows found in top gainers output", "WARN")
+                return None
+
+            # Convert to CSV string
+            csv_content = '\n'.join([','.join(row) for row in csv_rows])
+            return csv_content
+
+        except Exception as e:
+            self._log(f"Error parsing top gainers output: {e}", "ERROR")
+            return None
+
+    def _create_csv_table_image(self, csv_content: str, title: str = "Results") -> Optional[str]:
+        """Create a colorful table image from CSV content with each column having a unique color.
+
+        Args:
+            csv_content: CSV content as string
+            title: Title for the table
+
+        Returns:
+            Path to the generated image file, or None if failed
+        """
+        try:
+            # Parse CSV into DataFrame
+            df = pd.read_csv(io.StringIO(csv_content))
+
+            if df.empty:
+                self._log("CSV content is empty, cannot create image", "ERROR")
+                return None
+
+            # Limit rows for readability (max 50 rows to fit on screen)
+            max_rows = 50
+            if len(df) > max_rows:
+                self._log(f"Table has {len(df)} rows, showing first {max_rows} rows", "WARN")
+                df = df.head(max_rows)
+
+            # Define color palette for columns (pastel colors for better readability)
+            colors = [
+                '#FFB3BA',  # Light red/pink
+                '#BAFFC9',  # Light green
+                '#BAE1FF',  # Light blue
+                '#FFFFBA',  # Light yellow
+                '#FFDFBA',  # Light orange
+                '#E0BBE4',  # Light purple
+                '#FFDFD3',  # Light peach
+                '#C7CEEA',  # Light periwinkle
+            ]
+
+            # Calculate figure size based on data dimensions
+            num_rows, num_cols = df.shape
+            fig_width = max(12, num_cols * 2)
+            fig_height = max(8, (num_rows + 2) * 0.4)  # +2 for header and title
+
+            # Create figure and axis
+            fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+            ax.axis('off')
+
+            # Add title
+            ax.text(0.5, 0.98, title, ha='center', va='top',
+                   fontsize=16, fontweight='bold', transform=ax.transAxes)
+
+            # Create table
+            table = ax.table(cellText=df.values, colLabels=df.columns,
+                           cellLoc='center', loc='center',
+                           bbox=[0, 0, 1, 0.95])
+
+            # Style the table
+            table.auto_set_font_size(False)
+            table.set_fontsize(9)
+            table.scale(1, 2)
+
+            # Apply colors to columns
+            for i in range(len(df.columns)):
+                # Color for this column (cycle through colors if more columns than colors)
+                col_color = colors[i % len(colors)]
+
+                # Header cell
+                header_cell = table[(0, i)]
+                header_cell.set_facecolor('#4A4A4A')  # Dark gray for header
+                header_cell.set_text_props(weight='bold', color='white')
+
+                # Data cells in this column
+                for j in range(len(df)):
+                    cell = table[(j + 1, i)]
+                    cell.set_facecolor(col_color)
+                    cell.set_text_props(color='black')
+
+                    # Add border
+                    cell.set_edgecolor('white')
+                    cell.set_linewidth(1.5)
+
+            # Adjust layout
+            plt.tight_layout()
+
+            # Save to temporary file
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png', prefix='table_')
+            image_path = temp_file.name
+            temp_file.close()
+
+            plt.savefig(image_path, dpi=150, bbox_inches='tight',
+                       facecolor='white', edgecolor='none')
+            plt.close(fig)
+
+            self._log(f"Created table image: {image_path}")
+            return image_path
+
+        except Exception as e:
+            self._log(f"Error creating table image: {e}", "ERROR")
+            return None
 
     def _split_message(self, message: str, max_length: int = 4096) -> List[str]:
         """Split a large message into smaller chunks that fit Telegram's limits.
