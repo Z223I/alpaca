@@ -19,7 +19,7 @@ class MomentumAlertsConfig:
 
     # Time period constants for momentum calculations (in minutes)
     momentum_long_period: int = 60      # Future use - long-term momentum
-    momentum_period: int = 15           # Standard 20-minute momentum
+    momentum_period: int = 10           # Standard 10-minute momentum
     momentum_short_period: int = 5      # Short-term 5-minute momentum
     squeeze_duration: int = 10          # Squeeze detection period
 
