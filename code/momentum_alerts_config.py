@@ -213,10 +213,10 @@ def get_squeeze_emoji(momentum_per_minute: float) -> str:
 
     Returns:
         Emoji string for squeeze indicator
-        ✅ for squeezing (>= 1.0% per minute)
-        ⏸️ for not squeezing (< 1.0% per minute)
+        🟢 for squeezing (>= 1.0% per minute)
+        🔴 for not squeezing (< 1.0% per minute)
     """
     if momentum_per_minute >= 1.0:
-        return "✅"  # Squeezing - high momentum
+        return "🟢"  # Squeezing - high momentum
     else:
-        return "⏸️"  # Not squeezing
+        return "🔴"  # Not squeezing

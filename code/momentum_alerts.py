@@ -1409,7 +1409,7 @@ class MomentumAlertsSystem:
             # Add float rotation data (calculated from hourly bars since 04:00 ET)
             if float_rotation is not None and total_volume_since_0400 is not None:
                 message_parts.append(f"   • **Volume (since 04:00 ET):** {total_volume_since_0400:,}")
-                message_parts.append(f"   • **Float Rotation:** {float_rotation:.4f}x ({float_rotation_percent:.2f}%)")
+                message_parts.append(f"   • **Float Rotation:** {float_rotation:.2f}x")
             else:
                 message_parts.append(f"   • **Float Rotation:** N/A")
 
