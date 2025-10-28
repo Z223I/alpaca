@@ -720,13 +720,18 @@ class MomentumAlertsSystem:
         if self.volume_surge_csv_path.exists():
             try:
                 volume_surge_count = 0
+                volume_surge_updated_count = 0
                 with open(self.volume_surge_csv_path, 'r') as f:
                     reader = csv.DictReader(f)
                     for row in reader:
                         symbol = row.get('symbol', '').strip().upper()
-                        # Filter: must have symbol, not end in 'W', and not already in dict
-                        if symbol and not symbol.endswith('W') and symbol not in symbols_dict:
-                            if volume_surge_count < 5:  # Only keep first 5
+                        # Filter: must have symbol and not end in 'W'
+                        if symbol and not symbol.endswith('W'):
+                            if symbol in symbols_dict:
+                                # Symbol already exists - update from_volume_surge flag
+                                symbols_dict[symbol]['from_volume_surge'] = True
+                                volume_surge_updated_count += 1
+                            elif volume_surge_count < 5:  # Only add first 5 new symbols
                                 # Store symbol without market open price (volume surge CSV doesn't have it)
                                 symbols_dict[symbol] = {
                                     'source': 'volume_surge_csv',
@@ -737,9 +742,13 @@ class MomentumAlertsSystem:
                                 }
                                 volume_surge_count += 1
                             else:
-                                break  # Stop after first 5
+                                continue  # Skip additional symbols beyond first 5 new ones
 
-                self.logger.info(f"📈 Added {volume_surge_count} unique symbols from volume surge CSV (first 5 non-W symbols): {self.volume_surge_csv_path}")
+                self.logger.info(
+                    f"📈 Added {volume_surge_count} unique symbols from "
+                    f"volume surge CSV (first 5 non-W symbols), updated "
+                    f"{volume_surge_updated_count} existing: "
+                    f"{self.volume_surge_csv_path}")
 
             except Exception as e:
                 self.logger.error(f"❌ Error loading volume surge CSV file {self.volume_surge_csv_path}: {e}")
@@ -753,23 +762,32 @@ class MomentumAlertsSystem:
         if data_csv_path.exists():
             try:
                 additional_count = 0
+                oracle_updated_count = 0
                 with open(data_csv_path, 'r') as f:
                     reader = csv.DictReader(f)
                     for row in reader:
                         symbol = row.get('symbol', '').strip().upper()
-                        # Filter: must have symbol, not end in 'W', and not already in dict
-                        if symbol and not symbol.endswith('W') and symbol not in symbols_dict:
-                            # Store symbol without market open price (data CSV may not have it)
-                            symbols_dict[symbol] = {
-                                'source': 'data_csv',
-                                'market_open_price': None,
-                                'from_gainers': False,
-                                'from_volume_surge': False,
-                                'oracle': True
-                            }
-                            additional_count += 1
+                        # Filter: must have symbol and not end in 'W'
+                        if symbol and not symbol.endswith('W'):
+                            if symbol in symbols_dict:
+                                # Symbol already exists - update oracle flag
+                                symbols_dict[symbol]['oracle'] = True
+                                oracle_updated_count += 1
+                            else:
+                                # Store symbol without market open price (data CSV may not have it)
+                                symbols_dict[symbol] = {
+                                    'source': 'data_csv',
+                                    'market_open_price': None,
+                                    'from_gainers': False,
+                                    'from_volume_surge': False,
+                                    'oracle': True
+                                }
+                                additional_count += 1
 
-                self.logger.info(f"📊 Added {additional_count} unique symbols from data CSV (Oracle source): {data_csv_path}")
+                self.logger.info(
+                    f"📊 Added {additional_count} unique symbols from "
+                    f"data CSV (Oracle source), updated "
+                    f"{oracle_updated_count} existing: {data_csv_path}")
 
             except Exception as e:
                 self.logger.error(f"❌ Error loading data CSV file {data_csv_path}: {e}")
