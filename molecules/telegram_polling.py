@@ -621,7 +621,7 @@ the prior trading day results will be given.
             self._log(f"🚀 Top gainers command from {display_name}: {text}")
 
             # Send processing message
-            message = "🚀 Fetching top 40 gainers and losers from Alpaca..."
+            message = "🚀 Fetching top 40 gainers since market open..."
             self._send_response(chat_id, message)
 
             # Execute alpaca.py --top-gainers --limit 40
