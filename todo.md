@@ -207,6 +207,28 @@ Real time charts. Add a bar for the ratio of selling versus buying. Buying to th
 
 - [ ] Create MACD alerts.  Add that to momentum alerts and then use or.  Only use if in the top three or four top gainers. Otherwise there will be too much noise.  It’ll be necessary to store the number for the top gainer.  Look for the MACD atom. Include the number of consecutive green bars in the alert.  Once on the list always on the list until the program is restarted. Do not include symbols that end in a W.
 
+## Index.html
+
+### Config
+
+- [ ] claude --dangerously-skip-permissions
+- [ ] /login
+- [ ] /commit
+- [ ] Sync changes
+- [ ] /clear
+- [ ] run git switch -c feature/market_sentinel_chart
+- [ ] /clear
+- [ ] /read...
+
+### Spec File
+
+- [-] ULTRATHINK. Implement the instructions in specs/market_sentinel_chart.md
+- [ ] Nudge.
+- [ ] /commit
+- [ ] Publish the branch
+- [ ] run git switch master; merge current branch and verify that all changes are merged.
+- [ ] Sync changes
+
 
 ## Update Momentum Alerts
 
