@@ -212,7 +212,7 @@ Real time charts. Add a bar for the ratio of selling versus buying. Buying to th
 ### Config
 
 - [ ] claude --dangerously-skip-permissions
-- [ ] /login
+- [-] /login
 - [ ] /commit
 - [ ] Sync changes
 - [ ] /clear
