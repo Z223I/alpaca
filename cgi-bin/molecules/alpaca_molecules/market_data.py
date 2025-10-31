@@ -27,7 +27,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirna
 
 from atoms.api.init_alpaca_client import init_alpaca_client  # noqa: E402
 from atoms.api.get_latest_quote import get_latest_quote  # noqa: E402
-import alpaca_trade_api as tradeapi  # noqa: E402
+from alpaca.data.historical import StockHistoricalDataClient  # noqa: E402
+from alpaca.data.requests import StockBarsRequest, StockTradesRequest  # noqa: E402
+from alpaca.data.timeframe import TimeFrame, TimeFrameUnit  # noqa: E402
 
 
 class AlpacaMarketData:
@@ -40,14 +42,14 @@ class AlpacaMarketData:
     """
 
     # Mapping of interval strings to Alpaca TimeFrame objects
+    # Note: alpaca-py does not support second-level timeframes
     TIMEFRAME_MAP = {
-        '10s': TimeFrame(10, 'Second'),
-        '20s': TimeFrame(20, 'Second'),
-        '30s': TimeFrame(30, 'Second'),
         '1m': TimeFrame.Minute,
-        '5m': TimeFrame(5, 'Minute'),
-        '30m': TimeFrame(30, 'Minute'),
+        '5m': TimeFrame(5, TimeFrameUnit.Minute),
+        '15m': TimeFrame(15, TimeFrameUnit.Minute),
+        '30m': TimeFrame(30, TimeFrameUnit.Minute),
         '1h': TimeFrame.Hour,
+        '4h': TimeFrame(4, TimeFrameUnit.Hour),
         '1d': TimeFrame.Day,
         '1w': TimeFrame.Week,
         '1mo': TimeFrame.Month,
@@ -133,7 +135,7 @@ class AlpacaMarketData:
 
         Args:
             symbol: Stock symbol
-            timeframe: Bar timeframe ('10s', '20s', '30s', '1m', '5m', '30m', '1h', '1d', '1w', '1mo')
+            timeframe: Bar timeframe ('1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w', '1mo')
             start_date: Start date/time for data
             end_date: End date/time for data
 
@@ -159,18 +161,19 @@ class AlpacaMarketData:
             bars = self.hist_client.get_stock_bars(request_params)
 
             # Convert to DataFrame
-            if symbol in bars:
-                symbol_bars = bars[symbol]
+            # alpaca-py returns a BarSet object with data in bars.data dictionary
+            if hasattr(bars, 'data') and symbol in bars.data:
+                symbol_bars = bars.data[symbol]
                 data = []
                 for bar in symbol_bars:
-                    # CRITICAL: Use single-letter attributes (bar.o, bar.h, bar.l, bar.c, bar.v, bar.t)
+                    # alpaca-py uses full attribute names (not single letters like alpaca-trade-api)
                     data.append({
-                        'timestamp': bar.t,
-                        'open': float(bar.o),
-                        'high': float(bar.h),
-                        'low': float(bar.l),
-                        'close': float(bar.c),
-                        'volume': int(bar.v),
+                        'timestamp': bar.timestamp,
+                        'open': float(bar.open),
+                        'high': float(bar.high),
+                        'low': float(bar.low),
+                        'close': float(bar.close),
+                        'volume': int(bar.volume),
                         'symbol': symbol
                     })
 
@@ -199,7 +202,7 @@ class AlpacaMarketData:
 
         Args:
             symbol: Stock symbol
-            interval: Candlestick interval ('10s', '20s', '30s', '1m', '5m', '30m', '1h', '1d', '1w', '1mo')
+            interval: Candlestick interval ('1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w', '1mo')
             range_str: Display range ('1d', '2d', '5d', '1mo', '1y')
 
         Returns:
@@ -298,15 +301,16 @@ class AlpacaMarketData:
             trades = self.hist_client.get_stock_trades(request_params)
 
             # Convert to list of dictionaries
+            # alpaca-py returns a TradeSet object with data in trades.data dictionary
             trade_list = []
-            if symbol in trades:
-                for trade in trades[symbol]:
+            if hasattr(trades, 'data') and symbol in trades.data:
+                for trade in trades.data[symbol]:
                     trade_list.append({
-                        'timestamp': (trade.t.isoformat() if hasattr(trade, 't')
+                        'timestamp': (trade.timestamp.isoformat() if hasattr(trade, 'timestamp')
                                       else datetime.now(self.et_tz).isoformat()),
-                        'price': float(trade.p) if hasattr(trade, 'p') else 0.0,
-                        'size': int(trade.s) if hasattr(trade, 's') else 0,
-                        'exchange': str(trade.x) if hasattr(trade, 'x') else ''
+                        'price': float(trade.price) if hasattr(trade, 'price') else 0.0,
+                        'size': int(trade.size) if hasattr(trade, 'size') else 0,
+                        'exchange': str(trade.exchange) if hasattr(trade, 'exchange') else ''
                     })
 
             return trade_list

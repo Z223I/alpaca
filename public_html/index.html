@@ -705,11 +705,40 @@
             try {
                 updateStatus('Loading', `Fetching data for ${symbol}...`);
 
-                // TODO: Replace with actual backend API call
-                // For now, use mock data
-                const mockData = generateMockData(symbol, chartData.interval, chartData.range);
+                // Build API URL
+                const indicators = Object.keys(chartData.indicators)
+                    .filter(key => chartData.indicators[key])
+                    .join(',');
 
-                renderChart(symbol, mockData);
+                const apiUrl = `./cgi-bin/api/market_data_api.py?action=chart&symbol=${symbol}&interval=${chartData.interval}&range=${chartData.range}&indicators=${indicators}`;
+
+                // Fetch data from backend API
+                const response = await fetch(apiUrl);
+                const result = await response.json();
+
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to fetch chart data');
+                }
+
+                const data = result.data;
+
+                // Convert bar data to candlestick format for TradingView Lightweight Charts
+                const candlesticks = data.bars.map(bar => ({
+                    time: Math.floor(new Date(bar.timestamp).getTime() / 1000), // Unix timestamp in seconds
+                    open: bar.open,
+                    high: bar.high,
+                    low: bar.low,
+                    close: bar.close
+                }));
+
+                renderChart(symbol, {
+                    candlesticks,
+                    indicators: data.indicators || {},
+                    volume: data.bars.map(bar => ({
+                        time: Math.floor(new Date(bar.timestamp).getTime() / 1000),
+                        value: bar.volume
+                    }))
+                });
 
                 updateStatus('Connected', `${symbol} updated`);
                 document.getElementById('updateTime').textContent =
@@ -717,11 +746,11 @@
 
             } catch (error) {
                 console.error('Error loading chart data:', error);
-                updateStatus('Error', `Failed to load data for ${symbol}`);
+                updateStatus('Error', `Failed to load data for ${symbol}: ${error.message}`);
             }
         }
 
-        // Render chart using Chart.js
+        // Render chart
         function renderChart(symbol, data) {
             const canvasContainer = document.getElementById(`canvas-${symbol}`);
             const loading = canvasContainer.previousElementSibling;
@@ -771,12 +800,106 @@
                 wickDownColor: '#ff6b6b',
             });
 
-            // Set the data
+            // Set the candlestick data
             candlestickSeries.setData(data.candlesticks);
 
             // Store chart reference
             chartData.chart = chart;
             chartData.candlestickSeries = candlestickSeries;
+            chartData.indicatorSeries = {};
+
+            // Add indicator series if available
+            const indicators = data.indicators || {};
+
+            // EMA indicators
+            if (indicators.ema9 && indicators.ema9.length > 0) {
+                const ema9Series = chart.addLineSeries({
+                    color: '#2962FF',
+                    lineWidth: 2,
+                    title: 'EMA(9)'
+                });
+                const ema9Data = indicators.ema9.map(item => ({
+                    time: Math.floor(new Date(item.time).getTime() / 1000),
+                    value: item.value
+                }));
+                ema9Series.setData(ema9Data);
+                chartData.indicatorSeries.ema9 = ema9Series;
+            }
+
+            if (indicators.ema21 && indicators.ema21.length > 0) {
+                const ema21Series = chart.addLineSeries({
+                    color: '#FF6D00',
+                    lineWidth: 2,
+                    title: 'EMA(21)'
+                });
+                const ema21Data = indicators.ema21.map(item => ({
+                    time: Math.floor(new Date(item.time).getTime() / 1000),
+                    value: item.value
+                }));
+                ema21Series.setData(ema21Data);
+                chartData.indicatorSeries.ema21 = ema21Series;
+            }
+
+            if (indicators.ema50 && indicators.ema50.length > 0) {
+                const ema50Series = chart.addLineSeries({
+                    color: '#00E676',
+                    lineWidth: 2,
+                    title: 'EMA(50)'
+                });
+                const ema50Data = indicators.ema50.map(item => ({
+                    time: Math.floor(new Date(item.time).getTime() / 1000),
+                    value: item.value
+                }));
+                ema50Series.setData(ema50Data);
+                chartData.indicatorSeries.ema50 = ema50Series;
+            }
+
+            if (indicators.ema200 && indicators.ema200.length > 0) {
+                const ema200Series = chart.addLineSeries({
+                    color: '#D500F9',
+                    lineWidth: 2,
+                    title: 'EMA(200)'
+                });
+                const ema200Data = indicators.ema200.map(item => ({
+                    time: Math.floor(new Date(item.time).getTime() / 1000),
+                    value: item.value
+                }));
+                ema200Series.setData(ema200Data);
+                chartData.indicatorSeries.ema200 = ema200Series;
+            }
+
+            // VWAP indicator
+            if (indicators.vwap && indicators.vwap.length > 0) {
+                const vwapSeries = chart.addLineSeries({
+                    color: '#FFD600',
+                    lineWidth: 2,
+                    lineStyle: 2, // Dashed line
+                    title: 'VWAP'
+                });
+                const vwapData = indicators.vwap.map(item => ({
+                    time: Math.floor(new Date(item.time).getTime() / 1000),
+                    value: item.value
+                }));
+                vwapSeries.setData(vwapData);
+                chartData.indicatorSeries.vwap = vwapSeries;
+            }
+
+            // Volume indicator
+            if (chartData.indicators.volume && data.volume && data.volume.length > 0) {
+                const volumeSeries = chart.addHistogramSeries({
+                    color: '#26a69a',
+                    priceFormat: {
+                        type: 'volume',
+                    },
+                    priceScaleId: '', // Create a new price scale for volume
+                    scaleMargins: {
+                        top: 0.8,
+                        bottom: 0,
+                    },
+                });
+                volumeSeries.setData(data.volume);
+                chartData.indicatorSeries.volume = volumeSeries;
+            }
 
             // Handle window resize
             const resizeObserver = new ResizeObserver(entries => {
@@ -796,9 +919,17 @@
         // Load time and sales data
         async function loadTimeSales(symbol) {
             try {
-                // TODO: Replace with actual backend API call
-                const mockTrades = generateMockTrades(symbol);
-                renderTimeSales(symbol, mockTrades);
+                const apiUrl = `./cgi-bin/api/market_data_api.py?action=trades&symbol=${symbol}&limit=100`;
+
+                const response = await fetch(apiUrl);
+                const result = await response.json();
+
+                if (!result.success) {
+                    console.error('Error loading trades:', result.error);
+                    return;
+                }
+
+                renderTimeSales(symbol, result.data.trades);
             } catch (error) {
                 console.error('Error loading time & sales:', error);
             }
