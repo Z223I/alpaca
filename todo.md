@@ -223,6 +223,7 @@ Real time charts. Add a bar for the ratio of selling versus buying. Buying to th
 ### Spec File
 
 - [-] ULTRATHINK. Implement the instructions in specs/market_sentinel_chart.md
+All code is on branch feature/market_sentinel_chart and ready for the API compatibility updates in Phase 2!
 - [ ] Nudge.
 - [ ] /commit
 - [ ] Publish the branch

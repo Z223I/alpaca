@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Sentinel - Real-time Stock Monitor</title>
+
+    <!-- TradingView Lightweight Charts for professional candlestick charts -->
+    <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-tertiary: #0f3460;
+            --text-primary: #e4e4e4;
+            --text-secondary: #a0a0a0;
+            --accent-green: #4ecca3;
+            --accent-red: #ff6b6b;
+            --accent-blue: #4dabf7;
+            --border-color: #2a2a3e;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            background-color: var(--bg-secondary);
+            padding: 15px 20px;
+            border-bottom: 2px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--accent-green);
+        }
+
+        /* Search Bar */
+        .search-container {
+            display: flex;
+            align-items: center;
+            background-color: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 8px 15px;
+            flex: 0 0 400px;
+        }
+
+        .search-container input {
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 16px;
+            outline: none;
+            flex: 1;
+            padding: 5px;
+        }
+
+        .search-container input::placeholder {
+            color: var(--text-secondary);
+        }
+
+        .search-icon {
+            cursor: pointer;
+            color: var(--accent-blue);
+            font-size: 20px;
+            margin-left: 10px;
+        }
+
+        .search-icon:hover {
+            color: var(--accent-green);
+        }
+
+        /* Main Container */
+        .main-container {
+            display: flex;
+            height: calc(100vh - 70px);
+        }
+
+        /* Tab Bar */
+        .tab-bar {
+            background-color: var(--bg-secondary);
+            padding: 10px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            gap: 5px;
+            overflow-x: auto;
+            min-height: 50px;
+        }
+
+        .tab {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 5px 5px 0 0;
+            padding: 10px 20px;
+            cursor: pointer;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background-color 0.2s;
+        }
+
+        .tab:hover {
+            background-color: var(--bg-primary);
+        }
+
+        .tab.active {
+            background-color: var(--bg-primary);
+            border-bottom: 2px solid var(--accent-green);
+        }
+
+        .tab-close {
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        .tab-close:hover {
+            color: var(--accent-red);
+        }
+
+        /* Chart Container */
+        .chart-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-primary);
+            overflow: hidden;
+        }
+
+        .chart-panel {
+            display: none;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        .chart-panel.active {
+            display: flex;
+        }
+
+        /* Chart Controls */
+        .chart-controls {
+            background-color: var(--bg-secondary);
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .control-group label {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-right: 5px;
+        }
+
+        .control-btn {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .control-btn:hover {
+            background-color: var(--accent-blue);
+            color: white;
+        }
+
+        .control-btn.active {
+            background-color: var(--accent-green);
+            color: white;
+            border-color: var(--accent-green);
+        }
+
+        .control-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+
+        .control-checkbox input[type="checkbox"] {
+            cursor: pointer;
+        }
+
+        /* Chart Display Area */
+        .chart-display {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .chart-main {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .canvas-container {
+            flex: 1;
+            position: relative;
+        }
+
+        /* Time and Sales Panel */
+        .time-sales-panel {
+            width: 300px;
+            background-color: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .time-sales-header {
+            background-color: var(--bg-tertiary);
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+        }
+
+        .time-sales-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .trade-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 13px;
+        }
+
+        .trade-item:hover {
+            background-color: var(--bg-tertiary);
+        }
+
+        .trade-time {
+            color: var(--text-secondary);
+            font-size: 11px;
+        }
+
+        .trade-price {
+            font-weight: 600;
+        }
+
+        .trade-price.up {
+            color: var(--accent-green);
+        }
+
+        .trade-price.down {
+            color: var(--accent-red);
+        }
+
+        .trade-size {
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        /* Resize Handle */
+        .resize-handle {
+            width: 5px;
+            background-color: var(--border-color);
+            cursor: col-resize;
+            position: relative;
+        }
+
+        .resize-handle:hover {
+            background-color: var(--accent-blue);
+        }
+
+        /* Status Bar */
+        .status-bar {
+            background-color: var(--bg-secondary);
+            padding: 8px 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: var(--accent-green);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-tertiary);
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-blue);
+        }
+
+        /* Loading Spinner */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 50px;
+            color: var(--text-secondary);
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid var(--border-color);
+            border-top: 4px solid var(--accent-blue);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Welcome Message */
+        .welcome-message {
+            text-align: center;
+            padding: 100px 50px;
+            color: var(--text-secondary);
+        }
+
+        .welcome-message h2 {
+            font-size: 36px;
+            color: var(--text-primary);
+            margin-bottom: 20px;
+        }
+
+        .welcome-message p {
+            font-size: 18px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>📊 Market Sentinel</h1>
+        <div class="search-container">
+            <input
+                type="text"
+                id="symbolSearch"
+                placeholder="Enter stock symbol (e.g., AAPL, GOOGL, TSLA)"
+                onkeypress="handleSearchKeypress(event)"
+            />
+            <span class="search-icon" onclick="handleSearch()">🔍</span>
+        </div>
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="tab-bar" id="tabBar">
+        <!-- Tabs will be added dynamically -->
+    </div>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <div class="chart-container" id="chartContainer">
+            <!-- Welcome Message (shown when no charts open) -->
+            <div class="welcome-message" id="welcomeMessage">
+                <h2>Welcome to Market Sentinel</h2>
+                <p>Enter a stock symbol in the search bar above to begin monitoring real-time market data.</p>
+                <p>Features include candlestick charts, EMAs, VWAP, MACD, volume analysis, and time & sales data.</p>
+            </div>
+
+            <!-- Chart panels will be added dynamically -->
+        </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+        <div class="status-indicator">
+            <span class="status-dot"></span>
+            <span id="statusText">Ready</span>
+        </div>
+        <div>
+            <span id="updateTime">Last updated: Never</span>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        const state = {
+            charts: new Map(),
+            activeChart: null,
+            updateIntervals: new Map(),
+            timeSalesIntervals: new Map()
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Market Sentinel initialized');
+            updateStatus('Ready', 'System initialized');
+        });
+
+        // Search functionality
+        function handleSearchKeypress(event) {
+            if (event.key === 'Enter') {
+                handleSearch();
+            }
+        }
+
+        function handleSearch() {
+            const input = document.getElementById('symbolSearch');
+            const symbol = input.value.trim().toUpperCase();
+
+            if (!symbol) {
+                alert('Please enter a stock symbol');
+                return;
+            }
+
+            // Check if chart already exists
+            if (state.charts.has(symbol)) {
+                activateChart(symbol);
+                input.value = '';
+                return;
+            }
+
+            // Create new chart panel
+            createChartPanel(symbol);
+            input.value = '';
+        }
+
+        // Create a new chart panel
+        function createChartPanel(symbol) {
+            // Hide welcome message
+            document.getElementById('welcomeMessage').style.display = 'none';
+
+            // Create tab
+            const tabBar = document.getElementById('tabBar');
+            const tab = document.createElement('div');
+            tab.className = 'tab';
+            tab.id = `tab-${symbol}`;
+            tab.onclick = () => activateChart(symbol);
+            tab.innerHTML = `
+                <span>${symbol}</span>
+                <span class="tab-close" onclick="closeChart('${symbol}', event)">×</span>
+            `;
+            tabBar.appendChild(tab);
+
+            // Create chart panel
+            const chartContainer = document.getElementById('chartContainer');
+            const panel = document.createElement('div');
+            panel.className = 'chart-panel';
+            panel.id = `panel-${symbol}`;
+            panel.innerHTML = `
+                <!-- Chart Controls -->
+                <div class="chart-controls">
+                    <div class="control-group">
+                        <label>Interval:</label>
+                        <button class="control-btn active" onclick="setInterval('${symbol}', '1m')">1m</button>
+                        <button class="control-btn" onclick="setInterval('${symbol}', '5m')">5m</button>
+                        <button class="control-btn" onclick="setInterval('${symbol}', '30m')">30m</button>
+                        <button class="control-btn" onclick="setInterval('${symbol}', '1h')">1h</button>
+                        <button class="control-btn" onclick="setInterval('${symbol}', '1d')">1d</button>
+                    </div>
+                    <div class="control-group">
+                        <label>Range:</label>
+                        <button class="control-btn active" onclick="setRange('${symbol}', '1d')">1D</button>
+                        <button class="control-btn" onclick="setRange('${symbol}', '5d')">5D</button>
+                        <button class="control-btn" onclick="setRange('${symbol}', '1mo')">1M</button>
+                        <button class="control-btn" onclick="setRange('${symbol}', '1y')">1Y</button>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-checkbox">
+                            <input type="checkbox" onchange="toggleIndicator('${symbol}', 'ema9', this.checked)">
+                            EMA(9)
+                        </label>
+                        <label class="control-checkbox">
+                            <input type="checkbox" onchange="toggleIndicator('${symbol}', 'ema21', this.checked)">
+                            EMA(21)
+                        </label>
+                        <label class="control-checkbox">
+                            <input type="checkbox" onchange="toggleIndicator('${symbol}', 'ema50', this.checked)">
+                            EMA(50)
+                        </label>
+                        <label class="control-checkbox">
+                            <input type="checkbox" onchange="toggleIndicator('${symbol}', 'vwap', this.checked)">
+                            VWAP
+                        </label>
+                        <label class="control-checkbox">
+                            <input type="checkbox" onchange="toggleIndicator('${symbol}', 'macd', this.checked)">
+                            MACD
+                        </label>
+                        <label class="control-checkbox">
+                            <input type="checkbox" checked onchange="toggleIndicator('${symbol}', 'volume', this.checked)">
+                            Volume
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Chart Display -->
+                <div class="chart-display">
+                    <div class="chart-main">
+                        <div class="loading active">
+                            <div class="spinner"></div>
+                            <div>Loading chart data for ${symbol}...</div>
+                        </div>
+                        <div class="canvas-container" id="canvas-${symbol}" style="display: none;">
+                            <div id="chart-${symbol}" style="width: 100%; height: 100%;"></div>
+                        </div>
+                    </div>
+
+                    <div class="resize-handle"></div>
+
+                    <!-- Time and Sales Panel -->
+                    <div class="time-sales-panel">
+                        <div class="time-sales-header">
+                            Time & Sales - ${symbol}
+                        </div>
+                        <div class="time-sales-list" id="trades-${symbol}">
+                            <div style="text-align: center; color: var(--text-secondary); padding: 20px;">
+                                Loading trades...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            chartContainer.appendChild(panel);
+
+            // Initialize chart data
+            state.charts.set(symbol, {
+                interval: '1m',
+                range: '1d',
+                indicators: {
+                    ema9: false,
+                    ema21: false,
+                    ema50: false,
+                    vwap: false,
+                    macd: false,
+                    volume: true
+                },
+                chart: null,
+                lastPrice: null
+            });
+
+            // Activate the new chart
+            activateChart(symbol);
+
+            // Load chart data
+            loadChartData(symbol);
+
+            // Start auto-update (every 30 seconds)
+            const updateInterval = setInterval(() => loadChartData(symbol), 30000);
+            state.updateIntervals.set(symbol, updateInterval);
+
+            // Start time & sales updates (every 10 seconds)
+            const salesInterval = setInterval(() => loadTimeSales(symbol), 10000);
+            state.timeSalesIntervals.set(symbol, salesInterval);
+            loadTimeSales(symbol);
+        }
+
+        // Activate a chart panel
+        function activateChart(symbol) {
+            // Deactivate all tabs and panels
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.chart-panel').forEach(panel => panel.classList.remove('active'));
+
+            // Activate selected tab and panel
+            document.getElementById(`tab-${symbol}`).classList.add('active');
+            document.getElementById(`panel-${symbol}`).classList.add('active');
+
+            state.activeChart = symbol;
+        }
+
+        // Close a chart panel
+        function closeChart(symbol, event) {
+            event.stopPropagation();
+
+            // Clear intervals
+            if (state.updateIntervals.has(symbol)) {
+                clearInterval(state.updateIntervals.get(symbol));
+                state.updateIntervals.delete(symbol);
+            }
+            if (state.timeSalesIntervals.has(symbol)) {
+                clearInterval(state.timeSalesIntervals.get(symbol));
+                state.timeSalesIntervals.delete(symbol);
+            }
+
+            // Clean up chart and resize observer
+            const chartData = state.charts.get(symbol);
+            if (chartData) {
+                if (chartData.resizeObserver) {
+                    chartData.resizeObserver.disconnect();
+                }
+                if (chartData.chart) {
+                    chartData.chart.remove();
+                }
+            }
+
+            // Remove tab and panel
+            document.getElementById(`tab-${symbol}`).remove();
+            document.getElementById(`panel-${symbol}`).remove();
+
+            // Remove from state
+            state.charts.delete(symbol);
+
+            // Activate another chart if available
+            if (state.charts.size > 0) {
+                const firstSymbol = state.charts.keys().next().value;
+                activateChart(firstSymbol);
+            } else {
+                // Show welcome message if no charts
+                document.getElementById('welcomeMessage').style.display = 'block';
+                state.activeChart = null;
+            }
+        }
+
+        // Control functions
+        function setInterval(symbol, interval) {
+            const panel = document.getElementById(`panel-${symbol}`);
+            panel.querySelectorAll('.control-group:nth-child(1) .control-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            const chartData = state.charts.get(symbol);
+            chartData.interval = interval;
+            loadChartData(symbol);
+        }
+
+        function setRange(symbol, range) {
+            const panel = document.getElementById(`panel-${symbol}`);
+            panel.querySelectorAll('.control-group:nth-child(2) .control-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            const chartData = state.charts.get(symbol);
+            chartData.range = range;
+            loadChartData(symbol);
+        }
+
+        function toggleIndicator(symbol, indicator, enabled) {
+            const chartData = state.charts.get(symbol);
+            chartData.indicators[indicator] = enabled;
+            loadChartData(symbol);
+        }
+
+        // Load chart data from backend
+        async function loadChartData(symbol) {
+            const chartData = state.charts.get(symbol);
+            if (!chartData) return;
+
+            try {
+                updateStatus('Loading', `Fetching data for ${symbol}...`);
+
+                // TODO: Replace with actual backend API call
+                // For now, use mock data
+                const mockData = generateMockData(symbol, chartData.interval, chartData.range);
+
+                renderChart(symbol, mockData);
+
+                updateStatus('Connected', `${symbol} updated`);
+                document.getElementById('updateTime').textContent =
+                    `Last updated: ${new Date().toLocaleTimeString()}`;
+
+            } catch (error) {
+                console.error('Error loading chart data:', error);
+                updateStatus('Error', `Failed to load data for ${symbol}`);
+            }
+        }
+
+        // Render chart using Chart.js
+        function renderChart(symbol, data) {
+            const canvasContainer = document.getElementById(`canvas-${symbol}`);
+            const loading = canvasContainer.previousElementSibling;
+
+            loading.classList.remove('active');
+            canvasContainer.style.display = 'block';
+
+            const chartElement = document.getElementById(`chart-${symbol}`);
+            const chartData = state.charts.get(symbol);
+
+            // Destroy existing chart
+            if (chartData.chart) {
+                chartData.chart.remove();
+            }
+
+            // Create new Lightweight Charts instance
+            const chart = LightweightCharts.createChart(chartElement, {
+                width: chartElement.clientWidth,
+                height: chartElement.clientHeight,
+                layout: {
+                    background: { color: '#1a1a2e' },
+                    textColor: '#a0a0a0',
+                },
+                grid: {
+                    vertLines: { color: 'rgba(255, 255, 255, 0.1)' },
+                    horzLines: { color: 'rgba(255, 255, 255, 0.1)' },
+                },
+                crosshair: {
+                    mode: LightweightCharts.CrosshairMode.Normal,
+                },
+                rightPriceScale: {
+                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                },
+                timeScale: {
+                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                    timeVisible: true,
+                    secondsVisible: false,
+                },
+            });
+
+            // Add candlestick series
+            const candlestickSeries = chart.addCandlestickSeries({
+                upColor: '#4ecca3',
+                downColor: '#ff6b6b',
+                borderVisible: false,
+                wickUpColor: '#4ecca3',
+                wickDownColor: '#ff6b6b',
+            });
+
+            // Set the data
+            candlestickSeries.setData(data.candlesticks);
+
+            // Store chart reference
+            chartData.chart = chart;
+            chartData.candlestickSeries = candlestickSeries;
+
+            // Handle window resize
+            const resizeObserver = new ResizeObserver(entries => {
+                if (entries.length === 0) return;
+                const { width, height } = entries[0].contentRect;
+                chart.applyOptions({ width, height });
+            });
+            resizeObserver.observe(chartElement);
+
+            // Store resize observer for cleanup
+            chartData.resizeObserver = resizeObserver;
+
+            // Fit content to chart
+            chart.timeScale().fitContent();
+        }
+
+        // Load time and sales data
+        async function loadTimeSales(symbol) {
+            try {
+                // TODO: Replace with actual backend API call
+                const mockTrades = generateMockTrades(symbol);
+                renderTimeSales(symbol, mockTrades);
+            } catch (error) {
+                console.error('Error loading time & sales:', error);
+            }
+        }
+
+        // Render time and sales
+        function renderTimeSales(symbol, trades) {
+            const container = document.getElementById(`trades-${symbol}`);
+            const chartData = state.charts.get(symbol);
+
+            container.innerHTML = trades.map(trade => {
+                const priceClass = chartData.lastPrice && trade.price > chartData.lastPrice ? 'up' :
+                                  chartData.lastPrice && trade.price < chartData.lastPrice ? 'down' : '';
+
+                return `
+                    <div class="trade-item">
+                        <div>
+                            <div class="trade-time">${new Date(trade.timestamp).toLocaleTimeString()}</div>
+                            <div class="trade-price ${priceClass}">$${trade.price.toFixed(2)}</div>
+                        </div>
+                        <div class="trade-size">${trade.size.toLocaleString()}</div>
+                    </div>
+                `;
+            }).join('');
+
+            if (trades.length > 0) {
+                chartData.lastPrice = trades[trades.length - 1].price;
+            }
+        }
+
+        // Update status bar
+        function updateStatus(status, message) {
+            document.getElementById('statusText').textContent = `${status}: ${message}`;
+        }
+
+        // Mock data generators (to be replaced with backend calls)
+        function generateMockData(symbol, interval, range) {
+            const candlesticks = [];
+            const numBars = range === '1d' ? 390 : range === '5d' ? 1950 : 100;
+            let basePrice = 150 + Math.random() * 50;
+
+            for (let i = 0; i < numBars; i++) {
+                // Lightweight Charts requires Unix timestamp in SECONDS (not milliseconds)
+                const timeMs = Date.now() - (numBars - i) * 60000;
+                const time = Math.floor(timeMs / 1000);
+
+                const open = basePrice;
+                const close = basePrice + (Math.random() - 0.5) * 5;
+                const high = Math.max(open, close) + Math.random() * 2;
+                const low = Math.min(open, close) - Math.random() * 2;
+
+                candlesticks.push({
+                    time: time,
+                    open: Number(open.toFixed(2)),
+                    high: Number(high.toFixed(2)),
+                    low: Number(low.toFixed(2)),
+                    close: Number(close.toFixed(2))
+                });
+
+                basePrice = close;
+            }
+
+            return { candlesticks };
+        }
+
+        function generateMockTrades(symbol) {
+            const trades = [];
+            let basePrice = 150 + Math.random() * 50;
+
+            for (let i = 0; i < 20; i++) {
+                const price = basePrice + (Math.random() - 0.5) * 2;
+                trades.push({
+                    timestamp: new Date(Date.now() - (20 - i) * 5000),
+                    price: price,
+                    size: Math.floor(Math.random() * 1000) + 100
+                });
+                basePrice = price;
+            }
+
+            return trades.reverse();
+        }
+    </script>
+</body>
+</html>

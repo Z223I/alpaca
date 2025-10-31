@@ -1,0 +1,11 @@
+# Enable CGI execution
+Options +ExecCGI
+
+# Set Python scripts as CGI
+AddHandler cgi-script .py
+
+# Enable following symlinks (needed for some configurations)
+Options +FollowSymLinks
+
+# Set default charset
+AddDefaultCharset UTF-8
