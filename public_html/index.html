@@ -68,6 +68,7 @@
             outline: none;
             flex: 1;
             padding: 5px;
+            text-transform: uppercase;
         }
 
         .search-container input::placeholder {
@@ -147,6 +148,7 @@
             display: none;
             flex-direction: column;
             flex: 1;
+            min-height: 0;  /* Critical: prevents flex item from expanding beyond parent */
         }
 
         .chart-panel.active {
@@ -212,12 +214,14 @@
         /* Chart Display Area */
         .chart-display {
             flex: 1;
+            min-height: 0;  /* Critical: prevents flex item from expanding beyond parent */
             display: flex;
-            overflow: hidden;
+            overflow: auto;  /* Enable scrolling to debug */
         }
 
         .chart-main {
             flex: 1;
+            min-height: 0;  /* Critical: prevents flex item from expanding beyond parent */
             padding: 20px;
             display: flex;
             flex-direction: column;
@@ -226,7 +230,10 @@
 
         .canvas-container {
             flex: 1;
+            min-height: 0;  /* Critical: prevents flex item from expanding beyond parent */
             position: relative;
+            overflow: visible;  /* Allow timeScale to extend beyond container */
+            margin-bottom: 50px;  /* Create space for overflowing timeScale */
         }
 
         /* Time and Sales Panel */
@@ -508,11 +515,11 @@
                 <div class="chart-controls">
                     <div class="control-group">
                         <label>Interval:</label>
-                        <button class="control-btn active" onclick="setInterval('${symbol}', '1m')">1m</button>
-                        <button class="control-btn" onclick="setInterval('${symbol}', '5m')">5m</button>
-                        <button class="control-btn" onclick="setInterval('${symbol}', '30m')">30m</button>
-                        <button class="control-btn" onclick="setInterval('${symbol}', '1h')">1h</button>
-                        <button class="control-btn" onclick="setInterval('${symbol}', '1d')">1d</button>
+                        <button class="control-btn active" onclick="setChartInterval('${symbol}', '1m')">1m</button>
+                        <button class="control-btn" onclick="setChartInterval('${symbol}', '5m')">5m</button>
+                        <button class="control-btn" onclick="setChartInterval('${symbol}', '30m')">30m</button>
+                        <button class="control-btn" onclick="setChartInterval('${symbol}', '1h')">1h</button>
+                        <button class="control-btn" onclick="setChartInterval('${symbol}', '1d')">1d</button>
                     </div>
                     <div class="control-group">
                         <label>Range:</label>
@@ -667,8 +674,10 @@
         }
 
         // Control functions
-        function setInterval(symbol, interval) {
+        function setChartInterval(symbol, interval) {
             const panel = document.getElementById(`panel-${symbol}`);
+            if (!panel) return;
+
             panel.querySelectorAll('.control-group:nth-child(1) .control-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
@@ -681,6 +690,8 @@
 
         function setRange(symbol, range) {
             const panel = document.getElementById(`panel-${symbol}`);
+            if (!panel) return;
+
             panel.querySelectorAll('.control-group:nth-child(2) .control-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
@@ -700,7 +711,10 @@
         // Load chart data from backend
         async function loadChartData(symbol) {
             const chartData = state.charts.get(symbol);
-            if (!chartData) return;
+            if (!chartData) {
+                console.error('Chart data not found for symbol:', symbol);
+                return;
+            }
 
             try {
                 updateStatus('Loading', `Fetching data for ${symbol}...`);
@@ -711,10 +725,13 @@
                     .join(',');
 
                 const apiUrl = `./cgi-bin/api/market_data_api.py?action=chart&symbol=${symbol}&interval=${chartData.interval}&range=${chartData.range}&indicators=${indicators}`;
+                console.log('Loading chart from:', apiUrl);
 
                 // Fetch data from backend API
                 const response = await fetch(apiUrl);
                 const result = await response.json();
+
+                console.log('Chart response:', result);
 
                 if (!result.success) {
                     throw new Error(result.error || 'Failed to fetch chart data');
@@ -722,14 +739,41 @@
 
                 const data = result.data;
 
+                if (!data.bars || data.bars.length === 0) {
+                    throw new Error('No chart data available');
+                }
+
+                console.log(`Processing ${data.bars.length} bars for chart`);
+                console.log('Sample raw bar data:', data.bars[0]);
+
                 // Convert bar data to candlestick format for TradingView Lightweight Charts
-                const candlesticks = data.bars.map(bar => ({
-                    time: Math.floor(new Date(bar.timestamp).getTime() / 1000), // Unix timestamp in seconds
-                    open: bar.open,
-                    high: bar.high,
-                    low: bar.low,
-                    close: bar.close
-                }));
+                const candlesticks = data.bars.map(bar => {
+                    const timestamp = bar.timestamp;
+                    const date = new Date(timestamp);
+                    const unixTime = Math.floor(date.getTime() / 1000);
+
+                    // Debug first bar conversion
+                    if (bar === data.bars[0]) {
+                        console.log('First bar conversion:', {
+                            raw_timestamp: timestamp,
+                            date_object: date,
+                            unix_seconds: unixTime,
+                            is_valid: !isNaN(unixTime)
+                        });
+                    }
+
+                    return {
+                        time: unixTime,
+                        open: bar.open,
+                        high: bar.high,
+                        low: bar.low,
+                        close: bar.close
+                    };
+                });
+
+                console.log('Candlesticks prepared:', candlesticks.length);
+                console.log('First candlestick:', candlesticks[0]);
+                console.log('Last candlestick:', candlesticks[candlesticks.length - 1]);
 
                 renderChart(symbol, {
                     candlesticks,
@@ -752,27 +796,78 @@
 
         // Render chart
         function renderChart(symbol, data) {
-            const canvasContainer = document.getElementById(`canvas-${symbol}`);
-            const loading = canvasContainer.previousElementSibling;
+            console.log('renderChart called for', symbol, 'with', data.candlesticks.length, 'candlesticks');
 
-            loading.classList.remove('active');
+            const canvasContainer = document.getElementById(`canvas-${symbol}`);
+            if (!canvasContainer) {
+                console.error('Canvas container not found for', symbol);
+                return;
+            }
+
+            const loading = canvasContainer.previousElementSibling;
+            if (loading) {
+                loading.classList.remove('active');
+            }
             canvasContainer.style.display = 'block';
 
             const chartElement = document.getElementById(`chart-${symbol}`);
-            const chartData = state.charts.get(symbol);
+            if (!chartElement) {
+                console.error('Chart element not found for', symbol);
+                return;
+            }
 
-            // Destroy existing chart
+            const chartData = state.charts.get(symbol);
+            if (!chartData) {
+                console.error('Chart data state not found for', symbol);
+                return;
+            }
+
+            // Destroy existing chart and disconnect ResizeObserver
             if (chartData.chart) {
+                console.log('Removing existing chart');
+                if (chartData.resizeObserver) {
+                    chartData.resizeObserver.disconnect();
+                    chartData.resizeObserver = null;
+                }
                 chartData.chart.remove();
+                chartData.chart = null;
+            }
+
+            // Wait for layout to complete before creating chart
+            // This fixes the "chart appears then disappears" bug caused by 0x0 dimensions
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    createChart(chartElement, chartData, symbol, data);
+                });
+            });
+        }
+
+        // Create the actual chart (separated to handle async layout)
+        function createChart(chartElement, chartData, symbol, data) {
+            console.log('=== CREATE CHART CALLED ===');
+            console.log('Chart element dimensions:', chartElement.clientWidth, 'x', chartElement.clientHeight);
+            console.log('Candlesticks to render:', data.candlesticks.length);
+            console.log('First 3 candlesticks:', data.candlesticks.slice(0, 3));
+
+            // Check if element has dimensions
+            if (chartElement.clientWidth === 0 || chartElement.clientHeight === 0) {
+                console.error('Chart element has zero dimensions! Cannot create chart.');
+                // Try again after a short delay
+                setTimeout(() => {
+                    console.log('Retrying chart creation after delay...');
+                    createChart(chartElement, chartData, symbol, data);
+                }, 100);
+                return;
             }
 
             // Create new Lightweight Charts instance
+            console.log('Creating new chart with dimensions:', chartElement.clientWidth, 'x', chartElement.clientHeight);
             const chart = LightweightCharts.createChart(chartElement, {
                 width: chartElement.clientWidth,
                 height: chartElement.clientHeight,
                 layout: {
                     background: { color: '#1a1a2e' },
-                    textColor: '#a0a0a0',
+                    textColor: '#d1d4dc',  // Brighter text for better visibility
                 },
                 grid: {
                     vertLines: { color: 'rgba(255, 255, 255, 0.1)' },
@@ -785,13 +880,31 @@
                     borderColor: 'rgba(255, 255, 255, 0.2)',
                 },
                 timeScale: {
-                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                    borderColor: 'rgba(255, 255, 255, 0.8)',  // Much brighter border
                     timeVisible: true,
                     secondsVisible: false,
                 },
             });
 
+            // Force timeScale to be visible with bright colors
+            console.log('Forcing timeScale visibility...');
+            chart.applyOptions({
+                layout: {
+                    textColor: '#ffffff',  // Pure white for maximum visibility
+                },
+                timeScale: {
+                    visible: true,
+                    timeVisible: true,
+                    secondsVisible: false,
+                    borderColor: '#ffffff',  // Pure white border
+                }
+            });
+            const timeScale = chart.timeScale();
+            console.log('TimeScale object:', timeScale);
+            console.log('Full TimeScale options:', timeScale.options());
+
             // Add candlestick series
+            console.log('Adding candlestick series...');
             const candlestickSeries = chart.addCandlestickSeries({
                 upColor: '#4ecca3',
                 downColor: '#ff6b6b',
@@ -801,7 +914,13 @@
             });
 
             // Set the candlestick data
+            console.log('Setting candlestick data:', data.candlesticks.length, 'bars');
+            if (data.candlesticks.length > 0) {
+                console.log('First bar:', data.candlesticks[0]);
+                console.log('Last bar:', data.candlesticks[data.candlesticks.length - 1]);
+            }
             candlestickSeries.setData(data.candlesticks);
+            console.log('Candlestick data set successfully');
 
             // Store chart reference
             chartData.chart = chart;
@@ -893,8 +1012,8 @@
                     },
                     priceScaleId: '', // Create a new price scale for volume
                     scaleMargins: {
-                        top: 0.8,
-                        bottom: 0,
+                        top: 0.88,  // Volume takes only bottom 12% of chart
+                        bottom: 0.08,  // CRITICAL: Leave 8% gap at bottom for timeScale visibility!
                     },
                 });
                 volumeSeries.setData(data.volume);
@@ -912,26 +1031,90 @@
             // Store resize observer for cleanup
             chartData.resizeObserver = resizeObserver;
 
-            // Fit content to chart
-            chart.timeScale().fitContent();
+            // Show most recent data instead of entire history
+            // This prevents zooming to old price levels
+            const barsCount = data.candlesticks.length;
+            if (barsCount > 0) {
+                // Show last 100 bars (or all bars if less than 100)
+                const visibleBars = Math.min(100, barsCount);
+                chart.timeScale().setVisibleLogicalRange({
+                    from: barsCount - visibleBars,
+                    to: barsCount - 1
+                });
+
+                console.log('TimeScale set to show bars', barsCount - visibleBars, 'to', barsCount - 1);
+                console.log('TimeScale options:', chart.timeScale().options());
+            }
+
+            // Debug: Check if chart is actually visible in DOM
+            console.log('Chart element parent dimensions:', chartElement.parentElement.clientWidth, 'x', chartElement.parentElement.clientHeight);
+            console.log('Chart element computed style:', window.getComputedStyle(chartElement).display);
+
+            // Check if timeScale element exists in DOM
+            setTimeout(() => {
+                const allTables = chartElement.querySelectorAll('table');
+                console.log('Found', allTables.length, 'table elements in chart');
+
+                if (allTables.length > 0) {
+                    const table = allTables[0];
+                    const rows = table.querySelectorAll('tr');
+                    console.log('Found', rows.length, 'table rows');
+
+                    if (rows.length > 1) {
+                        console.log('Row 0 (main chart) height:', rows[0].querySelector('td')?.style.height);
+                        console.log('Row 1 (timeScale) height:', rows[1].querySelector('td')?.style.height);
+
+                        // Check the canvas in the timeScale row
+                        const timeScaleCanvas = rows[1].querySelector('canvas');
+                        if (timeScaleCanvas) {
+                            console.log('TimeScale canvas found! Dimensions:', timeScaleCanvas.width, 'x', timeScaleCanvas.height);
+                            console.log('TimeScale canvas style:', timeScaleCanvas.style.cssText);
+                        } else {
+                            console.log('No canvas found in timeScale row!');
+                        }
+                    }
+                }
+            }, 500);
         }
 
         // Load time and sales data
         async function loadTimeSales(symbol) {
+            const container = document.getElementById(`trades-${symbol}`);
+            if (!container) {
+                console.error(`Time & sales container not found for ${symbol}`);
+                return;
+            }
+
             try {
                 const apiUrl = `./cgi-bin/api/market_data_api.py?action=trades&symbol=${symbol}&limit=100`;
+                console.log('Loading trades from:', apiUrl);
 
                 const response = await fetch(apiUrl);
                 const result = await response.json();
 
+                console.log('Trades response:', result);
+
                 if (!result.success) {
                     console.error('Error loading trades:', result.error);
+                    container.innerHTML = `<div style="text-align: center; color: var(--accent-red); padding: 20px;">
+                        Error loading trades: ${result.error}
+                    </div>`;
+                    return;
+                }
+
+                if (!result.data || !result.data.trades || result.data.trades.length === 0) {
+                    container.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 20px;">
+                        No recent trades available
+                    </div>`;
                     return;
                 }
 
                 renderTimeSales(symbol, result.data.trades);
             } catch (error) {
                 console.error('Error loading time & sales:', error);
+                container.innerHTML = `<div style="text-align: center; color: var(--accent-red); padding: 20px;">
+                    Failed to load trades
+                </div>`;
             }
         }
 
@@ -940,14 +1123,33 @@
             const container = document.getElementById(`trades-${symbol}`);
             const chartData = state.charts.get(symbol);
 
-            container.innerHTML = trades.map(trade => {
+            if (!container || !chartData) {
+                console.error('Cannot render trades - container or chartData missing');
+                return;
+            }
+
+            console.log(`Rendering ${trades.length} trades for ${symbol}`);
+
+            // Reverse trades so newest are at the top
+            const reversedTrades = [...trades].reverse();
+
+            container.innerHTML = reversedTrades.map(trade => {
                 const priceClass = chartData.lastPrice && trade.price > chartData.lastPrice ? 'up' :
                                   chartData.lastPrice && trade.price < chartData.lastPrice ? 'down' : '';
+
+                // Format time in ET timezone
+                const tradeTime = new Date(trade.timestamp).toLocaleTimeString('en-US', {
+                    timeZone: 'America/New_York',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                });
 
                 return `
                     <div class="trade-item">
                         <div>
-                            <div class="trade-time">${new Date(trade.timestamp).toLocaleTimeString()}</div>
+                            <div class="trade-time">${tradeTime} ET</div>
                             <div class="trade-price ${priceClass}">$${trade.price.toFixed(2)}</div>
                         </div>
                         <div class="trade-size">${trade.size.toLocaleString()}</div>
@@ -956,8 +1158,12 @@
             }).join('');
 
             if (trades.length > 0) {
+                // Use the most recent trade (last in original array, first in reversed)
                 chartData.lastPrice = trades[trades.length - 1].price;
             }
+
+            // Auto-scroll to top to show newest trades
+            container.scrollTop = 0;
         }
 
         // Update status bar
