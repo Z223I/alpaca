@@ -209,7 +209,7 @@ Real time charts. Add a bar for the ratio of selling versus buying. Buying to th
 
 ## Index.html Update 1
 
-- [ ] THINK HARD. Follow the instructions in specs/market_sentinel_boilerplate.md;
+- [ ] ULTRATHINK. Follow the instructions in specs/market_sentinel_boilerplate.md;
 
 ## Index.html
 

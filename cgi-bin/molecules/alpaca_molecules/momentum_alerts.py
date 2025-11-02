@@ -35,7 +35,13 @@ import pandas as pd
 import pytz
 
 # Add project root to path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# This file is at: cgi-bin/molecules/alpaca_molecules/momentum_alerts.py
+# Need to go up 3 levels to reach project root
+script_dir = os.path.dirname(os.path.abspath(__file__))  # cgi-bin/molecules/alpaca_molecules/
+molecules_dir = os.path.dirname(script_dir)  # cgi-bin/molecules/
+cgi_bin_dir = os.path.dirname(molecules_dir)  # cgi-bin/
+project_root = os.path.dirname(cgi_bin_dir)  # project root
+sys.path.insert(0, project_root)
 
 import alpaca_trade_api as tradeapi
 from atoms.api.init_alpaca_client import init_alpaca_client
@@ -44,7 +50,7 @@ from atoms.api.fundamental_data import FundamentalDataFetcher
 from atoms.alerts.breakout_detector import BreakoutDetector
 from atoms.telegram.telegram_post import TelegramPoster
 from atoms.telegram.user_manager import UserManager
-from code.momentum_alerts_config import (
+from momentum_alerts_config import (
     get_momentum_alerts_config, get_volume_color_emoji,
     get_momentum_standard_color_emoji, get_momentum_short_color_emoji,
     get_urgency_level_dual, get_squeeze_emoji
@@ -1847,10 +1853,26 @@ class MomentumAlertsSystem:
         self.running = True
 
         try:
+            # Load existing symbols from CSV files immediately at startup
+            self.logger.info("📂 Loading existing symbols from CSV files at startup...")
+            if self.csv_file_path.exists() or (self.volume_surge_dir / "relative_volume_nasdaq_amex.csv").exists():
+                existing_symbols = self._load_csv_symbols()
+                if existing_symbols:
+                    self.monitored_symbols = existing_symbols
+                    self.logger.info(f"✅ Loaded {len(existing_symbols)} symbols from existing CSV files")
+                else:
+                    self.logger.info("📋 No existing symbols found, will collect fresh data")
+            else:
+                self.logger.info("📋 No existing CSV files, will generate fresh data")
+
+            # Run startup script immediately to collect fresh symbols from all sources
+            self.logger.info("📊 Running startup script immediately to collect fresh data...")
+            await self._run_startup_script()
+
             # Run volume surge scanner once at startup
             await self._run_volume_surge_scanner()
 
-            # Schedule startup script runs
+            # Schedule next startup script runs (will start scheduling from next 20-min interval)
             self._schedule_startup_runs()
 
             # Start the main monitoring loop

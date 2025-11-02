@@ -1,0 +1,23 @@
+[Unit]
+Description=Momentum Alerts System - Stock Monitoring and Alerts
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wilsonb
+Group=wilsonb
+WorkingDirectory=/home/wilsonb/dl/github.com/Z223I/alpaca
+Environment="PATH=/home/wilsonb/miniconda3/envs/alpaca/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/home/wilsonb/miniconda3/envs/alpaca/bin/python cgi-bin/molecules/alpaca_molecules/momentum_alerts.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/wilsonb/dl/github.com/Z223I/alpaca/logs/momentum_alerts.log
+StandardError=append:/home/wilsonb/dl/github.com/Z223I/alpaca/logs/momentum_alerts_error.log
+
+# Resource limits
+MemoryMax=2G
+CPUQuota=50%
+
+[Install]
+WantedBy=default.target

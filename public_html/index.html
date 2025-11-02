@@ -403,6 +403,178 @@
             100% { transform: rotate(360deg); }
         }
 
+        /* Watch List Panel */
+        .watch-list-panel {
+            width: 400px;
+            min-width: 300px;
+            max-width: 600px;
+            background-color: var(--bg-secondary);
+            border-right: 2px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .watch-list-header {
+            background-color: var(--bg-tertiary);
+            padding: 15px 20px;
+            border-bottom: 2px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .watch-list-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--accent-green);
+            margin: 0;
+        }
+
+        .watch-list-add-container {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            gap: 10px;
+        }
+
+        .watch-list-add-input {
+            flex: 1;
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        .watch-list-add-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .watch-list-add-btn {
+            background-color: var(--accent-green);
+            border: none;
+            color: var(--bg-primary);
+            padding: 8px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+
+        .watch-list-add-btn:hover {
+            background-color: #3dba8a;
+        }
+
+        .watch-list-table-container {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: auto;
+        }
+
+        .watch-list-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .watch-list-table thead {
+            position: sticky;
+            top: 0;
+            background-color: var(--bg-tertiary);
+            z-index: 10;
+        }
+
+        .watch-list-table th {
+            padding: 12px 10px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            border-bottom: 2px solid var(--border-color);
+            white-space: nowrap;
+        }
+
+        .watch-list-table th.source-col {
+            text-align: center;
+            width: 60px;
+        }
+
+        .watch-list-table th.del-col {
+            text-align: center;
+            width: 50px;
+        }
+
+        .watch-list-table tbody tr {
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .watch-list-table tbody tr:hover {
+            background-color: var(--bg-tertiary);
+        }
+
+        .watch-list-table td {
+            padding: 10px;
+            font-size: 14px;
+        }
+
+        .watch-list-table td.symbol-cell {
+            font-weight: 600;
+            color: var(--accent-blue);
+        }
+
+        .watch-list-table td.source-cell {
+            text-align: center;
+            font-size: 16px;
+        }
+
+        .watch-list-table td.del-cell {
+            text-align: center;
+        }
+
+        .source-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin: 0 2px;
+        }
+
+        .source-indicator.on {
+            background-color: var(--accent-green);
+        }
+
+        .source-indicator.off {
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .delete-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 18px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+            transition: color 0.2s;
+        }
+
+        .delete-btn:hover {
+            color: var(--accent-red);
+        }
+
+        .watch-list-empty {
+            padding: 40px 20px;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
         /* Welcome Message */
         .welcome-message {
             text-align: center;
@@ -444,6 +616,47 @@
 
     <!-- Main Container -->
     <div class="main-container">
+        <!-- Watch List Panel -->
+        <div class="watch-list-panel">
+            <div class="watch-list-header">
+                <h2>📋 Watch List</h2>
+            </div>
+
+            <!-- Add Symbol Section -->
+            <div class="watch-list-add-container">
+                <input
+                    type="text"
+                    id="watchListAddInput"
+                    class="watch-list-add-input"
+                    placeholder="Add symbol..."
+                    onkeypress="handleWatchListKeypress(event)"
+                />
+                <button class="watch-list-add-btn" onclick="addSymbolToWatchList()">Add</button>
+            </div>
+
+            <!-- Symbol Table -->
+            <div class="watch-list-table-container">
+                <table class="watch-list-table">
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th class="source-col" title="Oracle">🔮</th>
+                            <th class="source-col" title="Manual">✏️</th>
+                            <th class="source-col" title="Top Gainers">📈</th>
+                            <th class="source-col" title="Volume Surge">🚀</th>
+                            <th class="del-col">Del</th>
+                        </tr>
+                    </thead>
+                    <tbody id="watchListBody">
+                        <!-- Symbols will be populated here -->
+                        <tr class="watch-list-empty">
+                            <td colspan="6">Loading watch list...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <div class="chart-container" id="chartContainer">
             <!-- Welcome Message (shown when no charts open) -->
             <div class="welcome-message" id="welcomeMessage">
@@ -779,6 +992,9 @@
                         <button class="control-btn" onclick="setRange('${symbol}', '1y')">1Y</button>
                     </div>
                     <div class="control-group">
+                        <label style="color: var(--accent-green); font-weight: 600;">🕐 Eastern Time (ET)</label>
+                    </div>
+                    <div class="control-group">
                         <label class="control-checkbox">
                             <input type="checkbox" onchange="toggleIndicator('${symbol}', 'ema9', this.checked)">
                             EMA(9)
@@ -1009,9 +1225,11 @@
                 console.log('Sample raw bar data:', data.bars[0]);
 
                 // Convert bar data to candlestick format for TradingView Lightweight Charts
+                // Note: Timestamps from API are already in Eastern Time (ET) with timezone info
+                // Example: "2025-10-27T04:00:00-04:00" (4:00 AM EDT)
                 const candlesticks = data.bars.map(bar => {
                     const timestamp = bar.timestamp;
-                    const date = new Date(timestamp);
+                    const date = new Date(timestamp); // Correctly interprets ET timestamp
                     const unixTime = Math.floor(date.getTime() / 1000);
 
                     // Debug first bar conversion
@@ -1596,6 +1814,230 @@
             }
 
             return trades.reverse();
+        }
+
+        // ========================================
+        // WATCH LIST FUNCTIONALITY
+        // ========================================
+
+        // Watch list state
+        const watchListState = {
+            symbols: [],
+            manualSymbols: new Set(),  // Track manually added symbols
+            deletedSymbols: new Set(), // Track deleted symbols (to hide on auto-refresh)
+            refreshInterval: null
+        };
+
+        // Initialize watch list on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadWatchList();
+            // Refresh watch list every 60 seconds
+            watchListState.refreshInterval = setInterval(loadWatchList, 60000);
+        });
+
+        // Load watch list from API
+        async function loadWatchList() {
+            try {
+                console.log('Loading watch list from API...');
+                const response = await fetch('cgi-bin/api/watch_list_api.py');
+                console.log('Watch list API response status:', response.status);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log('Watch list data received:', data);
+
+                if (data.success) {
+                    // Filter out deleted symbols (unless they were manually re-added)
+                    watchListState.symbols = data.data.filter(symbol => {
+                        // Keep if NOT deleted, OR if deleted but manually re-added
+                        return !watchListState.deletedSymbols.has(symbol.symbol) ||
+                               watchListState.manualSymbols.has(symbol.symbol);
+                    });
+
+                    // Also add back any manual symbols that aren't in the API response
+                    const apiSymbols = new Set(data.data.map(s => s.symbol));
+                    watchListState.manualSymbols.forEach(manualSymbol => {
+                        if (!apiSymbols.has(manualSymbol) && !watchListState.symbols.find(s => s.symbol === manualSymbol)) {
+                            // Add manual symbol if it's not already in the list
+                            watchListState.symbols.push({
+                                symbol: manualSymbol,
+                                oracle: false,
+                                manual: true,
+                                top_gainers: false,
+                                surge: false
+                            });
+                        }
+                    });
+
+                    // Sort alphabetically
+                    watchListState.symbols.sort((a, b) => a.symbol.localeCompare(b.symbol));
+
+                    console.log(`Loaded ${watchListState.symbols.length} symbols from watch list (${data.count} from API, ${watchListState.deletedSymbols.size} deleted, ${watchListState.manualSymbols.size} manual)`);
+                    renderWatchList();
+                } else {
+                    console.error('Failed to load watch list:', data.error);
+                    showWatchListError(`Failed to load watch list: ${data.error || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.error('Error loading watch list:', error);
+                showWatchListError(`Error loading watch list: ${error.message}`);
+            }
+        }
+
+        // Render watch list table
+        function renderWatchList() {
+            const tbody = document.getElementById('watchListBody');
+
+            if (!watchListState.symbols || watchListState.symbols.length === 0) {
+                tbody.innerHTML = `
+                    <tr class="watch-list-empty">
+                        <td colspan="6">No symbols in watch list</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = watchListState.symbols.map(symbol => `
+                <tr ondblclick="openChartFromWatchList('${symbol.symbol}')">
+                    <td class="symbol-cell">${symbol.symbol}</td>
+                    <td class="source-cell">
+                        <span class="source-indicator ${symbol.oracle ? 'on' : 'off'}"
+                              title="${symbol.oracle ? 'Oracle: Yes' : 'Oracle: No'}"></span>
+                    </td>
+                    <td class="source-cell">
+                        <span class="source-indicator ${symbol.manual ? 'on' : 'off'}"
+                              title="${symbol.manual ? 'Manual: Yes' : 'Manual: No'}"></span>
+                    </td>
+                    <td class="source-cell">
+                        <span class="source-indicator ${symbol.top_gainers ? 'on' : 'off'}"
+                              title="${symbol.top_gainers ? 'Top Gainers: Yes' : 'Top Gainers: No'}"></span>
+                    </td>
+                    <td class="source-cell">
+                        <span class="source-indicator ${symbol.surge ? 'on' : 'off'}"
+                              title="${symbol.surge ? 'Volume Surge: Yes' : 'Volume Surge: No'}"></span>
+                    </td>
+                    <td class="del-cell">
+                        <button class="delete-btn"
+                                onclick="event.stopPropagation(); deleteSymbolFromWatchList('${symbol.symbol}')"
+                                title="Delete ${symbol.symbol}">
+                            🗑️
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Show watch list error
+        function showWatchListError(message) {
+            const tbody = document.getElementById('watchListBody');
+            tbody.innerHTML = `
+                <tr class="watch-list-empty">
+                    <td colspan="6" style="color: var(--accent-red);">${message}</td>
+                </tr>
+            `;
+        }
+
+        // Open chart from watch list (double-click)
+        function openChartFromWatchList(symbol) {
+            if (!symbol) return;
+
+            console.log(`Opening chart for ${symbol} from watch list`);
+
+            // Set search input value
+            const searchInput = document.getElementById('symbolSearch');
+            if (searchInput) {
+                searchInput.value = symbol.toUpperCase();
+            }
+
+            // Open chart
+            handleSearch();
+        }
+
+        // Handle keypress in watch list add input
+        function handleWatchListKeypress(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                addSymbolToWatchList();
+            }
+        }
+
+        // Add symbol to watch list
+        function addSymbolToWatchList() {
+            const input = document.getElementById('watchListAddInput');
+            if (!input) return;
+
+            const symbol = input.value.trim().toUpperCase();
+
+            if (!symbol) {
+                return;
+            }
+
+            // Check if symbol already exists
+            const exists = watchListState.symbols.some(s => s.symbol === symbol);
+            if (exists) {
+                console.log(`Symbol ${symbol} already in watch list`);
+                input.value = '';
+                return;
+            }
+
+            // If this symbol was previously deleted, remove it from deleted set
+            // This allows it to show up again even after auto-refresh
+            if (watchListState.deletedSymbols.has(symbol)) {
+                watchListState.deletedSymbols.delete(symbol);
+                console.log(`Symbol ${symbol} was previously deleted, now re-adding as manual`);
+            }
+
+            // Add symbol to list
+            const newSymbol = {
+                symbol: symbol,
+                oracle: false,
+                manual: true,
+                top_gainers: false,
+                surge: false
+            };
+
+            watchListState.symbols.push(newSymbol);
+            watchListState.manualSymbols.add(symbol);
+
+            // Re-sort symbols
+            watchListState.symbols.sort((a, b) => a.symbol.localeCompare(b.symbol));
+
+            // Render and clear input
+            renderWatchList();
+            input.value = '';
+
+            console.log(`Added ${symbol} to watch list (manual symbols: ${watchListState.manualSymbols.size})`);
+        }
+
+        // Delete symbol from watch list
+        function deleteSymbolFromWatchList(symbol) {
+            if (!symbol) return;
+
+            console.log(`Deleting ${symbol} from watch list`);
+
+            // Check if this is a manually added symbol
+            const isManual = watchListState.manualSymbols.has(symbol);
+
+            // Remove from symbols array
+            watchListState.symbols = watchListState.symbols.filter(s => s.symbol !== symbol);
+
+            if (isManual) {
+                // If it was manually added, remove from manual set
+                watchListState.manualSymbols.delete(symbol);
+                console.log(`Removed ${symbol} from manual symbols`);
+            } else {
+                // If it came from API, add to deleted set to prevent it from showing up on auto-refresh
+                watchListState.deletedSymbols.add(symbol);
+                console.log(`Added ${symbol} to deleted symbols (will hide on auto-refresh)`);
+            }
+
+            // Re-render
+            renderWatchList();
+
+            console.log(`Deleted ${symbol} from watch list (manual: ${watchListState.manualSymbols.size}, deleted: ${watchListState.deletedSymbols.size})`);
         }
     </script>
 </body>

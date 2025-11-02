@@ -35,6 +35,12 @@ Market Sentinel is a real-time stock market monitoring web application designed 
 
 **Features Implemented:**
 - 🔍 **Search Bar**: Enter stock symbols with magnifying glass icon
+- 📋 **Watch List Panel**: Left-side panel showing monitored stocks with source indicators
+  - Oracle (🔮), Manual (✏️), Top Gainers (📈), Volume Surge (🚀)
+  - Double-click symbols to open charts
+  - Add symbols manually via input box
+  - Delete symbols with one-click
+  - Auto-refreshes every 60 seconds
 - 📑 **Tabbed Interface**: Multiple charts in separate tabs with close buttons
 - 📊 **Candlestick Charts**: Professional-grade financial charts
 - ⚙️ **Chart Controls**:
@@ -89,8 +95,8 @@ The code correctly uses Alpaca Bar object single-letter attributes:
 ## Phase 1: Completed Items ✅
 
 1. ✅ Created GoDaddy-compliant directory structure
-2. ✅ Copied `alpaca_config.py` to `cgi-bin/molecules/alpaca/`
-3. ✅ Created data-collection-focused `alpaca.py` (no trading)
+2. ✅ Copied `alpaca_config.py` to `cgi-bin/molecules/alpaca_molecules/`
+3. ✅ Created data-collection-focused `market_data.py` (no trading)
 4. ✅ Built comprehensive HTML interface with:
    - Search functionality
    - Tabbed chart panels
@@ -99,6 +105,13 @@ The code correctly uses Alpaca Bar object single-letter attributes:
    - Chart controls (intervals, ranges, indicators)
    - Professional dark theme UI
 5. ✅ Created project documentation
+6. ✅ Implemented Watch List Panel with:
+   - Symbol list from momentum_alerts data sources
+   - Source indicators (Oracle, Manual, Top Gainers, Volume Surge)
+   - Double-click to chart functionality
+   - Manual symbol addition
+   - Symbol deletion
+   - Auto-refresh functionality
 
 ## Testing Findings
 
@@ -276,6 +289,45 @@ pip3 install alpaca-trade-api flask pandas pytz
 - [Flask CGI Deployment](https://flask.palletsprojects.com/en/2.3.x/deploying/cgi/)
 
 ## Changelog
+
+### 2025-11-02 - Timezone Display Clarification
+- **UI**: Added Eastern Time (ET) indicator to chart controls
+  - Green label "🕐 Eastern Time (ET)" displayed prominently
+  - Clarifies that all chart timestamps are in ET, not UTC
+  - Backend already converts all timestamps to ET before sending to frontend
+  - JavaScript correctly interprets ISO timestamps with timezone info
+
+### 2025-11-02 - Watch List Panel Implementation
+- **FEATURE**: Implemented comprehensive Watch List panel on left side of interface
+  - Symbol list dynamically loaded from momentum_alerts data sources
+  - Source indicators with visual green/red lights:
+    - 🔮 Oracle - symbols from data/{YYYYMMDD}.csv files
+    - ✏️ Manual - user-added symbols
+    - 📈 Top Gainers - symbols from top gainers CSV (first 40)
+    - 🚀 Volume Surge - symbols from volume surge CSV (first 40)
+  - Double-click any symbol to open its chart in a new tab
+  - Add symbols manually via input box with Enter key support
+  - Delete symbols with one-click trash button
+  - Auto-refreshes watch list every 60 seconds
+  - **Smart deletion tracking**:
+    - Deleted API symbols stay hidden across auto-refreshes
+    - Manually added symbols can be deleted permanently
+    - Deleted symbols can be re-added manually and will persist
+    - Maintains separate tracking for manual vs API symbols
+- **BACKEND**: Created watch list API endpoint
+  - New file: `cgi-bin/api/watch_list_api.py`
+  - CGI-compatible Python script for GoDaddy hosting
+  - Reads same CSV files as momentum_alerts.py
+  - Returns JSON with symbol data and source indicators
+- **DATA**: Updated momentum_alerts.py configuration
+  - Changed symbol limits from 5 to 40 per source
+  - Copied momentum_alerts.py and momentum_alerts_config.py to `cgi-bin/molecules/alpaca_molecules/`
+  - Added `get_current_symbol_list()` method for web interface integration
+- **UI**: Professional watch list styling with dark theme
+  - Sticky header for table scrolling
+  - Hover effects for symbol rows
+  - Color-coded source indicators
+  - Responsive design with min/max width constraints
 
 ### 2025-11-02 - Chart Zoom State Persistence
 - **FEATURE**: Implemented zoom/pan state preservation across chart updates
