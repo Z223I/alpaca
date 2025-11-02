@@ -43,23 +43,4 @@ Test.
 
 ## Low Level Requirements
 
-I am not receive trade data to my chart.
-
-I ran the starter script:
-./services/start_trade_stream.sh
-Checking dependencies...
-Starting Trade Stream Server...
-2025-11-02 09:02:07,409 - __main__ - INFO - Starting Trade Stream Server on 0.0.0.0:8765
-2025-11-02 09:02:07,410 - __main__ - INFO - Starting Alpaca data stream...
-2025-11-02 09:02:07,410 - websockets.server - INFO - server listening on 0.0.0.0:8765
-2025-11-02 09:02:07,410 - __main__ - INFO - ✅ Trade Stream Server running on ws://0.0.0.0:8765
-2025-11-02 09:02:26,719 - websockets.server - INFO - connection open
-2025-11-02 09:02:26,719 - __main__ - INFO - New client connected: 127.0.0.1:44254
-2025-11-02 09:02:31,996 - __main__ - INFO - Client subscribing to AAPL
-2025-11-02 09:02:31,996 - __main__ - INFO - Subscribing to Alpaca stream for AAPL
-2025-11-02 09:02:31,996 - __main__ - INFO - Client subscribed to AAPL. Total subscribers: 1
-2025-11-02 09:02:31,996 - alpaca.data.live.websocket - INFO - started data stream
-2025-11-02 09:02:31,996 - alpaca.data.live.websocket - INFO - starting data websocket connection
-2025-11-02 09:02:31,996 - alpaca.data.live.websocket - INFO - connecting to wss://stream.data.alpaca.markets/v2/iex
-2025-11-02 09:02:32,182 - alpaca.data.live.websocket - INFO - connected to wss://stream.data.alpaca.markets/v2/iex
-2025-11-02 09:02:32,215 - alpaca.data.live.websocket - INFO - subscribed to trades: ['AAPL'], corrections: ['AAPL'], cancelErrors: ['AAPL']
+Keep track of the zoom state of the chart and use it when refreshing due to changes in the indicators.

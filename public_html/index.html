@@ -849,7 +849,8 @@
                     volume: true
                 },
                 chart: null,
-                lastPrice: null
+                lastPrice: null,
+                savedZoomState: null  // Track zoom/pan state
             });
 
             // Activate the new chart
@@ -1086,6 +1087,18 @@
             // Destroy existing chart and disconnect ResizeObserver
             if (chartData.chart) {
                 console.log('Removing existing chart');
+
+                // Save current zoom/pan state before destroying chart
+                try {
+                    const currentRange = chartData.chart.timeScale().getVisibleLogicalRange();
+                    if (currentRange) {
+                        chartData.savedZoomState = currentRange;
+                        console.log('Saved zoom state:', currentRange);
+                    }
+                } catch (error) {
+                    console.warn('Could not save zoom state:', error);
+                }
+
                 if (chartData.resizeObserver) {
                     chartData.resizeObserver.disconnect();
                     chartData.resizeObserver = null;
@@ -1334,6 +1347,8 @@
                             syncingToVolume = true;
                             volumeChart.timeScale().setVisibleLogicalRange(range);
                             syncingToVolume = false;
+                            // Save zoom state whenever user changes it
+                            chartData.savedZoomState = range;
                         }
                     });
 
@@ -1344,6 +1359,8 @@
                             syncingToMain = true;
                             chart.timeScale().setVisibleLogicalRange(range);
                             syncingToMain = false;
+                            // Save zoom state whenever user changes it
+                            chartData.savedZoomState = range;
                         }
                     });
 
@@ -1358,6 +1375,14 @@
                     // Store for cleanup
                     chartData.volumeResizeObserver = volumeResizeObserver;
                 }
+            } else {
+                // If no volume chart, still track zoom state changes on main chart
+                chart.timeScale().subscribeVisibleTimeRangeChange(() => {
+                    const range = chart.timeScale().getVisibleLogicalRange();
+                    if (range) {
+                        chartData.savedZoomState = range;
+                    }
+                });
             }
 
             // Handle window resize
@@ -1371,18 +1396,33 @@
             // Store resize observer for cleanup
             chartData.resizeObserver = resizeObserver;
 
-            // Show most recent data instead of entire history
-            // This prevents zooming to old price levels
+            // Restore saved zoom state or set default view
             const barsCount = data.candlesticks.length;
             if (barsCount > 0) {
-                // Show last 100 bars (or all bars if less than 100)
-                const visibleBars = Math.min(100, barsCount);
-                chart.timeScale().setVisibleLogicalRange({
-                    from: barsCount - visibleBars,
-                    to: barsCount - 1
-                });
-
-                console.log('TimeScale set to show bars', barsCount - visibleBars, 'to', barsCount - 1);
+                if (chartData.savedZoomState) {
+                    // Restore previous zoom/pan state
+                    console.log('Restoring saved zoom state:', chartData.savedZoomState);
+                    try {
+                        chart.timeScale().setVisibleLogicalRange(chartData.savedZoomState);
+                        console.log('Zoom state restored successfully');
+                    } catch (error) {
+                        console.warn('Could not restore zoom state, using default:', error);
+                        // Fall back to default view
+                        const visibleBars = Math.min(100, barsCount);
+                        chart.timeScale().setVisibleLogicalRange({
+                            from: barsCount - visibleBars,
+                            to: barsCount - 1
+                        });
+                    }
+                } else {
+                    // Show last 100 bars (or all bars if less than 100) for new charts
+                    const visibleBars = Math.min(100, barsCount);
+                    chart.timeScale().setVisibleLogicalRange({
+                        from: barsCount - visibleBars,
+                        to: barsCount - 1
+                    });
+                    console.log('TimeScale set to show bars', barsCount - visibleBars, 'to', barsCount - 1);
+                }
                 console.log('TimeScale options:', chart.timeScale().options());
             }
 

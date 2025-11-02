@@ -161,9 +161,9 @@ Implement drag-to-resize for time & sales panel:
 - Maintain responsive behavior
 
 ### E. Chart Enhancements
-1. Add volume bars below candlesticks
+1. ✅ Add volume bars below candlesticks (completed)
 2. Add MACD histogram panel
-3. Implement zoom and pan controls
+3. ✅ Implement zoom and pan state persistence (completed)
 4. Add drawing tools (trend lines, support/resistance)
 
 ### F. Data Caching
@@ -276,6 +276,20 @@ pip3 install alpaca-trade-api flask pandas pytz
 - [Flask CGI Deployment](https://flask.palletsprojects.com/en/2.3.x/deploying/cgi/)
 
 ## Changelog
+
+### 2025-11-02 - Chart Zoom State Persistence
+- **FEATURE**: Implemented zoom/pan state preservation across chart updates
+  - Zoom state now saved when user zooms or pans the chart
+  - State automatically restored when indicators are toggled
+  - State preserved during automatic chart refreshes
+  - Works for both main candlestick chart and volume chart
+  - Prevents jarring "jump back to default view" behavior
+- Implementation details:
+  - Added `savedZoomState` property to chart data state object
+  - Save zoom state before destroying chart during refresh
+  - Restore saved zoom state after recreating chart
+  - Subscribe to `timeScale().subscribeVisibleTimeRangeChange()` events
+  - Synchronized zoom state between main chart and volume chart
 
 ### 2025-10-30 - Phase 1 Initial Implementation + Candlestick Fix
 - Created GoDaddy directory structure
