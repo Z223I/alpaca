@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Market Sentinel - Real-time Stock Monitor</title>
+    <title>Market Sentinel - TEST VOLUME FIX</title>
 
     <!-- TradingView Lightweight Charts for professional candlestick charts -->
     <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
@@ -230,10 +230,33 @@
 
         .canvas-container {
             flex: 1;
-            min-height: 0;  /* Critical: prevents flex item from expanding beyond parent */
+            min-height: 0;
             position: relative;
-            overflow: visible;  /* Allow timeScale to extend beyond container */
-            margin-bottom: 50px;  /* Create space for overflowing timeScale */
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            padding: 10px;
+        }
+
+        .main-chart {
+            flex: 3;
+            width: 100%;
+            min-height: 300px;
+            background-color: #16213e;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            position: relative;
+        }
+
+        .volume-chart {
+            flex: 1;
+            width: 100%;
+            min-height: 100px;
+            max-height: 200px;
+            background-color: #0f3460;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            position: relative;
         }
 
         /* Time and Sales Panel */
@@ -403,7 +426,7 @@
 <body>
     <!-- Header -->
     <div class="header">
-        <h1>📊 Market Sentinel</h1>
+        <h1>📊 Market Sentinel - VOLUME FIX TEST v2</h1>
         <div class="search-container">
             <input
                 type="text"
@@ -463,6 +486,41 @@
             console.log('Market Sentinel initialized');
             updateStatus('Ready', 'System initialized');
             initializeTradeWebSocket();
+
+            // Auto-focus search bar on page load
+            const searchInput = document.getElementById('symbolSearch');
+            if (searchInput) {
+                searchInput.focus();
+            }
+        });
+
+        // Global keyboard handler - any keystroke focuses search bar
+        document.addEventListener('keydown', (event) => {
+            const searchInput = document.getElementById('symbolSearch');
+            const activeElement = document.activeElement;
+
+            // Don't interfere if user is already typing in the search box
+            if (activeElement === searchInput) {
+                return;
+            }
+
+            // Don't interfere with special keys (Ctrl, Alt, etc.) or function keys
+            if (event.ctrlKey || event.altKey || event.metaKey || event.key.startsWith('F')) {
+                return;
+            }
+
+            // Don't interfere with navigation keys when not in search
+            const navigationKeys = ['Tab', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+            if (navigationKeys.includes(event.key)) {
+                return;
+            }
+
+            // For any other printable character, focus the search bar
+            if (event.key.length === 1 || event.key === 'Backspace') {
+                searchInput.focus();
+                // If it's a backspace, let it work on the search field
+                // If it's a character, it will be automatically added to the focused input
+            }
         });
 
         // Initialize WebSocket connection for real-time trades
@@ -757,7 +815,8 @@
                             <div>Loading chart data for ${symbol}...</div>
                         </div>
                         <div class="canvas-container" id="canvas-${symbol}" style="display: none;">
-                            <div id="chart-${symbol}" style="width: 100%; height: 100%;"></div>
+                            <div class="main-chart" id="chart-${symbol}"></div>
+                            <div class="volume-chart" id="volume-${symbol}"></div>
                         </div>
                     </div>
 
@@ -847,8 +906,14 @@
                 if (chartData.resizeObserver) {
                     chartData.resizeObserver.disconnect();
                 }
+                if (chartData.volumeResizeObserver) {
+                    chartData.volumeResizeObserver.disconnect();
+                }
                 if (chartData.chart) {
                     chartData.chart.remove();
+                }
+                if (chartData.volumeChart) {
+                    chartData.volumeChart.remove();
                 }
             }
 
@@ -1026,8 +1091,16 @@
                     chartData.resizeObserver.disconnect();
                     chartData.resizeObserver = null;
                 }
+                if (chartData.volumeResizeObserver) {
+                    chartData.volumeResizeObserver.disconnect();
+                    chartData.volumeResizeObserver = null;
+                }
                 chartData.chart.remove();
                 chartData.chart = null;
+                if (chartData.volumeChart) {
+                    chartData.volumeChart.remove();
+                    chartData.volumeChart = null;
+                }
             }
 
             // Wait for layout to complete before creating chart
@@ -1058,7 +1131,9 @@
             }
 
             // Create new Lightweight Charts instance
-            console.log('Creating new chart with dimensions:', chartElement.clientWidth, 'x', chartElement.clientHeight);
+            console.log('=== CREATING MAIN CHART ===');
+            console.log('Main chart element ID:', chartElement.id);
+            console.log('Main chart dimensions:', chartElement.clientWidth, 'x', chartElement.clientHeight);
             const chart = LightweightCharts.createChart(chartElement, {
                 width: chartElement.clientWidth,
                 height: chartElement.clientHeight,
@@ -1200,21 +1275,90 @@
                 chartData.indicatorSeries.vwap = vwapSeries;
             }
 
-            // Volume indicator
+            // Create separate volume chart
             if (chartData.indicators.volume && data.volume && data.volume.length > 0) {
-                const volumeSeries = chart.addHistogramSeries({
-                    color: '#26a69a',
-                    priceFormat: {
-                        type: 'volume',
-                    },
-                    priceScaleId: '', // Create a new price scale for volume
-                    scaleMargins: {
-                        top: 0.88,  // Volume takes only bottom 12% of chart
-                        bottom: 0.08,  // CRITICAL: Leave 8% gap at bottom for timeScale visibility!
-                    },
-                });
-                volumeSeries.setData(data.volume);
-                chartData.indicatorSeries.volume = volumeSeries;
+                const volumeElement = document.getElementById(`volume-${symbol}`);
+                if (volumeElement) {
+                    console.log('=== CREATING VOLUME CHART ===');
+                    console.log('Volume chart element ID:', volumeElement.id);
+                    console.log('Volume chart dimensions:', volumeElement.clientWidth, 'x', volumeElement.clientHeight);
+                    console.log('Volume element parent:', volumeElement.parentElement.id);
+
+                    // Check if volume element has dimensions
+                    if (volumeElement.clientWidth === 0 || volumeElement.clientHeight === 0) {
+                        console.warn('Volume chart element has zero dimensions! Width:', volumeElement.clientWidth, 'Height:', volumeElement.clientHeight);
+                        // Continue anyway - ResizeObserver will fix it when it gets dimensions
+                    }
+
+                    const volumeChart = LightweightCharts.createChart(volumeElement, {
+                        width: volumeElement.clientWidth,
+                        height: volumeElement.clientHeight,
+                        layout: {
+                            background: { color: '#1a1a2e' },
+                            textColor: '#d1d4dc',
+                        },
+                        grid: {
+                            vertLines: { color: 'rgba(255, 255, 255, 0.1)' },
+                            horzLines: { color: 'rgba(255, 255, 255, 0.1)' },
+                        },
+                        rightPriceScale: {
+                            borderColor: 'rgba(255, 255, 255, 0.2)',
+                        },
+                        timeScale: {
+                            borderColor: 'rgba(255, 255, 255, 0.8)',
+                            timeVisible: true,
+                            secondsVisible: false,
+                        },
+                    });
+
+                    const volumeSeries = volumeChart.addHistogramSeries({
+                        color: '#26a69a',
+                        priceFormat: {
+                            type: 'volume',
+                        },
+                    });
+                    volumeSeries.setData(data.volume);
+
+                    // Store volume chart reference
+                    chartData.volumeChart = volumeChart;
+                    chartData.indicatorSeries.volume = volumeSeries;
+
+                    // Sync time scales between main chart and volume chart
+                    // Use flags to prevent infinite loop
+                    let syncingToVolume = false;
+                    let syncingToMain = false;
+
+                    chart.timeScale().subscribeVisibleTimeRangeChange(() => {
+                        if (syncingToMain) return;
+                        const range = chart.timeScale().getVisibleLogicalRange();
+                        if (range) {
+                            syncingToVolume = true;
+                            volumeChart.timeScale().setVisibleLogicalRange(range);
+                            syncingToVolume = false;
+                        }
+                    });
+
+                    volumeChart.timeScale().subscribeVisibleTimeRangeChange(() => {
+                        if (syncingToVolume) return;
+                        const range = volumeChart.timeScale().getVisibleLogicalRange();
+                        if (range) {
+                            syncingToMain = true;
+                            chart.timeScale().setVisibleLogicalRange(range);
+                            syncingToMain = false;
+                        }
+                    });
+
+                    // Handle volume chart resize
+                    const volumeResizeObserver = new ResizeObserver(entries => {
+                        if (entries.length === 0) return;
+                        const { width, height } = entries[0].contentRect;
+                        volumeChart.applyOptions({ width, height });
+                    });
+                    volumeResizeObserver.observe(volumeElement);
+
+                    // Store for cleanup
+                    chartData.volumeResizeObserver = volumeResizeObserver;
+                }
             }
 
             // Handle window resize

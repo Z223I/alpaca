@@ -187,10 +187,12 @@ class TradeStreamServer:
 
         async def trade_handler(trade: Trade):
             """Handler for incoming trades from Alpaca."""
+            logger.info(f"🔔 Received trade from Alpaca for {symbol}: ${trade.price:.2f} x {trade.size}")
             await self.broadcast_trade(symbol, trade)
 
         # Subscribe to trades for this symbol
         self.alpaca_stream.subscribe_trades(trade_handler, symbol)
+        logger.info(f"✅ Trade handler registered for {symbol}")
 
     async def _unsubscribe_alpaca_symbol(self, symbol: str):
         """Unsubscribe from Alpaca trade stream for a symbol."""
@@ -200,6 +202,7 @@ class TradeStreamServer:
     async def broadcast_trade(self, symbol: str, trade: Trade):
         """Broadcast a trade to all subscribed clients."""
         if symbol not in self.subscriptions:
+            logger.warning(f"Received trade for {symbol} but no subscribers")
             return
 
         # Format trade data for frontend
@@ -216,6 +219,7 @@ class TradeStreamServer:
         }
 
         message = json.dumps(trade_data)
+        logger.info(f"📊 Broadcasting {symbol} trade: ${trade.price:.2f} x {trade.size} to {len(self.subscriptions[symbol])} clients")
 
         # Broadcast to all subscribers
         subscribers = list(self.subscriptions[symbol])  # Copy to avoid modification during iteration
@@ -224,19 +228,18 @@ class TradeStreamServer:
         for client in subscribers:
             try:
                 await client.send(message)
+                logger.info(f"✅ Sent trade to client {client.remote_address}")
             except websockets.exceptions.ConnectionClosed:
                 disconnected.append(client)
+                logger.warning(f"Client {client.remote_address} disconnected during broadcast")
             except Exception as e:
-                logger.error(f"Error broadcasting to client: {e}")
+                logger.error(f"Error broadcasting to client {client.remote_address}: {e}")
                 disconnected.append(client)
 
         # Clean up disconnected clients
         for client in disconnected:
             await self.unsubscribe_all(client)
             self.clients.discard(client)
-
-        if len(subscribers) > 0:
-            logger.debug(f"Broadcasted {symbol} trade: ${trade.price:.2f} x {trade.size} to {len(subscribers)} clients")
 
 
 async def main():

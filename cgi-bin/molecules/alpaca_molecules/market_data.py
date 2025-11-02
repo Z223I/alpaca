@@ -230,6 +230,13 @@ class AlpacaMarketData:
             # Get bar data
             df = self.get_bar_data(symbol, interval, start_date, end_date)
 
+            # If no data and requesting intraday data, extend lookback to capture recent market days
+            # This handles cases when market is closed (weekends, holidays)
+            if df.empty and interval in ['1m', '5m', '15m', '30m', '1h']:
+                # Extend lookback by up to 7 days to find recent market data
+                extended_start = end_date - timedelta(days=days + 7)
+                df = self.get_bar_data(symbol, interval, extended_start, end_date)
+
             if df.empty:
                 return {
                     'symbol': symbol,
