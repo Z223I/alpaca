@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Sentinel API Test Suite</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-tertiary: #0f3460;
+            --text-primary: #e4e4e4;
+            --text-secondary: #a0a0a0;
+            --accent-green: #4ecca3;
+            --accent-red: #ff6b6b;
+            --accent-blue: #4dabf7;
+            --accent-yellow: #ffd93d;
+            --border-color: #2a2a3e;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: var(--accent-green);
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+
+        .test-section {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .test-section h2 {
+            color: var(--accent-blue);
+            margin-bottom: 15px;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-badge {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: normal;
+        }
+
+        .status-badge.pending {
+            background-color: var(--bg-tertiary);
+            color: var(--text-secondary);
+        }
+
+        .status-badge.testing {
+            background-color: var(--accent-yellow);
+            color: var(--bg-primary);
+        }
+
+        .status-badge.success {
+            background-color: var(--accent-green);
+            color: var(--bg-primary);
+        }
+
+        .status-badge.error {
+            background-color: var(--accent-red);
+            color: white;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .input-group label {
+            color: var(--text-secondary);
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        .input-group input,
+        .input-group select {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 14px;
+            min-width: 120px;
+        }
+
+        .input-group input:focus,
+        .input-group select:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        button {
+            background-color: var(--accent-blue);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s;
+            margin-top: auto;
+        }
+
+        button:hover {
+            background-color: #339af0;
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background-color: var(--bg-tertiary);
+            color: var(--text-secondary);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .response-container {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .response-container.success {
+            border-color: var(--accent-green);
+        }
+
+        .response-container.error {
+            border-color: var(--accent-red);
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            background-color: var(--bg-tertiary);
+            padding: 10px 15px;
+            border-radius: 5px;
+            border: 1px solid var(--border-color);
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 11px;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            color: var(--text-primary);
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .stat-value.success {
+            color: var(--accent-green);
+        }
+
+        .stat-value.error {
+            color: var(--accent-red);
+        }
+
+        .loading {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .test-all-btn {
+            background-color: var(--accent-green);
+            font-size: 16px;
+            padding: 12px 24px;
+        }
+
+        .test-all-btn:hover {
+            background-color: #45b393;
+        }
+
+        .endpoint-url {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 5px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .websocket-section {
+            background-color: var(--bg-tertiary);
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+
+        .websocket-section h3 {
+            color: var(--accent-yellow);
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .trade-item {
+            background-color: var(--bg-secondary);
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border-left: 3px solid var(--accent-green);
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Market Sentinel API Test Suite</h1>
+        <p class="subtitle">Test the three CGI API endpoints and WebSocket real-time streaming</p>
+
+        <!-- Test All Button -->
+        <div style="margin-bottom: 20px;">
+            <button class="test-all-btn" onclick="testAllEndpoints()">▶ Test All Endpoints</button>
+        </div>
+
+        <!-- Test 1: Quote Endpoint -->
+        <div class="test-section">
+            <h2>
+                1. Quote Endpoint
+                <span class="status-badge pending" id="quote-status">PENDING</span>
+            </h2>
+            <div class="endpoint-url">GET /cgi-bin/api/market_data_api.py?action=quote&symbol={SYMBOL}</div>
+
+            <div class="controls">
+                <div class="input-group">
+                    <label>Symbol</label>
+                    <input type="text" id="quote-symbol" value="AAPL" placeholder="e.g., AAPL">
+                </div>
+                <button onclick="testQuote()">Test Quote</button>
+            </div>
+
+            <div class="stats" id="quote-stats" style="display: none;">
+                <div class="stat-item">
+                    <div class="stat-label">Status</div>
+                    <div class="stat-value" id="quote-status-code">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Response Time</div>
+                    <div class="stat-value" id="quote-response-time">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Bid Price</div>
+                    <div class="stat-value success" id="quote-bid-price">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Ask Price</div>
+                    <div class="stat-value success" id="quote-ask-price">-</div>
+                </div>
+            </div>
+
+            <div class="response-container" id="quote-response">Click "Test Quote" to fetch real-time quote data</div>
+        </div>
+
+        <!-- Test 2: Chart Endpoint -->
+        <div class="test-section">
+            <h2>
+                2. Chart Endpoint
+                <span class="status-badge pending" id="chart-status">PENDING</span>
+            </h2>
+            <div class="endpoint-url">GET /cgi-bin/api/market_data_api.py?action=chart&symbol={SYMBOL}&interval={INTERVAL}&range={RANGE}</div>
+
+            <div class="controls">
+                <div class="input-group">
+                    <label>Symbol</label>
+                    <input type="text" id="chart-symbol" value="AAPL" placeholder="e.g., AAPL">
+                </div>
+                <div class="input-group">
+                    <label>Interval</label>
+                    <select id="chart-interval">
+                        <option value="1m">1 Minute</option>
+                        <option value="5m">5 Minutes</option>
+                        <option value="15m">15 Minutes</option>
+                        <option value="30m">30 Minutes</option>
+                        <option value="1h">1 Hour</option>
+                        <option value="1d">1 Day</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Range</label>
+                    <select id="chart-range">
+                        <option value="1d" selected>1 Day</option>
+                        <option value="5d">5 Days</option>
+                        <option value="1mo">1 Month</option>
+                        <option value="1y">1 Year</option>
+                    </select>
+                </div>
+                <button onclick="testChart()">Test Chart</button>
+            </div>
+
+            <div class="stats" id="chart-stats" style="display: none;">
+                <div class="stat-item">
+                    <div class="stat-label">Status</div>
+                    <div class="stat-value" id="chart-status-code">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Response Time</div>
+                    <div class="stat-value" id="chart-response-time">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Bars Returned</div>
+                    <div class="stat-value success" id="chart-bars-count">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">First Bar</div>
+                    <div class="stat-value" id="chart-first-bar">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Last Bar</div>
+                    <div class="stat-value" id="chart-last-bar">-</div>
+                </div>
+            </div>
+
+            <div class="response-container" id="chart-response">Click "Test Chart" to fetch historical bar data</div>
+        </div>
+
+        <!-- Test 3: Trades Endpoint -->
+        <div class="test-section">
+            <h2>
+                3. Trades Endpoint (Time & Sales)
+                <span class="status-badge pending" id="trades-status">PENDING</span>
+            </h2>
+            <div class="endpoint-url">GET /cgi-bin/api/market_data_api.py?action=trades&symbol={SYMBOL}&limit={LIMIT}</div>
+
+            <div class="controls">
+                <div class="input-group">
+                    <label>Symbol</label>
+                    <input type="text" id="trades-symbol" value="AAPL" placeholder="e.g., AAPL">
+                </div>
+                <div class="input-group">
+                    <label>Limit</label>
+                    <select id="trades-limit">
+                        <option value="10">10 Trades</option>
+                        <option value="50">50 Trades</option>
+                        <option value="100" selected>100 Trades</option>
+                        <option value="500">500 Trades</option>
+                    </select>
+                </div>
+                <button onclick="testTrades()">Test Trades</button>
+            </div>
+
+            <div class="stats" id="trades-stats" style="display: none;">
+                <div class="stat-item">
+                    <div class="stat-label">Status</div>
+                    <div class="stat-value" id="trades-status-code">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Response Time</div>
+                    <div class="stat-value" id="trades-response-time">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Trades Returned</div>
+                    <div class="stat-value success" id="trades-count">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Latest Price</div>
+                    <div class="stat-value success" id="trades-latest-price">-</div>
+                </div>
+            </div>
+
+            <div class="response-container" id="trades-response">Click "Test Trades" to fetch time and sales data</div>
+        </div>
+
+        <!-- Test 4: WebSocket Streaming -->
+        <div class="test-section">
+            <h2>
+                4. WebSocket Real-Time Streaming
+                <span class="status-badge pending" id="ws-status">PENDING</span>
+            </h2>
+            <div class="endpoint-url">WebSocket ws://localhost:8765</div>
+
+            <div class="controls">
+                <div class="input-group">
+                    <label>Symbol</label>
+                    <input type="text" id="ws-symbol" value="AAPL" placeholder="e.g., AAPL">
+                </div>
+                <button onclick="testWebSocket()">Connect & Subscribe</button>
+                <button onclick="disconnectWebSocket()">Disconnect</button>
+            </div>
+
+            <div class="stats" id="ws-stats" style="display: none;">
+                <div class="stat-item">
+                    <div class="stat-label">Connection</div>
+                    <div class="stat-value" id="ws-connection">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Trades Received</div>
+                    <div class="stat-value success" id="ws-trades-count">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Last Price</div>
+                    <div class="stat-value success" id="ws-last-price">-</div>
+                </div>
+            </div>
+
+            <div class="websocket-section">
+                <h3>Real-Time Trades (Live Stream)</h3>
+                <div id="ws-trades" style="max-height: 300px; overflow-y: auto;">
+                    No trades yet. Connect and subscribe to start receiving real-time data.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let wsTradesCount = 0;
+
+        // Test Quote Endpoint
+        async function testQuote() {
+            const symbol = document.getElementById('quote-symbol').value.trim().toUpperCase();
+            if (!symbol) {
+                alert('Please enter a symbol');
+                return;
+            }
+
+            const statusBadge = document.getElementById('quote-status');
+            const responseDiv = document.getElementById('quote-response');
+            const statsDiv = document.getElementById('quote-stats');
+
+            statusBadge.textContent = 'TESTING...';
+            statusBadge.className = 'status-badge testing';
+            responseDiv.textContent = 'Fetching quote data...';
+            responseDiv.className = 'response-container';
+
+            const startTime = performance.now();
+
+            try {
+                const url = `./cgi-bin/api/market_data_api.py?action=quote&symbol=${symbol}`;
+                const response = await fetch(url);
+                const endTime = performance.now();
+                const data = await response.json();
+
+                const responseTime = (endTime - startTime).toFixed(0);
+
+                if (data.success) {
+                    statusBadge.textContent = 'SUCCESS';
+                    statusBadge.className = 'status-badge success';
+                    responseDiv.className = 'response-container success';
+
+                    // Update stats
+                    statsDiv.style.display = 'flex';
+                    document.getElementById('quote-status-code').textContent = response.status;
+                    document.getElementById('quote-response-time').textContent = responseTime + ' ms';
+                    document.getElementById('quote-bid-price').textContent = '$' + data.data.bid_price.toFixed(2);
+                    document.getElementById('quote-ask-price').textContent = '$' + data.data.ask_price.toFixed(2);
+                } else {
+                    statusBadge.textContent = 'ERROR';
+                    statusBadge.className = 'status-badge error';
+                    responseDiv.className = 'response-container error';
+                }
+
+                responseDiv.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                const endTime = performance.now();
+                statusBadge.textContent = 'ERROR';
+                statusBadge.className = 'status-badge error';
+                responseDiv.className = 'response-container error';
+                responseDiv.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        // Test Chart Endpoint
+        async function testChart() {
+            const symbol = document.getElementById('chart-symbol').value.trim().toUpperCase();
+            const interval = document.getElementById('chart-interval').value;
+            const range = document.getElementById('chart-range').value;
+
+            if (!symbol) {
+                alert('Please enter a symbol');
+                return;
+            }
+
+            const statusBadge = document.getElementById('chart-status');
+            const responseDiv = document.getElementById('chart-response');
+            const statsDiv = document.getElementById('chart-stats');
+
+            statusBadge.textContent = 'TESTING...';
+            statusBadge.className = 'status-badge testing';
+            responseDiv.textContent = 'Fetching chart data...';
+            responseDiv.className = 'response-container';
+
+            const startTime = performance.now();
+
+            try {
+                const url = `./cgi-bin/api/market_data_api.py?action=chart&symbol=${symbol}&interval=${interval}&range=${range}`;
+                const response = await fetch(url);
+                const endTime = performance.now();
+                const data = await response.json();
+
+                const responseTime = (endTime - startTime).toFixed(0);
+
+                if (data.success) {
+                    statusBadge.textContent = 'SUCCESS';
+                    statusBadge.className = 'status-badge success';
+                    responseDiv.className = 'response-container success';
+
+                    // Update stats
+                    statsDiv.style.display = 'flex';
+                    document.getElementById('chart-status-code').textContent = response.status;
+                    document.getElementById('chart-response-time').textContent = responseTime + ' ms';
+                    document.getElementById('chart-bars-count').textContent = data.data.bars.length;
+
+                    if (data.data.bars.length > 0) {
+                        const firstBar = new Date(data.data.bars[0].timestamp).toLocaleString();
+                        const lastBar = new Date(data.data.bars[data.data.bars.length - 1].timestamp).toLocaleString();
+                        document.getElementById('chart-first-bar').textContent = firstBar;
+                        document.getElementById('chart-last-bar').textContent = lastBar;
+                    }
+                } else {
+                    statusBadge.textContent = 'ERROR';
+                    statusBadge.className = 'status-badge error';
+                    responseDiv.className = 'response-container error';
+                }
+
+                // Show first 3 bars only to keep response readable
+                const displayData = {...data};
+                if (displayData.data && displayData.data.bars && displayData.data.bars.length > 3) {
+                    displayData.data.bars = [
+                        displayData.data.bars[0],
+                        displayData.data.bars[1],
+                        displayData.data.bars[2],
+                        { note: `... ${displayData.data.bars.length - 3} more bars ...` }
+                    ];
+                }
+
+                responseDiv.textContent = JSON.stringify(displayData, null, 2);
+            } catch (error) {
+                statusBadge.textContent = 'ERROR';
+                statusBadge.className = 'status-badge error';
+                responseDiv.className = 'response-container error';
+                responseDiv.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        // Test Trades Endpoint
+        async function testTrades() {
+            const symbol = document.getElementById('trades-symbol').value.trim().toUpperCase();
+            const limit = document.getElementById('trades-limit').value;
+
+            if (!symbol) {
+                alert('Please enter a symbol');
+                return;
+            }
+
+            const statusBadge = document.getElementById('trades-status');
+            const responseDiv = document.getElementById('trades-response');
+            const statsDiv = document.getElementById('trades-stats');
+
+            statusBadge.textContent = 'TESTING...';
+            statusBadge.className = 'status-badge testing';
+            responseDiv.textContent = 'Fetching trades data...';
+            responseDiv.className = 'response-container';
+
+            const startTime = performance.now();
+
+            try {
+                const url = `./cgi-bin/api/market_data_api.py?action=trades&symbol=${symbol}&limit=${limit}`;
+                const response = await fetch(url);
+                const endTime = performance.now();
+                const data = await response.json();
+
+                const responseTime = (endTime - startTime).toFixed(0);
+
+                if (data.success) {
+                    statusBadge.textContent = 'SUCCESS';
+                    statusBadge.className = 'status-badge success';
+                    responseDiv.className = 'response-container success';
+
+                    // Update stats
+                    statsDiv.style.display = 'flex';
+                    document.getElementById('trades-status-code').textContent = response.status;
+                    document.getElementById('trades-response-time').textContent = responseTime + ' ms';
+                    document.getElementById('trades-count').textContent = data.data.count;
+
+                    if (data.data.trades.length > 0) {
+                        document.getElementById('trades-latest-price').textContent = '$' + data.data.trades[data.data.trades.length - 1].price.toFixed(2);
+                    }
+                } else {
+                    statusBadge.textContent = 'ERROR';
+                    statusBadge.className = 'status-badge error';
+                    responseDiv.className = 'response-container error';
+                }
+
+                // Show first 5 trades only
+                const displayData = {...data};
+                if (displayData.data && displayData.data.trades && displayData.data.trades.length > 5) {
+                    displayData.data.trades = [
+                        ...displayData.data.trades.slice(0, 5),
+                        { note: `... ${displayData.data.trades.length - 5} more trades ...` }
+                    ];
+                }
+
+                responseDiv.textContent = JSON.stringify(displayData, null, 2);
+            } catch (error) {
+                statusBadge.textContent = 'ERROR';
+                statusBadge.className = 'status-badge error';
+                responseDiv.className = 'response-container error';
+                responseDiv.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        // Test WebSocket
+        function testWebSocket() {
+            const symbol = document.getElementById('ws-symbol').value.trim().toUpperCase();
+            if (!symbol) {
+                alert('Please enter a symbol');
+                return;
+            }
+
+            const statusBadge = document.getElementById('ws-status');
+            const statsDiv = document.getElementById('ws-stats');
+            const tradesDiv = document.getElementById('ws-trades');
+
+            statusBadge.textContent = 'CONNECTING...';
+            statusBadge.className = 'status-badge testing';
+            tradesDiv.innerHTML = 'Connecting to WebSocket server...';
+            wsTradesCount = 0;
+
+            try {
+                ws = new WebSocket('ws://localhost:8765');
+
+                ws.onopen = () => {
+                    console.log('WebSocket connected');
+                    statusBadge.textContent = 'CONNECTED';
+                    statusBadge.className = 'status-badge success';
+
+                    statsDiv.style.display = 'flex';
+                    document.getElementById('ws-connection').textContent = 'Connected';
+                    document.getElementById('ws-connection').className = 'stat-value success';
+
+                    tradesDiv.innerHTML = `Connected! Subscribing to ${symbol}...`;
+
+                    // Subscribe to symbol
+                    ws.send(JSON.stringify({
+                        action: 'subscribe',
+                        symbol: symbol
+                    }));
+                };
+
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    console.log('WebSocket message:', data);
+
+                    if (data.type === 'subscribed') {
+                        tradesDiv.innerHTML = `✅ Subscribed to ${data.symbol}. Waiting for trades...<br><br>`;
+                    } else if (data.type === 'trade') {
+                        wsTradesCount++;
+                        document.getElementById('ws-trades-count').textContent = wsTradesCount;
+                        document.getElementById('ws-last-price').textContent = '$' + data.data.price.toFixed(2);
+
+                        const tradeTime = new Date(data.data.timestamp).toLocaleTimeString();
+                        const tradeHtml = `
+                            <div class="trade-item">
+                                <strong>${data.symbol}</strong> @ ${tradeTime} -
+                                <span style="color: var(--accent-green)">$${data.data.price.toFixed(2)}</span> x ${data.data.size.toLocaleString()}
+                            </div>
+                        `;
+
+                        // Prepend new trade
+                        tradesDiv.innerHTML = tradeHtml + tradesDiv.innerHTML;
+
+                        // Keep only last 20 trades
+                        const trades = tradesDiv.querySelectorAll('.trade-item');
+                        if (trades.length > 20) {
+                            trades[trades.length - 1].remove();
+                        }
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    statusBadge.textContent = 'ERROR';
+                    statusBadge.className = 'status-badge error';
+                    tradesDiv.innerHTML = '❌ WebSocket error. Make sure the trade stream server is running:<br><br><code>./services/start_trade_stream.sh</code>';
+                };
+
+                ws.onclose = () => {
+                    console.log('WebSocket disconnected');
+                    statusBadge.textContent = 'DISCONNECTED';
+                    statusBadge.className = 'status-badge pending';
+                    document.getElementById('ws-connection').textContent = 'Disconnected';
+                    document.getElementById('ws-connection').className = 'stat-value error';
+                };
+
+            } catch (error) {
+                statusBadge.textContent = 'ERROR';
+                statusBadge.className = 'status-badge error';
+                tradesDiv.innerHTML = 'Error: ' + error.message;
+            }
+        }
+
+        function disconnectWebSocket() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+        // Test All Endpoints
+        async function testAllEndpoints() {
+            console.log('Testing all endpoints...');
+            await testQuote();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await testChart();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await testTrades();
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                testAllEndpoints();
+            }
+        });
+    </script>
+</body>
+</html>

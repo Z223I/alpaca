@@ -1,0 +1,17 @@
+[Unit]
+Description=Market Sentinel Trade Stream Server
+After=network.target
+
+[Service]
+Type=simple
+User=wilsonb
+WorkingDirectory=/home/wilsonb/dl/github.com/alpaca
+Environment="PATH=/home/wilsonb/miniconda3/envs/alpaca/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/home/wilsonb/miniconda3/envs/alpaca/bin/python /home/wilsonb/dl/github.com/alpaca/services/trade_stream_server.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

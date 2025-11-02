@@ -23,7 +23,10 @@ import pytz
 import pandas as pd
 
 # Add paths for importing from main codebase atoms
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+# Use realpath to resolve symlinks properly
+script_real_path = os.path.realpath(__file__)
+repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(script_real_path))))
+sys.path.insert(0, repo_root)
 
 from atoms.api.init_alpaca_client import init_alpaca_client  # noqa: E402
 from atoms.api.get_latest_quote import get_latest_quote  # noqa: E402

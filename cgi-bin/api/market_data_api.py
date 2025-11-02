@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/home/wilsonb/miniconda3/envs/alpaca/bin/python
 """
 Market Data CGI API Endpoint for Market Sentinel
 

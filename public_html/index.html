@@ -451,14 +451,207 @@
             charts: new Map(),
             activeChart: null,
             updateIntervals: new Map(),
-            timeSalesIntervals: new Map()
+            timeSalesIntervals: new Map(),
+            tradeWebSocket: null,
+            tradeBuffer: new Map(),  // Buffer for real-time trades
+            wsReconnectAttempts: 0,
+            wsMaxReconnectAttempts: 5
         };
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             console.log('Market Sentinel initialized');
             updateStatus('Ready', 'System initialized');
+            initializeTradeWebSocket();
         });
+
+        // Initialize WebSocket connection for real-time trades
+        function initializeTradeWebSocket() {
+            const wsUrl = 'ws://localhost:8765';
+            console.log('Connecting to trade stream:', wsUrl);
+            updateStatus('Connecting', 'Connecting to real-time trade stream...');
+
+            try {
+                state.tradeWebSocket = new WebSocket(wsUrl);
+
+                state.tradeWebSocket.onopen = () => {
+                    console.log('✅ WebSocket connected to trade stream');
+                    updateStatus('Connected', 'Real-time trade stream active');
+                    state.wsReconnectAttempts = 0;
+
+                    // Resubscribe to all active symbols
+                    state.charts.forEach((chartData, symbol) => {
+                        subscribeToSymbol(symbol);
+                    });
+                };
+
+                state.tradeWebSocket.onmessage = (event) => {
+                    handleTradeMessage(event.data);
+                };
+
+                state.tradeWebSocket.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    updateStatus('Error', 'Trade stream connection error');
+                };
+
+                state.tradeWebSocket.onclose = () => {
+                    console.log('WebSocket disconnected');
+                    updateStatus('Disconnected', 'Trade stream disconnected');
+                    state.tradeWebSocket = null;
+
+                    // Attempt reconnection
+                    if (state.wsReconnectAttempts < state.wsMaxReconnectAttempts) {
+                        state.wsReconnectAttempts++;
+                        const delay = Math.min(1000 * Math.pow(2, state.wsReconnectAttempts), 30000);
+                        console.log(`Reconnecting in ${delay/1000}s (attempt ${state.wsReconnectAttempts}/${state.wsMaxReconnectAttempts})...`);
+                        setTimeout(initializeTradeWebSocket, delay);
+                    } else {
+                        console.error('Max reconnection attempts reached. Please refresh the page.');
+                        updateStatus('Error', 'Trade stream unavailable. Please refresh page.');
+                    }
+                };
+
+                // Keep-alive ping every 30 seconds
+                setInterval(() => {
+                    if (state.tradeWebSocket && state.tradeWebSocket.readyState === WebSocket.OPEN) {
+                        state.tradeWebSocket.send(JSON.stringify({ action: 'ping' }));
+                    }
+                }, 30000);
+
+            } catch (error) {
+                console.error('Failed to create WebSocket:', error);
+                updateStatus('Error', 'Failed to connect to trade stream');
+            }
+        }
+
+        // Subscribe to real-time trades for a symbol
+        function subscribeToSymbol(symbol) {
+            if (!state.tradeWebSocket || state.tradeWebSocket.readyState !== WebSocket.OPEN) {
+                console.warn('WebSocket not ready, cannot subscribe to', symbol);
+                return;
+            }
+
+            console.log('Subscribing to real-time trades for', symbol);
+            state.tradeWebSocket.send(JSON.stringify({
+                action: 'subscribe',
+                symbol: symbol
+            }));
+
+            // Initialize trade buffer for this symbol
+            if (!state.tradeBuffer.has(symbol)) {
+                state.tradeBuffer.set(symbol, []);
+            }
+        }
+
+        // Unsubscribe from real-time trades for a symbol
+        function unsubscribeFromSymbol(symbol) {
+            if (!state.tradeWebSocket || state.tradeWebSocket.readyState !== WebSocket.OPEN) {
+                return;
+            }
+
+            console.log('Unsubscribing from real-time trades for', symbol);
+            state.tradeWebSocket.send(JSON.stringify({
+                action: 'unsubscribe',
+                symbol: symbol
+            }));
+
+            // Clear trade buffer
+            state.tradeBuffer.delete(symbol);
+        }
+
+        // Handle incoming WebSocket trade messages
+        function handleTradeMessage(message) {
+            try {
+                const data = JSON.parse(message);
+
+                if (data.type === 'trade') {
+                    handleRealTimeTrade(data.symbol, data.data);
+                } else if (data.type === 'subscribed') {
+                    console.log('✅ Subscribed to', data.symbol);
+                } else if (data.type === 'unsubscribed') {
+                    console.log('Unsubscribed from', data.symbol);
+                } else if (data.type === 'pong') {
+                    // Keep-alive response
+                }
+            } catch (error) {
+                console.error('Error handling trade message:', error);
+            }
+        }
+
+        // Handle a real-time trade update
+        function handleRealTimeTrade(symbol, tradeData) {
+            console.log(`Real-time trade for ${symbol}:`, tradeData);
+
+            // Add to buffer
+            const buffer = state.tradeBuffer.get(symbol) || [];
+            buffer.unshift(tradeData);  // Add to front (newest first)
+
+            // Keep only last 100 trades in buffer
+            if (buffer.length > 100) {
+                buffer.pop();
+            }
+            state.tradeBuffer.set(symbol, buffer);
+
+            // Update display if this symbol is active
+            const chartData = state.charts.get(symbol);
+            if (chartData) {
+                addTradeToDisplay(symbol, tradeData);
+            }
+        }
+
+        // Add a single trade to the display
+        function addTradeToDisplay(symbol, tradeData) {
+            const container = document.getElementById(`trades-${symbol}`);
+            if (!container) {
+                return;
+            }
+
+            const chartData = state.charts.get(symbol);
+            if (!chartData) {
+                return;
+            }
+
+            // Determine price direction
+            const priceClass = chartData.lastPrice && tradeData.price > chartData.lastPrice ? 'up' :
+                              chartData.lastPrice && tradeData.price < chartData.lastPrice ? 'down' : '';
+
+            // Format time in ET timezone
+            const tradeTime = new Date(tradeData.timestamp).toLocaleTimeString('en-US', {
+                timeZone: 'America/New_York',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+
+            // Create trade item element
+            const tradeItem = document.createElement('div');
+            tradeItem.className = 'trade-item';
+            tradeItem.innerHTML = `
+                <div>
+                    <div class="trade-time">${tradeTime} ET</div>
+                    <div class="trade-price ${priceClass}">$${tradeData.price.toFixed(2)}</div>
+                </div>
+                <div class="trade-size">${tradeData.size.toLocaleString()}</div>
+            `;
+
+            // Add flash animation
+            tradeItem.style.backgroundColor = 'rgba(78, 204, 163, 0.3)';
+            setTimeout(() => {
+                tradeItem.style.backgroundColor = '';
+            }, 1000);
+
+            // Insert at top
+            container.insertBefore(tradeItem, container.firstChild);
+
+            // Remove excess items (keep only 100)
+            while (container.children.length > 100) {
+                container.removeChild(container.lastChild);
+            }
+
+            // Update last price
+            chartData.lastPrice = tradeData.price;
+        }
 
         // Search functionality
         function handleSearchKeypress(event) {
@@ -611,10 +804,11 @@
             const updateInterval = setInterval(() => loadChartData(symbol), 30000);
             state.updateIntervals.set(symbol, updateInterval);
 
-            // Start time & sales updates (every 10 seconds)
-            const salesInterval = setInterval(() => loadTimeSales(symbol), 10000);
-            state.timeSalesIntervals.set(symbol, salesInterval);
+            // Load initial historical trades (one-time)
             loadTimeSales(symbol);
+
+            // Subscribe to real-time trades via WebSocket
+            subscribeToSymbol(symbol);
         }
 
         // Activate a chart panel
@@ -633,6 +827,9 @@
         // Close a chart panel
         function closeChart(symbol, event) {
             event.stopPropagation();
+
+            // Unsubscribe from real-time trades
+            unsubscribeFromSymbol(symbol);
 
             // Clear intervals
             if (state.updateIntervals.has(symbol)) {
