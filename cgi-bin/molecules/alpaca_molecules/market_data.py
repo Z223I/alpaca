@@ -219,6 +219,8 @@ class AlpacaMarketData:
         """
         try:
             # Calculate date range
+            # Note: Alpaca's historical bar data has a delay (typically 15-60 seconds)
+            # Request data up to "now" to get the most recent available bars
             end_date = datetime.now(self.et_tz)
 
             if range_str not in self.DISPLAY_RANGE_MAP:

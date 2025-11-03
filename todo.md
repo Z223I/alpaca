@@ -210,6 +210,12 @@ Real time charts. Add a bar for the ratio of selling versus buying. Buying to th
 ## Index.html Update 1
 
 - [ ] ULTRATHINK. Follow the instructions in specs/market_sentinel_boilerplate.md;
+- [ ] Continue.
+- [ ] Get rid of ET on tool bar.
+- [ ] The vulume bars should match the color of the candlesticks.
+- [ ] /commit
+- [ ] Create a legend in the top-lefthand corner.
+- [ ] ULTRATHINK. Follow the instructions in specs/market_sentinel_boilerplate.md;
 
 ## Index.html
 

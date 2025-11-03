@@ -51,16 +51,5 @@ Test.
 
 ## Low Level Requirements
 
-Copy code/momentum_alerts.py and code/momentum_alerts_config.py to cgi-bin/molecules/alpaca_molecules/.
-
-Update the new momentum_alerts.py: Focus on the logic that builds the stock symbol list.  Create a method if one does not exist to return the current stock symbol list.  Also, update the number of symbols saved from 5 to 40.  The code takes all the ./data symbols.  Leave that untouched.
-
-Create a new "Watch List" panel to the left of the candlestick chart.  Populate it with the symbols from momentum_alerts.py.  Have the following columns:
-Symbol
-Source (Oracle, manual, top gainers, and surge) (these are to be four columns)
-Del (To delete the symbol from the list)
-
-Symbols can be double-clicked to generate the chart.
-
-There needs to be a text box so that more symbols can be added manually.
+Update public_html/index.html: The watch list should be updated periodically from momentum_alerts.py.  Create a method in momentum_alerts.py to see if there is an update to the symbol list.  If so, retrieve it.  Poll every 30 seconds.
 

@@ -995,6 +995,11 @@
                         <label style="color: var(--accent-green); font-weight: 600;">🕐 Eastern Time (ET)</label>
                     </div>
                     <div class="control-group">
+                        <label style="color: var(--text-secondary); font-size: 0.85em;" id="chart-delay-${symbol}">
+                            📊 Chart: ~15-90s delay  |  💹 Trades: Real-time
+                        </label>
+                    </div>
+                    <div class="control-group">
                         <label class="control-checkbox">
                             <input type="checkbox" onchange="toggleIndicator('${symbol}', 'ema9', this.checked)">
                             EMA(9)
@@ -1065,8 +1070,7 @@
                     volume: true
                 },
                 chart: null,
-                lastPrice: null,
-                savedZoomState: null  // Track zoom/pan state
+                lastPrice: null
             });
 
             // Activate the new chart
@@ -1075,8 +1079,23 @@
             // Load chart data
             loadChartData(symbol);
 
-            // Start auto-update (every 30 seconds)
-            const updateInterval = setInterval(() => loadChartData(symbol), 30000);
+            // Start auto-update with adaptive refresh rate based on chart interval
+            const getRefreshInterval = (interval) => {
+                switch(interval) {
+                    case '1m': return 30000;  // 30 seconds for 1-minute charts
+                    case '5m': return 30000;  // 30 seconds for 5-minute charts
+                    case '30m': return 30000; // 30 seconds for 30-minute charts
+                    case '1h': return 60000;  // 60 seconds for hourly charts
+                    case '1d': return 60000;  // 60 seconds for daily charts
+                    default: return 30000;    // Default 30 seconds
+                }
+            };
+
+            // Get chart data to determine refresh interval
+            const chartData = state.charts.get(symbol);
+            const refreshInterval = getRefreshInterval(chartData.interval);
+            console.log(`Chart refresh interval for ${symbol} (${chartData.interval}): ${refreshInterval}ms`);
+            const updateInterval = setInterval(() => loadChartData(symbol), refreshInterval);
             state.updateIntervals.set(symbol, updateInterval);
 
             // Load initial historical trades (one-time)
@@ -1163,6 +1182,29 @@
 
             const chartData = state.charts.get(symbol);
             chartData.interval = interval;
+
+            // Update the refresh interval based on new chart interval
+            if (state.updateIntervals.has(symbol)) {
+                clearInterval(state.updateIntervals.get(symbol));
+
+                // Adaptive refresh rate based on interval
+                const getRefreshInterval = (interval) => {
+                    switch(interval) {
+                        case '1m': return 30000;  // 30 seconds for 1-minute charts
+                        case '5m': return 30000;  // 30 seconds for 5-minute charts
+                        case '30m': return 30000; // 30 seconds for 30-minute charts
+                        case '1h': return 60000;  // 60 seconds for hourly charts
+                        case '1d': return 60000;  // 60 seconds for daily charts
+                        default: return 30000;    // Default 30 seconds
+                    }
+                };
+
+                const refreshInterval = getRefreshInterval(interval);
+                console.log(`Updated refresh interval for ${symbol} (${interval}): ${refreshInterval}ms`);
+                const updateInterval = setInterval(() => loadChartData(symbol), refreshInterval);
+                state.updateIntervals.set(symbol, updateInterval);
+            }
+
             loadChartData(symbol);
         }
 
@@ -1746,35 +1788,48 @@
                 return;
             }
 
+            // Show loading state
+            container.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 20px;">
+                Loading trades...
+            </div>`;
+
             try {
                 const apiUrl = `./cgi-bin/api/market_data_api.py?action=trades&symbol=${symbol}&limit=100`;
                 console.log('Loading trades from:', apiUrl);
 
                 const response = await fetch(apiUrl);
+
+                // Check if response is ok
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
                 const result = await response.json();
 
-                console.log('Trades response:', result);
+                console.log('Trades response for', symbol, ':', result);
 
                 if (!result.success) {
-                    console.error('Error loading trades:', result.error);
+                    console.error('Error loading trades for', symbol, ':', result.error);
                     container.innerHTML = `<div style="text-align: center; color: var(--accent-red); padding: 20px;">
-                        Error loading trades: ${result.error}
+                        Error: ${result.error || 'Failed to load trades'}
                     </div>`;
                     return;
                 }
 
                 if (!result.data || !result.data.trades || result.data.trades.length === 0) {
+                    console.warn('No trades available for', symbol);
                     container.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 20px;">
-                        No recent trades available
+                        No recent trades available for ${symbol}
                     </div>`;
                     return;
                 }
 
+                console.log(`Got ${result.data.trades.length} trades for ${symbol}`);
                 renderTimeSales(symbol, result.data.trades);
             } catch (error) {
-                console.error('Error loading time & sales:', error);
+                console.error('Error loading time & sales for', symbol, ':', error);
                 container.innerHTML = `<div style="text-align: center; color: var(--accent-red); padding: 20px;">
-                    Failed to load trades
+                    Failed to load trades: ${error.message}
                 </div>`;
             }
         }
