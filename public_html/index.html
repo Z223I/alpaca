@@ -1227,18 +1227,41 @@
                 // Convert bar data to candlestick format for TradingView Lightweight Charts
                 // Note: Timestamps from API are already in Eastern Time (ET) with timezone info
                 // Example: "2025-10-27T04:00:00-04:00" (4:00 AM EDT)
+                //
+                // IMPORTANT: TradingView charts display timestamps in UTC, so we need to convert
+                // ET time components to a "fake" UTC timestamp that displays the correct ET time
                 const candlesticks = data.bars.map(bar => {
                     const timestamp = bar.timestamp;
-                    const date = new Date(timestamp); // Correctly interprets ET timestamp
-                    const unixTime = Math.floor(date.getTime() / 1000);
+                    const date = new Date(timestamp);
+
+                    // Extract date/time components in ET timezone
+                    const etDateString = date.toLocaleString('en-US', {
+                        timeZone: 'America/New_York',
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false
+                    });
+
+                    // Parse the ET string (format: "MM/DD/YYYY, HH:mm:ss")
+                    const [datePart, timePart] = etDateString.split(', ');
+                    const [month, day, year] = datePart.split('/');
+                    const [hour, minute, second] = timePart.split(':');
+
+                    // Create Unix timestamp treating ET components as UTC
+                    // This makes the chart display ET times correctly
+                    const unixTime = Math.floor(Date.UTC(year, month - 1, day, hour, minute, second) / 1000);
 
                     // Debug first bar conversion
                     if (bar === data.bars[0]) {
                         console.log('First bar conversion:', {
                             raw_timestamp: timestamp,
-                            date_object: date,
+                            et_string: etDateString,
                             unix_seconds: unixTime,
-                            is_valid: !isNaN(unixTime)
+                            display_time: new Date(unixTime * 1000).toISOString()
                         });
                     }
 
@@ -1255,13 +1278,34 @@
                 console.log('First candlestick:', candlesticks[0]);
                 console.log('Last candlestick:', candlesticks[candlesticks.length - 1]);
 
+                // Convert volume timestamps using the same ET timezone conversion
+                const volume = data.bars.map(bar => {
+                    const date = new Date(bar.timestamp);
+                    const etDateString = date.toLocaleString('en-US', {
+                        timeZone: 'America/New_York',
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false
+                    });
+                    const [datePart, timePart] = etDateString.split(', ');
+                    const [month, day, year] = datePart.split('/');
+                    const [hour, minute, second] = timePart.split(':');
+                    const unixTime = Math.floor(Date.UTC(year, month - 1, day, hour, minute, second) / 1000);
+
+                    return {
+                        time: unixTime,
+                        value: bar.volume
+                    };
+                });
+
                 renderChart(symbol, {
                     candlesticks,
                     indicators: data.indicators || {},
-                    volume: data.bars.map(bar => ({
-                        time: Math.floor(new Date(bar.timestamp).getTime() / 1000),
-                        value: bar.volume
-                    }))
+                    volume: volume
                 });
 
                 updateStatus('Connected', `${symbol} updated`);
@@ -1429,6 +1473,25 @@
             chartData.candlestickSeries = candlestickSeries;
             chartData.indicatorSeries = {};
 
+            // Helper function to convert timestamps from ET to display correctly in UTC charts
+            function convertTimestampToET(timestamp) {
+                const date = new Date(timestamp);
+                const etDateString = date.toLocaleString('en-US', {
+                    timeZone: 'America/New_York',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                });
+                const [datePart, timePart] = etDateString.split(', ');
+                const [month, day, year] = datePart.split('/');
+                const [hour, minute, second] = timePart.split(':');
+                return Math.floor(Date.UTC(year, month - 1, day, hour, minute, second) / 1000);
+            }
+
             // Add indicator series if available
             const indicators = data.indicators || {};
 
@@ -1440,7 +1503,7 @@
                     title: 'EMA(9)'
                 });
                 const ema9Data = indicators.ema9.map(item => ({
-                    time: Math.floor(new Date(item.time).getTime() / 1000),
+                    time: convertTimestampToET(item.time),
                     value: item.value
                 }));
                 ema9Series.setData(ema9Data);
@@ -1454,7 +1517,7 @@
                     title: 'EMA(21)'
                 });
                 const ema21Data = indicators.ema21.map(item => ({
-                    time: Math.floor(new Date(item.time).getTime() / 1000),
+                    time: convertTimestampToET(item.time),
                     value: item.value
                 }));
                 ema21Series.setData(ema21Data);
@@ -1468,7 +1531,7 @@
                     title: 'EMA(50)'
                 });
                 const ema50Data = indicators.ema50.map(item => ({
-                    time: Math.floor(new Date(item.time).getTime() / 1000),
+                    time: convertTimestampToET(item.time),
                     value: item.value
                 }));
                 ema50Series.setData(ema50Data);
@@ -1482,7 +1545,7 @@
                     title: 'EMA(200)'
                 });
                 const ema200Data = indicators.ema200.map(item => ({
-                    time: Math.floor(new Date(item.time).getTime() / 1000),
+                    time: convertTimestampToET(item.time),
                     value: item.value
                 }));
                 ema200Series.setData(ema200Data);
@@ -1498,7 +1561,7 @@
                     title: 'VWAP'
                 });
                 const vwapData = indicators.vwap.map(item => ({
-                    time: Math.floor(new Date(item.time).getTime() / 1000),
+                    time: convertTimestampToET(item.time),
                     value: item.value
                 }));
                 vwapSeries.setData(vwapData);
