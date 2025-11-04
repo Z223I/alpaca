@@ -215,7 +215,7 @@ Real time charts. Add a bar for the ratio of selling versus buying. Buying to th
 - [ ] ULTRATHINK. Follow the instructions in specs/market_sentinel_boilerplate.md;
 - [ ] Get rid of ET on the tool bar.
 - [ ] The volume bars should match the color of the candlesticks.  They are always green.  Some should be red.
-- [ ] Create a legend in the top-lefthand corner.
+- [ ] Create a legend in the top-lefthand corner of the candlestick chart.
 
 ## Index.html
 

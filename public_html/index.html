@@ -248,6 +248,52 @@
             position: relative;
         }
 
+        /* Chart Legend */
+        .chart-legend {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(26, 26, 46, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            padding: 10px 15px;
+            z-index: 100;
+            font-size: 14px;
+            line-height: 1.6;
+            pointer-events: none;
+        }
+
+        .legend-symbol {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--accent-blue);
+            margin-bottom: 5px;
+        }
+
+        .legend-price {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .legend-price.up {
+            color: var(--accent-green);
+        }
+
+        .legend-price.down {
+            color: var(--accent-red);
+        }
+
+        .legend-change {
+            font-size: 13px;
+            margin-left: 8px;
+        }
+
+        .legend-details {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 3px;
+        }
+
         .volume-chart {
             flex: 1;
             width: 100%;
@@ -1027,7 +1073,15 @@
                             <div>Loading chart data for ${symbol}...</div>
                         </div>
                         <div class="canvas-container" id="canvas-${symbol}" style="display: none;">
-                            <div class="main-chart" id="chart-${symbol}"></div>
+                            <div class="main-chart" id="chart-${symbol}">
+                                <div class="chart-legend" id="legend-${symbol}">
+                                    <div class="legend-symbol">${symbol}</div>
+                                    <div class="legend-price" id="legend-price-${symbol}">--</div>
+                                    <div class="legend-details" id="legend-details-${symbol}">
+                                        O: -- H: -- L: -- C: --
+                                    </div>
+                                </div>
+                            </div>
                             <div class="volume-chart" id="volume-${symbol}"></div>
                         </div>
                     </div>
@@ -1313,6 +1367,7 @@
                 console.log('Last candlestick:', candlesticks[candlesticks.length - 1]);
 
                 // Convert volume timestamps using the same ET timezone conversion
+                // Color volume bars based on whether the bar closed up (green) or down (red)
                 const volume = data.bars.map(bar => {
                     const date = new Date(bar.timestamp);
                     const etDateString = date.toLocaleString('en-US', {
@@ -1330,9 +1385,13 @@
                     const [hour, minute, second] = timePart.split(':');
                     const unixTime = Math.floor(Date.UTC(year, month - 1, day, hour, minute, second) / 1000);
 
+                    // Determine color: green if close >= open, red if close < open
+                    const color = bar.close >= bar.open ? '#4ecca3' : '#ff6b6b';
+
                     return {
                         time: unixTime,
-                        value: bar.volume
+                        value: bar.volume,
+                        color: color
                     };
                 });
 
@@ -1507,6 +1566,17 @@
             chartData.candlestickSeries = candlestickSeries;
             chartData.indicatorSeries = {};
 
+            // Update legend on crosshair move
+            chart.subscribeCrosshairMove((param) => {
+                updateLegend(symbol, param, candlestickSeries, data.candlesticks);
+            });
+
+            // Initialize legend with latest bar
+            if (data.candlesticks.length > 0) {
+                const latestBar = data.candlesticks[data.candlesticks.length - 1];
+                updateLegendWithBar(symbol, latestBar);
+            }
+
             // Helper function to convert timestamps from ET to display correctly in UTC charts
             function convertTimestampToET(timestamp) {
                 const date = new Date(timestamp);
@@ -1639,7 +1709,6 @@
                     });
 
                     const volumeSeries = volumeChart.addHistogramSeries({
-                        color: '#26a69a',
                         priceFormat: {
                             type: 'volume',
                         },
@@ -1877,6 +1946,40 @@
         // Update status bar
         function updateStatus(status, message) {
             document.getElementById('statusText').textContent = `${status}: ${message}`;
+        }
+
+        // Update legend with bar data
+        function updateLegendWithBar(symbol, bar) {
+            const priceElement = document.getElementById(`legend-price-${symbol}`);
+            const detailsElement = document.getElementById(`legend-details-${symbol}`);
+
+            if (!priceElement || !detailsElement) return;
+
+            const isUp = bar.close >= bar.open;
+            const change = bar.close - bar.open;
+            const changePercent = bar.open > 0 ? (change / bar.open * 100) : 0;
+
+            priceElement.className = `legend-price ${isUp ? 'up' : 'down'}`;
+            priceElement.innerHTML = `$${bar.close.toFixed(2)} <span class="legend-change">${change >= 0 ? '+' : ''}${change.toFixed(2)} (${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}%)</span>`;
+
+            detailsElement.textContent = `O: $${bar.open.toFixed(2)} H: $${bar.high.toFixed(2)} L: $${bar.low.toFixed(2)} C: $${bar.close.toFixed(2)}`;
+        }
+
+        // Update legend on crosshair move
+        function updateLegend(symbol, param, candlestickSeries, candlesticks) {
+            if (!param.time) {
+                // No bar under crosshair, show latest bar
+                if (candlesticks.length > 0) {
+                    const latestBar = candlesticks[candlesticks.length - 1];
+                    updateLegendWithBar(symbol, latestBar);
+                }
+                return;
+            }
+
+            const data = param.seriesData.get(candlestickSeries);
+            if (data) {
+                updateLegendWithBar(symbol, data);
+            }
         }
 
         // Mock data generators (to be replaced with backend calls)
