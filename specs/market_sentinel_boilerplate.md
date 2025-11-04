@@ -51,5 +51,5 @@ Test.
 
 ## Low Level Requirements
 
-Update public_html/index.html: The search box always has focus.  This is preventing adding stocks to the watch list.  Please fix.
+Update public_html/index.html: Dig deep.  The Watch List is to be updated periodically.  Increase that period to two minutes for testing.  It should be returning symbols from three different sources, i.e. Oracle list, volume surge, and top gainers.  I am only seeing stock symbols from the Oracle list.
 

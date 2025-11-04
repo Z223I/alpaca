@@ -376,8 +376,34 @@ pip3 install alpaca-trade-api flask pandas pytz
   - Native financial chart support with better performance
   - Updated data format: Unix timestamps in seconds, proper OHLC structure
 
+### 2025-11-04 - Watch List Multi-Source Fix and Script Migration
+- **ISSUE RESOLVED**: Watch List only showing Oracle symbols
+  - **Root Cause**: Missing CSV files for top gainers and volume surge data
+    - Missing: `historical_data/{YYYY-MM-DD}/market/gainers_nasdaq_amex.csv`
+    - Missing: `historical_data/{YYYY-MM-DD}/volume_surge/relative_volume_nasdaq_amex.csv`
+    - Only Oracle data file existed: `data/{YYYYMMDD}.csv`
+  - **Solution**: Generate missing CSV files by running data collection scripts
+- **SCRIPT MIGRATION**: Moved data collection scripts to GoDaddy directories
+  - Copied `market_open_top_gainers.py` from `code/` to `cgi-bin/molecules/alpaca_molecules/`
+  - Copied `alpaca_screener.py` from `code/` to `cgi-bin/molecules/alpaca_molecules/`
+  - Updated both scripts with proper shebang: `#!/home/wilsonb/miniconda3/envs/alpaca/bin/python`
+  - Updated path resolution to work from GoDaddy directory structure
+  - Added "GoDaddy CGI compatible" documentation
+  - **IMPORTANT**: Scripts in `code/` directory will diverge from GoDaddy versions
+- **UI UPDATE**: Increased Watch List refresh period from 30 seconds to 2 minutes for testing
+  - Updated `setInterval(loadWatchList, 120000)` in `public_html/index.html:2448`
+  - Reduces API load during development and testing
+- **DATA COLLECTION**: Running background scripts to populate all three sources
+  - `market_open_top_gainers.py`: Generates top gainers CSV (takes ~15 minutes)
+  - `alpaca_screener.py`: Generates volume surge CSV (takes ~15 minutes)
+  - Both scripts query Alpaca API for current market data
+- **EXPECTED RESULT**: Watch List will display symbols from all three sources once scripts complete:
+  - 🔮 Oracle symbols from `data/{YYYYMMDD}.csv`
+  - 📈 Top Gainers symbols (first 40) from market CSV
+  - 🚀 Volume Surge symbols (first 40) from volume surge CSV
+
 ---
 
-**Last Updated**: 2025-10-30
+**Last Updated**: 2025-11-04
 **Branch**: `feature/market_sentinel_chart`
-**Status**: Phase 1 Complete, Ready for Phase 2 Backend Integration
+**Status**: Phase 1 Complete, Watch List Multi-Source Active, Ready for Phase 2 Backend Integration

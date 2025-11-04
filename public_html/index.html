@@ -2444,8 +2444,8 @@
         // Initialize watch list on page load
         document.addEventListener('DOMContentLoaded', () => {
             loadWatchList();
-            // Refresh watch list every 30 seconds
-            watchListState.refreshInterval = setInterval(loadWatchList, 30000);
+            // Refresh watch list every 2 minutes (for testing)
+            watchListState.refreshInterval = setInterval(loadWatchList, 120000);
         });
 
         // Load watch list from API
