@@ -51,5 +51,5 @@ Test.
 
 ## Low Level Requirements
 
-Update public_html/index.html: The watch list should be updated periodically from momentum_alerts.py.  Create a method in momentum_alerts.py to see if there is an update to the symbol list.  If so, retrieve it.  Poll every 30 seconds.
+Update public_html/index.html: The search box always has focus.  This is preventing adding stocks to the watch list.  Please fix.
 
