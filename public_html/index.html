@@ -211,6 +211,30 @@
             cursor: pointer;
         }
 
+        .save-settings-btn {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.2s;
+            margin-left: 10px;
+        }
+
+        .save-settings-btn:hover {
+            background-color: var(--accent-green);
+            border-color: var(--accent-green);
+            color: white;
+        }
+
+        .save-settings-btn.saved {
+            background-color: var(--accent-green);
+            border-color: var(--accent-green);
+            color: white;
+        }
+
         /* Chart Display Area */
         .chart-display {
             flex: 1;
@@ -1062,6 +1086,7 @@
                             <input type="checkbox" checked onchange="toggleIndicator('${symbol}', 'volume', this.checked)">
                             Volume
                         </label>
+                        <button class="save-settings-btn" id="save-btn-${symbol}" onclick="saveChartSettings('${symbol}')" title="Save chart settings">💾</button>
                     </div>
                 </div>
 
@@ -1121,6 +1146,12 @@
 
             // Activate the new chart
             activateChart(symbol);
+
+            // Try to load saved global settings
+            const savedSettings = loadChartSettings();
+            if (savedSettings) {
+                applyChartSettings(symbol, savedSettings);
+            }
 
             // Load chart data
             loadChartData(symbol);
@@ -1272,6 +1303,107 @@
             const chartData = state.charts.get(symbol);
             chartData.indicators[indicator] = enabled;
             loadChartData(symbol);
+        }
+
+        // Save chart settings to localStorage (global for all symbols)
+        function saveChartSettings(symbol) {
+            const chartData = state.charts.get(symbol);
+            if (!chartData) return;
+
+            const settings = {
+                interval: chartData.interval,
+                range: chartData.range,
+                indicators: chartData.indicators,
+                savedAt: new Date().toISOString()
+            };
+
+            // Save to localStorage with global key (not symbol-specific)
+            localStorage.setItem('chart_settings_global', JSON.stringify(settings));
+
+            console.log('Saved global chart settings:', settings);
+
+            // Visual feedback - flash all save buttons
+            document.querySelectorAll('.save-settings-btn').forEach(btn => {
+                btn.classList.add('saved');
+            });
+            setTimeout(() => {
+                document.querySelectorAll('.save-settings-btn').forEach(btn => {
+                    btn.classList.remove('saved');
+                });
+            }, 1000);
+
+            updateStatus('Saved', 'Chart settings saved for all symbols');
+        }
+
+        // Load chart settings from localStorage (global for all symbols)
+        function loadChartSettings() {
+            try {
+                const savedSettings = localStorage.getItem('chart_settings_global');
+                if (!savedSettings) {
+                    console.log('No saved global settings found');
+                    return null;
+                }
+
+                const settings = JSON.parse(savedSettings);
+                console.log('Loaded global chart settings:', settings);
+                return settings;
+            } catch (error) {
+                console.error('Error loading global settings:', error);
+                return null;
+            }
+        }
+
+        // Apply saved settings to chart
+        function applyChartSettings(symbol, settings) {
+            if (!settings) return;
+
+            const panel = document.getElementById(`panel-${symbol}`);
+            if (!panel) return;
+
+            const chartData = state.charts.get(symbol);
+            if (!chartData) return;
+
+            // Apply interval
+            if (settings.interval) {
+                chartData.interval = settings.interval;
+                panel.querySelectorAll('.control-group:nth-child(1) .control-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                    if (btn.textContent === settings.interval) {
+                        btn.classList.add('active');
+                    }
+                });
+            }
+
+            // Apply range
+            if (settings.range) {
+                chartData.range = settings.range;
+                panel.querySelectorAll('.control-group:nth-child(2) .control-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                    const btnText = btn.textContent;
+                    if (btnText === settings.range ||
+                        (btnText === '1D' && settings.range === '1d') ||
+                        (btnText === '5D' && settings.range === '5d') ||
+                        (btnText === '1M' && settings.range === '1mo') ||
+                        (btnText === '1Y' && settings.range === '1y')) {
+                        btn.classList.add('active');
+                    }
+                });
+            }
+
+            // Apply indicators
+            if (settings.indicators) {
+                chartData.indicators = { ...settings.indicators };
+
+                // Update checkboxes
+                Object.keys(settings.indicators).forEach(indicator => {
+                    const checkbox = panel.querySelector(`input[onchange*="'${indicator}'"]`);
+                    if (checkbox) {
+                        checkbox.checked = settings.indicators[indicator];
+                    }
+                });
+            }
+
+            console.log(`Applied settings for ${symbol}`);
         }
 
         // Load chart data from backend
