@@ -124,6 +124,9 @@ class MomentumAlertsSystem:
         self.scanner_dir.mkdir(parents=True, exist_ok=True)
         self.symbol_list_csv_path = self.scanner_dir / "symbol_list.csv"
 
+        # Watch list export for web interface
+        self.watch_list_json_path = Path("historical_data") / self.today / "scanner" / "watch_list.json"
+
         # State
         self.running = False
         self.startup_processes = {}  # Track running startup scripts
@@ -964,6 +967,40 @@ class MomentumAlertsSystem:
 
         return symbol_list
 
+    def _export_symbol_list_to_json(self) -> None:
+        """
+        Export the current symbol list to JSON file for web interface consumption.
+
+        Creates a JSON file with timestamp and symbol list data that can be
+        efficiently checked by the watch_list_api.py endpoint.
+
+        File location: historical_data/{YYYY-MM-DD}/scanner/watch_list.json
+        """
+        try:
+            # Get current symbol list
+            symbol_list = self.get_current_symbol_list()
+
+            # Create export data with timestamp
+            export_data = {
+                'success': True,
+                'timestamp': datetime.now(self.et_tz).isoformat(),
+                'count': len(symbol_list),
+                'symbols': symbol_list
+            }
+
+            # Write to JSON file (atomic write using temp file)
+            temp_path = self.watch_list_json_path.with_suffix('.tmp')
+            with open(temp_path, 'w') as f:
+                json.dump(export_data, f, indent=2)
+
+            # Atomic rename
+            temp_path.replace(self.watch_list_json_path)
+
+            self.logger.debug(f"📝 Exported {len(symbol_list)} symbols to {self.watch_list_json_path}")
+
+        except Exception as e:
+            self.logger.error(f"❌ Error exporting symbol list to JSON: {e}")
+
     def _monitor_csv_file(self):
         """Monitor the CSV file for creation/updates."""
         # Check if we should reload symbols
@@ -991,6 +1028,9 @@ class MomentumAlertsSystem:
                 self.logger.info(f"➖ Removed symbols: {sorted(removed_symbols)}")
 
             self.monitored_symbols = new_symbols_dict
+
+            # Export updated symbol list to JSON for web interface
+            self._export_symbol_list_to_json()
 
     async def _collect_stock_data(self, symbols: List[str]) -> Dict[str, pd.DataFrame]:
         """

@@ -992,14 +992,6 @@
                         <button class="control-btn" onclick="setRange('${symbol}', '1y')">1Y</button>
                     </div>
                     <div class="control-group">
-                        <label style="color: var(--accent-green); font-weight: 600;">🕐 Eastern Time (ET)</label>
-                    </div>
-                    <div class="control-group">
-                        <label style="color: var(--text-secondary); font-size: 0.85em;" id="chart-delay-${symbol}">
-                            📊 Chart: ~15-90s delay  |  💹 Trades: Real-time
-                        </label>
-                    </div>
-                    <div class="control-group">
                         <label class="control-checkbox">
                             <input type="checkbox" onchange="toggleIndicator('${symbol}', 'ema9', this.checked)">
                             EMA(9)
@@ -1949,8 +1941,8 @@
         // Initialize watch list on page load
         document.addEventListener('DOMContentLoaded', () => {
             loadWatchList();
-            // Refresh watch list every 60 seconds
-            watchListState.refreshInterval = setInterval(loadWatchList, 60000);
+            // Refresh watch list every 30 seconds
+            watchListState.refreshInterval = setInterval(loadWatchList, 30000);
         });
 
         // Load watch list from API

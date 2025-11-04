@@ -177,18 +177,69 @@ def get_watch_list_symbols() -> List[Dict]:
     return symbol_list
 
 
+def get_watch_list_from_momentum_alerts() -> dict:
+    """
+    Check for watch list JSON exported by momentum_alerts.py.
+
+    Returns:
+        Dictionary with watch list data if available and recent, None otherwise
+    """
+    et_tz = pytz.timezone('US/Eastern')
+    today = datetime.now(et_tz).strftime('%Y-%m-%d')
+
+    # Path to the JSON file exported by momentum_alerts.py
+    watch_list_json = Path(project_root) / "historical_data" / today / "scanner" / "watch_list.json"
+
+    if not watch_list_json.exists():
+        print(f"Watch list JSON not found: {watch_list_json}", file=sys.stderr)
+        return None
+
+    try:
+        # Check file age (should be less than 2 minutes old to be considered fresh)
+        file_mtime = datetime.fromtimestamp(watch_list_json.stat().st_mtime, et_tz)
+        age_seconds = (datetime.now(et_tz) - file_mtime).total_seconds()
+
+        if age_seconds > 120:  # 2 minutes
+            print(f"Watch list JSON is stale ({age_seconds:.0f}s old), falling back to CSV", file=sys.stderr)
+            return None
+
+        # Read and parse the JSON file
+        with open(watch_list_json, 'r') as f:
+            data = json.load(f)
+
+        if not data.get('success'):
+            print("Watch list JSON indicates failure, falling back to CSV", file=sys.stderr)
+            return None
+
+        print(f"Using watch list from momentum_alerts.py (age: {age_seconds:.0f}s)", file=sys.stderr)
+        return data
+
+    except Exception as e:
+        print(f"Error reading watch list JSON: {e}, falling back to CSV", file=sys.stderr)
+        return None
+
+
 def main():
     """Main CGI entry point."""
-    # Get watch list symbols
-    watch_list = get_watch_list_symbols()
+    # Try to get watch list from momentum_alerts.py JSON export first
+    response = get_watch_list_from_momentum_alerts()
 
-    # Prepare response
-    response = {
-        'success': True,
-        'data': watch_list,
-        'count': len(watch_list),
-        'timestamp': datetime.now(pytz.timezone('US/Eastern')).isoformat()
-    }
+    # Fall back to reading CSV files directly if JSON not available
+    if response is None:
+        watch_list = get_watch_list_symbols()
+        response = {
+            'success': True,
+            'data': watch_list,
+            'count': len(watch_list),
+            'timestamp': datetime.now(pytz.timezone('US/Eastern')).isoformat(),
+            'source': 'csv_fallback'
+        }
+    else:
+        # Add source indicator to show data came from momentum_alerts.py
+        response['source'] = 'momentum_alerts'
+        # Rename 'symbols' key to 'data' for API consistency
+        if 'symbols' in response:
+            response['data'] = response.pop('symbols')
 
     # Output CGI headers
     print("Content-Type: application/json")

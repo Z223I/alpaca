@@ -40,7 +40,7 @@ Market Sentinel is a real-time stock market monitoring web application designed 
   - Double-click symbols to open charts
   - Add symbols manually via input box
   - Delete symbols with one-click
-  - Auto-refreshes every 60 seconds
+  - Auto-refreshes every 30 seconds from momentum_alerts.py symbol list
 - 📑 **Tabbed Interface**: Multiple charts in separate tabs with close buttons
 - 📊 **Candlestick Charts**: Professional-grade financial charts
 - ⚙️ **Chart Controls**:
@@ -297,6 +297,26 @@ pip3 install alpaca-trade-api flask pandas pytz
   - Backend already converts all timestamps to ET before sending to frontend
   - JavaScript correctly interprets ISO timestamps with timezone info
 
+### 2025-11-03 - Watch List API Integration with Momentum Alerts
+- **INTEGRATION**: Connected web interface to live momentum_alerts.py system
+  - Added `_export_symbol_list_to_json()` method to `momentum_alerts.py`
+    - Exports current symbol list to JSON file: `historical_data/{YYYY-MM-DD}/scanner/watch_list.json`
+    - Includes timestamp for freshness checks
+    - Uses atomic write (temp file + rename) for thread safety
+    - Called automatically when symbol list updates in `_monitor_csv_file()`
+  - Updated `watch_list_api.py` to use two-tier data fetching:
+    - **Primary**: Check JSON file from momentum_alerts.py (if < 2 minutes old)
+    - **Fallback**: Read CSV files directly if JSON unavailable or stale
+    - Response includes 'source' field ('momentum_alerts' or 'csv_fallback')
+  - Changed polling interval from 60 seconds to 30 seconds
+    - Web interface now polls every 30 seconds for faster updates
+    - Ensures watch list reflects changes from momentum_alerts.py quickly
+- **BENEFITS**:
+  - Web interface now receives same data as the running momentum_alerts system
+  - Reduced redundant CSV parsing when momentum_alerts.py is running
+  - Automatic fallback ensures reliability even if momentum_alerts.py is stopped
+  - Timestamp-based freshness checks prevent serving stale data
+
 ### 2025-11-02 - Watch List Panel Implementation
 - **FEATURE**: Implemented comprehensive Watch List panel on left side of interface
   - Symbol list dynamically loaded from momentum_alerts data sources
@@ -308,7 +328,7 @@ pip3 install alpaca-trade-api flask pandas pytz
   - Double-click any symbol to open its chart in a new tab
   - Add symbols manually via input box with Enter key support
   - Delete symbols with one-click trash button
-  - Auto-refreshes watch list every 60 seconds
+  - Auto-refreshes watch list every 30 seconds
   - **Smart deletion tracking**:
     - Deleted API symbols stay hidden across auto-refreshes
     - Manually added symbols can be deleted permanently
