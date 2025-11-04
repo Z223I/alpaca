@@ -1302,6 +1302,8 @@
         function toggleIndicator(symbol, indicator, enabled) {
             const chartData = state.charts.get(symbol);
             chartData.indicators[indicator] = enabled;
+            // Force chart recreation when indicators change
+            chartData.forceRecreate = true;
             loadChartData(symbol);
         }
 
@@ -1571,9 +1573,90 @@
                 return;
             }
 
-            // Destroy existing chart and disconnect ResizeObserver
+            // If chart already exists, just update the data instead of destroying/recreating
+            // (unless indicators changed, which requires recreation)
+            if (chartData.chart && chartData.candlestickSeries && !chartData.forceRecreate) {
+                console.log('Updating existing chart with new data');
+
+                // Update candlestick data
+                chartData.candlestickSeries.setData(data.candlesticks);
+
+                // Update legend with latest bar
+                if (data.candlesticks.length > 0) {
+                    const latestBar = data.candlesticks[data.candlesticks.length - 1];
+                    updateLegendWithBar(symbol, latestBar);
+                }
+
+                // Helper function to convert timestamps
+                function convertTimestampToET(timestamp) {
+                    const date = new Date(timestamp);
+                    const etDateString = date.toLocaleString('en-US', {
+                        timeZone: 'America/New_York',
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false
+                    });
+                    const [datePart, timePart] = etDateString.split(', ');
+                    const [month, day, year] = datePart.split('/');
+                    const [hour, minute, second] = timePart.split(':');
+                    return Math.floor(Date.UTC(year, month - 1, day, hour, minute, second) / 1000);
+                }
+
+                // Update indicators
+                const indicators = data.indicators || {};
+
+                // Update EMA indicators
+                if (chartData.indicatorSeries.ema9 && indicators.ema9) {
+                    const ema9Data = indicators.ema9.map(item => ({
+                        time: convertTimestampToET(item.time),
+                        value: item.value
+                    }));
+                    chartData.indicatorSeries.ema9.setData(ema9Data);
+                }
+
+                if (chartData.indicatorSeries.ema21 && indicators.ema21) {
+                    const ema21Data = indicators.ema21.map(item => ({
+                        time: convertTimestampToET(item.time),
+                        value: item.value
+                    }));
+                    chartData.indicatorSeries.ema21.setData(ema21Data);
+                }
+
+                if (chartData.indicatorSeries.ema50 && indicators.ema50) {
+                    const ema50Data = indicators.ema50.map(item => ({
+                        time: convertTimestampToET(item.time),
+                        value: item.value
+                    }));
+                    chartData.indicatorSeries.ema50.setData(ema50Data);
+                }
+
+                if (chartData.indicatorSeries.vwap && indicators.vwap) {
+                    const vwapData = indicators.vwap.map(item => ({
+                        time: convertTimestampToET(item.time),
+                        value: item.value
+                    }));
+                    chartData.indicatorSeries.vwap.setData(vwapData);
+                }
+
+                // Update volume chart
+                if (chartData.indicatorSeries.volume && data.volume) {
+                    chartData.indicatorSeries.volume.setData(data.volume);
+                }
+
+                console.log('Chart data updated without recreation');
+                return;
+            }
+
+            // Chart doesn't exist yet, create it (or needs recreation due to indicator changes)
             if (chartData.chart) {
-                console.log('Removing existing chart');
+                console.log('Removing existing chart for recreation');
+
+                // Clear the forceRecreate flag
+                chartData.forceRecreate = false;
 
                 // Save current zoom/pan state before destroying chart
                 try {
