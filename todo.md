@@ -216,6 +216,7 @@ Real time charts. Add a bar for the ratio of selling versus buying. Buying to th
 - [ ] Get rid of ET on the tool bar.
 - [ ] The volume bars should match the color of the candlesticks.  They are always green.  Some should be red.
 - [ ] Create a legend in the top-lefthand corner of the candlestick chart.
+- [ ] THINK HARD.  check time and sales.  It should be continously updating and the trades scrolling down.
 
 ## Index.html
 

@@ -981,12 +981,20 @@
                 tradeItem.style.backgroundColor = '';
             }, 1000);
 
+            // Check if user is scrolled to top (within 50px threshold)
+            const isScrolledToTop = container.scrollTop < 50;
+
             // Insert at top
             container.insertBefore(tradeItem, container.firstChild);
 
             // Remove excess items (keep only 100)
             while (container.children.length > 100) {
                 container.removeChild(container.lastChild);
+            }
+
+            // Auto-scroll to top to show newest trades (only if already near top)
+            if (isScrolledToTop) {
+                container.scrollTop = 0;
             }
 
             // Update last price
@@ -1116,7 +1124,8 @@
                     <!-- Time and Sales Panel -->
                     <div class="time-sales-panel">
                         <div class="time-sales-header">
-                            Time & Sales - ${symbol}
+                            <span>Time & Sales - ${symbol}</span>
+                            <span id="trades-update-${symbol}" style="font-size: 0.85em; color: var(--text-secondary); margin-left: 10px;"></span>
                         </div>
                         <div class="time-sales-list" id="trades-${symbol}">
                             <div style="text-align: center; color: var(--text-secondary); padding: 20px;">
@@ -1175,8 +1184,13 @@
             const updateInterval = setInterval(() => loadChartData(symbol), refreshInterval);
             state.updateIntervals.set(symbol, updateInterval);
 
-            // Load initial historical trades (one-time)
+            // Load initial historical trades
             loadTimeSales(symbol);
+
+            // Periodically refresh historical trades (every 10 seconds)
+            // This ensures T&S updates even during after-hours/market closed
+            const tradesInterval = setInterval(() => loadTimeSales(symbol), 10000);
+            state.updateIntervals.set(`trades_${symbol}`, tradesInterval);
 
             // Subscribe to real-time trades via WebSocket
             subscribeToSymbol(symbol);
@@ -1206,6 +1220,11 @@
             if (state.updateIntervals.has(symbol)) {
                 clearInterval(state.updateIntervals.get(symbol));
                 state.updateIntervals.delete(symbol);
+            }
+            // Clear trades polling interval
+            if (state.updateIntervals.has(`trades_${symbol}`)) {
+                clearInterval(state.updateIntervals.get(`trades_${symbol}`));
+                state.updateIntervals.delete(`trades_${symbol}`);
             }
             if (state.timeSalesIntervals.has(symbol)) {
                 clearInterval(state.timeSalesIntervals.get(symbol));
@@ -2064,10 +2083,16 @@
                 return;
             }
 
-            // Show loading state
-            container.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 20px;">
-                Loading trades...
-            </div>`;
+            // Only show loading state on initial load (when container is empty or has placeholder)
+            const isInitialLoad = container.children.length === 0 ||
+                                  container.textContent.includes('Loading') ||
+                                  container.textContent.includes('No recent trades');
+
+            if (isInitialLoad) {
+                container.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 20px;">
+                    Loading trades...
+                </div>`;
+            }
 
             try {
                 const apiUrl = `./cgi-bin/api/market_data_api.py?action=trades&symbol=${symbol}&limit=100`;
@@ -2152,6 +2177,18 @@
             if (trades.length > 0) {
                 // Use the most recent trade (last in original array, first in reversed)
                 chartData.lastPrice = trades[trades.length - 1].price;
+            }
+
+            // Update "Last Updated" timestamp in header
+            const updateTime = document.getElementById(`trades-update-${symbol}`);
+            if (updateTime) {
+                const now = new Date().toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                });
+                updateTime.textContent = `Updated: ${now}`;
             }
 
             // Auto-scroll to top to show newest trades

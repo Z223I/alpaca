@@ -317,9 +317,17 @@ class AlpacaMarketData:
             trade_list = []
             if hasattr(trades, 'data') and symbol in trades.data:
                 for trade in trades.data[symbol]:
+                    # Ensure timestamp is in ET timezone before converting to ISO format
+                    timestamp = trade.timestamp if hasattr(trade, 'timestamp') else datetime.now(self.et_tz)
+                    # Convert UTC timestamp to ET
+                    if timestamp.tzinfo is None:
+                        # If naive, assume UTC
+                        import pytz
+                        timestamp = pytz.UTC.localize(timestamp)
+                    timestamp_et = timestamp.astimezone(self.et_tz)
+
                     trade_list.append({
-                        'timestamp': (trade.timestamp.isoformat() if hasattr(trade, 'timestamp')
-                                      else datetime.now(self.et_tz).isoformat()),
+                        'timestamp': timestamp_et.isoformat(),
                         'price': float(trade.price) if hasattr(trade, 'price') else 0.0,
                         'size': int(trade.size) if hasattr(trade, 'size') else 0,
                         'exchange': str(trade.exchange) if hasattr(trade, 'exchange') else ''
