@@ -781,8 +781,8 @@
             const searchInput = document.getElementById('symbolSearch');
             const activeElement = document.activeElement;
 
-            // Don't interfere if user is already typing in the search box
-            if (activeElement === searchInput) {
+            // Don't interfere if user is already typing in any input field or textarea
+            if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
                 return;
             }
 
@@ -1630,34 +1630,42 @@
 
                 // Update EMA indicators
                 if (chartData.indicatorSeries.ema9 && indicators.ema9) {
-                    const ema9Data = indicators.ema9.map(item => ({
-                        time: convertTimestampToET(item.time),
-                        value: item.value
-                    }));
+                    const ema9Data = indicators.ema9
+                        .filter(item => item.value != null && !isNaN(item.value) && isFinite(item.value))
+                        .map(item => ({
+                            time: convertTimestampToET(item.time),
+                            value: item.value
+                        }));
                     chartData.indicatorSeries.ema9.setData(ema9Data);
                 }
 
                 if (chartData.indicatorSeries.ema21 && indicators.ema21) {
-                    const ema21Data = indicators.ema21.map(item => ({
-                        time: convertTimestampToET(item.time),
-                        value: item.value
-                    }));
+                    const ema21Data = indicators.ema21
+                        .filter(item => item.value != null && !isNaN(item.value) && isFinite(item.value))
+                        .map(item => ({
+                            time: convertTimestampToET(item.time),
+                            value: item.value
+                        }));
                     chartData.indicatorSeries.ema21.setData(ema21Data);
                 }
 
                 if (chartData.indicatorSeries.ema50 && indicators.ema50) {
-                    const ema50Data = indicators.ema50.map(item => ({
-                        time: convertTimestampToET(item.time),
-                        value: item.value
-                    }));
+                    const ema50Data = indicators.ema50
+                        .filter(item => item.value != null && !isNaN(item.value) && isFinite(item.value))
+                        .map(item => ({
+                            time: convertTimestampToET(item.time),
+                            value: item.value
+                        }));
                     chartData.indicatorSeries.ema50.setData(ema50Data);
                 }
 
                 if (chartData.indicatorSeries.vwap && indicators.vwap) {
-                    const vwapData = indicators.vwap.map(item => ({
-                        time: convertTimestampToET(item.time),
-                        value: item.value
-                    }));
+                    const vwapData = indicators.vwap
+                        .filter(item => item.value != null && !isNaN(item.value) && isFinite(item.value))
+                        .map(item => ({
+                            time: convertTimestampToET(item.time),
+                            value: item.value
+                        }));
                     chartData.indicatorSeries.vwap.setData(vwapData);
                 }
 
@@ -1838,12 +1846,20 @@
                 const ema9Series = chart.addLineSeries({
                     color: '#2962FF',
                     lineWidth: 2,
-                    title: 'EMA(9)'
+                    title: 'EMA(9)',
+                    lastValueVisible: false,  // Hide the price label on right side
+                    priceLineVisible: false   // Hide the horizontal price line
                 });
-                const ema9Data = indicators.ema9.map(item => ({
-                    time: convertTimestampToET(item.time),
-                    value: item.value
-                }));
+                const ema9Data = indicators.ema9
+                    .filter(item => item.value != null && !isNaN(item.value) && isFinite(item.value))
+                    .map(item => ({
+                        time: convertTimestampToET(item.time),
+                        value: item.value
+                    }));
+                console.log(`EMA(9): Filtered ${indicators.ema9.length} -> ${ema9Data.length} data points`);
+                if (ema9Data.length > 0) {
+                    console.log('EMA(9) first/last values:', ema9Data[0].value, ema9Data[ema9Data.length-1].value);
+                }
                 ema9Series.setData(ema9Data);
                 chartData.indicatorSeries.ema9 = ema9Series;
             }
@@ -1852,12 +1868,16 @@
                 const ema21Series = chart.addLineSeries({
                     color: '#FF6D00',
                     lineWidth: 2,
-                    title: 'EMA(21)'
+                    title: 'EMA(21)',
+                    lastValueVisible: false,  // Hide the price label on right side
+                    priceLineVisible: false   // Hide the horizontal price line
                 });
-                const ema21Data = indicators.ema21.map(item => ({
-                    time: convertTimestampToET(item.time),
-                    value: item.value
-                }));
+                const ema21Data = indicators.ema21
+                    .filter(item => item.value != null && !isNaN(item.value) && isFinite(item.value))
+                    .map(item => ({
+                        time: convertTimestampToET(item.time),
+                        value: item.value
+                    }));
                 ema21Series.setData(ema21Data);
                 chartData.indicatorSeries.ema21 = ema21Series;
             }
@@ -1866,12 +1886,16 @@
                 const ema50Series = chart.addLineSeries({
                     color: '#00E676',
                     lineWidth: 2,
-                    title: 'EMA(50)'
+                    title: 'EMA(50)',
+                    lastValueVisible: false,  // Hide the price label on right side
+                    priceLineVisible: false   // Hide the horizontal price line
                 });
-                const ema50Data = indicators.ema50.map(item => ({
-                    time: convertTimestampToET(item.time),
-                    value: item.value
-                }));
+                const ema50Data = indicators.ema50
+                    .filter(item => item.value != null && !isNaN(item.value) && isFinite(item.value))
+                    .map(item => ({
+                        time: convertTimestampToET(item.time),
+                        value: item.value
+                    }));
                 ema50Series.setData(ema50Data);
                 chartData.indicatorSeries.ema50 = ema50Series;
             }
@@ -1880,12 +1904,16 @@
                 const ema200Series = chart.addLineSeries({
                     color: '#D500F9',
                     lineWidth: 2,
-                    title: 'EMA(200)'
+                    title: 'EMA(200)',
+                    lastValueVisible: false,  // Hide the price label on right side
+                    priceLineVisible: false   // Hide the horizontal price line
                 });
-                const ema200Data = indicators.ema200.map(item => ({
-                    time: convertTimestampToET(item.time),
-                    value: item.value
-                }));
+                const ema200Data = indicators.ema200
+                    .filter(item => item.value != null && !isNaN(item.value) && isFinite(item.value))
+                    .map(item => ({
+                        time: convertTimestampToET(item.time),
+                        value: item.value
+                    }));
                 ema200Series.setData(ema200Data);
                 chartData.indicatorSeries.ema200 = ema200Series;
             }
@@ -1896,12 +1924,20 @@
                     color: '#FFD600',
                     lineWidth: 2,
                     lineStyle: 2, // Dashed line
-                    title: 'VWAP'
+                    title: 'VWAP',
+                    lastValueVisible: false,  // Hide the price label on right side
+                    priceLineVisible: false   // Hide the horizontal price line
                 });
-                const vwapData = indicators.vwap.map(item => ({
-                    time: convertTimestampToET(item.time),
-                    value: item.value
-                }));
+                const vwapData = indicators.vwap
+                    .filter(item => item.value != null && !isNaN(item.value) && isFinite(item.value))
+                    .map(item => ({
+                        time: convertTimestampToET(item.time),
+                        value: item.value
+                    }));
+                console.log(`VWAP: Filtered ${indicators.vwap.length} -> ${vwapData.length} data points`);
+                if (vwapData.length > 0) {
+                    console.log('VWAP first/last values:', vwapData[0].value, vwapData[vwapData.length-1].value);
+                }
                 vwapSeries.setData(vwapData);
                 chartData.indicatorSeries.vwap = vwapSeries;
             }

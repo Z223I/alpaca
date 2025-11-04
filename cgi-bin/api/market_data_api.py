@@ -196,16 +196,18 @@ def calculate_indicators(bars, indicators):
 def calculate_ema(df, period):
     """Calculate Exponential Moving Average."""
     import pandas as pd
+    import numpy as np
 
     if len(df) < period:
         return []
 
     ema = df['close'].ewm(span=period, adjust=False).mean()
 
-    # Return as list of {time, value} objects
+    # Return as list of {time, value} objects, filtering out invalid values
     result = []
     for i, (timestamp, value) in enumerate(zip(df['timestamp'], ema)):
-        if not pd.isna(value):
+        # Only include valid, finite, non-NaN values
+        if not pd.isna(value) and not np.isinf(value) and value > 0:
             result.append({
                 'time': timestamp,
                 'value': float(value)
@@ -215,22 +217,40 @@ def calculate_ema(df, period):
 
 
 def calculate_vwap(df):
-    """Calculate Volume Weighted Average Price."""
+    """Calculate Volume Weighted Average Price (resets daily)."""
     import pandas as pd
+    import numpy as np
+    from datetime import datetime
+    import pytz
 
     if 'volume' not in df.columns or len(df) == 0:
         return []
 
-    typical_price = (df['high'] + df['low'] + df['close']) / 3
-    vwap = (typical_price * df['volume']).cumsum() / df['volume'].cumsum()
+    # Convert timestamps to datetime for grouping by day
+    df = df.copy()
+    df['datetime'] = pd.to_datetime(df['timestamp'])
+    df['date'] = df['datetime'].dt.date
 
     result = []
-    for timestamp, value in zip(df['timestamp'], vwap):
-        if not pd.isna(value):
-            result.append({
-                'time': timestamp,
-                'value': float(value)
-            })
+
+    # Calculate VWAP separately for each trading day
+    for date, day_df in df.groupby('date'):
+        typical_price = (day_df['high'] + day_df['low'] + day_df['close']) / 3
+
+        # Calculate cumulative VWAP for this day
+        cumulative_tp_volume = (typical_price * day_df['volume']).cumsum()
+        cumulative_volume = day_df['volume'].cumsum()
+
+        # Avoid division by zero
+        vwap = cumulative_tp_volume / cumulative_volume.replace(0, np.nan)
+
+        for timestamp, value, vol in zip(day_df['timestamp'], vwap, day_df['volume']):
+            # Only include valid values with actual volume
+            if not pd.isna(value) and vol > 0 and not np.isinf(value):
+                result.append({
+                    'time': timestamp,
+                    'value': float(value)
+                })
 
     return result
 
