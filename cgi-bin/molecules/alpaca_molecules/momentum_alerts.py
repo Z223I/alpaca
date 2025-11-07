@@ -134,7 +134,14 @@ class MomentumAlertsSystem:
         self.running = False
         self.startup_processes = {}  # Track running startup scripts
 
+        # Debug mode - send random alerts for testing
+        self.debug_mode = True  # Set to False to disable debug alerts
+        self.debug_symbols = ['AAPL', 'TSLA', 'NVDA', 'AMD', 'GOOGL', 'MSFT', 'AMZN', 'META']
+        self.last_debug_alert_time = None
+
         self.logger.info(f"🔧 Momentum Alerts System initialized in {'TEST' if test_mode else 'LIVE'} mode")
+        if self.debug_mode:
+            self.logger.warning(f"⚠️ DEBUG MODE ENABLED - Will send random test alerts every minute")
         self.logger.info(f"📅 Monitoring date: {self.today}")
         self.logger.info(f"📁 CSV file path: {self.csv_file_path}")
         self.logger.info(f"📊 Historical data client: "
@@ -1808,10 +1815,107 @@ class MomentumAlertsSystem:
         except Exception as e:
             self.logger.error(f"❌ Error saving sent momentum alert: {e}")
 
+    async def _send_debug_alert(self):
+        """
+        Send a random debug alert for testing purposes.
+        Only active when debug_mode is True.
+        """
+        import random
+
+        # Pick a random symbol
+        symbol = random.choice(self.debug_symbols)
+
+        # Generate random but realistic alert data
+        current_price = round(random.uniform(50.0, 500.0), 2)
+        market_open_price = round(current_price * random.uniform(0.85, 0.98), 2)
+        percent_gain = ((current_price - market_open_price) / market_open_price) * 100
+
+        vwap = round(current_price * random.uniform(0.95, 1.00), 2)
+        ema_9 = round(current_price * random.uniform(0.90, 0.98), 2)
+
+        momentum = round(random.uniform(0.5, 3.0), 2)
+        momentum_short = round(random.uniform(0.5, 4.0), 2)
+        momentum_squeeze = round(random.uniform(0.3, 2.5), 2)
+
+        # Pick random emojis for momentum
+        momentum_emojis = ['🟢', '🟡', '🔴']
+        momentum_emoji = random.choice(momentum_emojis)
+        momentum_short_emoji = random.choice(momentum_emojis)
+        squeeze_emoji = random.choice(momentum_emojis)
+
+        volume = random.randint(100000, 5000000)
+        volume_emojis = ['🟢', '🟡', '🔴']
+        volume_emoji = random.choice(volume_emojis)
+
+        halt_emojis = ['✅', '⏸️']
+        halt_emoji = random.choice(halt_emojis)
+
+        urgencies = ['low', 'medium', 'high', 'critical']
+        urgency = random.choice(urgencies)
+
+        timestamp = datetime.now(self.et_tz)
+
+        # Create debug alert data
+        alert_data = {
+            'symbol': symbol,
+            'current_price': current_price,
+            'market_open_price': market_open_price,
+            'percent_gain_since_market_open': percent_gain,
+            'vwap': vwap,
+            'ema_9': ema_9,
+            'momentum': momentum,
+            'momentum_short': momentum_short,
+            'momentum_squeeze': momentum_squeeze,
+            'raw_momentum_20': momentum * 20,
+            'raw_momentum_5': momentum_short * 5,
+            'raw_momentum_squeeze': momentum_squeeze * 3,
+            'actual_time_diff': 20.0,
+            'actual_time_diff_short': 5.0,
+            'actual_time_diff_squeeze': 3.0,
+            'momentum_emoji': momentum_emoji,
+            'momentum_short_emoji': momentum_short_emoji,
+            'squeeze_emoji': squeeze_emoji,
+            'is_halted': halt_emoji == '⏸️',
+            'halt_emoji': halt_emoji,
+            'current_volume': volume,
+            'volume_emoji': volume_emoji,
+            'urgency': urgency,
+            'timestamp': timestamp,
+            'indicators': {},
+            'from_gainers': random.choice([True, False]),
+            'from_volume_surge': random.choice([True, False]),
+            'oracle': random.choice([True, False]),
+            'volume_surge_detected': random.choice([True, False]),
+            'volume_surge_ratio': round(random.uniform(1.0, 10.0), 2) if random.choice([True, False]) else None,
+            'shares_outstanding': random.randint(10000000, 1000000000),
+            'float_shares': random.randint(5000000, 500000000),
+            'market_cap': random.randint(1000000000, 100000000000),
+            'fundamental_source': 'debug',
+            'total_volume_since_0400': random.randint(500000, 10000000),
+            'float_rotation': round(random.uniform(0.1, 5.0), 2),
+            'float_rotation_percent': round(random.uniform(10.0, 500.0), 2)
+        }
+
+        self.logger.info(f"🧪 DEBUG: Sending random test alert for {symbol}")
+        await self._send_momentum_alert(alert_data)
+
     async def _stock_monitoring_loop(self):
         """Main stock monitoring loop - runs every minute."""
         while self.running:
             try:
+                # Debug mode: Send random alert every minute
+                if self.debug_mode:
+                    current_time = datetime.now(self.et_tz)
+
+                    # Check if a minute has passed since last debug alert
+                    if (self.last_debug_alert_time is None or
+                        (current_time - self.last_debug_alert_time).total_seconds() >= 60):
+
+                        self.logger.debug(f"🧪 DEBUG: Triggering test alert (1 minute elapsed)")
+                        await self._send_debug_alert()
+                        self.last_debug_alert_time = current_time
+
+                # Normal monitoring logic
                 if self.monitored_symbols:
                     self.logger.debug(f"🔍 Monitoring {len(self.monitored_symbols)} symbols for momentum alerts")
 

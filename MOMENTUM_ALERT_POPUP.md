@@ -80,3 +80,52 @@ To test the system:
 - Web Page: `/home/wilsonb/dl/github.com/Z223I/alpaca/public_html/index.html`
 - Alert Data: `/home/wilsonb/dl/github.com/Z223I/alpaca/historical_data/{YYYY-MM-DD}/momentum_alerts_sent/bullish/`
 - Service: `/home/wilsonb/dl/github.com/Z223I/alpaca/cgi-bin/molecules/alpaca_molecules/momentum_alerts.py`
+
+## Debug Mode
+
+The momentum_alerts.py script now includes a debug mode for testing the alert popup system.
+
+### Configuration
+
+Located in `momentum_alerts.py` at line 138:
+```python
+self.debug_mode = True  # Set to False to disable debug alerts
+```
+
+### Behavior
+
+When `debug_mode = True`:
+- Sends a random test alert every 60 seconds
+- Uses a predefined list of test symbols: AAPL, TSLA, NVDA, AMD, GOOGL, MSFT, AMZN, META
+- Generates realistic random data for all alert fields:
+  - Random prices ($50-$500)
+  - Random momentum values
+  - Random volume data
+  - Random emoji indicators
+  - Random source flags (gainers, volume surge, oracle)
+
+### Purpose
+
+- Test the web popup functionality without waiting for real momentum alerts
+- Verify the coordination between backend service and frontend display
+- Debug the alert queue and display system
+- Test the "View Chart" button functionality
+
+### Usage
+
+1. **Enable Debug Mode**: Set `self.debug_mode = True` in momentum_alerts.py (currently enabled)
+2. **Restart Service**: 
+   ```bash
+   pkill -f momentum_alerts.py
+   nohup ~/miniconda3/envs/alpaca/bin/python cgi-bin/molecules/alpaca_molecules/momentum_alerts.py &
+   ```
+3. **Open Web Interface**: Navigate to `public_html/index.html`
+4. **Watch for Alerts**: A new random alert will appear every minute
+
+### Disabling Debug Mode
+
+To return to production mode:
+1. Set `self.debug_mode = False` in momentum_alerts.py (line 138)
+2. Restart the service
+
+**Note**: Debug alerts are sent to Telegram (if configured) and saved to the same directories as real alerts, making them indistinguishable from production alerts in the web interface.
