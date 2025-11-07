@@ -67,14 +67,32 @@ class AlpacaMarketData:
         '1y': 365,
     }
 
-    def __init__(self, provider: str = "alpaca", account_name: str = "Bruce", account: str = "paper"):
+    def __init__(self, provider: str = "alpaca", account_name: str = "Bruce", account: str = "live"):
         """
         Initialize the Alpaca market data client.
+
+        IMPORTANT: Uses LIVE account for SIP (Securities Information Processor) data access.
+        Live account provides real-time, high-quality market data from the consolidated tape.
+        Paper account data has significant delays (15+ minutes to hours).
 
         Args:
             provider: Provider name (default: "alpaca")
             account_name: Account name (default: "Bruce")
-            account: Account type - "paper", "live", or "cash" (default: "paper")
+            account: Account type - "paper", "live", or "cash" (default: "live")
+                     NOTE: Default changed from "paper" to "live" to access SIP data.
+                     This uses read-only market data API and does NOT place any trades.
+
+        Credentials Configuration:
+            Set your live Alpaca API credentials using environment variables:
+            - ALPACA_LIVE_API_KEY: Your live account API key
+            - ALPACA_LIVE_SECRET_KEY: Your live account secret key
+
+            Or edit alpaca_config.py lines 136-137 directly:
+            live=EnvironmentConfig(
+                app_key=os.getenv("ALPACA_LIVE_API_KEY", "YOUR_KEY_HERE"),
+                app_secret=os.getenv("ALPACA_LIVE_SECRET_KEY", "YOUR_SECRET_HERE"),
+                url="https://api.alpaca.markets"
+            )
         """
         self.provider = provider
         self.account_name = account_name
@@ -286,7 +304,7 @@ class AlpacaMarketData:
 
         Args:
             symbol: Stock symbol
-            start_date: Start date/time for trades (default: last 1 hour)
+            start_date: Start date/time for trades (default: last 10 minutes for recent trades)
             limit: Maximum number of trades to return (default: 100)
 
         Returns:
@@ -298,7 +316,9 @@ class AlpacaMarketData:
         """
         try:
             if start_date is None:
-                start_date = datetime.now(self.et_tz) - timedelta(hours=1)
+                # Use last 2 hours to capture recent trades, especially for low-volume stocks
+                # The trades will be sorted by timestamp (newest first) and limited anyway
+                start_date = datetime.now(self.et_tz) - timedelta(hours=2)
 
             end_date = datetime.now(self.et_tz)
 
@@ -328,10 +348,19 @@ class AlpacaMarketData:
 
                     trade_list.append({
                         'timestamp': timestamp_et.isoformat(),
+                        'timestamp_dt': timestamp_et,  # Keep datetime for sorting
                         'price': float(trade.price) if hasattr(trade, 'price') else 0.0,
                         'size': int(trade.size) if hasattr(trade, 'size') else 0,
                         'exchange': str(trade.exchange) if hasattr(trade, 'exchange') else ''
                     })
+
+            # Sort trades by timestamp in descending order (newest first)
+            # This ensures we always show the most recent trades at the top
+            trade_list.sort(key=lambda x: x['timestamp_dt'], reverse=True)
+
+            # Remove the datetime object used for sorting
+            for trade in trade_list:
+                del trade['timestamp_dt']
 
             return trade_list
 

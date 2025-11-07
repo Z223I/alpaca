@@ -41,6 +41,15 @@ Market Sentinel is a real-time stock market monitoring web application designed 
   - Add symbols manually via input box
   - Delete symbols with one-click
   - Auto-refreshes every 30 seconds from momentum_alerts.py symbol list
+- 🚨 **Momentum Alert Pop-ups**: Real-time momentum alerts displayed as pop-up windows
+  - Auto-polls for new alerts every 10 seconds
+  - Displays alerts that were sent by momentum_alerts.py system
+  - Shows price, VWAP, EMA9, momentum indicators, and urgency level
+  - Color-coded urgency (green for normal, red for urgent)
+  - Animated slide-in with pulsing glow effect
+  - Click to open chart or dismiss alert
+  - Auto-dismisses after 30 seconds
+  - Max 3 alerts displayed at once
 - 📑 **Tabbed Interface**: Multiple charts in separate tabs with close buttons
 - 📊 **Candlestick Charts**: Professional-grade financial charts
 - ⚙️ **Chart Controls**:
@@ -290,6 +299,34 @@ pip3 install alpaca-trade-api flask pandas pytz
 
 ## Changelog
 
+### 2025-11-05 - Momentum Alert Pop-up System
+- **FEATURE**: Implemented real-time momentum alert pop-up windows in web interface
+  - Alerts automatically displayed when momentum_alerts.py sends alerts
+  - Professional animated pop-ups with slide-in and pulsing glow effects
+  - Shows comprehensive alert data: price, VWAP, EMA9, momentum, urgency, sources
+  - Color-coded urgency levels: green (normal), red (urgent)
+  - Interactive buttons: "Open Chart" and "Dismiss"
+  - Auto-dismisses after 30 seconds
+  - Maximum 3 alerts displayed at once (removes oldest when limit reached)
+  - Tracks displayed alerts to avoid duplicates
+- **BACKEND**: Created momentum alerts API endpoint
+  - New file: `cgi-bin/api/momentum_alerts_api.py`
+  - CGI-compatible Python script for GoDaddy hosting
+  - Reads alerts from `historical_data/{YYYY-MM-DD}/momentum_alerts_sent/bullish/`
+  - Returns JSON with formatted alert data
+  - Supports filtering by timestamp (only new alerts since last check)
+  - Supports limit parameter (max alerts to return)
+- **FRONTEND**: Alert polling system
+  - Polls API every 10 seconds for new alerts
+  - Incremental updates using timestamp filtering
+  - Smooth animations with CSS transitions
+  - Responsive design works on all screen sizes
+  - Dark theme styling consistent with Market Sentinel aesthetic
+- **INTEGRATION**: Seamless connection with momentum_alerts.py
+  - Web interface displays same alerts sent via Telegram
+  - No modifications needed to momentum_alerts.py (reads existing JSON files)
+  - Automatic synchronization between backend alert system and web display
+
 ### 2025-11-02 - Timezone Display Clarification
 - **UI**: Added Eastern Time (ET) indicator to chart controls
   - Green label "🕐 Eastern Time (ET)" displayed prominently
@@ -404,6 +441,6 @@ pip3 install alpaca-trade-api flask pandas pytz
 
 ---
 
-**Last Updated**: 2025-11-04
+**Last Updated**: 2025-11-05
 **Branch**: `feature/market_sentinel_chart`
-**Status**: Phase 1 Complete, Watch List Multi-Source Active, Ready for Phase 2 Backend Integration
+**Status**: Phase 1 Complete, Watch List Multi-Source Active, Momentum Alert Pop-ups Implemented, Ready for Phase 2 Backend Integration

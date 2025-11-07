@@ -5,6 +5,24 @@ Market Data CGI API Endpoint for Market Sentinel
 This CGI script provides REST-like endpoints for the Market Sentinel web interface.
 It bridges the frontend (HTML/JS) with the backend (market_data.py).
 
+IMPORTANT - SIP DATA ACCESS:
+    This API uses your LIVE Alpaca account to access SIP (Securities Information Processor) data.
+    SIP provides real-time, high-quality market data from the consolidated tape.
+
+    This is READ-ONLY market data access. NO TRADING OPERATIONS are performed.
+
+    The live account is used instead of paper because:
+    - Paper account has 15+ minute to hour delays on trade data
+    - Live account SIP data is real-time and accurate
+    - Market data API is separate from trading API - no risk of accidental trades
+
+Credentials Configuration:
+    Set environment variables in your shell or .env file:
+        export ALPACA_LIVE_API_KEY="your_live_api_key"
+        export ALPACA_LIVE_SECRET_KEY="your_live_secret_key"
+
+    Or edit: cgi-bin/molecules/alpaca_molecules/alpaca_config.py lines 136-137
+
 Endpoints:
 - ?action=quote&symbol=AAPL
 - ?action=chart&symbol=AAPL&interval=1m&range=1d
@@ -131,7 +149,7 @@ def handle_trades(params):
     import pytz
 
     symbol = params.get('symbol', '').upper()
-    limit = int(params.get('limit', 100))
+    requested_limit = int(params.get('limit', 100))
 
     if not symbol:
         send_response(None, 400, "Missing 'symbol' parameter")
@@ -140,9 +158,42 @@ def handle_trades(params):
     try:
         client = AlpacaMarketData()
         et_tz = pytz.timezone('America/New_York')
-        start_date = datetime.now(et_tz) - timedelta(hours=1)
+        start_date = datetime.now(et_tz) - timedelta(hours=2)
 
-        trades = client.get_time_and_sales(symbol, start_date, limit)
+        # Request more trades than needed to ensure we get recent ones
+        # The market_data module will sort them newest-first
+        fetch_limit = max(requested_limit * 10, 1000)  # Fetch 10x or at least 1000
+
+        trades = client.get_time_and_sales(symbol, start_date, fetch_limit)
+
+        # Check if trades are stale (older than 5 minutes)
+        # Alpaca's trade data has significant delay, so fall back to bar data for recent info
+        if trades:
+            from datetime import datetime
+            latest_trade_time = datetime.fromisoformat(trades[0]['timestamp'])
+            now = datetime.now(et_tz)
+            age_minutes = (now - latest_trade_time).total_seconds() / 60
+
+            if age_minutes > 5:
+                # Trades are stale, supplement with recent bar data
+                chart_data = client.get_chart_data(symbol, interval='1m', range_str='1d')
+                if chart_data.get('bars'):
+                    # Convert recent bars to trade-like format
+                    synthetic_trades = []
+                    for bar in reversed(chart_data['bars'][-requested_limit:]):  # Get last N bars
+                        # Use close price and volume as a synthetic "trade"
+                        synthetic_trades.append({
+                            'timestamp': bar['timestamp'],
+                            'price': bar['close'],
+                            'size': bar['volume'],
+                            'exchange': 'BAR',  # Indicate this is from bar data
+                            'synthetic': True
+                        })
+                    trades = synthetic_trades
+
+        # Trades are already sorted newest-first by market_data.py or our bar conversion
+        # Trim to requested limit
+        trades = trades[:requested_limit]
 
         send_response({'trades': trades, 'count': len(trades)})
 

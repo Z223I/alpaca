@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Market Sentinel - Real-time Stock Monitor</title>
+    <!-- Version: 2.0 - Live SIP Data - Cache Bust 20251107 -->
 
     <!-- TradingView Lightweight Charts for professional candlestick charts -->
     <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
@@ -704,9 +705,253 @@
             font-size: 18px;
             line-height: 1.6;
         }
+
+        /* Momentum Alert Pop-ups */
+        .alert-container {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 10000;
+            max-width: 450px;
+            pointer-events: none;
+        }
+
+        .momentum-alert {
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+            border: 2px solid var(--accent-green);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 20px rgba(78, 204, 163, 0.3);
+            pointer-events: auto;
+            animation: slideInRight 0.4s ease-out, pulse-glow 2s ease-in-out infinite;
+            position: relative;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(500px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% {
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 20px rgba(78, 204, 163, 0.3);
+            }
+            50% {
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 30px rgba(78, 204, 163, 0.5);
+            }
+        }
+
+        .momentum-alert.urgent {
+            border-color: var(--accent-red);
+            animation: slideInRight 0.4s ease-out, pulse-urgent 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse-urgent {
+            0%, 100% {
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 20px rgba(255, 107, 107, 0.5);
+            }
+            50% {
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 40px rgba(255, 107, 107, 0.8);
+            }
+        }
+
+        .momentum-alert.closing {
+            animation: slideOutRight 0.3s ease-in forwards;
+        }
+
+        @keyframes slideOutRight {
+            to {
+                transform: translateX(500px);
+                opacity: 0;
+            }
+        }
+
+        .alert-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .alert-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--accent-green);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .alert-title.urgent {
+            color: var(--accent-red);
+        }
+
+        .alert-symbol {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--accent-blue);
+        }
+
+        .alert-close {
+            cursor: pointer;
+            font-size: 24px;
+            color: var(--text-secondary);
+            transition: color 0.2s;
+            line-height: 1;
+            padding: 0 5px;
+        }
+
+        .alert-close:hover {
+            color: var(--accent-red);
+        }
+
+        .alert-body {
+            font-size: 14px;
+            line-height: 1.8;
+        }
+
+        .alert-price-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+        }
+
+        .alert-price-label {
+            color: var(--text-secondary);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .alert-price-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--accent-green);
+        }
+
+        .alert-price-value.down {
+            color: var(--accent-red);
+        }
+
+        .alert-info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .alert-info-item {
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        .alert-info-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 3px;
+        }
+
+        .alert-info-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .alert-sources {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .alert-source-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .alert-source-badge.active {
+            background: var(--accent-green);
+            color: white;
+        }
+
+        .alert-source-badge.inactive {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-secondary);
+        }
+
+        .alert-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .alert-action-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .alert-action-btn.primary {
+            background: var(--accent-green);
+            color: white;
+        }
+
+        .alert-action-btn.primary:hover {
+            background: var(--accent-blue);
+            transform: translateY(-2px);
+        }
+
+        .alert-action-btn.secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+        }
+
+        .alert-action-btn.secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .alert-timestamp {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 10px;
+            text-align: right;
+        }
     </style>
 </head>
 <body>
+    <!-- Momentum Alert Container -->
+    <div id="alertContainer" class="alert-container">
+        <!-- Alerts will be dynamically added here -->
+    </div>
+
     <!-- Header -->
     <div class="header">
         <h1>📊 Market Sentinel</h1>
@@ -1487,11 +1732,15 @@
                     .filter(key => chartData.indicators[key])
                     .join(',');
 
-                const apiUrl = `./cgi-bin/api/market_data_api.py?action=chart&symbol=${symbol}&interval=${chartData.interval}&range=${chartData.range}&indicators=${indicators}`;
+                // Add cache-busting timestamp to ensure fresh data from live account SIP
+                const timestamp = Date.now();
+                const apiUrl = `./cgi-bin/api/market_data_api.py?action=chart&symbol=${symbol}&interval=${chartData.interval}&range=${chartData.range}&indicators=${indicators}&_t=${timestamp}`;
                 console.log('Loading chart from:', apiUrl);
 
                 // Fetch data from backend API
-                const response = await fetch(apiUrl);
+                const response = await fetch(apiUrl, {
+                    cache: 'no-store'  // Disable browser caching for real-time data
+                });
                 const result = await response.json();
 
                 console.log('Chart response:', result);
@@ -2156,6 +2405,7 @@
 
         // Load time and sales data
         async function loadTimeSales(symbol) {
+            console.log(`[V2.0] loadTimeSales called for ${symbol} at ${new Date().toLocaleTimeString()}`);
             const container = document.getElementById(`trades-${symbol}`);
             if (!container) {
                 console.error(`Time & sales container not found for ${symbol}`);
@@ -2174,10 +2424,14 @@
             }
 
             try {
-                const apiUrl = `./cgi-bin/api/market_data_api.py?action=trades&symbol=${symbol}&limit=100`;
+                // Add cache-busting timestamp to ensure fresh data from live account SIP
+                const timestamp = Date.now();
+                const apiUrl = `./cgi-bin/api/market_data_api.py?action=trades&symbol=${symbol}&limit=100&_t=${timestamp}`;
                 console.log('Loading trades from:', apiUrl);
 
-                const response = await fetch(apiUrl);
+                const response = await fetch(apiUrl, {
+                    cache: 'no-store'  // Disable browser caching for real-time data
+                });
 
                 // Check if response is ok
                 if (!response.ok) {
@@ -2439,7 +2693,8 @@
             symbols: [],
             manualSymbols: new Set(),  // Track manually added symbols
             deletedSymbols: new Set(), // Track deleted symbols (to hide on auto-refresh)
-            refreshInterval: null
+            refreshInterval: null,
+            currentOracleFile: null    // Track current Oracle CSV file to detect changes
         };
 
         // Initialize watch list on page load
@@ -2464,6 +2719,26 @@
                 console.log('Watch list data received:', data);
 
                 if (data.success) {
+                    // Check if Oracle file has changed
+                    const newOracleFile = data.oracle_file || '';
+                    if (watchListState.currentOracleFile && newOracleFile &&
+                        watchListState.currentOracleFile !== newOracleFile) {
+                        console.log(`🔄 Oracle file changed: ${watchListState.currentOracleFile} -> ${newOracleFile}`);
+                        console.log(`   Clearing deleted symbols to allow new Oracle symbols to appear`);
+
+                        // Clear ALL deleted symbols when Oracle file changes
+                        // This ensures that:
+                        // 1. Old Oracle symbols that were deleted won't block new Oracle symbols
+                        // 2. New Oracle symbols from the new file will show up fresh
+                        // 3. User can re-delete any unwanted symbols from the new file
+                        const previousDeletedCount = watchListState.deletedSymbols.size;
+                        watchListState.deletedSymbols.clear();
+                        console.log(`   Cleared ${previousDeletedCount} deleted symbols for fresh Oracle data`);
+                    }
+
+                    // Update current Oracle file
+                    watchListState.currentOracleFile = newOracleFile;
+
                     // Filter out deleted symbols (unless they were manually re-added)
                     watchListState.symbols = data.data.filter(symbol => {
                         // Keep if NOT deleted, OR if deleted but manually re-added
@@ -2653,6 +2928,242 @@
 
             console.log(`Deleted ${symbol} from watch list (manual: ${watchListState.manualSymbols.size}, deleted: ${watchListState.deletedSymbols.size})`);
         }
+
+        // ==================== MOMENTUM ALERT SYSTEM ====================
+
+        // State management for momentum alerts
+        const alertState = {
+            displayedAlerts: new Set(),  // Track alerts we've already shown
+            lastCheckTimestamp: null,    // Last time we checked for new alerts
+            pollInterval: null,          // Polling interval ID
+            maxDisplayedAlerts: 3,       // Maximum number of alerts to display at once
+            alertTimeout: 30000          // Auto-dismiss alerts after 30 seconds
+        };
+
+        // Initialize momentum alert system on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            // Start polling for new alerts every 10 seconds
+            pollMomentumAlerts();
+            alertState.pollInterval = setInterval(pollMomentumAlerts, 10000);
+            console.log('Momentum alert system initialized');
+        });
+
+        // Poll for new momentum alerts
+        async function pollMomentumAlerts() {
+            try {
+                // Build API URL with query parameters
+                let apiUrl = 'cgi-bin/api/momentum_alerts_api.py?limit=10';
+
+                // If we have a last check timestamp, only get alerts since then
+                if (alertState.lastCheckTimestamp) {
+                    apiUrl += `&since=${encodeURIComponent(alertState.lastCheckTimestamp)}`;
+                }
+
+                console.log('Polling for momentum alerts:', apiUrl);
+                const response = await fetch(apiUrl);
+
+                if (!response.ok) {
+                    console.error('Momentum alerts API error:', response.status);
+                    return;
+                }
+
+                const data = await response.json();
+                console.log('Momentum alerts received:', data);
+
+                if (data.success && data.data && data.data.length > 0) {
+                    // Process new alerts
+                    const newAlerts = data.data.filter(alert => !alertState.displayedAlerts.has(alert.id));
+
+                    if (newAlerts.length > 0) {
+                        console.log(`Found ${newAlerts.length} new momentum alerts`);
+
+                        // Display each new alert
+                        newAlerts.forEach(alert => {
+                            displayMomentumAlert(alert);
+                            alertState.displayedAlerts.add(alert.id);
+                        });
+                    }
+                }
+
+                // Update last check timestamp
+                alertState.lastCheckTimestamp = data.timestamp;
+
+            } catch (error) {
+                console.error('Error polling momentum alerts:', error);
+            }
+        }
+
+        // Display a momentum alert as a pop-up
+        function displayMomentumAlert(alert) {
+            const container = document.getElementById('alertContainer');
+
+            // Check if we're at max capacity
+            const currentAlerts = container.querySelectorAll('.momentum-alert:not(.closing)');
+            if (currentAlerts.length >= alertState.maxDisplayedAlerts) {
+                // Remove oldest alert to make room
+                dismissAlert(currentAlerts[0].id);
+            }
+
+            // Format timestamp
+            const alertTime = new Date(alert.timestamp);
+            const timeStr = alertTime.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                timeZone: 'America/New_York'
+            });
+
+            // Determine urgency class
+            const urgencyClass = alert.urgency === 'urgent' ? 'urgent' : '';
+            const titleClass = alert.urgency === 'urgent' ? 'urgent' : '';
+
+            // Format numbers
+            const formatPrice = (val) => val != null ? `$${val.toFixed(2)}` : 'N/A';
+            const formatPercent = (val) => val != null ? `${val > 0 ? '+' : ''}${val.toFixed(2)}%` : 'N/A';
+            const formatMomentum = (val) => val != null ? `${val > 0 ? '+' : ''}${val.toFixed(2)}%/min` : 'N/A';
+
+            // Build alert HTML
+            const alertHTML = `
+                <div id="alert-${alert.id}" class="momentum-alert ${urgencyClass}">
+                    <div class="alert-header">
+                        <div class="alert-title ${titleClass}">
+                            🚀 <span class="alert-symbol">${alert.symbol}</span>
+                        </div>
+                        <div class="alert-close" onclick="dismissAlert('alert-${alert.id}')">✕</div>
+                    </div>
+
+                    <div class="alert-body">
+                        <!-- Price Information -->
+                        <div class="alert-price-row">
+                            <div>
+                                <div class="alert-price-label">Current Price</div>
+                                <div class="alert-price-value">${formatPrice(alert.current_price)}</div>
+                            </div>
+                            ${alert.percent_gain_since_market_open != null ? `
+                            <div style="text-align: right;">
+                                <div class="alert-price-label">Since Open</div>
+                                <div class="alert-price-value">${formatPercent(alert.percent_gain_since_market_open)}</div>
+                            </div>
+                            ` : ''}
+                        </div>
+
+                        <!-- Technical Indicators Grid -->
+                        <div class="alert-info-grid">
+                            <div class="alert-info-item">
+                                <div class="alert-info-label">VWAP</div>
+                                <div class="alert-info-value">${formatPrice(alert.vwap)} ✅</div>
+                            </div>
+                            <div class="alert-info-item">
+                                <div class="alert-info-label">EMA9</div>
+                                <div class="alert-info-value">${formatPrice(alert.ema_9)} ✅</div>
+                            </div>
+                            <div class="alert-info-item">
+                                <div class="alert-info-label">Momentum</div>
+                                <div class="alert-info-value">${formatMomentum(alert.momentum)} ${alert.momentum_emoji || ''}</div>
+                            </div>
+                            <div class="alert-info-item">
+                                <div class="alert-info-label">Momentum Short</div>
+                                <div class="alert-info-value">${formatMomentum(alert.momentum_short)} ${alert.momentum_short_emoji || ''}</div>
+                            </div>
+                            ${alert.volume_surge_detected ? `
+                            <div class="alert-info-item">
+                                <div class="alert-info-label">Volume Surge</div>
+                                <div class="alert-info-value">✅ ${alert.volume_surge_ratio ? alert.volume_surge_ratio.toFixed(2) + 'x' : ''}</div>
+                            </div>
+                            ` : ''}
+                            ${alert.float_rotation != null ? `
+                            <div class="alert-info-item">
+                                <div class="alert-info-label">Float Rotation</div>
+                                <div class="alert-info-value">${alert.float_rotation.toFixed(2)}x</div>
+                            </div>
+                            ` : ''}
+                        </div>
+
+                        <!-- Source Badges -->
+                        <div class="alert-sources">
+                            <div class="alert-source-badge ${alert.from_gainers ? 'active' : 'inactive'}">
+                                📈 Gainers
+                            </div>
+                            <div class="alert-source-badge ${alert.from_volume_surge ? 'active' : 'inactive'}">
+                                🚀 Surge
+                            </div>
+                            <div class="alert-source-badge ${alert.oracle ? 'active' : 'inactive'}">
+                                🔮 Oracle
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="alert-actions">
+                            <button class="alert-action-btn primary" onclick="openChartFromAlert('${alert.symbol}', 'alert-${alert.id}')">
+                                Open Chart
+                            </button>
+                            <button class="alert-action-btn secondary" onclick="dismissAlert('alert-${alert.id}')">
+                                Dismiss
+                            </button>
+                        </div>
+
+                        <!-- Timestamp -->
+                        <div class="alert-timestamp">
+                            ${timeStr} ET | Urgency: ${alert.urgency ? alert.urgency.toUpperCase() : 'NORMAL'}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Add alert to container
+            container.insertAdjacentHTML('afterbegin', alertHTML);
+
+            // Play notification sound (optional - can be enabled later)
+            // playNotificationSound();
+
+            // Auto-dismiss after timeout
+            setTimeout(() => {
+                const alertElement = document.getElementById(`alert-${alert.id}`);
+                if (alertElement && !alertElement.classList.contains('closing')) {
+                    dismissAlert(`alert-${alert.id}`);
+                }
+            }, alertState.alertTimeout);
+
+            console.log(`Displayed momentum alert for ${alert.symbol}`);
+        }
+
+        // Dismiss an alert with animation
+        function dismissAlert(alertId) {
+            const alertElement = document.getElementById(alertId);
+            if (!alertElement) return;
+
+            // Add closing animation
+            alertElement.classList.add('closing');
+
+            // Remove from DOM after animation completes
+            setTimeout(() => {
+                alertElement.remove();
+            }, 300);
+
+            console.log(`Dismissed alert: ${alertId}`);
+        }
+
+        // Open chart from alert and dismiss the alert
+        function openChartFromAlert(symbol, alertId) {
+            // Open the chart
+            openChart(symbol);
+
+            // Dismiss the alert
+            dismissAlert(alertId);
+
+            console.log(`Opened chart for ${symbol} from alert`);
+        }
+
+        // Optional: Play notification sound for alerts
+        function playNotificationSound() {
+            // This can be implemented later with an audio element
+            // For now, we'll use the browser's built-in notification API
+            if ('Notification' in window && Notification.permission === 'granted') {
+                // Could show a browser notification here
+            }
+        }
+
+        // ==================== END MOMENTUM ALERT SYSTEM ====================
     </script>
 </body>
 </html>

@@ -24,9 +24,11 @@ Any Alpaca related code that is a molecule is to go into ./cgi-bin/molecules/alp
 
 Only work in the standard GoDaddy directories.
 
-You may use existing code in other directories as context but leave it unchanged.
+You may use existing terminal-based code in other directories as context but leave it unchanged.
 
 ### Background Information
+
+There are two sets of software in this repo.  The first code is run from the terminal.  The second set of code is internet-based and uses the standard GoDaddy directory structure.
 
 #### Review
 
@@ -35,12 +37,6 @@ You may use existing code in other directories as context but leave it unchanged
 The Apache 2 web server is running.  The ./public_html files can be reached using http://localhost/market_sentinel/.
 
 See APACHE_SETUP.md and keep it up to date.
-
-##### Momentum Alerts
-
-For context, see:
-code/momentum_alerts.py
-code/momentum_alerts_config.py
 
 ### Standards
 
@@ -51,5 +47,8 @@ Test.
 
 ## Low Level Requirements
 
-Update public_html/index.html: Dig deep.  The Watch List is to be updated periodically.  Increase that period to two minutes for testing.  It should be returning symbols from three different sources, i.e. Oracle list, volume surge, and top gainers.  I am only seeing stock symbols from the Oracle list.
+Only update the internet-based code.  Copy files as necessary from the terminal based code directory structure to the internet-based directories because the two code bases will diverge.
 
+Update ./cgi-bin/molecules/alpaca_molecules/momentum_alerts.py: This script should be searching for stock momentum alerts that are to be displayed in index.html as pop-up windows.
+
+Update ./public_html/index.html: This page has a stock watch list which ultimately comes from ./cgi-bin/molecules/alpaca_molecules/momentum_alerts.py.  Display pop-up windows for momentum alerts.

@@ -52,7 +52,7 @@ def find_latest_oracle_csv() -> Path:
     return csv_files[0]
 
 
-def get_watch_list_symbols() -> List[Dict]:
+def get_watch_list_symbols() -> tuple[List[Dict], str]:
     """
     Load watch list symbols from CSV files and return with source indicators.
 
@@ -62,12 +62,14 @@ def get_watch_list_symbols() -> List[Dict]:
     3. data/{YYYYMMDD}.csv (oracle) - falls back to latest CSV if today's not found
 
     Returns:
-        List of dictionaries with fields:
-        - symbol: Stock symbol
-        - oracle: Boolean - from Oracle data source
-        - manual: Boolean - manually added (always False for now)
-        - top_gainers: Boolean - from top gainers list
-        - surge: Boolean - from volume surge list
+        Tuple of:
+        - List of dictionaries with fields:
+            - symbol: Stock symbol
+            - oracle: Boolean - from Oracle data source
+            - manual: Boolean - manually added (always False for now)
+            - top_gainers: Boolean - from top gainers list
+            - surge: Boolean - from volume surge list
+        - Oracle CSV filename (or empty string if no Oracle file used)
     """
     et_tz = pytz.timezone('US/Eastern')
     today = datetime.now(et_tz).strftime('%Y-%m-%d')
@@ -79,11 +81,15 @@ def get_watch_list_symbols() -> List[Dict]:
     oracle_csv = Path(project_root) / "data" / f"{compact_date}.csv"
 
     # Fallback to latest CSV if today's doesn't exist
+    oracle_filename = ""
     if not oracle_csv.exists():
         latest_csv = find_latest_oracle_csv()
         if latest_csv:
             oracle_csv = latest_csv
+            oracle_filename = oracle_csv.name
             print(f"Using fallback Oracle CSV: {oracle_csv.name}", file=sys.stderr)
+    else:
+        oracle_filename = oracle_csv.name
 
     symbols_dict = {}
 
@@ -174,7 +180,7 @@ def get_watch_list_symbols() -> List[Dict]:
     # Sort by symbol name
     symbol_list.sort(key=lambda x: x['symbol'])
 
-    return symbol_list
+    return symbol_list, oracle_filename
 
 
 def get_watch_list_from_momentum_alerts() -> dict:
@@ -226,13 +232,14 @@ def main():
 
     # Fall back to reading CSV files directly if JSON not available
     if response is None:
-        watch_list = get_watch_list_symbols()
+        watch_list, oracle_filename = get_watch_list_symbols()
         response = {
             'success': True,
             'data': watch_list,
             'count': len(watch_list),
             'timestamp': datetime.now(pytz.timezone('US/Eastern')).isoformat(),
-            'source': 'csv_fallback'
+            'source': 'csv_fallback',
+            'oracle_file': oracle_filename
         }
     else:
         # Add source indicator to show data came from momentum_alerts.py
@@ -240,6 +247,9 @@ def main():
         # Rename 'symbols' key to 'data' for API consistency
         if 'symbols' in response:
             response['data'] = response.pop('symbols')
+        # Add oracle_file if available in the momentum_alerts response
+        if 'oracle_file' not in response:
+            response['oracle_file'] = ''
 
     # Output CGI headers
     print("Content-Type: application/json")

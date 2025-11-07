@@ -5,8 +5,6 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=wilsonb
-Group=wilsonb
 WorkingDirectory=/home/wilsonb/dl/github.com/Z223I/alpaca
 Environment="PATH=/home/wilsonb/miniconda3/envs/alpaca/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ExecStart=/home/wilsonb/miniconda3/envs/alpaca/bin/python cgi-bin/molecules/alpaca_molecules/momentum_alerts.py
