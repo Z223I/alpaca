@@ -1469,6 +1469,9 @@ class MomentumAlertsSystem:
             message_parts = [
                 f"🚀 **MOMENTUM ALERT - {symbol}**",
                 "",
+                f"📅 **Date:** {timestamp.strftime('%Y-%m-%d')}",
+                f"⏰ **Time:** {timestamp.strftime('%H:%M:%S ET')}",
+                "",
                 f"💰 **Price:** ${current_price:.2f}",
             ]
 
@@ -1571,13 +1574,6 @@ class MomentumAlertsSystem:
             # Oracle source indicator
             oracle_indicator = "🟢" if oracle else "🔴"
             message_parts.append(f"   • **Oracle:** {oracle_indicator}")
-
-            # Add timestamp
-            message_parts.extend([
-                "",
-                f"⏰ **Time:** {timestamp.strftime('%H:%M:%S ET')}",
-                f"📅 **Date:** {timestamp.strftime('%Y-%m-%d')}"
-            ])
 
             message = "\n".join(message_parts)
 
