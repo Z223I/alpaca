@@ -704,6 +704,116 @@
             font-size: 18px;
             line-height: 1.6;
         }
+
+        /* Momentum Alert Popup */
+        .alert-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        .alert-overlay.show {
+            display: flex;
+        }
+
+        .alert-popup {
+            background-color: var(--bg-secondary);
+            border: 2px solid var(--accent-green);
+            border-radius: 10px;
+            padding: 30px;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .alert-header {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--accent-green);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .alert-content {
+            color: var(--text-primary);
+            line-height: 1.8;
+            margin-bottom: 25px;
+        }
+
+        .alert-content .alert-line {
+            margin: 8px 0;
+        }
+
+        .alert-content .alert-section {
+            margin: 15px 0;
+        }
+
+        .alert-content strong {
+            color: var(--accent-blue);
+        }
+
+        .alert-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: flex-end;
+        }
+
+        .alert-btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .alert-btn-ok {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .alert-btn-ok:hover {
+            background-color: var(--accent-blue);
+            color: white;
+        }
+
+        .alert-btn-chart {
+            background-color: var(--accent-green);
+            color: white;
+        }
+
+        .alert-btn-chart:hover {
+            background-color: #3dba8a;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
     </style>
 </head>
 <body>
@@ -2653,6 +2763,156 @@
 
             console.log(`Deleted ${symbol} from watch list (manual: ${watchListState.manualSymbols.size}, deleted: ${watchListState.deletedSymbols.size})`);
         }
+
+        // ============================================================================
+        // MOMENTUM ALERT POPUP FUNCTIONALITY
+        // ============================================================================
+
+        // Alert state
+        const alertState = {
+            lastCheckTime: new Date().toISOString(),
+            pollInterval: 10000, // Poll every 10 seconds
+            currentAlert: null,
+            alertQueue: []
+        };
+
+        // Show alert popup
+        function showMomentumAlert(alertData) {
+            const overlay = document.getElementById('alertOverlay');
+            const header = document.getElementById('alertHeader');
+            const content = document.getElementById('alertContent');
+
+            // Store current alert
+            alertState.currentAlert = alertData;
+
+            // Set header
+            header.textContent = `🚀 MOMENTUM ALERT - ${alertData.symbol}`;
+
+            // Format alert content
+            const lines = [];
+
+            // Date and Time
+            const timestamp = new Date(alertData.timestamp);
+            lines.push(`<div class="alert-line"><strong>📅 Date:</strong> ${timestamp.toLocaleDateString()}</div>`);
+            lines.push(`<div class="alert-line"><strong>⏰ Time:</strong> ${timestamp.toLocaleTimeString()} ET</div>`);
+            lines.push('<div class="alert-line" style="margin-bottom: 15px;"></div>');
+
+            // Price info
+            lines.push(`<div class="alert-line"><strong>💰 Price:</strong> $${alertData.current_price.toFixed(2)}</div>`);
+
+            if (alertData.market_open_price) {
+                lines.push(`<div class="alert-line"><strong>🌅 Market Open:</strong> $${alertData.market_open_price.toFixed(2)}</div>`);
+                lines.push(`<div class="alert-line"><strong>📈 Gain Since Open:</strong> ${alertData.percent_gain_since_market_open > 0 ? '+' : ''}${alertData.percent_gain_since_market_open.toFixed(2)}%</div>`);
+            }
+
+            // Technical indicators
+            lines.push(`<div class="alert-line"><strong>📊 VWAP:</strong> $${alertData.vwap.toFixed(2)} ✅</div>`);
+            lines.push(`<div class="alert-line"><strong>📈 EMA9:</strong> $${alertData.ema_9.toFixed(2)} ✅</div>`);
+            lines.push(`<div class="alert-line"><strong>⚡ Momentum:</strong> ${alertData.momentum.toFixed(2)}%/min ${alertData.momentum_emoji}</div>`);
+            lines.push(`<div class="alert-line"><strong>⚡ Momentum Short:</strong> ${alertData.momentum_short.toFixed(2)}%/min ${alertData.momentum_short_emoji}</div>`);
+            lines.push(`<div class="alert-line"><strong>🔥 Squeezing:</strong> ${alertData.momentum_squeeze.toFixed(2)}%/min ${alertData.squeeze_emoji}</div>`);
+            lines.push(`<div class="alert-line"><strong>📈 Volume:</strong> ${alertData.current_volume.toLocaleString()} ${alertData.volume_emoji}</div>`);
+            lines.push(`<div class="alert-line"><strong>🚦 Halt Status:</strong> ${alertData.halt_emoji}</div>`);
+            lines.push(`<div class="alert-line"><strong>🎯 Urgency:</strong> ${alertData.urgency.toUpperCase()}</div>`);
+
+            content.innerHTML = lines.join('');
+
+            // Show overlay
+            overlay.classList.add('show');
+        }
+
+        // Close alert popup
+        function closeAlertPopup() {
+            const overlay = document.getElementById('alertOverlay');
+            overlay.classList.remove('show');
+            alertState.currentAlert = null;
+
+            // Show next alert in queue if any
+            if (alertState.alertQueue.length > 0) {
+                const nextAlert = alertState.alertQueue.shift();
+                setTimeout(() => showMomentumAlert(nextAlert), 500);
+            }
+        }
+
+        // View chart from alert
+        function viewAlertChart() {
+            if (alertState.currentAlert) {
+                const symbol = alertState.currentAlert.symbol;
+                closeAlertPopup();
+
+                // Load chart for the symbol
+                loadChart(symbol);
+            }
+        }
+
+        // Poll for new alerts
+        async function pollForAlerts() {
+            try {
+                const apiUrl = `./cgi-bin/api/momentum_alerts_api.py?action=poll&since=${encodeURIComponent(alertState.lastCheckTime)}`;
+                const response = await fetch(apiUrl);
+
+                if (!response.ok) {
+                    console.error('Alert poll failed:', response.status);
+                    return;
+                }
+
+                const result = await response.json();
+
+                if (result.success && result.alerts && result.alerts.length > 0) {
+                    console.log(`Received ${result.alerts.length} new alert(s)`);
+
+                    // Update last check time to the most recent alert
+                    alertState.lastCheckTime = result.alerts[0].timestamp;
+
+                    // Show first alert immediately, queue the rest
+                    if (alertState.currentAlert === null && alertState.alertQueue.length === 0) {
+                        showMomentumAlert(result.alerts[0]);
+
+                        // Queue remaining alerts
+                        for (let i = 1; i < result.alerts.length; i++) {
+                            alertState.alertQueue.push(result.alerts[i]);
+                        }
+                    } else {
+                        // Currently showing an alert, queue all new alerts
+                        alertState.alertQueue.push(...result.alerts);
+                    }
+                }
+            } catch (error) {
+                console.error('Error polling for alerts:', error);
+            }
+        }
+
+        // Start alert polling
+        function startAlertPolling() {
+            console.log('Starting momentum alert polling...');
+
+            // Initial poll
+            pollForAlerts();
+
+            // Poll every 10 seconds
+            setInterval(pollForAlerts, alertState.pollInterval);
+        }
+
+        // Initialize alert system when page loads
+        window.addEventListener('load', function() {
+            startAlertPolling();
+        });
     </script>
+
+    <!-- Alert Popup Overlay -->
+    <div id="alertOverlay" class="alert-overlay">
+        <div class="alert-popup">
+            <div id="alertHeader" class="alert-header">
+                🚀 MOMENTUM ALERT
+            </div>
+            <div id="alertContent" class="alert-content">
+                <!-- Alert content will be inserted here -->
+            </div>
+            <div class="alert-buttons">
+                <button class="alert-btn alert-btn-ok" onclick="closeAlertPopup()">OK</button>
+                <button class="alert-btn alert-btn-chart" onclick="viewAlertChart()">View Chart</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
