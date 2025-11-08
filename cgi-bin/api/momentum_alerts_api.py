@@ -14,10 +14,20 @@ from pathlib import Path
 import pytz
 
 # Add project root to path
+# When running from /var/www/html/market_sentinel, use the actual project path
+# When running from project directory, calculate relative path
 script_dir = os.path.dirname(os.path.abspath(__file__))
-api_dir = script_dir
-cgi_bin_dir = os.path.dirname(api_dir)
-project_root = os.path.dirname(cgi_bin_dir)
+
+# Check if we're running from the web directory or user directory
+if '/var/www/html/market_sentinel' in script_dir or '/home/wilsonb/public_html' in script_dir:
+    # Use absolute path to actual project directory
+    project_root = '/home/wilsonb/dl/github.com/Z223I/alpaca'
+else:
+    # Calculate relative path from project directory
+    api_dir = script_dir
+    cgi_bin_dir = os.path.dirname(api_dir)
+    project_root = os.path.dirname(cgi_bin_dir)
+
 sys.path.insert(0, project_root)
 
 # CGI headers
@@ -36,7 +46,7 @@ def get_query_params():
 
 def get_recent_alerts(minutes=60):
     """
-    Get momentum alerts from the last N minutes (only sent alerts).
+    Get momentum alerts from the last N minutes (both sent and unsent alerts).
 
     Args:
         minutes: Number of minutes to look back (default: 60)
@@ -44,34 +54,45 @@ def get_recent_alerts(minutes=60):
     Returns:
         List of alert dictionaries sorted by timestamp (newest first)
     """
-    et_tz = pytz.timezone('US/Eastern')
+    et_tz = pytz.timezone('America/New_York')
     now = datetime.now(et_tz)
     cutoff_time = now - timedelta(minutes=minutes)
 
     alerts = []
+    seen_alerts = set()  # Track unique alerts by (symbol, timestamp)
 
-    # Check today's sent alerts (only bullish)
+    # Check today's date
     today = now.strftime('%Y-%m-%d')
-    alerts_dir = Path(project_root) / "historical_data" / today / "momentum_alerts_sent" / "bullish"
 
-    if alerts_dir.exists():
-        for alert_file in alerts_dir.glob("alert_*.json"):
-            try:
-                with open(alert_file, 'r') as f:
-                    alert_data = json.load(f)
+    # Check both sent and regular alerts directories (only bullish)
+    alerts_dirs = [
+        Path(project_root) / "historical_data" / today / "momentum_alerts_sent" / "bullish",
+        Path(project_root) / "historical_data" / today / "momentum_alerts" / "bullish"
+    ]
 
-                # Parse timestamp
-                alert_timestamp = datetime.fromisoformat(alert_data['timestamp'])
-                if alert_timestamp.tzinfo is None:
-                    alert_timestamp = et_tz.localize(alert_timestamp)
+    for alerts_dir in alerts_dirs:
+        if alerts_dir.exists():
+            for alert_file in alerts_dir.glob("alert_*.json"):
+                try:
+                    with open(alert_file, 'r') as f:
+                        alert_data = json.load(f)
 
-                # Only include alerts within the time window
-                if alert_timestamp >= cutoff_time:
-                    alerts.append(alert_data)
+                    # Parse timestamp
+                    alert_timestamp = datetime.fromisoformat(alert_data['timestamp'])
+                    if alert_timestamp.tzinfo is None:
+                        alert_timestamp = et_tz.localize(alert_timestamp)
 
-            except Exception as e:
-                print(f"Error reading alert file {alert_file}: {e}", file=sys.stderr)
-                continue
+                    # Create unique key for this alert
+                    alert_key = (alert_data['symbol'], alert_data['timestamp'])
+
+                    # Only include alerts within the time window and not already seen
+                    if alert_timestamp >= cutoff_time and alert_key not in seen_alerts:
+                        alerts.append(alert_data)
+                        seen_alerts.add(alert_key)
+
+                except Exception as e:
+                    print(f"Error reading alert file {alert_file}: {e}", file=sys.stderr)
+                    continue
 
     # Sort by timestamp (newest first)
     alerts.sort(key=lambda x: x['timestamp'], reverse=True)
@@ -81,7 +102,7 @@ def get_recent_alerts(minutes=60):
 
 def get_new_alerts(since_timestamp):
     """
-    Get momentum alerts since a given timestamp (only sent alerts).
+    Get momentum alerts since a given timestamp (both sent and unsent alerts).
 
     Args:
         since_timestamp: ISO format timestamp string
@@ -89,7 +110,7 @@ def get_new_alerts(since_timestamp):
     Returns:
         List of alert dictionaries sorted by timestamp (newest first)
     """
-    et_tz = pytz.timezone('US/Eastern')
+    et_tz = pytz.timezone('America/New_York')
 
     # Parse the since_timestamp
     try:
@@ -100,30 +121,41 @@ def get_new_alerts(since_timestamp):
         return {'error': f'Invalid timestamp format: {e}'}
 
     alerts = []
+    seen_alerts = set()  # Track unique alerts by (symbol, timestamp)
 
-    # Check today's sent alerts (only bullish)
+    # Check today's date
     now = datetime.now(et_tz)
     today = now.strftime('%Y-%m-%d')
-    alerts_dir = Path(project_root) / "historical_data" / today / "momentum_alerts_sent" / "bullish"
 
-    if alerts_dir.exists():
-        for alert_file in alerts_dir.glob("alert_*.json"):
-            try:
-                with open(alert_file, 'r') as f:
-                    alert_data = json.load(f)
+    # Check both sent and regular alerts directories (only bullish)
+    alerts_dirs = [
+        Path(project_root) / "historical_data" / today / "momentum_alerts_sent" / "bullish",
+        Path(project_root) / "historical_data" / today / "momentum_alerts" / "bullish"
+    ]
 
-                # Parse timestamp
-                alert_timestamp = datetime.fromisoformat(alert_data['timestamp'])
-                if alert_timestamp.tzinfo is None:
-                    alert_timestamp = et_tz.localize(alert_timestamp)
+    for alerts_dir in alerts_dirs:
+        if alerts_dir.exists():
+            for alert_file in alerts_dir.glob("alert_*.json"):
+                try:
+                    with open(alert_file, 'r') as f:
+                        alert_data = json.load(f)
 
-                # Only include alerts after the cutoff
-                if alert_timestamp > cutoff_time:
-                    alerts.append(alert_data)
+                    # Parse timestamp
+                    alert_timestamp = datetime.fromisoformat(alert_data['timestamp'])
+                    if alert_timestamp.tzinfo is None:
+                        alert_timestamp = et_tz.localize(alert_timestamp)
 
-            except Exception as e:
-                print(f"Error reading alert file {alert_file}: {e}", file=sys.stderr)
-                continue
+                    # Create unique key for this alert
+                    alert_key = (alert_data['symbol'], alert_data['timestamp'])
+
+                    # Only include alerts after the cutoff and not already seen
+                    if alert_timestamp > cutoff_time and alert_key not in seen_alerts:
+                        alerts.append(alert_data)
+                        seen_alerts.add(alert_key)
+
+                except Exception as e:
+                    print(f"Error reading alert file {alert_file}: {e}", file=sys.stderr)
+                    continue
 
     # Sort by timestamp (newest first)
     alerts.sort(key=lambda x: x['timestamp'], reverse=True)

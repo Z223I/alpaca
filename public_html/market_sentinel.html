@@ -903,6 +903,8 @@
     </div>
 
     <script>
+        console.log('✅ SCRIPT START - Beginning of main script block');
+
         // Global state
         const state = {
             charts: new Map(),
@@ -2768,9 +2770,11 @@
         // MOMENTUM ALERT POPUP FUNCTIONALITY
         // ============================================================================
 
+        console.log('🚀 Momentum Alert System: Initializing...');
+
         // Alert state
         const alertState = {
-            lastCheckTime: new Date().toISOString(),
+            lastCheckTime: new Date(Date.now() - 2 * 60 * 1000).toISOString(), // Start from 2 minutes ago to catch recent alerts
             pollInterval: 10000, // Poll every 10 seconds
             currentAlert: null,
             alertQueue: []
@@ -2841,7 +2845,7 @@
                 closeAlertPopup();
 
                 // Load chart for the symbol
-                loadChart(symbol);
+                openChartFromWatchList(symbol);
             }
         }
 
