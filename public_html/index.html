@@ -2275,9 +2275,9 @@
             }
 
             // Only show loading state on initial load (when container is empty or has placeholder)
+            // Don't show loading if "No recent trades" is already displayed
             const isInitialLoad = container.children.length === 0 ||
-                                  container.textContent.includes('Loading') ||
-                                  container.textContent.includes('No recent trades');
+                                  container.textContent.includes('Loading');
 
             if (isInitialLoad) {
                 container.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 20px;">
