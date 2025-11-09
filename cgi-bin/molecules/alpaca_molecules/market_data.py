@@ -242,17 +242,31 @@ class AlpacaMarketData:
                 # Filter to keep only the most recent N trading days worth of data
                 # Group by date and keep only the most recent 'days' worth of trading days
                 if not df.empty and 'timestamp' in df.columns:
-                    # Get unique trading dates in the data
-                    df['date'] = pd.to_datetime(df['timestamp']).dt.date
-                    unique_dates = sorted(df['date'].unique(), reverse=True)
+                    try:
+                        # Make a copy to avoid SettingWithCopyWarning
+                        df = df.copy()
 
-                    # Keep only the most recent N trading days
-                    if len(unique_dates) > days:
-                        keep_dates = unique_dates[:days]
-                        df = df[df['date'].isin(keep_dates)]
+                        # Ensure timestamp is datetime type (only convert if not already datetime)
+                        if not pd.api.types.is_datetime64_any_dtype(df['timestamp']):
+                            df['timestamp'] = pd.to_datetime(df['timestamp'])
 
-                    # Remove temporary date column
-                    df = df.drop('date', axis=1)
+                        # Get unique trading dates in the data
+                        df['date'] = df['timestamp'].dt.date
+                        unique_dates = sorted(df['date'].unique(), reverse=True)
+
+                        # Keep only the most recent N trading days
+                        if len(unique_dates) > days:
+                            keep_dates = unique_dates[:days]
+                            df = df[df['date'].isin(keep_dates)]
+
+                        # Remove temporary date column
+                        df = df.drop('date', axis=1)
+                    except Exception as e:
+                        # Log the error but don't filter - return all data
+                        import sys
+                        print(f"ERROR in date filtering: {str(e)}", file=sys.stderr)
+                        import traceback
+                        traceback.print_exc(file=sys.stderr)
 
             if df.empty:
                 return {

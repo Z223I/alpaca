@@ -116,7 +116,10 @@ def handle_chart(params):
             indicators_param = params.get('indicators', '')
             if indicators_param:
                 indicators = indicators_param.split(',')
-                chart_data['indicators'] = calculate_indicators(chart_data['bars'], indicators)
+                # Filter out VWAP if not a 1-day chart (VWAP only valid for intraday)
+                if range_str != '1d' and 'vwap' in indicators:
+                    indicators = [ind for ind in indicators if ind != 'vwap']
+                chart_data['indicators'] = calculate_indicators(chart_data['bars'], indicators, range_str)
 
             send_response(chart_data)
 
@@ -150,13 +153,14 @@ def handle_trades(params):
         send_response(None, 500, f"Error fetching trades: {str(e)}")
 
 
-def calculate_indicators(bars, indicators):
+def calculate_indicators(bars, indicators, range_str='1d'):
     """
     Calculate technical indicators for the chart.
 
     Args:
         bars: List of bar dictionaries
         indicators: List of indicator names to calculate
+        range_str: Time range of the chart (e.g., '1d', '5d', '1mo', '1y')
 
     Returns:
         Dictionary of indicator data
@@ -228,7 +232,15 @@ def calculate_vwap(df):
 
     # Convert timestamps to datetime for grouping by day
     df = df.copy()
-    df['datetime'] = pd.to_datetime(df['timestamp'])
+
+    # Ensure proper datetime conversion - timestamps may be strings or datetime objects
+    if not pd.api.types.is_datetime64_any_dtype(df['timestamp']):
+        # If not datetime, convert (may be ISO strings)
+        df['datetime'] = pd.to_datetime(df['timestamp'], utc=True)
+    else:
+        # Already datetime, just copy
+        df['datetime'] = df['timestamp']
+
     df['date'] = df['datetime'].dt.date
 
     result = []

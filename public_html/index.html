@@ -211,6 +211,13 @@
             cursor: pointer;
         }
 
+        .indicator-note {
+            font-size: 0.75em;
+            color: var(--text-secondary);
+            opacity: 0.7;
+            font-style: italic;
+        }
+
         .save-settings-btn {
             background-color: var(--bg-tertiary);
             border: 1px solid var(--border-color);
@@ -1236,9 +1243,9 @@
                             <input type="checkbox" onchange="toggleIndicator('${symbol}', 'ema50', this.checked)">
                             EMA(50)
                         </label>
-                        <label class="control-checkbox">
-                            <input type="checkbox" onchange="toggleIndicator('${symbol}', 'vwap', this.checked)">
-                            VWAP
+                        <label class="control-checkbox" id="vwap-label-${symbol}">
+                            <input type="checkbox" id="vwap-checkbox-${symbol}" onchange="toggleIndicator('${symbol}', 'vwap', this.checked)">
+                            VWAP <span class="indicator-note">(1D only)</span>
                         </label>
                         <label class="control-checkbox">
                             <input type="checkbox" onchange="toggleIndicator('${symbol}', 'macd', this.checked)">
@@ -1478,6 +1485,24 @@
 
             const chartData = state.charts.get(symbol);
             chartData.range = range;
+
+            // Enable/disable VWAP based on range (only valid for 1D charts)
+            const vwapCheckbox = document.getElementById(`vwap-checkbox-${symbol}`);
+            const vwapLabel = document.getElementById(`vwap-label-${symbol}`);
+            if (vwapCheckbox && vwapLabel) {
+                if (range !== '1d') {
+                    // Disable VWAP for non-1D ranges
+                    vwapCheckbox.disabled = true;
+                    vwapCheckbox.checked = false;
+                    vwapLabel.style.opacity = '0.5';
+                    chartData.indicators.vwap = false;
+                } else {
+                    // Enable VWAP for 1D range
+                    vwapCheckbox.disabled = false;
+                    vwapLabel.style.opacity = '1';
+                }
+            }
+
             // Force chart recreation when range changes to properly display new time scale
             chartData.forceRecreate = true;
             loadChartData(symbol);
@@ -1580,6 +1605,11 @@
             if (settings.indicators) {
                 chartData.indicators = { ...settings.indicators };
 
+                // Disable VWAP if range is not 1D
+                if (chartData.range !== '1d') {
+                    chartData.indicators.vwap = false;
+                }
+
                 // Update checkboxes
                 Object.keys(settings.indicators).forEach(indicator => {
                     const checkbox = panel.querySelector(`input[onchange*="'${indicator}'"]`);
@@ -1587,6 +1617,15 @@
                         checkbox.checked = settings.indicators[indicator];
                     }
                 });
+
+                // Disable VWAP checkbox/label if not 1D range
+                const vwapCheckbox = document.getElementById(`vwap-checkbox-${symbol}`);
+                const vwapLabel = document.getElementById(`vwap-label-${symbol}`);
+                if (vwapCheckbox && vwapLabel && chartData.range !== '1d') {
+                    vwapCheckbox.disabled = true;
+                    vwapCheckbox.checked = false;
+                    vwapLabel.style.opacity = '0.5';
+                }
             }
 
             console.log(`Applied settings for ${symbol}`);
