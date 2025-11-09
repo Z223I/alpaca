@@ -1464,13 +1464,22 @@
             const panel = document.getElementById(`panel-${symbol}`);
             if (!panel) return;
 
+            // Update button active states
             panel.querySelectorAll('.control-group:nth-child(2) .control-btn').forEach(btn => {
                 btn.classList.remove('active');
+                const btnText = btn.textContent;
+                if ((btnText === '1D' && range === '1d') ||
+                    (btnText === '5D' && range === '5d') ||
+                    (btnText === '1M' && range === '1mo') ||
+                    (btnText === '1Y' && range === '1y')) {
+                    btn.classList.add('active');
+                }
             });
-            event.target.classList.add('active');
 
             const chartData = state.charts.get(symbol);
             chartData.range = range;
+            // Force chart recreation when range changes to properly display new time scale
+            chartData.forceRecreate = true;
             loadChartData(symbol);
         }
 
