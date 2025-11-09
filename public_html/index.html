@@ -533,6 +533,32 @@
             border-right: 2px solid var(--border-color);
             overflow: hidden;
             padding-bottom: 30px; /* Add space at bottom */
+            position: relative; /* For resize handle positioning */
+        }
+
+        /* Left Sidebar Resize Handle */
+        .left-sidebar-resize {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 8px;
+            height: 100%;
+            cursor: col-resize;
+            background-color: transparent;
+            z-index: 1000;
+            transition: background-color 0.2s;
+        }
+
+        .left-sidebar-resize:hover {
+            background-color: var(--accent-blue);
+        }
+
+        .left-sidebar.resizing {
+            user-select: none;
+        }
+
+        .left-sidebar.resizing .left-sidebar-resize {
+            background-color: var(--accent-green);
         }
 
         /* Watch List Panel */
@@ -1087,6 +1113,9 @@
                 </table>
             </div>
         </div>
+
+        <!-- Left Sidebar Resize Handle -->
+        <div class="left-sidebar-resize" id="leftSidebarResize"></div>
         </div><!-- End of left-sidebar -->
 
         <div class="chart-container" id="chartContainer">
@@ -1124,7 +1153,12 @@
             tradeWebSocket: null,
             tradeBuffer: new Map(),  // Buffer for real-time trades
             wsReconnectAttempts: 0,
-            wsMaxReconnectAttempts: 5
+            wsMaxReconnectAttempts: 5,
+            leftSidebarResize: {
+                isResizing: false,
+                startX: 0,
+                startWidth: 0
+            }
         };
 
         // Initialize
@@ -1132,6 +1166,7 @@
             console.log('Market Sentinel initialized');
             updateStatus('Ready', 'System initialized');
             initializeTradeWebSocket();
+            initLeftSidebarResize();
 
             // Auto-focus search bar on page load
             const searchInput = document.getElementById('symbolSearch');
@@ -1365,7 +1400,59 @@
             chartData.lastPrice = tradeData.price;
         }
 
-        // Search functionality
+        // ========================================
+        // LEFT SIDEBAR RESIZE FUNCTIONALITY
+        // ========================================
+
+        function initLeftSidebarResize() {
+            const leftSidebar = document.querySelector('.left-sidebar');
+            const resizeHandle = document.getElementById('leftSidebarResize');
+
+            if (!leftSidebar || !resizeHandle) {
+                console.warn('Left sidebar or resize handle not found');
+                return;
+            }
+
+            resizeHandle.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                state.leftSidebarResize.isResizing = true;
+                state.leftSidebarResize.startX = e.pageX;
+                state.leftSidebarResize.startWidth = leftSidebar.offsetWidth;
+
+                leftSidebar.classList.add('resizing');
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!state.leftSidebarResize.isResizing) return;
+
+                const diff = e.pageX - state.leftSidebarResize.startX;
+                const newWidth = state.leftSidebarResize.startWidth + diff;
+
+                // Enforce min and max width constraints
+                const minWidth = 500;
+                const maxWidth = 900;
+
+                if (newWidth >= minWidth && newWidth <= maxWidth) {
+                    leftSidebar.style.width = newWidth + 'px';
+                }
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (state.leftSidebarResize.isResizing) {
+                    state.leftSidebarResize.isResizing = false;
+                    leftSidebar.classList.remove('resizing');
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+                }
+            });
+        }
+
+        // ========================================
+        // SEARCH FUNCTIONALITY
+        // ========================================
+
         function handleSearchKeypress(event) {
             if (event.key === 'Enter') {
                 handleSearch();
