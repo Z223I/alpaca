@@ -525,13 +525,14 @@
 
         /* Left Sidebar Container */
         .left-sidebar {
-            width: 400px;
-            min-width: 300px;
-            max-width: 600px;
+            width: 700px;
+            min-width: 500px;
+            max-width: 900px;
             display: flex;
             flex-direction: column;
             border-right: 2px solid var(--border-color);
             overflow: hidden;
+            padding-bottom: 30px; /* Add space at bottom */
         }
 
         /* Watch List Panel */
@@ -713,6 +714,7 @@
             flex-direction: column;
             overflow: hidden;
             min-height: 0;
+            margin-bottom: 20px; /* Add space at bottom so content doesn't go off screen */
         }
 
         .scanner-header {
@@ -735,6 +737,7 @@
             flex: 1;
             overflow-y: auto;
             overflow-x: auto;
+            padding-bottom: 60px; /* Add space at bottom so last rows are visible */
         }
 
         .scanner-table {
@@ -757,6 +760,28 @@
             color: var(--text-secondary);
             border-bottom: 2px solid var(--border-color);
             white-space: nowrap;
+            position: relative;
+            user-select: none;
+        }
+
+        /* Column resize handle */
+        .scanner-table th .resize-handle {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 5px;
+            height: 100%;
+            cursor: col-resize;
+            background-color: transparent;
+            z-index: 1;
+        }
+
+        .scanner-table th .resize-handle:hover {
+            background-color: var(--accent-blue);
+        }
+
+        .scanner-table th.resizing {
+            border-right: 2px solid var(--accent-blue);
         }
 
         .scanner-table th.source-col {
@@ -1045,12 +1070,12 @@
                 <table class="scanner-table">
                     <thead>
                         <tr>
-                            <th>Symbol</th>
-                            <th class="source-col">Source</th>
-                            <th class="time-col">Time</th>
-                            <th class="gain-col">Gain</th>
-                            <th class="volume-col">Volume</th>
-                            <th>Text</th>
+                            <th>Symbol<div class="resize-handle"></div></th>
+                            <th class="source-col">Source<div class="resize-handle"></div></th>
+                            <th class="time-col">Time<div class="resize-handle"></div></th>
+                            <th class="gain-col">Gain<div class="resize-handle"></div></th>
+                            <th class="volume-col">Volume<div class="resize-handle"></div></th>
+                            <th>Text<div class="resize-handle"></div></th>
                         </tr>
                     </thead>
                     <tbody id="scannerBody">
@@ -2999,7 +3024,13 @@
         // Scanner state
         const scannerState = {
             alerts: [],
-            refreshInterval: null
+            refreshInterval: null,
+            resizing: {
+                isResizing: false,
+                currentColumn: null,
+                startX: 0,
+                startWidth: 0
+            }
         };
 
         // Initialize scanner on page load
@@ -3007,6 +3038,8 @@
             loadScanner();
             // Refresh scanner every 30 seconds
             scannerState.refreshInterval = setInterval(loadScanner, 30000);
+            // Initialize column resizing
+            initScannerColumnResize();
         });
 
         // Load scanner alerts from API
@@ -3095,6 +3128,60 @@
 
             // Open chart
             handleSearch();
+        }
+
+        // Initialize scanner column resizing
+        function initScannerColumnResize() {
+            const table = document.querySelector('.scanner-table');
+            if (!table) return;
+
+            const headers = table.querySelectorAll('th');
+
+            headers.forEach((header, index) => {
+                const resizeHandle = header.querySelector('.resize-handle');
+                if (!resizeHandle) return;
+
+                resizeHandle.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    scannerState.resizing.isResizing = true;
+                    scannerState.resizing.currentColumn = header;
+                    scannerState.resizing.startX = e.pageX;
+                    scannerState.resizing.startWidth = header.offsetWidth;
+
+                    header.classList.add('resizing');
+                    document.body.style.cursor = 'col-resize';
+                    document.body.style.userSelect = 'none';
+                });
+            });
+
+            // Global mouse move handler
+            document.addEventListener('mousemove', (e) => {
+                if (!scannerState.resizing.isResizing) return;
+
+                const diff = e.pageX - scannerState.resizing.startX;
+                const newWidth = scannerState.resizing.startWidth + diff;
+
+                // Set minimum width of 50px
+                if (newWidth >= 50) {
+                    scannerState.resizing.currentColumn.style.width = newWidth + 'px';
+                    scannerState.resizing.currentColumn.style.minWidth = newWidth + 'px';
+                }
+            });
+
+            // Global mouse up handler
+            document.addEventListener('mouseup', () => {
+                if (scannerState.resizing.isResizing) {
+                    scannerState.resizing.isResizing = false;
+                    if (scannerState.resizing.currentColumn) {
+                        scannerState.resizing.currentColumn.classList.remove('resizing');
+                    }
+                    scannerState.resizing.currentColumn = null;
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+                }
+            });
         }
 
         // ============================================================================
