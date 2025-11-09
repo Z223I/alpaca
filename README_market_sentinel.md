@@ -41,6 +41,12 @@ Market Sentinel is a real-time stock market monitoring web application designed 
   - Add symbols manually via input box
   - Delete symbols with one-click
   - Auto-refreshes every 30 seconds from momentum_alerts.py symbol list
+- 🔍 **Scanner Panel**: Second left-side panel showing recent Momentum Alerts
+  - Displays last 50 momentum alerts sorted by time (newest first)
+  - Columns: Symbol, Source, Time (ET), Gain, Volume, Text
+  - Shows momentum indicators with emoji status lights
+  - Double-click alerts to open charts
+  - Auto-refreshes every 30 seconds from momentum_alerts_sent directory
 - 📑 **Tabbed Interface**: Multiple charts in separate tabs with close buttons
 - 📊 **Candlestick Charts**: Professional-grade financial charts
 - ⚙️ **Chart Controls**:
@@ -289,6 +295,36 @@ pip3 install alpaca-trade-api flask pandas pytz
 - [Flask CGI Deployment](https://flask.palletsprojects.com/en/2.3.x/deploying/cgi/)
 
 ## Changelog
+
+### 2025-11-09 - Scanner Panel Implementation
+- **FEATURE**: Implemented comprehensive Scanner panel below the Watch List
+  - Displays recent Momentum Alerts from the momentum_alerts.py system
+  - Columns: Symbol, Source, Time (ET), Gain, Volume, Text
+  - Shows last 50 momentum alerts sorted by timestamp (newest first)
+  - Source is always "Momentum" for momentum alerts
+  - Time displays in HH:MM:SS ET format
+  - Gain shows percent gain since market open with color coding (green/red)
+  - Volume displays formatted with commas
+  - Text field shows momentum indicators: Momentum, Short, Squeeze, Halt status with emoji indicators
+  - Double-click any row to open a chart for that symbol
+  - Auto-refreshes every 30 seconds
+- **BACKEND**: Created Scanner API endpoint
+  - New file: `cgi-bin/api/scanner_api.py`
+  - CGI-compatible Python script for GoDaddy hosting
+  - Reads JSON files from `historical_data/{YYYY-MM-DD}/momentum_alerts_sent/bullish/`
+  - Returns last 50 alerts in JSON format
+  - Parses momentum indicator emojis and formats data for web display
+- **UI**: Professional scanner styling with dark theme
+  - Sticky header for table scrolling
+  - Hover effects for alert rows
+  - Color-coded gain values (green for positive, red for negative)
+  - Responsive design matching Watch List panel
+  - Clean tabular layout with proper column widths
+- **INTEGRATION**: Scanner panel integrated with existing Market Sentinel features
+  - Double-click to open charts works seamlessly
+  - Polling mechanism similar to Watch List
+  - Error handling with user-friendly messages
+  - Console logging for debugging
 
 ### 2025-11-02 - Timezone Display Clarification
 - **UI**: Added Eastern Time (ET) indicator to chart controls

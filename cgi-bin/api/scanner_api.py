@@ -1,0 +1,155 @@
+#!/home/wilsonb/miniconda3/envs/alpaca/bin/python
+"""
+Scanner API Endpoint
+
+Provides REST API for retrieving recent Momentum Alerts for the Market Sentinel Scanner panel.
+Reads JSON files from the momentum_alerts_sent directory.
+
+Usage:
+    GET /api/scanner - Returns recent momentum alerts
+
+GoDaddy CGI compatible.
+"""
+
+import json
+import os
+import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List
+
+# Add project root to path for imports
+# Resolve symlinks to get the actual repository path
+script_path = Path(__file__).resolve()
+project_root = script_path.parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+import pytz
+
+
+def get_momentum_alerts() -> List[Dict]:
+    """
+    Load recent momentum alerts from the sent directory.
+
+    Reads from:
+    historical_data/{YYYY-MM-DD}/momentum_alerts_sent/bullish/alert_*.json
+
+    Returns:
+        List of dictionaries with fields:
+        - symbol: Stock symbol
+        - source: "Momentum"
+        - time: Time in ET (HH:MM:SS)
+        - gain: Percent gain since market open
+        - volume: Current volume
+        - text: Combined text with momentum indicators
+        - timestamp: ISO timestamp for sorting
+    """
+    et_tz = pytz.timezone('US/Eastern')
+    today = datetime.now(et_tz).strftime('%Y-%m-%d')
+
+    # Directory path for momentum alerts sent
+    alerts_dir = Path(project_root) / "historical_data" / today / "momentum_alerts_sent" / "bullish"
+
+    alerts_list = []
+
+    # Check if directory exists
+    if not alerts_dir.exists():
+        print(f"Alerts directory not found: {alerts_dir}", file=sys.stderr)
+        return alerts_list
+
+    # Find all JSON alert files
+    alert_files = sorted(alerts_dir.glob('alert_*.json'), key=lambda x: x.stat().st_mtime, reverse=True)
+
+    # Limit to last 50 alerts
+    alert_files = alert_files[:50]
+
+    print(f"Found {len(alert_files)} alert files", file=sys.stderr)
+
+    for alert_file in alert_files:
+        try:
+            with open(alert_file, 'r') as f:
+                alert_data = json.load(f)
+
+            # Parse timestamp
+            timestamp_str = alert_data.get('timestamp', '')
+            if timestamp_str:
+                # Parse ISO timestamp with timezone
+                timestamp_dt = datetime.fromisoformat(timestamp_str)
+                # Ensure it's in ET
+                if timestamp_dt.tzinfo is None:
+                    timestamp_dt = et_tz.localize(timestamp_dt)
+                else:
+                    timestamp_dt = timestamp_dt.astimezone(et_tz)
+                time_str = timestamp_dt.strftime('%H:%M:%S')
+            else:
+                time_str = "N/A"
+
+            # Extract data
+            symbol = alert_data.get('symbol', 'N/A')
+            gain = alert_data.get('percent_gain_since_market_open', 0)
+            volume = alert_data.get('current_volume', 0)
+
+            # Build text field from momentum indicators
+            momentum_emoji = alert_data.get('momentum_emoji', '')
+            momentum_short_emoji = alert_data.get('momentum_short_emoji', '')
+            squeeze_emoji = alert_data.get('squeeze_emoji', '')
+            halt_emoji = alert_data.get('halt_emoji', '')
+
+            text_parts = []
+            text_parts.append(f"Momentum {momentum_emoji}")
+            text_parts.append(f"Short {momentum_short_emoji}")
+            text_parts.append(f"Squeeze {squeeze_emoji}")
+            text_parts.append(f"Halt {halt_emoji}")
+            text = " | ".join(text_parts)
+
+            alert_obj = {
+                'symbol': symbol,
+                'source': 'Momentum',
+                'time': time_str,
+                'gain': gain,
+                'volume': volume,
+                'text': text,
+                'timestamp': timestamp_str  # For sorting
+            }
+
+            alerts_list.append(alert_obj)
+
+        except Exception as e:
+            print(f"Error reading alert file {alert_file}: {e}", file=sys.stderr)
+            continue
+
+    # Sort by timestamp descending (newest first)
+    alerts_list.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+
+    return alerts_list
+
+
+def main():
+    """Main CGI handler."""
+    # Print CGI headers
+    print("Content-Type: application/json")
+    print("Access-Control-Allow-Origin: *")
+    print("")  # End of headers
+
+    try:
+        alerts = get_momentum_alerts()
+
+        response = {
+            'success': True,
+            'count': len(alerts),
+            'data': alerts
+        }
+
+        print(json.dumps(response, indent=2))
+
+    except Exception as e:
+        error_response = {
+            'success': False,
+            'error': str(e)
+        }
+        print(json.dumps(error_response, indent=2))
+        print(f"Error in scanner_api: {e}", file=sys.stderr)
+
+
+if __name__ == '__main__':
+    main()

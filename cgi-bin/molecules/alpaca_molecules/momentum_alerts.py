@@ -135,7 +135,7 @@ class MomentumAlertsSystem:
         self.startup_processes = {}  # Track running startup scripts
 
         # Debug mode - send random alerts for testing
-        self.debug_mode = True  # Set to False to disable debug alerts
+        self.debug_mode = False  # Set to False to disable debug alerts
         self.debug_symbols = ['AAPL', 'TSLA', 'NVDA', 'AMD', 'GOOGL', 'MSFT', 'AMZN', 'META']
         self.last_debug_alert_time = None
 

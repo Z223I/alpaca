@@ -7,8 +7,6 @@ You will be using Python and Flask to be compatible with GoDaddy websites.  I wi
 
 ## Mid Level Requirements
 
-Create ./public_html/index.html to be the "Market Sentinel" web interface.
-
 Use ONLY standard GoDaddy directories:
 
 - public_html/
@@ -51,5 +49,26 @@ Test.
 
 ## Low Level Requirements
 
-Update public_html/index.html: Dig deep.  The Watch List is to be updated periodically.  Increase that period to two minutes for testing.  It should be returning symbols from three different sources, i.e. Oracle list, volume surge, and top gainers.  I am only seeing stock symbols from the Oracle list.
+### Update public_html/index.html
+
+#### Scanner Panel
+
+Add "Scanner" panel below the Watch List panel
+
+Columns:
+Source
+Time (Always ET)
+Gain
+Volume
+Text
+
+#### Use Momentum Alerts
+
+Populate the Scanner Panel at the top for Momentum Alerts.  Check for the trigger of the popup window and use the trigger.  It is probably the creation of a momentum alert sent file.
+
+Set Source = "Momentum"
+
+Populate Time, Gain, and Volume from the Momentum alert.
+
+Populate the "Text" field with "Momentum", "Momentum Short", "Squeezing" and "Halt Status"
 

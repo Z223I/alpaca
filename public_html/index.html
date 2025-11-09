@@ -523,17 +523,26 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* Watch List Panel */
-        .watch-list-panel {
+        /* Left Sidebar Container */
+        .left-sidebar {
             width: 400px;
             min-width: 300px;
             max-width: 600px;
-            max-height: calc(100vh - 150px);
-            background-color: var(--bg-secondary);
+            display: flex;
+            flex-direction: column;
             border-right: 2px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        /* Watch List Panel */
+        .watch-list-panel {
+            flex: 1;
+            background-color: var(--bg-secondary);
+            border-bottom: 2px solid var(--border-color);
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            min-height: 0;
         }
 
         .watch-list-header {
@@ -696,6 +705,141 @@
             color: var(--text-secondary);
         }
 
+        /* Scanner Panel */
+        .scanner-panel {
+            flex: 1;
+            background-color: var(--bg-secondary);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        .scanner-header {
+            background-color: var(--bg-tertiary);
+            padding: 15px 20px;
+            border-bottom: 2px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .scanner-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--accent-green);
+            margin: 0;
+        }
+
+        .scanner-table-container {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: auto;
+        }
+
+        .scanner-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .scanner-table thead {
+            position: sticky;
+            top: 0;
+            background-color: var(--bg-tertiary);
+            z-index: 10;
+        }
+
+        .scanner-table th {
+            padding: 12px 10px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            border-bottom: 2px solid var(--border-color);
+            white-space: nowrap;
+        }
+
+        .scanner-table th.source-col {
+            text-align: center;
+            width: 80px;
+        }
+
+        .scanner-table th.time-col {
+            width: 80px;
+        }
+
+        .scanner-table th.gain-col {
+            text-align: right;
+            width: 70px;
+        }
+
+        .scanner-table th.volume-col {
+            text-align: right;
+            width: 90px;
+        }
+
+        .scanner-table tbody tr {
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .scanner-table tbody tr:hover {
+            background-color: var(--bg-tertiary);
+        }
+
+        .scanner-table td {
+            padding: 10px;
+            font-size: 14px;
+        }
+
+        .scanner-table td.symbol-cell {
+            font-weight: 600;
+            color: var(--accent-blue);
+        }
+
+        .scanner-table td.source-cell {
+            text-align: center;
+            font-weight: 600;
+            color: var(--accent-green);
+        }
+
+        .scanner-table td.time-cell {
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .scanner-table td.gain-cell {
+            text-align: right;
+            font-weight: 600;
+        }
+
+        .scanner-table td.gain-cell.positive {
+            color: var(--accent-green);
+        }
+
+        .scanner-table td.gain-cell.negative {
+            color: var(--accent-red);
+        }
+
+        .scanner-table td.volume-cell {
+            text-align: right;
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+
+        .scanner-table td.text-cell {
+            font-size: 11px;
+            color: var(--text-secondary);
+            max-width: 200px;
+        }
+
+        .scanner-empty {
+            padding: 40px 20px;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
         /* Welcome Message */
         .welcome-message {
             text-align: center;
@@ -847,8 +991,10 @@
 
     <!-- Main Container -->
     <div class="main-container">
-        <!-- Watch List Panel -->
-        <div class="watch-list-panel">
+        <!-- Left Sidebar: Watch List + Scanner -->
+        <div class="left-sidebar">
+            <!-- Watch List Panel -->
+            <div class="watch-list-panel">
             <div class="watch-list-header">
                 <h2>📋 Watch List</h2>
             </div>
@@ -887,6 +1033,36 @@
                 </table>
             </div>
         </div>
+
+        <!-- Scanner Panel -->
+        <div class="scanner-panel">
+            <div class="scanner-header">
+                <h2>🔍 Scanner</h2>
+            </div>
+
+            <!-- Scanner Table -->
+            <div class="scanner-table-container">
+                <table class="scanner-table">
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th class="source-col">Source</th>
+                            <th class="time-col">Time</th>
+                            <th class="gain-col">Gain</th>
+                            <th class="volume-col">Volume</th>
+                            <th>Text</th>
+                        </tr>
+                    </thead>
+                    <tbody id="scannerBody">
+                        <!-- Alerts will be populated here -->
+                        <tr class="scanner-empty">
+                            <td colspan="6">Loading scanner...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        </div><!-- End of left-sidebar -->
 
         <div class="chart-container" id="chartContainer">
             <!-- Welcome Message (shown when no charts open) -->
@@ -2814,6 +2990,111 @@
             renderWatchList();
 
             console.log(`Deleted ${symbol} from watch list (manual: ${watchListState.manualSymbols.size}, deleted: ${watchListState.deletedSymbols.size})`);
+        }
+
+        // ========================================
+        // SCANNER FUNCTIONALITY
+        // ========================================
+
+        // Scanner state
+        const scannerState = {
+            alerts: [],
+            refreshInterval: null
+        };
+
+        // Initialize scanner on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadScanner();
+            // Refresh scanner every 30 seconds
+            scannerState.refreshInterval = setInterval(loadScanner, 30000);
+        });
+
+        // Load scanner alerts from API
+        async function loadScanner() {
+            try {
+                console.log('Loading scanner alerts from API...');
+                const response = await fetch('cgi-bin/api/scanner_api.py');
+                console.log('Scanner API response status:', response.status);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log('Scanner data received:', data);
+
+                if (data.success) {
+                    scannerState.alerts = data.data;
+                    console.log(`Loaded ${scannerState.alerts.length} momentum alerts`);
+                    renderScanner();
+                } else {
+                    console.error('Failed to load scanner:', data.error);
+                    showScannerError(`Failed to load scanner: ${data.error || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.error('Error loading scanner:', error);
+                showScannerError(`Error loading scanner: ${error.message}`);
+            }
+        }
+
+        // Render scanner table
+        function renderScanner() {
+            const tbody = document.getElementById('scannerBody');
+
+            if (!scannerState.alerts || scannerState.alerts.length === 0) {
+                tbody.innerHTML = `
+                    <tr class="scanner-empty">
+                        <td colspan="6">No momentum alerts</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = scannerState.alerts.map(alert => {
+                // Format gain with + sign for positive values
+                const gainStr = alert.gain >= 0 ? `+${alert.gain.toFixed(2)}%` : `${alert.gain.toFixed(2)}%`;
+                const gainClass = alert.gain >= 0 ? 'positive' : 'negative';
+
+                // Format volume with commas
+                const volumeStr = alert.volume.toLocaleString();
+
+                return `
+                    <tr ondblclick="openChartFromScanner('${alert.symbol}')">
+                        <td class="symbol-cell">${alert.symbol}</td>
+                        <td class="source-cell">${alert.source}</td>
+                        <td class="time-cell">${alert.time}</td>
+                        <td class="gain-cell ${gainClass}">${gainStr}</td>
+                        <td class="volume-cell">${volumeStr}</td>
+                        <td class="text-cell">${alert.text}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Show scanner error
+        function showScannerError(message) {
+            const tbody = document.getElementById('scannerBody');
+            tbody.innerHTML = `
+                <tr class="scanner-empty">
+                    <td colspan="6" style="color: var(--accent-red);">${message}</td>
+                </tr>
+            `;
+        }
+
+        // Open chart from scanner (double-click)
+        function openChartFromScanner(symbol) {
+            if (!symbol) return;
+
+            console.log(`Opening chart for ${symbol} from scanner`);
+
+            // Set search input value
+            const searchInput = document.getElementById('symbolSearch');
+            if (searchInput) {
+                searchInput.value = symbol.toUpperCase();
+            }
+
+            // Open chart
+            handleSearch();
         }
 
         // ============================================================================
