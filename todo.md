@@ -207,10 +207,14 @@ Real time charts. Add a bar for the ratio of selling versus buying. Buying to th
 
 - [ ] Create MACD alerts.  Add that to momentum alerts and then use or.  Only use if in the top three or four top gainers. Otherwise there will be too much noise.  It’ll be necessary to store the number for the top gainer.  Look for the MACD atom. Include the number of consecutive green bars in the alert.  Once on the list always on the list until the program is restarted. Do not include symbols that end in a W.
 
+## Time and Sales
+
+- [ ] Off by one hour
+
 ## Momentum Alerts Timing
 
-- [ ] Review cgi-bin/molecules/alpaca_molecules/momentum_alerts.py. What scripts is it running? What are the timing of the script? and what are the args?
-- [ ] Update cgi-bin/molecules/alpaca_molecules/momentum_alerts.py. Run an additional script
+- [X] Review cgi-bin/molecules/alpaca_molecules/momentum_alerts.py. What scripts is it running? What are the timing of the script? and what are the args?
+- [X] Update cgi-bin/molecules/alpaca_molecules/momentum_alerts.py. Run an additional script
 
 ```python
 premarket_script = os.path.join(project_root, 'code', 'premarket_top_gainers.py')
