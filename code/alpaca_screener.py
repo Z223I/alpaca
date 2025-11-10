@@ -636,11 +636,13 @@ class AlpacaScreener:
         if not results:
             print("No results to export")
             return
-        
-        # Auto-create directory structure for historical_data/YYYY-MM-DD/scanner/
+
+        # Auto-create directory structure for historical_data/YYYY-MM-DD/{subdirectory}/
+        # Use volume_surge for relative_volume files, scanner for symbol_list files
         if not filename.startswith('/'):
             today = datetime.now().strftime('%Y-%m-%d')
-            directory = f"./historical_data/{today}/scanner"
+            subdirectory = "volume_surge" if "relative_volume" in filename else "scanner"
+            directory = f"./historical_data/{today}/{subdirectory}"
             os.makedirs(directory, exist_ok=True)
             if not filename.startswith(directory):
                 filename = os.path.join(directory, os.path.basename(filename))
@@ -679,11 +681,13 @@ class AlpacaScreener:
         if not results:
             print("No results to export")
             return
-        
-        # Auto-create directory structure for historical_data/YYYY-MM-DD/scanner/
+
+        # Auto-create directory structure for historical_data/YYYY-MM-DD/{subdirectory}/
+        # Use volume_surge for relative_volume files, scanner for symbol_list files
         if not filename.startswith('/'):
             today = datetime.now().strftime('%Y-%m-%d')
-            directory = f"./historical_data/{today}/scanner"
+            subdirectory = "volume_surge" if "relative_volume" in filename else "scanner"
+            directory = f"./historical_data/{today}/{subdirectory}"
             os.makedirs(directory, exist_ok=True)
             if not filename.startswith(directory):
                 filename = os.path.join(directory, os.path.basename(filename))

@@ -2,17 +2,34 @@
 """
 Momentum Alerts System
 
-This system monitors stocks from the market open top gainers CSV and generates momentum alerts
-based on VWAP and EMA9 criteria. It follows the specification in specs/momentum_alert.md.
+This system monitors stocks from multiple sources (market open gainers, premarket gainers,
+volume surge, Oracle data) and generates momentum alerts based on VWAP and EMA9 criteria.
+It follows the specification in specs/momentum_alert.md.
 
 Process:
-1. Startup: Run market_open_top_gainers.py starting at 9:40 ET, then every 20 minutes continuously
+1. Premarket Scanning: Run premarket_top_gainers.py from 04:00 to 20:00 ET every 20 minutes
+   - Runs on separate CPU core (core 1) using taskset
+   - Generates top_gainers_nasdaq_amex.csv in ./historical_data/{YYYY-MM-DD}/market/
+   - Monitors premarket top gainers continuously
+   - Runs every day including weekends for continuous data collection
+2. Market Open Scanning: Run market_open_top_gainers.py starting at 9:40 ET, every 20 minutes
+   - Generates gainers_nasdaq_amex.csv
    - Runs every day including weekends for continuous data collection
    - Automatically reschedules after each run
-2. Monitor: Watch for CSV file creation in ./historical_data/{YYYY-MM-DD}/market/gainers_nasdaq_amex.csv
-3. Stock monitoring: Every minute, collect 30 minutes of 1-minute candlesticks for each stock
-4. Momentum alerts: Check stocks above VWAP, above EMA9, and pass urgency filter
-5. Integration: Send alerts to all users with momentum_alerts=true via Telegram
+3. Volume Surge: Run volume surge scanner once at startup
+   - Generates relative_volume_nasdaq_amex.csv
+4. Data Integration: Load symbols from all sources (premarket, market open, volume surge, Oracle)
+   - Track source with boolean fields: from_premarket, from_gainers, from_volume_surge, oracle
+   - Merge and deduplicate symbols across all sources
+5. Stock Monitoring: Every minute, collect 30 minutes of 1-minute candlesticks for each stock
+6. Momentum Alerts: Check stocks above VWAP, above EMA9, and pass urgency filter
+7. Integration: Send alerts to all users with momentum_alerts=true via Telegram
+
+CSV Files Generated:
+- ./historical_data/{YYYY-MM-DD}/market/top_gainers_nasdaq_amex.csv (premarket)
+- ./historical_data/{YYYY-MM-DD}/market/gainers_nasdaq_amex.csv (market open)
+- ./historical_data/{YYYY-MM-DD}/volume_surge/relative_volume_nasdaq_amex.csv
+- ./historical_data/{YYYY-MM-DD}/scanner/symbol_list.csv
 
 Usage:
     python3 code/momentum_alerts.py
@@ -130,9 +147,15 @@ class MomentumAlertsSystem:
         self.scanner_dir.mkdir(parents=True, exist_ok=True)
         self.symbol_list_csv_path = self.scanner_dir / "symbol_list.csv"
 
+        # Premarket data directory
+        self.premarket_csv_path = self.historical_data_dir / "top_gainers_nasdaq_amex.csv"
+        self.premarket_schedule = []  # List of scheduled premarket times
+        self.premarket_runs_completed = 0
+
         # State
         self.running = False
         self.startup_processes = {}  # Track running startup scripts
+        self.premarket_processes = {}  # Track running premarket scripts
 
         # Debug mode - send random alerts for testing
         self.debug_mode = False  # Set to False to disable debug alerts
@@ -230,6 +253,55 @@ class MomentumAlertsSystem:
         self.logger.info(f"📅 Next startup script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
         self.logger.info(f"⏰ Runs every 20 minutes starting at 9:40 ET daily (including weekends)")
 
+    def _schedule_premarket_runs(self):
+        """
+        Schedule the premarket script to run from 04:00 to 20:00 ET, every 20 minutes.
+
+        Runs every day (including weekends) for continuous data collection.
+        Simple approach: Calculate next run time based on current time.
+        """
+        current_time = datetime.now(self.et_tz)
+
+        # Calculate next run time from 04:00 to 20:00 ET, every 20 minutes
+        # Base time is 04:00 ET (hour=4, minute=0)
+
+        # Get minutes since midnight
+        current_minutes_since_midnight = current_time.hour * 60 + current_time.minute
+
+        # First run at 04:00 ET = 240 minutes since midnight
+        first_run_minutes = 4 * 60  # 240 minutes
+
+        # Last run at 20:00 ET = 1200 minutes since midnight
+        last_run_minutes = 20 * 60  # 1200 minutes
+
+        # If before 04:00 today, schedule for 04:00 today
+        if current_minutes_since_midnight < first_run_minutes:
+            next_run = current_time.replace(hour=4, minute=0, second=0, microsecond=0)
+        elif current_minutes_since_midnight >= last_run_minutes:
+            # After 20:00 today, schedule for 04:00 tomorrow
+            next_run = (current_time + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
+        else:
+            # Between 04:00 and 20:00 - calculate how many 20-minute intervals have passed since 04:00 today
+            minutes_since_0400 = current_minutes_since_midnight - first_run_minutes
+            intervals_passed = minutes_since_0400 // 20
+
+            # Next run is the next 20-minute interval
+            next_interval_minutes = first_run_minutes + ((intervals_passed + 1) * 20)
+
+            # If we've gone past 20:00, schedule for 04:00 tomorrow
+            if next_interval_minutes >= last_run_minutes:
+                next_run = (current_time + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
+            else:
+                next_run_hour = next_interval_minutes // 60
+                next_run_minute = next_interval_minutes % 60
+                next_run = current_time.replace(hour=next_run_hour, minute=next_run_minute, second=0, microsecond=0)
+
+        # Store the next scheduled run
+        self.premarket_schedule = [next_run]
+
+        self.logger.info(f"🌅 Next premarket script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
+        self.logger.info(f"⏰ Runs every 20 minutes from 04:00 to 20:00 ET daily (including weekends)")
+
     async def _run_startup_script(self) -> bool:
         """
         Run the market_open_top_gainers.py script.
@@ -257,13 +329,18 @@ class MomentumAlertsSystem:
             # Expand the tilde in the Python path
             cmd[0] = os.path.expanduser(cmd[0])
 
+            # Create environment with PYTHONPATH set to project root
+            env = os.environ.copy()
+            env['PYTHONPATH'] = project_root
+
             # Create process with logging
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
-                cwd=str(Path.cwd())
+                cwd=str(Path.cwd()),
+                env=env
             )
 
             # Store process for monitoring
@@ -281,6 +358,62 @@ class MomentumAlertsSystem:
 
         except Exception as e:
             self.logger.error(f"❌ Failed to start startup script: {e}")
+            return False
+
+    async def _run_premarket_script(self) -> bool:
+        """
+        Run the premarket_top_gainers.py script on a separate CPU core.
+
+        Returns:
+            True if script ran successfully, False otherwise
+        """
+        self.logger.info("🌅 Running premarket script: premarket_top_gainers.py")
+
+        script_path = Path("code") / "premarket_top_gainers.py"
+        cmd = [
+            "taskset", "-c", "1",  # Run on CPU core 1 (separate from main process)
+            os.path.expanduser("~/miniconda3/envs/alpaca/bin/python"),
+            str(script_path),
+            "--exchanges", "NASDAQ", "AMEX",
+            "--max-symbols", "7000",
+            "--min-price", "0.75",
+            "--max-price", "40.00",
+            "--min-volume", "250000",
+            "--top-gainers", "40",
+            "--export-csv", "top_gainers_nasdaq_amex.csv",
+            "--verbose"
+        ]
+
+        try:
+            # Create environment with PYTHONPATH set to project root
+            env = os.environ.copy()
+            env['PYTHONPATH'] = project_root
+
+            # Create process with logging
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                cwd=str(Path.cwd()),
+                env=env
+            )
+
+            # Store process for monitoring
+            process_id = f"premarket_{self.premarket_runs_completed + 1}"
+            self.premarket_processes[process_id] = {
+                'process': process,
+                'start_time': datetime.now(self.et_tz),
+                'cmd': ' '.join(cmd)
+            }
+
+            self.logger.info(f"🌅 Started premarket script on CPU core 1 (PID: {process.pid})")
+            self.logger.info("🕒 Expected completion: up to 20 minutes")
+
+            return True
+
+        except Exception as e:
+            self.logger.error(f"❌ Failed to start premarket script: {e}")
             return False
 
     def _check_startup_schedule(self):
@@ -324,6 +457,52 @@ class MomentumAlertsSystem:
             self.startup_schedule = [next_run]
             self.logger.info(f"⏰ Next startup script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
 
+    def _check_premarket_schedule(self):
+        """
+        Check if it's time to run a premarket script.
+
+        After each run, automatically schedule the next one (every 20 minutes).
+        Only runs between 04:00 and 20:00 ET.
+        """
+        current_time = datetime.now(self.et_tz)
+
+        # Check if we have a scheduled run and it's time to execute
+        if self.premarket_schedule and current_time >= self.premarket_schedule[0]:
+            # Run the script
+            asyncio.create_task(self._run_premarket_script())
+            self.premarket_runs_completed += 1
+
+            # Immediately schedule the next run (20 minutes from now)
+            next_run = current_time + timedelta(minutes=20)
+            # Align to the next 20-minute boundary based on 04:00 start
+            # Round to nearest 20-minute mark: 04:00, 04:20, 04:40, 05:00, etc.
+            minutes_since_midnight = next_run.hour * 60 + next_run.minute
+            first_run_minutes = 4 * 60  # 240 minutes (04:00)
+            last_run_minutes = 20 * 60  # 1200 minutes (20:00)
+
+            if minutes_since_midnight < first_run_minutes:
+                # Before 04:00, schedule for 04:00
+                next_run = next_run.replace(hour=4, minute=0, second=0, microsecond=0)
+            elif minutes_since_midnight >= last_run_minutes:
+                # After 20:00, schedule for 04:00 tomorrow
+                next_run = (next_run + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
+            else:
+                # Between 04:00 and 20:00, round to next 20-minute interval from 04:00
+                minutes_since_0400 = minutes_since_midnight - first_run_minutes
+                intervals_from_0400 = (minutes_since_0400 // 20) + 1
+                next_interval_minutes = first_run_minutes + (intervals_from_0400 * 20)
+
+                if next_interval_minutes >= last_run_minutes:
+                    # Past 20:00, schedule for 04:00 tomorrow
+                    next_run = (next_run + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
+                else:
+                    next_run_hour = next_interval_minutes // 60
+                    next_run_minute = next_interval_minutes % 60
+                    next_run = next_run.replace(hour=next_run_hour, minute=next_run_minute, second=0, microsecond=0)
+
+            self.premarket_schedule = [next_run]
+            self.logger.info(f"🌅 Next premarket script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
+
     async def _check_startup_processes(self):
         """Check the status of running startup processes."""
         completed_processes = []
@@ -364,6 +543,40 @@ class MomentumAlertsSystem:
         # Remove completed processes
         for process_id in completed_processes:
             del self.startup_processes[process_id]
+
+    async def _check_premarket_processes(self):
+        """Check the status of running premarket processes."""
+        completed_processes = []
+
+        for process_id, process_info in self.premarket_processes.items():
+            process = process_info['process']
+
+            if process.poll() is not None:  # Process has completed
+                return_code = process.returncode
+                runtime = datetime.now(self.et_tz) - process_info['start_time']
+
+                if return_code == 0:
+                    self.logger.info(f"✅ Premarket script completed successfully (Runtime: {runtime})")
+                    # Send the generated premarket file to Bruce
+                    await self._send_premarket_file_to_bruce()
+                else:
+                    self.logger.error(f"❌ Premarket script failed with return code {return_code} (Runtime: {runtime})")
+
+                # Log any output
+                try:
+                    stdout, stderr = process.communicate(timeout=1)
+                    if stdout:
+                        self.logger.debug(f"Premarket script output: {stdout[-500:]}")  # Last 500 chars
+                    if stderr:
+                        self.logger.debug(f"Premarket script stderr: {stderr[-500:]}")  # Last 500 chars
+                except Exception:
+                    pass
+
+                completed_processes.append(process_id)
+
+        # Remove completed processes
+        for process_id in completed_processes:
+            del self.premarket_processes[process_id]
 
     async def _send_top_gainers_file_to_bruce(self):
         """
@@ -441,6 +654,82 @@ class MomentumAlertsSystem:
         except Exception as e:
             self.logger.error(f"❌ Error sending top gainers file contents: {e}")
 
+    async def _send_premarket_file_to_bruce(self):
+        """
+        Send the generated premarket file contents to Bruce via Telegram.
+        """
+        try:
+            # Check if the CSV file exists
+            if not self.premarket_csv_path.exists():
+                self.logger.warning(f"⚠️ Premarket file not found: {self.premarket_csv_path}")
+                return
+
+            # Read the CSV file contents
+            try:
+                with open(self.premarket_csv_path, 'r') as f:
+                    file_contents = f.read().strip()
+
+                if not file_contents:
+                    self.logger.warning(f"⚠️ Premarket file is empty: {self.premarket_csv_path}")
+                    return
+
+                # Get file metadata
+                file_time = datetime.fromtimestamp(self.premarket_csv_path.stat().st_mtime, self.et_tz)
+
+                # Count rows (excluding header)
+                lines = file_contents.split('\n')
+                total_rows = len(lines) - 1 if len(lines) > 1 else 0
+
+                # Create message with file contents
+                message_parts = [
+                    "🌅 **PREMARKET TOP GAINERS FILE GENERATED**",
+                    "",
+                    "📁 **File:** `top_gainers_nasdaq_amex.csv`",
+                    f"⏰ **Generated:** {file_time.strftime('%H:%M:%S ET')}",
+                    f"📅 **Date:** {file_time.strftime('%Y-%m-%d')}",
+                    f"📈 **Total Symbols:** {total_rows}",
+                    "",
+                    "📋 **File Contents:**",
+                    "```csv",
+                    file_contents,
+                    "```",
+                    "",
+                    f"📂 **Path:** `{self.premarket_csv_path}`"
+                ]
+
+                message = "\n".join(message_parts)
+
+                if self.test_mode:
+                    self.logger.info(f"[TEST MODE] Premarket file contents: {len(file_contents)} characters")
+                else:
+                    # Send to Bruce
+                    result = self.telegram_poster.send_message_to_user(message, "bruce", urgent=False)
+
+                    if result['success']:
+                        self.logger.info(f"✅ Premarket file contents sent to Bruce ({len(file_contents)} characters)")
+                    else:
+                        errors = result.get('errors', ['Unknown error'])
+                        error_msg = ', '.join(errors) if isinstance(errors, list) else str(errors)
+                        self.logger.error(f"❌ Failed to send premarket file contents to Bruce: {error_msg}")
+
+            except Exception as file_error:
+                self.logger.error(f"❌ Error reading premarket file: {file_error}")
+
+                # Send basic notification even if file reading fails
+                basic_message = (
+                    "🌅 **PREMARKET TOP GAINERS FILE GENERATED**\n\n"
+                    "📁 **File:** `top_gainers_nasdaq_amex.csv`\n"
+                    f"⏰ **Time:** {datetime.now(self.et_tz).strftime('%H:%M:%S ET')}\n"
+                    f"📂 **Path:** `{self.premarket_csv_path}`\n\n"
+                    "⚠️ **Note:** Could not read file contents for sending"
+                )
+
+                if not self.test_mode:
+                    self.telegram_poster.send_message_to_user(basic_message, "bruce", urgent=False)
+
+        except Exception as e:
+            self.logger.error(f"❌ Error sending premarket file contents: {e}")
+
     async def _run_volume_surge_scanner(self) -> bool:
         """
         Run the volume surge scanner once at startup.
@@ -470,13 +759,18 @@ class MomentumAlertsSystem:
             # Expand the tilde in the Python path
             cmd[0] = os.path.expanduser(cmd[0])
 
+            # Create environment with PYTHONPATH set to project root
+            env = os.environ.copy()
+            env['PYTHONPATH'] = project_root
+
             # Create process with logging
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
-                cwd=str(Path.cwd())
+                cwd=str(Path.cwd()),
+                env=env
             )
 
             # Store process for monitoring
@@ -531,6 +825,10 @@ class MomentumAlertsSystem:
             # Expand the tilde in the Python path
             cmd[0] = os.path.expanduser(cmd[0])
 
+            # Create environment with PYTHONPATH set to project root
+            env = os.environ.copy()
+            env['PYTHONPATH'] = project_root
+
             # Run synchronously with timeout
             result = subprocess.run(
                 cmd,
@@ -538,7 +836,8 @@ class MomentumAlertsSystem:
                 stderr=subprocess.STDOUT,
                 text=True,
                 timeout=300,  # 5 minute timeout
-                cwd=str(Path.cwd())
+                cwd=str(Path.cwd()),
+                env=env
             )
 
             if result.returncode == 0:
@@ -849,6 +1148,52 @@ class MomentumAlertsSystem:
         else:
             self.logger.debug(f"📄 Data CSV file not found: {data_csv_path}")
 
+        # Load from premarket CSV file - keep first 40 symbols that don't end in 'W'
+        if self.premarket_csv_path.exists():
+            try:
+                premarket_count = 0
+                premarket_updated_count = 0
+                with open(self.premarket_csv_path, 'r') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        symbol = row.get('symbol', '').strip().upper()
+                        # Filter: must have symbol and not end in 'W'
+                        if symbol and not symbol.endswith('W'):
+                            if symbol in symbols_dict:
+                                # Symbol already exists - mark as from_premarket
+                                symbols_dict[symbol]['from_premarket'] = True
+                                premarket_updated_count += 1
+                            elif premarket_count < 40:  # Only add first 40 new symbols
+                                # Store symbol with premarket price from CSV if available
+                                premarket_price = row.get('premarket_price', None)
+                                symbols_dict[symbol] = {
+                                    'source': 'premarket_csv',
+                                    'market_open_price': float(premarket_price) if premarket_price else None,
+                                    'from_gainers': False,
+                                    'from_volume_surge': False,
+                                    'oracle': False,
+                                    'from_premarket': True
+                                }
+                                premarket_count += 1
+                            else:
+                                continue  # Skip additional symbols beyond first 40 new ones
+
+                self.logger.info(
+                    f"🌅 Added {premarket_count} unique symbols from "
+                    f"premarket CSV (first 40 non-W symbols), updated "
+                    f"{premarket_updated_count} existing: "
+                    f"{self.premarket_csv_path}")
+
+            except Exception as e:
+                self.logger.error(f"❌ Error loading premarket CSV file {self.premarket_csv_path}: {e}")
+        else:
+            self.logger.debug(f"🌅 Premarket CSV file not found: {self.premarket_csv_path}")
+
+        # Initialize from_premarket field for symbols that don't have it
+        for symbol in symbols_dict:
+            if 'from_premarket' not in symbols_dict[symbol]:
+                symbols_dict[symbol]['from_premarket'] = False
+
         # Fetch market open prices for symbols that don't have them
         if symbols_dict and self.historical_client:
             symbols_without_price = [
@@ -968,7 +1313,8 @@ class MomentumAlertsSystem:
                 'oracle': metadata.get('oracle', False),
                 'manual': False,  # Manual additions not yet implemented
                 'top_gainers': metadata.get('from_gainers', False),
-                'surge': metadata.get('from_volume_surge', False)
+                'surge': metadata.get('from_volume_surge', False),
+                'premarket': metadata.get('from_premarket', False)
             }
             symbol_list.append(symbol_info)
 
@@ -1972,8 +2318,15 @@ class MomentumAlertsSystem:
             # Run volume surge scanner once at startup
             await self._run_volume_surge_scanner()
 
+            # Run premarket script immediately to collect premarket data
+            self.logger.info("🌅 Running premarket script immediately to collect fresh data...")
+            await self._run_premarket_script()
+
             # Schedule next startup script runs (will start scheduling from next 20-min interval)
             self._schedule_startup_runs()
+
+            # Schedule premarket script runs (04:00-20:00 ET, every 20 minutes)
+            self._schedule_premarket_runs()
 
             # Start the main monitoring loop
             monitoring_task = asyncio.create_task(self._stock_monitoring_loop())
@@ -1984,8 +2337,14 @@ class MomentumAlertsSystem:
                     # Check startup schedule
                     self._check_startup_schedule()
 
+                    # Check premarket schedule
+                    self._check_premarket_schedule()
+
                     # Check startup processes
                     await self._check_startup_processes()
+
+                    # Check premarket processes
+                    await self._check_premarket_processes()
 
                     # Monitor CSV file
                     self._monitor_csv_file()
@@ -2030,6 +2389,20 @@ class MomentumAlertsSystem:
                         process.kill()
             except Exception as e:
                 self.logger.error(f"❌ Error stopping process {process_id}: {e}")
+
+        # Stop any running premarket processes
+        for process_id, process_info in self.premarket_processes.items():
+            try:
+                process = process_info['process']
+                if process.poll() is None:
+                    self.logger.info(f"🛑 Terminating premarket process {process_id}")
+                    process.terminate()
+                    try:
+                        process.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+            except Exception as e:
+                self.logger.error(f"❌ Error stopping premarket process {process_id}: {e}")
 
         self.logger.info("✅ Momentum Alerts System stopped")
 
