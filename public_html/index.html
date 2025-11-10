@@ -378,14 +378,62 @@
             position: relative;
         }
 
+        /* Chart Resize Handle (between main chart and volume chart) */
+        .chart-resize-handle {
+            width: 100%;
+            height: 8px;
+            cursor: row-resize;
+            background-color: transparent;
+            position: relative;
+            z-index: 100;
+            transition: background-color 0.2s;
+            margin: 5px 0;
+        }
+
+        .chart-resize-handle:hover {
+            background-color: var(--accent-blue);
+        }
+
+        .chart-resize-handle.resizing {
+            background-color: var(--accent-green);
+        }
+
         /* Time and Sales Panel */
         .time-sales-panel {
             width: 300px;
+            min-width: 200px;
+            max-width: 600px;
             background-color: var(--bg-secondary);
             border-left: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            position: relative;
+        }
+
+        /* Time & Sales Resize Handle */
+        .time-sales-resize {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 8px;
+            height: 100%;
+            cursor: col-resize;
+            background-color: transparent;
+            z-index: 1000;
+            transition: background-color 0.2s;
+        }
+
+        .time-sales-resize:hover {
+            background-color: var(--accent-blue);
+        }
+
+        .time-sales-panel.resizing {
+            user-select: none;
+        }
+
+        .time-sales-panel.resizing .time-sales-resize {
+            background-color: var(--accent-green);
         }
 
         .time-sales-header {
@@ -1158,6 +1206,22 @@
                 isResizing: false,
                 startX: 0,
                 startWidth: 0
+            },
+            timeSalesResize: {
+                isResizing: false,
+                currentPanel: null,
+                chartMain: null,
+                startX: 0,
+                startWidth: 0,
+                startChartWidth: 0
+            },
+            chartResize: {
+                isResizing: false,
+                currentMainChart: null,
+                currentVolumeChart: null,
+                startY: 0,
+                startMainHeight: 0,
+                startVolumeHeight: 0
             }
         };
 
@@ -1450,6 +1514,167 @@
         }
 
         // ========================================
+        // TIME & SALES RESIZE FUNCTIONALITY
+        // ========================================
+
+        function initTimeSalesResize(symbol) {
+            const timeSalesPanel = document.getElementById(`time-sales-${symbol}`);
+            const resizeHandle = timeSalesPanel?.querySelector('.time-sales-resize');
+
+            if (!timeSalesPanel || !resizeHandle) {
+                console.warn(`Time & Sales panel or resize handle not found for ${symbol}`);
+                return;
+            }
+
+            resizeHandle.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                // Find the chart-main element (sibling in the chart-display div)
+                const chartDisplay = timeSalesPanel.parentElement;
+                const chartMain = chartDisplay?.querySelector('.chart-main');
+
+                state.timeSalesResize.isResizing = true;
+                state.timeSalesResize.currentPanel = timeSalesPanel;
+                state.timeSalesResize.chartMain = chartMain;
+                state.timeSalesResize.startX = e.pageX;
+                state.timeSalesResize.startWidth = timeSalesPanel.offsetWidth;
+                state.timeSalesResize.startChartWidth = chartMain?.offsetWidth || 0;
+
+                timeSalesPanel.classList.add('resizing');
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+            });
+
+            // Use existing global mousemove handler
+            if (!state.timeSalesResize.mouseMoveAttached) {
+                document.addEventListener('mousemove', (e) => {
+                    if (!state.timeSalesResize.isResizing) return;
+
+                    // Calculate new width (subtract because we're dragging from left edge)
+                    // Dragging left (decreasing pageX) should increase width
+                    // Dragging right (increasing pageX) should decrease width
+                    const diff = state.timeSalesResize.startX - e.pageX;
+                    let newWidth = state.timeSalesResize.startWidth + diff;
+
+                    // Enforce min and max width constraints
+                    const minWidth = 200;
+                    const maxWidth = 600;
+
+                    // Clamp the width
+                    newWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+
+                    // Update Time & Sales panel width
+                    state.timeSalesResize.currentPanel.style.width = newWidth + 'px';
+                    state.timeSalesResize.currentPanel.style.flexShrink = '0';
+
+                    // Update chart-main width (inverse relationship)
+                    if (state.timeSalesResize.chartMain) {
+                        const newChartWidth = state.timeSalesResize.startChartWidth - diff;
+                        state.timeSalesResize.chartMain.style.width = newChartWidth + 'px';
+                        state.timeSalesResize.chartMain.style.flex = 'none';
+                    }
+                });
+
+                document.addEventListener('mouseup', () => {
+                    if (state.timeSalesResize.isResizing) {
+                        state.timeSalesResize.isResizing = false;
+                        if (state.timeSalesResize.currentPanel) {
+                            state.timeSalesResize.currentPanel.classList.remove('resizing');
+                        }
+                        state.timeSalesResize.currentPanel = null;
+                        document.body.style.cursor = '';
+                        document.body.style.userSelect = '';
+                    }
+                });
+
+                state.timeSalesResize.mouseMoveAttached = true;
+            }
+        }
+
+        // ========================================
+        // CHART RESIZE FUNCTIONALITY
+        // ========================================
+
+        function initChartResize(symbol) {
+            const mainChart = document.getElementById(`chart-${symbol}`);
+            const volumeChart = document.getElementById(`volume-${symbol}`);
+            const resizeHandle = document.querySelector(`.chart-resize-handle[data-symbol="${symbol}"]`);
+
+            if (!mainChart || !volumeChart || !resizeHandle) {
+                console.warn(`Chart elements or resize handle not found for ${symbol}`);
+                return;
+            }
+
+            resizeHandle.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                state.chartResize.isResizing = true;
+                state.chartResize.currentMainChart = mainChart;
+                state.chartResize.currentVolumeChart = volumeChart;
+                state.chartResize.startY = e.pageY;
+                state.chartResize.startMainHeight = mainChart.offsetHeight;
+                state.chartResize.startVolumeHeight = volumeChart.offsetHeight;
+
+                resizeHandle.classList.add('resizing');
+                document.body.style.cursor = 'row-resize';
+                document.body.style.userSelect = 'none';
+            });
+
+            // Use existing global mousemove handler
+            if (!state.chartResize.mouseMoveAttached) {
+                document.addEventListener('mousemove', (e) => {
+                    if (!state.chartResize.isResizing) return;
+
+                    const diff = e.pageY - state.chartResize.startY;
+                    const newMainHeight = state.chartResize.startMainHeight + diff;
+                    const newVolumeHeight = state.chartResize.startVolumeHeight - diff;
+
+                    // Enforce minimum heights
+                    const minMainHeight = 300;
+                    const minVolumeHeight = 100;
+
+                    if (newMainHeight >= minMainHeight && newVolumeHeight >= minVolumeHeight) {
+                        state.chartResize.currentMainChart.style.height = newMainHeight + 'px';
+                        state.chartResize.currentMainChart.style.flex = 'none';
+                        state.chartResize.currentVolumeChart.style.height = newVolumeHeight + 'px';
+                        state.chartResize.currentVolumeChart.style.flex = 'none';
+
+                        // Resize the TradingView charts
+                        const chartData = state.charts.get(symbol);
+                        if (chartData && chartData.chart) {
+                            chartData.chart.applyOptions({
+                                width: state.chartResize.currentMainChart.offsetWidth,
+                                height: newMainHeight
+                            });
+                        }
+                        if (chartData && chartData.volumeChart) {
+                            chartData.volumeChart.applyOptions({
+                                width: state.chartResize.currentVolumeChart.offsetWidth,
+                                height: newVolumeHeight
+                            });
+                        }
+                    }
+                });
+
+                document.addEventListener('mouseup', () => {
+                    if (state.chartResize.isResizing) {
+                        state.chartResize.isResizing = false;
+                        const resizeHandles = document.querySelectorAll('.chart-resize-handle');
+                        resizeHandles.forEach(h => h.classList.remove('resizing'));
+                        state.chartResize.currentMainChart = null;
+                        state.chartResize.currentVolumeChart = null;
+                        document.body.style.cursor = '';
+                        document.body.style.userSelect = '';
+                    }
+                });
+
+                state.chartResize.mouseMoveAttached = true;
+            }
+        }
+
+        // ========================================
         // SEARCH FUNCTIONALITY
         // ========================================
 
@@ -1568,6 +1793,10 @@
                                     <div class="legend-indicators" id="legend-indicators-${symbol}"></div>
                                 </div>
                             </div>
+
+                            <!-- Chart Resize Handle -->
+                            <div class="chart-resize-handle" data-symbol="${symbol}"></div>
+
                             <div class="volume-chart" id="volume-${symbol}"></div>
                         </div>
                     </div>
@@ -1575,7 +1804,10 @@
                     <div class="resize-handle"></div>
 
                     <!-- Time and Sales Panel -->
-                    <div class="time-sales-panel">
+                    <div class="time-sales-panel" id="time-sales-${symbol}">
+                        <!-- Resize Handle -->
+                        <div class="time-sales-resize" data-symbol="${symbol}"></div>
+
                         <div class="time-sales-header">
                             <span>Time & Sales - ${symbol}</span>
                             <span id="trades-update-${symbol}" style="font-size: 0.85em; color: var(--text-secondary); margin-left: 10px;"></span>
@@ -1589,6 +1821,12 @@
                 </div>
             `;
             chartContainer.appendChild(panel);
+
+            // Initialize Time & Sales resize for this panel
+            initTimeSalesResize(symbol);
+
+            // Initialize chart resize for this panel
+            initChartResize(symbol);
 
             // Initialize chart data
             state.charts.set(symbol, {
