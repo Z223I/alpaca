@@ -83,7 +83,8 @@ class AlpacaMarketData:
         # Initialize Alpaca API client
         self.api = init_alpaca_client(provider, account_name, account)
 
-        # Initialize historical data client for SIP access
+        # Initialize historical data client
+        # Note: We specify feed='iex' in requests for real-time free data
         from alpaca_config import get_api_credentials
         api_key, secret_key, base_url = get_api_credentials(provider, account_name, account)
         self.hist_client = StockHistoricalDataClient(api_key, secret_key)
@@ -153,12 +154,14 @@ class AlpacaMarketData:
             tf = self.TIMEFRAME_MAP[timeframe]
 
             # Request bar data
+            # Use IEX feed for real-time free data (SIP has 15-min delay on free tier)
             request_params = StockBarsRequest(
                 symbol_or_symbols=symbol,
                 timeframe=tf,
                 start=start_date,
                 end=end_date,
-                limit=10000  # Max bars
+                limit=10000,  # Max bars
+                feed='iex'  # Free real-time data from IEX exchange
             )
 
             bars = self.hist_client.get_stock_bars(request_params)
@@ -332,11 +335,13 @@ class AlpacaMarketData:
             end_date = datetime.now(self.et_tz)
 
             # Request trade data
+            # Use IEX feed for real-time free data (SIP has 15-min delay on free tier)
             request_params = StockTradesRequest(
                 symbol_or_symbols=symbol,
                 start=start_date,
                 end=end_date,
-                limit=limit
+                limit=limit,
+                feed='iex'  # Free real-time data from IEX exchange
             )
 
             trades = self.hist_client.get_stock_trades(request_params)

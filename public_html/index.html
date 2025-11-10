@@ -2806,6 +2806,18 @@
 
             console.log(`Rendering ${trades.length} trades for ${symbol}`);
 
+            // Debug: Log first and last trade timestamps
+            if (trades.length > 0) {
+                const now = new Date();
+                const oldestTrade = new Date(trades[0].timestamp);
+                const newestTrade = new Date(trades[trades.length - 1].timestamp);
+                const ageMinutes = Math.round((now - newestTrade) / 1000 / 60);
+                console.log(`Trade age: Most recent trade is ${ageMinutes} minutes old`);
+                console.log(`Oldest trade: ${oldestTrade.toISOString()}`);
+                console.log(`Newest trade: ${newestTrade.toISOString()}`);
+                console.log(`Current time: ${now.toISOString()}`);
+            }
+
             // Reverse trades so newest are at the top
             const reversedTrades = [...trades].reverse();
 
@@ -2813,8 +2825,9 @@
                 const priceClass = chartData.lastPrice && trade.price > chartData.lastPrice ? 'up' :
                                   chartData.lastPrice && trade.price < chartData.lastPrice ? 'down' : '';
 
-                // Format time in ET timezone
-                const tradeTime = new Date(trade.timestamp).toLocaleTimeString('en-US', {
+                // Format time in ET timezone (backend returns ISO strings with ET offset)
+                const tradeDate = new Date(trade.timestamp);
+                const tradeTime = tradeDate.toLocaleTimeString('en-US', {
                     timeZone: 'America/New_York',
                     hour: '2-digit',
                     minute: '2-digit',
