@@ -1702,7 +1702,6 @@
 
                         <div class="time-sales-header">
                             <span>Time & Sales - ${symbol}</span>
-                            <span id="trades-update-${symbol}" style="font-size: 0.85em; color: var(--text-secondary); margin-left: 10px;"></span>
                         </div>
                         <div class="time-sales-list" id="trades-${symbol}">
                             <div style="text-align: center; color: var(--text-secondary); padding: 20px;">
@@ -2851,17 +2850,6 @@
                 chartData.lastPrice = trades[trades.length - 1].price;
             }
 
-            // Update "Last Updated" timestamp in header
-            const updateTime = document.getElementById(`trades-update-${symbol}`);
-            if (updateTime) {
-                const now = new Date().toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                    hour12: false
-                });
-                updateTime.textContent = `Updated: ${now}`;
-            }
 
             // Auto-scroll to top to show newest trades
             container.scrollTop = 0;

@@ -154,14 +154,14 @@ class AlpacaMarketData:
             tf = self.TIMEFRAME_MAP[timeframe]
 
             # Request bar data
-            # Use IEX feed for real-time free data (SIP has 15-min delay on free tier)
+            # IMPORTANT: Use SIP feed - this account has paid SIP subscription for real-time data
             request_params = StockBarsRequest(
                 symbol_or_symbols=symbol,
                 timeframe=tf,
                 start=start_date,
                 end=end_date,
                 limit=10000,  # Max bars
-                feed='iex'  # Free real-time data from IEX exchange
+                feed='sip'  # Paid SIP feed for comprehensive real-time market data
             )
 
             bars = self.hist_client.get_stock_bars(request_params)
