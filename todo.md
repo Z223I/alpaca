@@ -212,7 +212,11 @@ Real time charts. Add a bar for the ratio of selling versus buying. Buying to th
 - [ ] Watch alpaca-py L1 for best bid/ask; and Time & Sales to see if there is a hidden buyer or seller.  If there are more sales on the T&S at a specific price than on the L1, there is a hidden buyer/seller.
 
 Use alpaca-py to get the latest stock quote with ask_price, bid_size, and ask_size.
-Looking at your code in atoms/api/get_latest_quote.py:5 and atoms/display/print_quote.py:20-21, the current implementation only displays bid_price and ask_price, but the quote object also contains bid_size and ask_size that you can access. NOTE:
+Looking at your code in atoms/api/get_latest_quote.py:5 and atoms/display/print_quote.py:20-21, the current implementation only displays bid_price and ask_price, but the quote object also contains bid_size and ask_size that you can access.
+
+## Top Pre-market Gainers is Wrong
+
+- [ ] 
 
 ## Time and Sales
 

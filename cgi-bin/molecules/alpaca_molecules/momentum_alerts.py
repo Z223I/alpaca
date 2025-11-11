@@ -1052,7 +1052,7 @@ class MomentumAlertsSystem:
         """
         symbols_dict = {}  # Use dict to store symbol metadata
 
-        # Load from gainers CSV file - keep first 40 symbols that don't end in 'W'
+        # Load from gainers CSV file - keep symbols with gain >= 20% that don't end in 'W'
         if self.csv_file_path.exists():
             try:
                 gainers_count = 0
@@ -1060,23 +1060,28 @@ class MomentumAlertsSystem:
                     reader = csv.DictReader(f)
                     for row in reader:
                         symbol = row.get('symbol', '').strip().upper()
-                        # Filter: must have symbol and not end in 'W'
-                        if symbol and not symbol.endswith('W'):
-                            if gainers_count < 40:  # Only keep first 40
-                                # Store symbol with market open price from CSV
-                                market_open_price = row.get('market_open_price', None)
-                                symbols_dict[symbol] = {
-                                    'source': 'gainers_csv',
-                                    'market_open_price': float(market_open_price) if market_open_price else None,
-                                    'from_gainers': True,
-                                    'from_volume_surge': False,
-                                    'oracle': False
-                                }
-                                gainers_count += 1
-                            else:
-                                break  # Stop after first 40
+                        gain_percent = row.get('gain_percent', None)
 
-                self.logger.info(f"📊 Loaded {gainers_count} symbols from gainers CSV (first 40 non-W symbols)")
+                        # Filter: must have symbol, not end in 'W', and gain >= 20%
+                        if symbol and not symbol.endswith('W'):
+                            try:
+                                gain = float(gain_percent) if gain_percent else 0
+                                if gain >= 20.0:  # Only keep stocks with gain >= 20%
+                                    # Store symbol with market open price from CSV
+                                    market_open_price = row.get('market_open_price', None)
+                                    symbols_dict[symbol] = {
+                                        'source': 'gainers_csv',
+                                        'market_open_price': float(market_open_price) if market_open_price else None,
+                                        'from_gainers': True,
+                                        'from_volume_surge': False,
+                                        'oracle': False
+                                    }
+                                    gainers_count += 1
+                            except ValueError:
+                                # Skip if gain_percent cannot be converted to float
+                                continue
+
+                self.logger.info(f"📊 Loaded {gainers_count} symbols from gainers CSV (gain >= 20%, non-W symbols)")
 
             except Exception as e:
                 self.logger.error(f"❌ Error loading gainers CSV file: {e}")
