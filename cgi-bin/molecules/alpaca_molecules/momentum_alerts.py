@@ -158,8 +158,9 @@ class MomentumAlertsSystem:
         self.scanner_dir.mkdir(parents=True, exist_ok=True)
         self.symbol_list_csv_path = self.scanner_dir / "symbol_list.csv"
 
-        # Premarket data directory
-        self.premarket_csv_path = self.historical_data_dir / "top_gainers_nasdaq_amex.csv"
+        # Premarket data directory (premarket script saves to /premarket subdirectory)
+        self.premarket_data_dir = Path("historical_data") / self.today / "premarket"
+        self.premarket_csv_path = self.premarket_data_dir / "top_gainers_nasdaq_amex.csv"
         self.premarket_schedule = []  # List of scheduled premarket times
         self.premarket_runs_completed = 0
 

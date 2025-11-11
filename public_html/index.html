@@ -1019,6 +1019,7 @@
                             <th class="source-col" title="Oracle">🔮</th>
                             <th class="source-col" title="Manual">✏️</th>
                             <th class="source-col" title="Top Gainers">📈</th>
+                            <th class="source-col" title="Premarket">🌅</th>
                             <th class="source-col" title="Volume Surge">🚀</th>
                             <th class="del-col">Del</th>
                         </tr>
@@ -1026,7 +1027,7 @@
                     <tbody id="watchListBody">
                         <!-- Symbols will be populated here -->
                         <tr class="watch-list-empty">
-                            <td colspan="6">Loading watch list...</td>
+                            <td colspan="7">Loading watch list...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -3074,6 +3075,7 @@
                                 oracle: false,
                                 manual: true,
                                 top_gainers: false,
+                                premarket: false,
                                 surge: false
                             });
                         }
@@ -3121,6 +3123,10 @@
                     <td class="source-cell">
                         <span class="source-indicator ${symbol.top_gainers ? 'on' : 'off'}"
                               title="${symbol.top_gainers ? 'Top Gainers: Yes' : 'Top Gainers: No'}"></span>
+                    </td>
+                    <td class="source-cell">
+                        <span class="source-indicator ${symbol.premarket ? 'on' : 'off'}"
+                              title="${symbol.premarket ? 'Premarket: Yes' : 'Premarket: No'}"></span>
                     </td>
                     <td class="source-cell">
                         <span class="source-indicator ${symbol.surge ? 'on' : 'off'}"
@@ -3203,6 +3209,7 @@
                 oracle: false,
                 manual: true,
                 top_gainers: false,
+                premarket: false,
                 surge: false
             };
 

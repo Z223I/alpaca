@@ -59,7 +59,8 @@ def get_watch_list_symbols() -> List[Dict]:
     Reads from:
     1. historical_data/{YYYY-MM-DD}/market/gainers_nasdaq_amex.csv (top gainers)
     2. historical_data/{YYYY-MM-DD}/volume_surge/relative_volume_nasdaq_amex.csv (surge)
-    3. data/{YYYYMMDD}.csv (oracle) - falls back to latest CSV if today's not found
+    3. historical_data/{YYYY-MM-DD}/premarket/top_gainers_nasdaq_amex.csv (premarket)
+    4. data/{YYYYMMDD}.csv (oracle) - falls back to latest CSV if today's not found
 
     Returns:
         List of dictionaries with fields:
@@ -68,6 +69,7 @@ def get_watch_list_symbols() -> List[Dict]:
         - manual: Boolean - manually added (always False for now)
         - top_gainers: Boolean - from top gainers list
         - surge: Boolean - from volume surge list
+        - premarket: Boolean - from premarket gainers list
     """
     et_tz = pytz.timezone('US/Eastern')
     today = datetime.now(et_tz).strftime('%Y-%m-%d')
@@ -76,6 +78,7 @@ def get_watch_list_symbols() -> List[Dict]:
     # File paths
     gainers_csv = Path(project_root) / "historical_data" / today / "market" / "gainers_nasdaq_amex.csv"
     volume_surge_csv = Path(project_root) / "historical_data" / today / "volume_surge" / "relative_volume_nasdaq_amex.csv"
+    premarket_csv = Path(project_root) / "historical_data" / today / "premarket" / "top_gainers_nasdaq_amex.csv"
     oracle_csv = Path(project_root) / "data" / f"{compact_date}.csv"
 
     # Fallback to latest CSV if today's doesn't exist
@@ -102,7 +105,8 @@ def get_watch_list_symbols() -> List[Dict]:
                                 'oracle': False,
                                 'manual': False,
                                 'top_gainers': True,
-                                'surge': False
+                                'surge': False,
+                                'premarket': False
                             }
                             gainers_count += 1
                         else:
@@ -128,13 +132,41 @@ def get_watch_list_symbols() -> List[Dict]:
                                 'oracle': False,
                                 'manual': False,
                                 'top_gainers': False,
-                                'surge': True
+                                'surge': True,
+                                'premarket': False
                             }
                             volume_surge_count += 1
                         else:
                             continue  # Skip additional symbols beyond first 40 new ones
         except Exception as e:
             print(f"Error loading volume surge CSV: {e}", file=sys.stderr)
+
+    # Load from premarket CSV file - keep first 40 symbols that don't end in 'W'
+    if premarket_csv.exists():
+        try:
+            premarket_count = 0
+            with open(premarket_csv, 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    symbol = row.get('symbol', '').strip().upper()
+                    # Filter: must have symbol and not end in 'W'
+                    if symbol and not symbol.endswith('W'):
+                        if symbol in symbols_dict:
+                            # Symbol already exists - update premarket flag
+                            symbols_dict[symbol]['premarket'] = True
+                        elif premarket_count < 40:  # Only add first 40 new symbols
+                            symbols_dict[symbol] = {
+                                'oracle': False,
+                                'manual': False,
+                                'top_gainers': False,
+                                'surge': False,
+                                'premarket': True
+                            }
+                            premarket_count += 1
+                        else:
+                            continue  # Skip additional symbols beyond first 40 new ones
+        except Exception as e:
+            print(f"Error loading premarket CSV: {e}", file=sys.stderr)
 
     # Load from Oracle CSV file - all symbols (no limit)
     if oracle_csv.exists():
@@ -155,7 +187,8 @@ def get_watch_list_symbols() -> List[Dict]:
                                 'oracle': True,
                                 'manual': False,
                                 'top_gainers': False,
-                                'surge': False
+                                'surge': False,
+                                'premarket': False
                             }
         except Exception as e:
             print(f"Error loading oracle CSV {oracle_csv}: {e}", file=sys.stderr)
