@@ -67,6 +67,15 @@ from atoms.api.fundamental_data import FundamentalDataFetcher
 from atoms.alerts.breakout_detector import BreakoutDetector
 from atoms.telegram.telegram_post import TelegramPoster
 from atoms.telegram.user_manager import UserManager
+
+# Import yfinance-based fetcher using direct import to avoid namespace conflict
+import importlib.util
+cgi_api_atoms_dir = os.path.join(cgi_bin_dir, 'api', 'atoms', 'alpaca_api')
+yfinance_fetcher_path = os.path.join(cgi_api_atoms_dir, 'fundamental_data.py')
+spec = importlib.util.spec_from_file_location("yfinance_fundamental_data", yfinance_fetcher_path)
+yfinance_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(yfinance_module)
+YFinanceFetcher = yfinance_module.FundamentalDataFetcher
 from momentum_alerts_config import (
     get_momentum_alerts_config, get_volume_color_emoji,
     get_momentum_standard_color_emoji, get_momentum_short_color_emoji,
@@ -130,7 +139,9 @@ class MomentumAlertsSystem:
         self.telegram_poster = TelegramPoster()
         self.user_manager = UserManager()
         self.momentum_config = get_momentum_alerts_config()
-        self.fundamental_fetcher = FundamentalDataFetcher(verbose=verbose)
+
+        # Use yfinance-based fetcher for float shares (replaces Polygon/Yahoo fallback)
+        self.fundamental_fetcher = YFinanceFetcher(verbose=verbose)
 
         # Tracking - store dict with symbol metadata including market_open_price
         self.monitored_symbols: Dict[str, Dict] = {}
@@ -943,8 +954,8 @@ class MomentumAlertsSystem:
                 f"✅ Retrieved fundamental data for {len(fundamental_data)}/{len(symbols)} symbols")
         else:
             self.logger.warning(
-                "⚠️ No fundamental data retrieved. Configure POLYGON_API_KEY in .env "
-                "or install yfinance library")
+                "⚠️ No fundamental data retrieved. Ensure yfinance library is installed "
+                "(pip install yfinance)")
 
         return fundamental_data
 

@@ -94,12 +94,31 @@ def get_momentum_alerts() -> List[Dict]:
             momentum_short_emoji = alert_data.get('momentum_short_emoji', '')
             squeeze_emoji = alert_data.get('squeeze_emoji', '')
             halt_emoji = alert_data.get('halt_emoji', '')
+            float_shares = alert_data.get('float_shares')
 
             text_parts = []
             text_parts.append(f"Momentum {momentum_emoji}")
             text_parts.append(f"Short {momentum_short_emoji}")
             text_parts.append(f"Squeeze {squeeze_emoji}")
             text_parts.append(f"Halt {halt_emoji}")
+
+            # Add float shares (formatted) - only if valid
+            if float_shares is not None and float_shares > 0:
+                # Convert to float if needed and validate
+                try:
+                    float_shares = float(float_shares)
+                    if float_shares > 0:
+                        if float_shares >= 1_000_000_000:
+                            float_str = f"{float_shares / 1_000_000_000:.2f}B"
+                        elif float_shares >= 1_000_000:
+                            float_str = f"{float_shares / 1_000_000:.2f}M"
+                        else:
+                            float_str = f"{float_shares:,.0f}"
+                        text_parts.append(f"Float {float_str}")
+                except (ValueError, TypeError):
+                    # Invalid float_shares value, skip it
+                    pass
+
             text = " | ".join(text_parts)
 
             alert_obj = {
