@@ -7,7 +7,7 @@ volume surge, Oracle data) and generates momentum alerts based on VWAP and EMA9 
 It follows the specification in specs/momentum_alert.md.
 
 Process:
-1. Premarket Scanning: Run premarket_top_gainers.py from 04:00 to 20:00 ET every 20 minutes
+1. Premarket Scanning: Run PTG.py from 04:00 to 20:00 ET every 20 minutes
    - Runs on separate CPU core (core 1) using taskset
    - Generates top_gainers_nasdaq_amex.csv in ./historical_data/{YYYY-MM-DD}/market/
    - Monitors premarket top gainers continuously
@@ -374,27 +374,27 @@ class MomentumAlertsSystem:
 
     async def _run_premarket_script(self) -> bool:
         """
-        Run the premarket_top_gainers.py script on a separate CPU core.
+        Run the PTG.py script on a separate CPU core.
 
         Returns:
             True if script ran successfully, False otherwise
         """
-        self.logger.info("🌅 Running premarket script: premarket_top_gainers.py")
+        self.logger.info("🌅 Running premarket script: PTG.py")
 
-        script_path = Path("code") / "premarket_top_gainers.py"
+        script_path = Path("code") / "PTG.py"
         cmd = [
             "taskset", "-c", "1",  # Run on CPU core 1 (separate from main process)
             os.path.expanduser("~/miniconda3/envs/alpaca/bin/python"),
             str(script_path),
-            "--account", "live",  # Use live account with SIP feed access
+            "--paper",  # Use paper account with SIP feed access
             "--exchanges", "NASDAQ", "AMEX",
             "--max-symbols", "7000",
             "--min-price", "0.75",
             "--max-price", "40.00",
             "--min-volume", "250000",
-            "--top-gainers", "40",
+            "--top", "40",
             "--export-csv", "top_gainers_nasdaq_amex.csv",
-            "--verbose"
+            "--verbose"  # Enable verbose output for debugging
         ]
 
         try:
