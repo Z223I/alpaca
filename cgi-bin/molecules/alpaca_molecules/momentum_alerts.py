@@ -158,6 +158,10 @@ class MomentumAlertsSystem:
         self.scanner_dir.mkdir(parents=True, exist_ok=True)
         self.symbol_list_csv_path = self.scanner_dir / "symbol_list.csv"
 
+        # Manual symbols data file (JSON)
+        self.manual_symbols_file = Path("data") / "manual_symbols.json"
+        self.last_manual_symbols_check = None
+
         # Premarket data directory
         self.premarket_csv_path = self.historical_data_dir / "top_gainers_nasdaq_amex.csv"
         self.premarket_schedule = []  # List of scheduled premarket times
@@ -1310,6 +1314,80 @@ class MomentumAlertsSystem:
 
         return symbols_dict
 
+    def _load_manual_symbols(self) -> Dict[str, Dict]:
+        """
+        Load manually added symbols from JSON file.
+
+        Returns:
+            Dictionary mapping symbols to their metadata
+        """
+        manual_symbols_dict = {}
+
+        if not self.manual_symbols_file.exists():
+            self.logger.debug(f"📝 Manual symbols file not found: {self.manual_symbols_file}")
+            return manual_symbols_dict
+
+        try:
+            with open(self.manual_symbols_file, 'r') as f:
+                data = json.load(f)
+
+            symbols = data.get('symbols', [])
+
+            if not symbols:
+                self.logger.debug("📝 No manual symbols found in file")
+                return manual_symbols_dict
+
+            # Add each manual symbol with appropriate metadata
+            for symbol in symbols:
+                symbol = symbol.strip().upper()
+                if symbol and not symbol.endswith('W'):
+                    manual_symbols_dict[symbol] = {
+                        'source': 'manual',
+                        'market_open_price': None,  # Will be fetched if needed
+                        'from_gainers': False,
+                        'from_volume_surge': False,
+                        'oracle': False,
+                        'manual': True
+                    }
+
+            self.logger.info(f"📝 Loaded {len(manual_symbols_dict)} manual symbols for monitoring")
+
+            # Update last check timestamp
+            self.last_manual_symbols_check = datetime.now(self.et_tz)
+
+        except Exception as e:
+            self.logger.error(f"❌ Error loading manual symbols file {self.manual_symbols_file}: {e}")
+
+        return manual_symbols_dict
+
+    def _merge_manual_symbols(self, symbols_dict: Dict[str, Dict]) -> Dict[str, Dict]:
+        """
+        Merge manual symbols into the existing symbols dictionary.
+
+        Args:
+            symbols_dict: Existing dictionary of symbols
+
+        Returns:
+            Updated dictionary with manual symbols merged in
+        """
+        manual_symbols = self._load_manual_symbols()
+
+        if not manual_symbols:
+            return symbols_dict
+
+        # Merge manual symbols into existing dict
+        for symbol, metadata in manual_symbols.items():
+            if symbol in symbols_dict:
+                # Symbol already exists - just add the manual flag
+                symbols_dict[symbol]['manual'] = True
+                self.logger.debug(f"📝 Symbol {symbol} already monitored, marking as manual")
+            else:
+                # Add new manual symbol
+                symbols_dict[symbol] = metadata
+                self.logger.debug(f"📝 Added manual symbol {symbol} to monitoring")
+
+        return symbols_dict
+
     def get_current_symbol_list(self) -> List[Dict]:
         """
         Get the current monitored symbol list with metadata for web interface.
@@ -1318,7 +1396,7 @@ class MomentumAlertsSystem:
             List of dictionaries containing symbol information with fields:
             - symbol: Stock symbol
             - oracle: Boolean - from Oracle data source
-            - manual: Boolean - manually added (always False in this implementation)
+            - manual: Boolean - manually added
             - top_gainers: Boolean - from top gainers list
             - surge: Boolean - from volume surge list
         """
@@ -1328,7 +1406,7 @@ class MomentumAlertsSystem:
             symbol_info = {
                 'symbol': symbol,
                 'oracle': metadata.get('oracle', False),
-                'manual': False,  # Manual additions not yet implemented
+                'manual': metadata.get('manual', False),
                 'top_gainers': metadata.get('from_gainers', False),
                 'surge': metadata.get('from_volume_surge', False),
                 'premarket': metadata.get('from_premarket', False)
@@ -1355,6 +1433,10 @@ class MomentumAlertsSystem:
 
         if should_reload:
             new_symbols_dict = self._load_csv_symbols()
+
+            # Merge manual symbols
+            new_symbols_dict = self._merge_manual_symbols(new_symbols_dict)
+
             new_symbols = set(new_symbols_dict.keys())
             current_symbols = set(self.monitored_symbols.keys())
 
@@ -1365,6 +1447,36 @@ class MomentumAlertsSystem:
                 self.logger.info(f"➕ Added symbols: {sorted(added_symbols)}")
             if removed_symbols:
                 self.logger.info(f"➖ Removed symbols: {sorted(removed_symbols)}")
+
+            self.monitored_symbols = new_symbols_dict
+
+    def _monitor_manual_symbols_file(self):
+        """Monitor the manual symbols JSON file for updates."""
+        # Check if we should reload manual symbols
+        should_reload = False
+
+        if self.manual_symbols_file.exists():
+            file_mtime = datetime.fromtimestamp(self.manual_symbols_file.stat().st_mtime, self.et_tz)
+
+            if self.last_manual_symbols_check is None or file_mtime > self.last_manual_symbols_check:
+                should_reload = True
+                self.logger.info(f"📝 Manual symbols file detected/updated: {file_mtime.strftime('%H:%M:%S ET')}")
+
+        if should_reload:
+            # Reload all symbols (CSV + manual)
+            csv_symbols = self._load_csv_symbols()
+            new_symbols_dict = self._merge_manual_symbols(csv_symbols)
+
+            new_symbols = set(new_symbols_dict.keys())
+            current_symbols = set(self.monitored_symbols.keys())
+
+            added_symbols = new_symbols - current_symbols
+            removed_symbols = current_symbols - new_symbols
+
+            if added_symbols:
+                self.logger.info(f"📝 ➕ Added manual symbols: {sorted(added_symbols)}")
+            if removed_symbols:
+                self.logger.info(f"📝 ➖ Removed manual symbols: {sorted(removed_symbols)}")
 
             self.monitored_symbols = new_symbols_dict
 
@@ -2320,6 +2432,10 @@ class MomentumAlertsSystem:
             self.logger.info("📂 Loading existing symbols from CSV files at startup...")
             if self.csv_file_path.exists() or (self.volume_surge_dir / "relative_volume_nasdaq_amex.csv").exists():
                 existing_symbols = self._load_csv_symbols()
+
+                # Merge manual symbols
+                existing_symbols = self._merge_manual_symbols(existing_symbols)
+
                 if existing_symbols:
                     self.monitored_symbols = existing_symbols
                     self.logger.info(f"✅ Loaded {len(existing_symbols)} symbols from existing CSV files")
@@ -2327,6 +2443,11 @@ class MomentumAlertsSystem:
                     self.logger.info("📋 No existing symbols found, will collect fresh data")
             else:
                 self.logger.info("📋 No existing CSV files, will generate fresh data")
+                # Still load manual symbols even if no CSV files exist
+                manual_symbols = self._load_manual_symbols()
+                if manual_symbols:
+                    self.monitored_symbols = manual_symbols
+                    self.logger.info(f"✅ Loaded {len(manual_symbols)} manual symbols")
 
             # Run startup script immediately to collect fresh symbols from all sources
             self.logger.info("📊 Running startup script immediately to collect fresh data...")
@@ -2365,6 +2486,9 @@ class MomentumAlertsSystem:
 
                     # Monitor CSV file
                     self._monitor_csv_file()
+
+                    # Monitor manual symbols file
+                    self._monitor_manual_symbols_file()
 
                     # Sleep for 30 seconds before next check
                     await asyncio.sleep(30)

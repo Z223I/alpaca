@@ -3172,7 +3172,7 @@
         }
 
         // Add symbol to watch list
-        function addSymbolToWatchList() {
+        async function addSymbolToWatchList() {
             const input = document.getElementById('watchListAddInput');
             if (!input) return;
 
@@ -3217,10 +3217,31 @@
             input.value = '';
 
             console.log(`Added ${symbol} to watch list (manual symbols: ${watchListState.manualSymbols.size})`);
+
+            // Send to backend API to be monitored by momentum_alerts.py
+            try {
+                const response = await fetch('cgi-bin/api/manual_symbols_api.py', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ symbol: symbol })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    console.log(`✅ Symbol ${symbol} sent to momentum_alerts.py for monitoring`);
+                } else {
+                    console.error(`❌ Failed to send ${symbol} to backend:`, result.error);
+                }
+            } catch (error) {
+                console.error(`❌ Error sending ${symbol} to backend:`, error);
+            }
         }
 
         // Delete symbol from watch list
-        function deleteSymbolFromWatchList(symbol) {
+        async function deleteSymbolFromWatchList(symbol) {
             if (!symbol) return;
 
             console.log(`Deleting ${symbol} from watch list`);
@@ -3235,6 +3256,27 @@
                 // If it was manually added, remove from manual set
                 watchListState.manualSymbols.delete(symbol);
                 console.log(`Removed ${symbol} from manual symbols`);
+
+                // Send DELETE request to backend API
+                try {
+                    const response = await fetch('cgi-bin/api/manual_symbols_api.py', {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ symbol: symbol })
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        console.log(`✅ Symbol ${symbol} removed from momentum_alerts.py monitoring`);
+                    } else {
+                        console.error(`❌ Failed to remove ${symbol} from backend:`, result.error);
+                    }
+                } catch (error) {
+                    console.error(`❌ Error removing ${symbol} from backend:`, error);
+                }
             } else {
                 // If it came from API, add to deleted set to prevent it from showing up on auto-refresh
                 watchListState.deletedSymbols.add(symbol);
