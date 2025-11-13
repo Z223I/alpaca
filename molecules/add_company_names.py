@@ -311,10 +311,14 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python molecules/add_company_names.py -i input.csv -o output.csv
-  python molecules/add_company_names.py -i data/stocks.csv -o data/stocks_with_names.csv -v
-  python molecules/add_company_names.py -i input.csv -o output.csv --float -v
-  python molecules/add_company_names.py -i input.csv -o output.csv --account-name Dale --account live --float
+  # Default: fetches company names AND float shares
+  python molecules/add_company_names.py -i input.csv -o output.csv -v
+
+  # Skip float shares for faster processing
+  python molecules/add_company_names.py -i input.csv -o output.csv --no-float -v
+
+  # With different account
+  python molecules/add_company_names.py -i input.csv -o output.csv --account-name Dale --account live -v
         """
     )
 
@@ -333,8 +337,10 @@ Examples:
                         help='Account type (default: paper)')
 
     # Data fetching options
-    parser.add_argument('--float', action='store_true',
-                        help='Fetch float shares from Yahoo Finance (slow for large lists)')
+    parser.add_argument('--float', dest='fetch_float', action='store_true', default=True,
+                        help='Fetch float shares from Yahoo Finance (default: True, slow for large lists)')
+    parser.add_argument('--no-float', dest='fetch_float', action='store_false',
+                        help='Skip fetching float shares (faster)')
 
     # Output options
     parser.add_argument('-v', '--verbose', action='store_true',
@@ -354,7 +360,7 @@ def main():
             provider=args.provider,
             account=args.account_name,
             environment=args.account,
-            fetch_float=getattr(args, 'float', False),
+            fetch_float=args.fetch_float,
             verbose=args.verbose
         )
     except KeyboardInterrupt:

@@ -23,6 +23,11 @@ Usage:
 
     # Volume surge detection
     python3 code/alpaca_screener.py --volume-surge 2.0 --surge-days 5 --export-csv surge_stocks.csv
+
+    # Bruce
+    python3 code/alpaca_screener.py --exchanges NASDAQ AMEX --max-symbols 7000 --min-price 1.00 --max-price 20.00 --export-csv stocks_screened.csv --verbose
+
+    python code/alpaca_screener.py --symbols-file data_master/master.csv --min-volume 250000 --min-percent-change 5.0 --surge-days 50 --volume-surge 5.0 --export-csv relative_volume_nasdaq_amex_test.csv --verbose
 """
 
 import argparse
