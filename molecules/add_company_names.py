@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """
-Add Company Names to Stock Symbol CSV
+Add Company Names and Float Shares to Stock Symbol CSV
 
 Reads a CSV file with a 'symbol' column, fetches company names from Alpaca API,
-and inserts a 'company_name' column after the symbol column.
+fetches float shares from Yahoo Finance via yfinance, and adds columns for both.
 """
 
 import argparse
 import csv
 import os
 import sys
-from typing import Dict, List
+import time
+from typing import Dict, List, Optional
 
 # Add the atoms directory to the path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'atoms', 'api'))
@@ -85,6 +86,68 @@ def clean_company_name(full_name: str) -> str:
     return cleaned
 
 
+def get_float_shares(symbols: List[str], verbose: bool = False) -> Dict[str, Optional[int]]:
+    """
+    Fetch float shares for a list of stock symbols from Yahoo Finance via yfinance.
+
+    Note: This makes individual API calls for each symbol and can be slow for large lists.
+    Consider using batch_size parameter or running during off-peak hours.
+
+    Args:
+        symbols: List of stock ticker symbols
+        verbose: Enable verbose logging
+
+    Returns:
+        Dictionary mapping symbols to float shares (None if not available)
+    """
+    try:
+        import yfinance as yf
+    except ImportError:
+        if verbose:
+            print("ERROR: yfinance library not installed. Install with: pip install yfinance")
+        return {symbol: None for symbol in symbols}
+
+    if verbose:
+        print(f"Fetching float shares for {len(symbols)} symbols from Yahoo Finance...")
+        print(f"  Note: This requires individual API calls and may take several minutes")
+        start_time = time.time()
+
+    float_data = {}
+    failed_count = 0
+
+    for i, symbol in enumerate(symbols, 1):
+        try:
+            ticker = yf.Ticker(symbol)
+            info = ticker.info
+
+            float_shares = info.get('floatShares')
+            float_data[symbol] = float_shares
+
+            if verbose and i % 50 == 0:
+                elapsed = time.time() - start_time
+                rate = i / elapsed
+                remaining = (len(symbols) - i) / rate if rate > 0 else 0
+                print(f"  Processed {i}/{len(symbols)} symbols ({rate:.1f}/sec, ~{remaining:.0f}s remaining)")
+
+        except Exception as e:
+            if verbose and i <= 5:  # Only show first few errors
+                print(f"  Warning: Could not fetch float for {symbol}: {e}")
+            float_data[symbol] = None
+            failed_count += 1
+
+        # Small delay to avoid rate limiting
+        time.sleep(0.1)
+
+    if verbose:
+        total_elapsed = time.time() - start_time
+        success_count = len([v for v in float_data.values() if v is not None])
+        print(f"Successfully fetched {success_count}/{len(symbols)} float values in {total_elapsed:.1f} seconds")
+        if failed_count > 0:
+            print(f"  Failed to fetch: {failed_count} symbols")
+
+    return float_data
+
+
 def get_company_names(symbols: List[str], provider: str = "alpaca",
                       account: str = "Bruce", environment: str = "paper",
                       verbose: bool = False) -> Dict[str, str]:
@@ -154,9 +217,9 @@ def get_company_names(symbols: List[str], provider: str = "alpaca",
 
 def process_csv(input_file: str, output_file: str, provider: str = "alpaca",
                 account: str = "Bruce", environment: str = "paper",
-                verbose: bool = False):
+                fetch_float: bool = False, verbose: bool = False):
     """
-    Read CSV file, add company names, and write to output file.
+    Read CSV file, add company names and optionally float shares, and write to output file.
 
     Args:
         input_file: Path to input CSV file with 'symbol' column
@@ -164,6 +227,7 @@ def process_csv(input_file: str, output_file: str, provider: str = "alpaca",
         provider: API provider (default: "alpaca")
         account: Account name (default: "Bruce")
         environment: Environment type (default: "paper")
+        fetch_float: Fetch float shares from Yahoo Finance (default: False, can be slow)
         verbose: Enable verbose logging
     """
     # Verify input file exists
@@ -198,17 +262,27 @@ def process_csv(input_file: str, output_file: str, provider: str = "alpaca",
     # Fetch company names
     company_names = get_company_names(symbols, provider, account, environment, verbose)
 
-    # Add company names to rows
+    # Fetch float shares if requested
+    float_shares = {}
+    if fetch_float:
+        float_shares = get_float_shares(symbols, verbose)
+
+    # Add company names and float shares to rows
     for row in rows:
         symbol = row.get('symbol', '')
         row['company_name'] = company_names.get(symbol, 'N/A')
+        if fetch_float:
+            float_val = float_shares.get(symbol)
+            row['float'] = float_val if float_val is not None else 'N/A'
 
-    # Create new fieldnames with company_name after symbol
+    # Create new fieldnames with company_name and float after symbol
     new_fieldnames = []
     for field in original_fieldnames:
         new_fieldnames.append(field)
         if field == 'symbol':
             new_fieldnames.append('company_name')
+            if fetch_float:
+                new_fieldnames.append('float')
 
     # Create output directory if needed
     output_dir = os.path.dirname(output_file)
@@ -233,13 +307,14 @@ def process_csv(input_file: str, output_file: str, provider: str = "alpaca",
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description='Add company names to stock symbol CSV file',
+        description='Add company names and float shares to stock symbol CSV file',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   python molecules/add_company_names.py -i input.csv -o output.csv
   python molecules/add_company_names.py -i data/stocks.csv -o data/stocks_with_names.csv -v
-  python molecules/add_company_names.py -i input.csv -o output.csv --account-name Dale --account live
+  python molecules/add_company_names.py -i input.csv -o output.csv --float -v
+  python molecules/add_company_names.py -i input.csv -o output.csv --account-name Dale --account live --float
         """
     )
 
@@ -256,6 +331,10 @@ Examples:
                         help='Account name (default: Bruce)')
     parser.add_argument('--account', default='paper',
                         help='Account type (default: paper)')
+
+    # Data fetching options
+    parser.add_argument('--float', action='store_true',
+                        help='Fetch float shares from Yahoo Finance (slow for large lists)')
 
     # Output options
     parser.add_argument('-v', '--verbose', action='store_true',
@@ -275,6 +354,7 @@ def main():
             provider=args.provider,
             account=args.account_name,
             environment=args.account,
+            fetch_float=getattr(args, 'float', False),
             verbose=args.verbose
         )
     except KeyboardInterrupt:
