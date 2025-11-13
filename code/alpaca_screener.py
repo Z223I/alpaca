@@ -5,8 +5,24 @@ Alpaca Stock Screener
 A comprehensive stock screener using Alpaca Trading API v2 with volume surge detection
 and traditional screening metrics. Built to integrate with existing infrastructure.
 
-Commands:
-python3 code/alpaca_screener.py --exchanges NASDAQ AMEX --min-price 2 --max-price 20 --export-csv stocks_screened.csv --verbose
+Usage:
+    # Screen by exchange and price range
+    python3 code/alpaca_screener.py --exchanges NASDAQ AMEX --min-price 2 --max-price 20 --export-csv stocks_screened.csv --verbose
+
+    # Screen specific symbols from command line
+    python3 code/alpaca_screener.py --symbols AAPL TSLA MSFT --min-volume 1000000 --verbose
+
+    # Screen symbols from CSV file (must have 'symbol' column)
+    python3 code/alpaca_screener.py --symbols-file data_master/stocks_with_float.csv --min-price 5 --max-price 15 --verbose
+
+    # Screen symbols from text file (one symbol per line)
+    python3 code/alpaca_screener.py --symbols-file watchlist.txt --volume-surge 1.5 --export-csv results.csv
+
+    # Find top gainers
+    python3 code/alpaca_screener.py --top-gainers 10 --min-volume 100000 --verbose
+
+    # Volume surge detection
+    python3 code/alpaca_screener.py --volume-surge 2.0 --surge-days 5 --export-csv surge_stocks.csv
 """
 
 import argparse
@@ -742,6 +758,58 @@ class AlpacaScreener:
         print(f"Results exported to {filename}")
 
 
+def read_symbols_from_file(file_path: str) -> List[str]:
+    """
+    Read stock symbols from a file.
+
+    Supports:
+    - CSV files with a 'symbol' column
+    - Text files with one symbol per line
+
+    Args:
+        file_path: Path to the file containing symbols
+
+    Returns:
+        List of stock symbols (uppercase)
+    """
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Symbols file not found: {file_path}")
+
+    symbols = []
+    file_ext = os.path.splitext(file_path)[1].lower()
+
+    try:
+        if file_ext == '.csv':
+            # Read from CSV file with 'symbol' column
+            with open(file_path, 'r', newline='') as csvfile:
+                reader = csv.DictReader(csvfile)
+
+                if not reader.fieldnames or 'symbol' not in reader.fieldnames:
+                    raise ValueError(f"CSV file must contain a 'symbol' column. Found columns: {reader.fieldnames}")
+
+                symbols = [row['symbol'].strip().upper() for row in reader if row.get('symbol', '').strip()]
+        else:
+            # Read from text file (one symbol per line)
+            with open(file_path, 'r') as f:
+                symbols = [line.strip().upper() for line in f if line.strip() and not line.strip().startswith('#')]
+
+    except Exception as e:
+        raise ValueError(f"Error reading symbols from {file_path}: {e}")
+
+    if not symbols:
+        raise ValueError(f"No symbols found in {file_path}")
+
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_symbols = []
+    for symbol in symbols:
+        if symbol not in seen:
+            seen.add(symbol)
+            unique_symbols.append(symbol)
+
+    return unique_symbols
+
+
 def print_results(results: List[StockResult], criteria: ScreeningCriteria):
     """Print screening results in a formatted table."""
     if not results:
@@ -793,6 +861,8 @@ Examples:
   python alpaca_screener.py --volume-surge 2.0 --surge-days 5
   python alpaca_screener.py --exchanges NYSE NASDAQ AMEX --min-price 1.0 --max-price 50.0
   python alpaca_screener.py --symbols AAPL TSLA NVDA --volume-surge 1.5 --verbose
+  python alpaca_screener.py --symbols-file symbols.csv --min-price 2 --max-price 20 --verbose
+  python alpaca_screener.py --symbols-file watchlist.txt --volume-surge 1.5 --export-csv results.csv
   python alpaca_screener.py --top-gainers 10 --min-volume 100000 --verbose
   python alpaca_screener.py --min-volume 500000 --export-csv results.csv --export-json results.json
         """
@@ -824,6 +894,7 @@ Examples:
 
     # Specific symbol analysis
     parser.add_argument('--symbols', type=str, nargs='+', help='Analyze specific symbols (e.g., AAPL MSFT TSLA)')
+    parser.add_argument('--symbols-file', type=str, help='Read symbols from file (CSV with "symbol" column or text file with one symbol per line)')
 
     # Top performers
     parser.add_argument('--top-gainers', type=int, help='Get top N gainers (e.g., --top-gainers 10)')
@@ -846,6 +917,22 @@ def main():
     if args.feed not in valid_feeds:
         args.feed = 'sip'  # Default to SIP
 
+    # Handle symbol input - either from command line or file
+    specific_symbols = None
+    if args.symbols and args.symbols_file:
+        print("Error: Cannot specify both --symbols and --symbols-file")
+        sys.exit(1)
+    elif args.symbols:
+        specific_symbols = [symbol.upper() for symbol in args.symbols]
+    elif args.symbols_file:
+        try:
+            specific_symbols = read_symbols_from_file(args.symbols_file)
+            if args.verbose:
+                print(f"Loaded {len(specific_symbols)} symbols from {args.symbols_file}")
+        except Exception as e:
+            print(f"Error reading symbols file: {e}")
+            sys.exit(1)
+
     # Create screening criteria
     criteria = ScreeningCriteria(
         min_price=args.min_price,
@@ -861,7 +948,7 @@ def main():
         feed=args.feed,
         max_symbols=args.max_symbols,
         exchanges=args.exchanges,
-        specific_symbols=[symbol.upper() for symbol in args.symbols] if args.symbols else None,
+        specific_symbols=specific_symbols,
         top_gainers=args.top_gainers,
         top_losers=args.top_losers
     )
