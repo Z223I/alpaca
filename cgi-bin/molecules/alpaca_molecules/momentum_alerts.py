@@ -16,8 +16,10 @@ Process:
    - Generates gainers_nasdaq_amex.csv
    - Runs every day including weekends for continuous data collection
    - Automatically reschedules after each run
-3. Volume Surge: Run volume surge scanner once at startup
+3. Volume Surge: Run volume surge scanner hourly at :45 from 06:45 to 12:45 ET on weekdays only
+   - Runs at: 06:45, 07:45, 08:45, 09:45, 10:45, 11:45, 12:45 ET (7 runs per weekday)
    - Generates relative_volume_nasdaq_amex.csv
+   - Automatically reschedules after each run
 4. Data Integration: Load symbols from all sources (premarket, market open, volume surge, Oracle)
    - Track source with boolean fields: from_premarket, from_gainers, from_volume_surge, oracle
    - Merge and deduplicate symbols across all sources
@@ -152,6 +154,8 @@ class MomentumAlertsSystem:
         # Volume surge data
         self.volume_surge_csv_path = self.volume_surge_dir / "relative_volume_nasdaq_amex.csv"
         self.volume_surge_completed = False
+        self.volume_surge_schedule = []  # List of scheduled volume surge times
+        self.volume_surge_runs_completed = 0
 
         # Scanner data directory
         self.scanner_dir = Path("historical_data") / self.today / "scanner"
@@ -316,6 +320,93 @@ class MomentumAlertsSystem:
 
         self.logger.info(f"🌅 Next premarket script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
         self.logger.info(f"⏰ Runs every 20 minutes from 04:00 to 20:00 ET daily (including weekends)")
+
+    def _schedule_volume_surge_runs(self):
+        """
+        Schedule the volume surge scanner to run hourly at :45 from 06:45 to 12:45 ET on weekdays only.
+
+        Runs: 06:45, 07:45, 08:45, 09:45, 10:45, 11:45, 12:45 ET (7 runs per weekday)
+        """
+        current_time = datetime.now(self.et_tz)
+
+        # Check if today is a weekday (Monday=0, Sunday=6)
+        is_weekday = current_time.weekday() < 5
+
+        # Volume surge runs at :45 of each hour from 06:45 to 12:45 ET
+        # First run at 06:45 ET = 405 minutes since midnight (6*60 + 45)
+        # Last run at 12:45 ET = 765 minutes since midnight (12*60 + 45)
+
+        # Get minutes since midnight
+        current_minutes_since_midnight = current_time.hour * 60 + current_time.minute
+
+        # Define run times (in minutes since midnight)
+        run_times = [
+            6 * 60 + 45,   # 06:45 (405)
+            7 * 60 + 45,   # 07:45 (465)
+            8 * 60 + 45,   # 08:45 (525)
+            9 * 60 + 45,   # 09:45 (585)
+            10 * 60 + 45,  # 10:45 (645)
+            11 * 60 + 45,  # 11:45 (705)
+            12 * 60 + 45   # 12:45 (765)
+        ]
+
+        if not is_weekday:
+            # If today is weekend, schedule for next Monday at 06:45
+            days_until_monday = (7 - current_time.weekday()) % 7
+            if days_until_monday == 0:  # Today is Sunday
+                days_until_monday = 1
+
+            next_run = (current_time + timedelta(days=days_until_monday)).replace(
+                hour=6, minute=45, second=0, microsecond=0
+            )
+        elif current_minutes_since_midnight < run_times[0]:
+            # Before 06:45 today, schedule for 06:45 today
+            next_run = current_time.replace(hour=6, minute=45, second=0, microsecond=0)
+        elif current_minutes_since_midnight >= run_times[-1]:
+            # After 12:45 today, schedule for 06:45 tomorrow (if tomorrow is weekday)
+            tomorrow = current_time + timedelta(days=1)
+            if tomorrow.weekday() < 5:  # Tomorrow is weekday
+                next_run = tomorrow.replace(hour=6, minute=45, second=0, microsecond=0)
+            else:
+                # Tomorrow is weekend, find next Monday
+                days_until_monday = (7 - tomorrow.weekday()) % 7
+                if days_until_monday == 0:
+                    days_until_monday = 7
+                next_run = (tomorrow + timedelta(days=days_until_monday)).replace(
+                    hour=6, minute=45, second=0, microsecond=0
+                )
+        else:
+            # Between 06:45 and 12:45 - find next scheduled time
+            next_run_minutes = None
+            for run_minute in run_times:
+                if current_minutes_since_midnight < run_minute:
+                    next_run_minutes = run_minute
+                    break
+
+            if next_run_minutes:
+                next_run_hour = next_run_minutes // 60
+                next_run_minute = next_run_minutes % 60
+                next_run = current_time.replace(
+                    hour=next_run_hour, minute=next_run_minute, second=0, microsecond=0
+                )
+            else:
+                # Shouldn't reach here, but fallback to next day
+                tomorrow = current_time + timedelta(days=1)
+                if tomorrow.weekday() < 5:
+                    next_run = tomorrow.replace(hour=6, minute=45, second=0, microsecond=0)
+                else:
+                    days_until_monday = (7 - tomorrow.weekday()) % 7
+                    if days_until_monday == 0:
+                        days_until_monday = 7
+                    next_run = (tomorrow + timedelta(days=days_until_monday)).replace(
+                        hour=6, minute=45, second=0, microsecond=0
+                    )
+
+        # Store the next scheduled run
+        self.volume_surge_schedule = [next_run]
+
+        self.logger.info(f"📈 Next volume surge scanner run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
+        self.logger.info(f"⏰ Runs hourly at :45 from 06:45 to 12:45 ET on weekdays only")
 
     async def _run_startup_script(self) -> bool:
         """
@@ -518,6 +609,69 @@ class MomentumAlertsSystem:
 
             self.premarket_schedule = [next_run]
             self.logger.info(f"🌅 Next premarket script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
+
+    def _check_volume_surge_schedule(self):
+        """
+        Check if it's time to run a volume surge scanner.
+
+        After each run, automatically schedule the next one (hourly at :45).
+        Only runs from 06:45 to 12:45 ET on weekdays.
+        """
+        current_time = datetime.now(self.et_tz)
+
+        # Check if we have a scheduled run and it's time to execute
+        if self.volume_surge_schedule and current_time >= self.volume_surge_schedule[0]:
+            # Run the script
+            asyncio.create_task(self._run_volume_surge_scanner())
+            self.volume_surge_runs_completed += 1
+
+            # Schedule the next run (next hourly :45 time slot)
+            # Run times: 06:45, 07:45, 08:45, 09:45, 10:45, 11:45, 12:45 ET
+            run_times = [
+                6 * 60 + 45,   # 06:45 (405)
+                7 * 60 + 45,   # 07:45 (465)
+                8 * 60 + 45,   # 08:45 (525)
+                9 * 60 + 45,   # 09:45 (585)
+                10 * 60 + 45,  # 10:45 (645)
+                11 * 60 + 45,  # 11:45 (705)
+                12 * 60 + 45   # 12:45 (765)
+            ]
+
+            # Find the next run time
+            current_minutes_since_midnight = current_time.hour * 60 + current_time.minute
+            next_run = None
+
+            # Look for next run time today
+            for run_minute in run_times:
+                if current_minutes_since_midnight < run_minute:
+                    next_run_hour = run_minute // 60
+                    next_run_minute = run_minute % 60
+                    next_run = current_time.replace(
+                        hour=next_run_hour, minute=next_run_minute, second=0, microsecond=0
+                    )
+                    break
+
+            # If no more runs today, schedule for next weekday at 06:45
+            if next_run is None:
+                tomorrow = current_time + timedelta(days=1)
+
+                # Find next weekday
+                while tomorrow.weekday() >= 5:  # Skip weekends
+                    tomorrow += timedelta(days=1)
+
+                next_run = tomorrow.replace(hour=6, minute=45, second=0, microsecond=0)
+
+            # Check if next_run is a weekday, if not, find next Monday
+            if next_run.weekday() >= 5:
+                days_until_monday = (7 - next_run.weekday()) % 7
+                if days_until_monday == 0:
+                    days_until_monday = 7
+                next_run = (next_run + timedelta(days=days_until_monday)).replace(
+                    hour=6, minute=45, second=0, microsecond=0
+                )
+
+            self.volume_surge_schedule = [next_run]
+            self.logger.info(f"📈 Next volume surge scanner run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
 
     async def _check_startup_processes(self):
         """Check the status of running startup processes."""
@@ -2453,9 +2607,6 @@ class MomentumAlertsSystem:
             self.logger.info("📊 Running startup script immediately to collect fresh data...")
             await self._run_startup_script()
 
-            # Run volume surge scanner once at startup
-            await self._run_volume_surge_scanner()
-
             # Run premarket script immediately to collect premarket data
             self.logger.info("🌅 Running premarket script immediately to collect fresh data...")
             await self._run_premarket_script()
@@ -2465,6 +2616,9 @@ class MomentumAlertsSystem:
 
             # Schedule premarket script runs (04:00-20:00 ET, every 20 minutes)
             self._schedule_premarket_runs()
+
+            # Schedule volume surge scanner runs (hourly at :45 from 06:45-12:45 ET, weekdays only)
+            self._schedule_volume_surge_runs()
 
             # Start the main monitoring loop
             monitoring_task = asyncio.create_task(self._stock_monitoring_loop())
@@ -2477,6 +2631,9 @@ class MomentumAlertsSystem:
 
                     # Check premarket schedule
                     self._check_premarket_schedule()
+
+                    # Check volume surge schedule
+                    self._check_volume_surge_schedule()
 
                     # Check startup processes
                     await self._check_startup_processes()
