@@ -1781,9 +1781,9 @@
             // Load initial historical trades
             loadTimeSales(symbol);
 
-            // Periodically refresh historical trades (every 10 seconds)
+            // Periodically refresh historical trades (every 2 seconds)
             // This ensures T&S updates even during after-hours/market closed
-            const tradesInterval = setInterval(() => loadTimeSales(symbol), 10000);
+            const tradesInterval = setInterval(() => loadTimeSales(symbol), 2000);
             state.updateIntervals.set(`trades_${symbol}`, tradesInterval);
 
             // Subscribe to real-time trades via WebSocket
@@ -2765,7 +2765,7 @@
             }
 
             try {
-                const apiUrl = `./cgi-bin/api/market_data_api.py?action=trades&symbol=${symbol}&limit=100`;
+                const apiUrl = `./cgi-bin/api/market_data_api.py?action=trades&symbol=${symbol}&limit=250`;
                 console.log('Loading trades from:', apiUrl);
 
                 const response = await fetch(apiUrl);
