@@ -26,8 +26,10 @@ Usage:
 
     # Bruce
     python3 code/alpaca_screener.py --exchanges NASDAQ AMEX --max-symbols 7000 --min-price 1.00 --max-price 20.00 --export-csv stocks_screened.csv --verbose
+    python3 molecules/add_company_names.py
+    Use libre-calc to open and filter stocks_screened.csv float < 20M (Could write code to do this later)
 
-    python code/alpaca_screener.py --symbols-file data_master/master.csv --min-volume 250000 --min-percent-change 5.0 --surge-days 50 --volume-surge 5.0 --export-csv relative_volume_nasdaq_amex_test.csv --verbose
+    python code/alpaca_screener.py --symbols-file data_master/master.csv --min-volume 250000 --min-percent-change 5.0 --surge-days 50 --volume-surge 5.0 --export-csv relative_volume_nasdaq_amex.csv --verbose
 """
 
 import argparse

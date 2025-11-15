@@ -913,10 +913,7 @@ class MomentumAlertsSystem:
         cmd = [
             "~/miniconda3/envs/alpaca/bin/python",
             str(script_path),
-            "--exchanges", "NASDAQ", "AMEX",
-            "--max-symbols", "7000",
-            "--min-price", "0.75",
-            "--max-price", "100.00",
+            "--symbols-file", "data_master/master.csv",
             "--min-volume", "250000",
             "--min-percent-change", "5.0",
             "--surge-days", "50",
@@ -2142,8 +2139,16 @@ class MomentumAlertsSystem:
 
             # Add float rotation data (calculated from hourly bars since 04:00 ET)
             if float_rotation is not None and total_volume_since_0400 is not None:
+                # Determine emoji based on float rotation value
+                if float_rotation > 1:
+                    float_emoji = "🟢"  # Green if > 1
+                elif float_rotation < 0.8:
+                    float_emoji = "🔴"  # Red if < 0.8
+                else:
+                    float_emoji = "🟡"  # Yellow otherwise
+
                 message_parts.append(f"   • **Volume (since 04:00 ET):** {total_volume_since_0400:,}")
-                message_parts.append(f"   • **Float Rotation:** {float_rotation:.2f}x")
+                message_parts.append(f"   • **Float Rotation:** {float_rotation:.2f}x {float_emoji}")
             else:
                 message_parts.append(f"   • **Float Rotation:** N/A")
 

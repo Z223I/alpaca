@@ -3183,10 +3183,39 @@
             }
 
             // Check if symbol already exists
-            const exists = watchListState.symbols.some(s => s.symbol === symbol);
-            if (exists) {
-                console.log(`Symbol ${symbol} already in watch list`);
+            const existingSymbol = watchListState.symbols.find(s => s.symbol === symbol);
+            if (existingSymbol) {
+                // Mark existing symbol as manually added
+                existingSymbol.manual = true;
+                watchListState.manualSymbols.add(symbol);
+
+                // Re-render to show the manual indicator
+                renderWatchList();
                 input.value = '';
+
+                console.log(`Symbol ${symbol} already in watch list, marked as manual`);
+
+                // Send to backend API to be monitored by momentum_alerts.py
+                try {
+                    const response = await fetch('cgi-bin/api/manual_symbols_api.py', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ symbol: symbol })
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        console.log(`✅ Symbol ${symbol} sent to momentum_alerts.py for monitoring`);
+                    } else {
+                        console.error(`❌ Failed to send ${symbol} to backend:`, result.error);
+                    }
+                } catch (error) {
+                    console.error(`❌ Error sending ${symbol} to backend:`, error);
+                }
+
                 return;
             }
 
