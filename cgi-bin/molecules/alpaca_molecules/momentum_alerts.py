@@ -233,7 +233,7 @@ class MomentumAlertsSystem:
         """
         Schedule the startup script to run starting at 9:40 ET, then every 20 minutes.
 
-        Runs every day (including weekends) for continuous data collection.
+        Runs on weekdays only (Monday-Friday) during market hours.
         Simple approach: Calculate next run time based on current time.
         """
         current_time = datetime.now(self.et_tz)
@@ -266,17 +266,24 @@ class MomentumAlertsSystem:
                 next_run_minute = next_interval_minutes % 60
                 next_run = current_time.replace(hour=next_run_hour, minute=next_run_minute, second=0, microsecond=0)
 
+        # If next_run is on a weekend, find next Monday at 9:40
+        if next_run.weekday() >= 5:  # Saturday=5, Sunday=6
+            days_until_monday = (7 - next_run.weekday()) % 7
+            if days_until_monday == 0:
+                days_until_monday = 7
+            next_run = (next_run + timedelta(days=days_until_monday)).replace(hour=9, minute=40, second=0, microsecond=0)
+
         # Store the next scheduled run
         self.startup_schedule = [next_run]
 
         self.logger.info(f"📅 Next startup script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
-        self.logger.info(f"⏰ Runs every 20 minutes starting at 9:40 ET daily (including weekends)")
+        self.logger.info(f"⏰ Runs every 20 minutes starting at 9:40 ET on weekdays only")
 
     def _schedule_premarket_runs(self):
         """
         Schedule the premarket script to run from 04:00 to 20:00 ET, every 20 minutes.
 
-        Runs every day (including weekends) for continuous data collection.
+        Runs on weekdays only (Monday-Friday) during market hours.
         Simple approach: Calculate next run time based on current time.
         """
         current_time = datetime.now(self.et_tz)
@@ -315,11 +322,18 @@ class MomentumAlertsSystem:
                 next_run_minute = next_interval_minutes % 60
                 next_run = current_time.replace(hour=next_run_hour, minute=next_run_minute, second=0, microsecond=0)
 
+        # If next_run is on a weekend, find next Monday at 04:00
+        if next_run.weekday() >= 5:  # Saturday=5, Sunday=6
+            days_until_monday = (7 - next_run.weekday()) % 7
+            if days_until_monday == 0:
+                days_until_monday = 7
+            next_run = (next_run + timedelta(days=days_until_monday)).replace(hour=4, minute=0, second=0, microsecond=0)
+
         # Store the next scheduled run
         self.premarket_schedule = [next_run]
 
         self.logger.info(f"🌅 Next premarket script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
-        self.logger.info(f"⏰ Runs every 20 minutes from 04:00 to 20:00 ET daily (including weekends)")
+        self.logger.info(f"⏰ Runs every 20 minutes from 04:00 to 20:00 ET on weekdays only")
 
     def _schedule_volume_surge_runs(self):
         """
@@ -481,8 +495,7 @@ class MomentumAlertsSystem:
             os.path.expanduser("~/miniconda3/envs/alpaca/bin/python"),
             str(script_path),
             "--account", "live",  # Use live account with SIP feed access
-            "--exchanges", "NASDAQ", "AMEX",
-            "--max-symbols", "7000",
+            "--symbols-file", "data_master/master.csv",
             "--min-price", "0.75",
             "--max-price", "40.00",
             "--min-volume", "250000",
@@ -528,14 +541,17 @@ class MomentumAlertsSystem:
         Check if it's time to run a startup script.
 
         After each run, automatically schedule the next one (every 20 minutes).
+        Only runs on weekdays (Monday-Friday).
         """
         current_time = datetime.now(self.et_tz)
 
         # Check if we have a scheduled run and it's time to execute
         if self.startup_schedule and current_time >= self.startup_schedule[0]:
-            # Run the script
-            asyncio.create_task(self._run_startup_script())
-            self.startup_runs_completed += 1
+            # Check if today is a weekday before running
+            if current_time.weekday() < 5:  # Monday=0, Friday=4
+                # Run the script
+                asyncio.create_task(self._run_startup_script())
+                self.startup_runs_completed += 1
 
             # Immediately schedule the next run (20 minutes from now)
             next_run = current_time + timedelta(minutes=20)
@@ -561,6 +577,13 @@ class MomentumAlertsSystem:
                     next_run_minute = next_interval_minutes % 60
                     next_run = next_run.replace(hour=next_run_hour, minute=next_run_minute, second=0, microsecond=0)
 
+            # If next_run is on a weekend, find next Monday at 9:40
+            if next_run.weekday() >= 5:  # Saturday=5, Sunday=6
+                days_until_monday = (7 - next_run.weekday()) % 7
+                if days_until_monday == 0:
+                    days_until_monday = 7
+                next_run = (next_run + timedelta(days=days_until_monday)).replace(hour=9, minute=40, second=0, microsecond=0)
+
             self.startup_schedule = [next_run]
             self.logger.info(f"⏰ Next startup script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
 
@@ -569,15 +592,17 @@ class MomentumAlertsSystem:
         Check if it's time to run a premarket script.
 
         After each run, automatically schedule the next one (every 20 minutes).
-        Only runs between 04:00 and 20:00 ET.
+        Only runs between 04:00 and 20:00 ET on weekdays (Monday-Friday).
         """
         current_time = datetime.now(self.et_tz)
 
         # Check if we have a scheduled run and it's time to execute
         if self.premarket_schedule and current_time >= self.premarket_schedule[0]:
-            # Run the script
-            asyncio.create_task(self._run_premarket_script())
-            self.premarket_runs_completed += 1
+            # Check if today is a weekday before running
+            if current_time.weekday() < 5:  # Monday=0, Friday=4
+                # Run the script
+                asyncio.create_task(self._run_premarket_script())
+                self.premarket_runs_completed += 1
 
             # Immediately schedule the next run (20 minutes from now)
             next_run = current_time + timedelta(minutes=20)
@@ -606,6 +631,13 @@ class MomentumAlertsSystem:
                     next_run_hour = next_interval_minutes // 60
                     next_run_minute = next_interval_minutes % 60
                     next_run = next_run.replace(hour=next_run_hour, minute=next_run_minute, second=0, microsecond=0)
+
+            # If next_run is on a weekend, find next Monday at 04:00
+            if next_run.weekday() >= 5:  # Saturday=5, Sunday=6
+                days_until_monday = (7 - next_run.weekday()) % 7
+                if days_until_monday == 0:
+                    days_until_monday = 7
+                next_run = (next_run + timedelta(days=days_until_monday)).replace(hour=4, minute=0, second=0, microsecond=0)
 
             self.premarket_schedule = [next_run]
             self.logger.info(f"🌅 Next premarket script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")

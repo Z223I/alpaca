@@ -21,7 +21,9 @@ Mirrors the structure of alpaca_screener.py for consistency.
 
 """
 Usage:
-python code/premarket_top_gainers.py  --exchanges NASDAQ AMEX  --max-symbols 7000  --min-price 0.75  --max-price 40.00  --min-volume 50000 --top-gainers 20 --export-csv gainers_nasdaq_amex.csv --verbose
+python code/premarket_top_gainers.py --exchanges NASDAQ AMEX --max-symbols 7000 --min-price 0.75 --max-price 40.00 --min-volume 50000 --top-gainers 20 --export-csv gainers_nasdaq_amex.csv --verbose
+python code/premarket_top_gainers.py --symbols-file watchlist.csv --min-gain 1.5 --verbose
+python code/premarket_top_gainers.py --symbols-file symbols.txt --min-volume 100000 --export-csv results.csv
 """
 
 import argparse
@@ -736,6 +738,66 @@ class PremarketTopGainersScanner:
         print(f"Results exported to {filename}")
 
 
+def read_symbols_from_file(file_path: str) -> List[str]:
+    """
+    Read stock symbols from a file.
+
+    Supports:
+    - CSV files with a 'symbol' column
+    - Text files with one symbol per line
+
+    Args:
+        file_path: Path to the file containing symbols
+
+    Returns:
+        List of stock symbols (uppercase)
+    """
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Symbols file not found: {file_path}")
+
+    symbols = []
+    file_ext = os.path.splitext(file_path)[1].lower()
+
+    try:
+        if file_ext == '.csv':
+            # Read from CSV file with 'symbol' column (case-insensitive)
+            with open(file_path, 'r', newline='') as csvfile:
+                reader = csv.DictReader(csvfile)
+
+                # Find the symbol column (case-insensitive)
+                symbol_col = None
+                if reader.fieldnames:
+                    for field in reader.fieldnames:
+                        if field.lower() == 'symbol':
+                            symbol_col = field
+                            break
+
+                if not symbol_col:
+                    raise ValueError(f"CSV file must contain a 'symbol' column. Found columns: {reader.fieldnames}")
+
+                symbols = [row[symbol_col].strip().upper() for row in reader if row.get(symbol_col, '').strip()]
+        else:
+            # Read from text file (one symbol per line)
+            with open(file_path, 'r') as f:
+                symbols = [line.strip().upper() for line in f if line.strip() and not line.strip().startswith('#')]
+
+    except Exception as e:
+        raise ValueError(f"Error reading symbols from {file_path}: {e}")
+
+    if not symbols:
+        raise ValueError(f"No symbols found in {file_path}")
+
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_symbols = []
+    for symbol in symbols:
+        if symbol not in seen:
+            seen.add(symbol)
+            unique_symbols.append(symbol)
+
+    return unique_symbols
+
+
 def print_premarket_results(results: List[PremarketResult], criteria: PremarketCriteria):
     """Print premarket results in a formatted table."""
     if not results:
@@ -786,6 +848,8 @@ Examples:
   python premarket_top_gainers.py --min-gain 2.0 --top-gainers 10
   python premarket_top_gainers.py --exchanges NYSE NASDAQ --min-price 5.0 --max-price 40.0
   python premarket_top_gainers.py --symbols AAPL TSLA NVDA --verbose
+  python premarket_top_gainers.py --symbols-file watchlist.csv --min-gain 1.5 --verbose
+  python premarket_top_gainers.py --symbols-file symbols.txt --min-volume 100000 --export-csv results.csv
   python premarket_top_gainers.py --exchanges NASDAQ AMEX --max-symbols 7000 --min-price 0.75 --max-price 40.00 --min-volume 50000 --top-gainers 20 --export-csv gainers_nasdaq_amex.csv --verbose
 
 Note: This scanner finds stocks gaining since the last market close and can run at any time of day
@@ -815,6 +879,8 @@ Note: This scanner finds stocks gaining since the last market close and can run 
     # Specific symbol analysis
     parser.add_argument('--symbols', type=str, nargs='+',
                        help='Analyze specific symbols (e.g., AAPL MSFT TSLA)')
+    parser.add_argument('--symbols-file', type=str,
+                       help='Read symbols from file (CSV with "symbol" column or text file with one symbol per line)')
 
     # Top performers (matching alpaca_screener.py)
     parser.add_argument('--top-gainers', type=int, help='Get top N gainers (e.g., --top-gainers 10)')
@@ -832,6 +898,22 @@ def main():
     """Main entry point for the premarket scanner."""
     args = parse_premarket_args()
 
+    # Handle symbol input - either from command line or file
+    specific_symbols = None
+    if args.symbols and args.symbols_file:
+        print("Error: Cannot specify both --symbols and --symbols-file")
+        sys.exit(1)
+    elif args.symbols:
+        specific_symbols = [symbol.upper() for symbol in args.symbols]
+    elif args.symbols_file:
+        try:
+            specific_symbols = read_symbols_from_file(args.symbols_file)
+            if args.verbose:
+                print(f"Loaded {len(specific_symbols)} symbols from {args.symbols_file}")
+        except Exception as e:
+            print(f"Error reading symbols file: {e}")
+            sys.exit(1)
+
     # Create screening criteria
     criteria = PremarketCriteria(
         min_price=args.min_price,
@@ -842,7 +924,7 @@ def main():
         max_symbols=args.max_symbols,
         lookback_days=args.lookback_days,
         exchanges=args.exchanges,
-        specific_symbols=[symbol.upper() for symbol in args.symbols] if args.symbols else None,
+        specific_symbols=specific_symbols,
         top_gainers=args.top_gainers,
         top_losers=args.top_losers
     )

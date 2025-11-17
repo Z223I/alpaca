@@ -222,10 +222,24 @@ How many time is Surge ran.  I want it more than once.
 Are manually added watch list items being sent to momentum_alerts.py?
 
 
+
+Add company names to index.html
+
+
 ## Top Pre-market Gainers is Wrong
 
 - [ ] Oops it is using top gainers instead.
-- [ ] Pre-market is failing on server.  Check to see if failing on Orin Nano.
+
+
+
+## Premarket Top Gainer to Accept File
+
+- [ ] THINK HARD.  Update code/premarket_top_gainers.py to accept a file of symbols like code/alpaca_screener.py does.
+- [ ] Update cgi-bin/molecules/alpaca_molecules/momentum_alerts.py to call "premarket_top_gainers.py" (See line 492) with "--symbols-file", "data_master/master.csv".
+
+## Other
+
+- [X] Pre-market is failing on server.  Check to see if failing on Orin Nano.  Nano is fine.  Fixed on server.
 
 ## Time and Sales
 

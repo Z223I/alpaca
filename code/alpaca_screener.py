@@ -787,14 +787,22 @@ def read_symbols_from_file(file_path: str) -> List[str]:
 
     try:
         if file_ext == '.csv':
-            # Read from CSV file with 'symbol' column
+            # Read from CSV file with 'symbol' column (case-insensitive)
             with open(file_path, 'r', newline='') as csvfile:
                 reader = csv.DictReader(csvfile)
 
-                if not reader.fieldnames or 'symbol' not in reader.fieldnames:
+                # Find the symbol column (case-insensitive)
+                symbol_col = None
+                if reader.fieldnames:
+                    for field in reader.fieldnames:
+                        if field.lower() == 'symbol':
+                            symbol_col = field
+                            break
+
+                if not symbol_col:
                     raise ValueError(f"CSV file must contain a 'symbol' column. Found columns: {reader.fieldnames}")
 
-                symbols = [row['symbol'].strip().upper() for row in reader if row.get('symbol', '').strip()]
+                symbols = [row[symbol_col].strip().upper() for row in reader if row.get(symbol_col, '').strip()]
         else:
             # Read from text file (one symbol per line)
             with open(file_path, 'r') as f:
