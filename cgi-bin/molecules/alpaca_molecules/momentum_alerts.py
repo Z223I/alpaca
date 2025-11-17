@@ -107,9 +107,9 @@ class MomentumAlertsSystem:
         # Get today's date for file monitoring
         self.today = datetime.now(self.et_tz).strftime('%Y-%m-%d')
 
-        # Historical data directory path
-        self.historical_data_dir = Path("historical_data") / self.today / "market"
-        self.csv_file_path = self.historical_data_dir / "gainers_nasdaq_amex.csv"
+        # Historical data directory path (using premarket subdirectory)
+        self.historical_data_dir = Path("historical_data") / self.today / "premarket"
+        self.csv_file_path = self.historical_data_dir / "top_gainers_nasdaq_amex.csv"
 
         # Momentum alerts data directories
         self.momentum_alerts_dir = Path("historical_data") / self.today / "momentum_alerts" / "bullish"
@@ -166,8 +166,7 @@ class MomentumAlertsSystem:
         self.manual_symbols_file = Path("data") / "manual_symbols.json"
         self.last_manual_symbols_check = None
 
-        # Premarket data directory
-        self.premarket_csv_path = self.historical_data_dir / "top_gainers_nasdaq_amex.csv"
+        # Premarket data (now using self.csv_file_path for premarket CSV)
         self.premarket_schedule = []  # List of scheduled premarket times
         self.premarket_runs_completed = 0
 
@@ -185,7 +184,7 @@ class MomentumAlertsSystem:
         if self.debug_mode:
             self.logger.warning(f"⚠️ DEBUG MODE ENABLED - Will send random test alerts every minute")
         self.logger.info(f"📅 Monitoring date: {self.today}")
-        self.logger.info(f"📁 CSV file path: {self.csv_file_path}")
+        self.logger.info(f"🌅 Premarket CSV file path: {self.csv_file_path}")
         self.logger.info(f"📊 Historical data client: "
                          f"{'Available' if self.historical_client else 'Not available'}")
         self.logger.info(f"⚙️ Momentum periods: {self.momentum_config.momentum_period}min / "
@@ -722,8 +721,8 @@ class MomentumAlertsSystem:
                         self.volume_surge_completed = True
                     else:
                         self.logger.info(f"✅ Startup script completed successfully (Runtime: {runtime})")
-                        # Send the generated top gainers file to Bruce
-                        await self._send_top_gainers_file_to_bruce()
+                        # NOTE: Market open CSV is no longer sent to Bruce since we switched to premarket scanner
+                        # await self._send_top_gainers_file_to_bruce()
                 else:
                     if process_id == 'volume_surge':
                         self.logger.error(f"❌ Volume surge scanner failed with return code {return_code} (Runtime: {runtime})")
@@ -760,7 +759,7 @@ class MomentumAlertsSystem:
                 if return_code == 0:
                     self.logger.info(f"✅ Premarket script completed successfully (Runtime: {runtime})")
                     # Send the generated premarket file to Bruce
-                    await self._send_premarket_file_to_bruce()
+                    await self._send_top_gainers_file_to_bruce()
                 else:
                     self.logger.error(f"❌ Premarket script failed with return code {return_code} (Runtime: {runtime})")
 
@@ -782,12 +781,12 @@ class MomentumAlertsSystem:
 
     async def _send_top_gainers_file_to_bruce(self):
         """
-        Send the generated top gainers file contents to Bruce via Telegram.
+        Send the generated premarket top gainers file contents to Bruce via Telegram.
         """
         try:
             # Check if the CSV file exists
             if not self.csv_file_path.exists():
-                self.logger.warning(f"⚠️ Top gainers file not found: {self.csv_file_path}")
+                self.logger.warning(f"⚠️ Premarket top gainers file not found: {self.csv_file_path}")
                 return
 
             # Read the CSV file contents
@@ -796,87 +795,11 @@ class MomentumAlertsSystem:
                     file_contents = f.read().strip()
 
                 if not file_contents:
-                    self.logger.warning(f"⚠️ Top gainers file is empty: {self.csv_file_path}")
+                    self.logger.warning(f"⚠️ Premarket top gainers file is empty: {self.csv_file_path}")
                     return
 
                 # Get file metadata
                 file_time = datetime.fromtimestamp(self.csv_file_path.stat().st_mtime, self.et_tz)
-
-                # Count rows (excluding header)
-                lines = file_contents.split('\n')
-                total_rows = len(lines) - 1 if len(lines) > 1 else 0
-
-                # Create message with file contents
-                message_parts = [
-                    "📊 **TOP GAINERS FILE GENERATED**",
-                    "",
-                    "📁 **File:** `gainers_nasdaq_amex.csv`",
-                    f"⏰ **Generated:** {file_time.strftime('%H:%M:%S ET')}",
-                    f"📅 **Date:** {file_time.strftime('%Y-%m-%d')}",
-                    f"📈 **Total Symbols:** {total_rows}",
-                    "",
-                    "📋 **File Contents:**",
-                    "```csv",
-                    file_contents,
-                    "```",
-                    "",
-                    f"📂 **Path:** `{self.csv_file_path}`"
-                ]
-
-                message = "\n".join(message_parts)
-
-                if self.test_mode:
-                    self.logger.info(f"[TEST MODE] Top gainers file contents: {len(file_contents)} characters")
-                else:
-                    # Send to Bruce
-                    result = self.telegram_poster.send_message_to_user(message, "bruce", urgent=False)
-
-                    if result['success']:
-                        self.logger.info(f"✅ Top gainers file contents sent to Bruce ({len(file_contents)} characters)")
-                    else:
-                        errors = result.get('errors', ['Unknown error'])
-                        error_msg = ', '.join(errors) if isinstance(errors, list) else str(errors)
-                        self.logger.error(f"❌ Failed to send top gainers file contents to Bruce: {error_msg}")
-
-            except Exception as file_error:
-                self.logger.error(f"❌ Error reading top gainers file: {file_error}")
-
-                # Send basic notification even if file reading fails
-                basic_message = (
-                    "📊 **TOP GAINERS FILE GENERATED**\n\n"
-                    "📁 **File:** `gainers_nasdaq_amex.csv`\n"
-                    f"⏰ **Time:** {datetime.now(self.et_tz).strftime('%H:%M:%S ET')}\n"
-                    f"📂 **Path:** `{self.csv_file_path}`\n\n"
-                    "⚠️ **Note:** Could not read file contents for sending"
-                )
-
-                if not self.test_mode:
-                    self.telegram_poster.send_message_to_user(basic_message, "bruce", urgent=False)
-
-        except Exception as e:
-            self.logger.error(f"❌ Error sending top gainers file contents: {e}")
-
-    async def _send_premarket_file_to_bruce(self):
-        """
-        Send the generated premarket file contents to Bruce via Telegram.
-        """
-        try:
-            # Check if the CSV file exists
-            if not self.premarket_csv_path.exists():
-                self.logger.warning(f"⚠️ Premarket file not found: {self.premarket_csv_path}")
-                return
-
-            # Read the CSV file contents
-            try:
-                with open(self.premarket_csv_path, 'r') as f:
-                    file_contents = f.read().strip()
-
-                if not file_contents:
-                    self.logger.warning(f"⚠️ Premarket file is empty: {self.premarket_csv_path}")
-                    return
-
-                # Get file metadata
-                file_time = datetime.fromtimestamp(self.premarket_csv_path.stat().st_mtime, self.et_tz)
 
                 # Count rows (excluding header)
                 lines = file_contents.split('\n')
@@ -896,33 +819,33 @@ class MomentumAlertsSystem:
                     file_contents,
                     "```",
                     "",
-                    f"📂 **Path:** `{self.premarket_csv_path}`"
+                    f"📂 **Path:** `{self.csv_file_path}`"
                 ]
 
                 message = "\n".join(message_parts)
 
                 if self.test_mode:
-                    self.logger.info(f"[TEST MODE] Premarket file contents: {len(file_contents)} characters")
+                    self.logger.info(f"[TEST MODE] Premarket top gainers file contents: {len(file_contents)} characters")
                 else:
                     # Send to Bruce
                     result = self.telegram_poster.send_message_to_user(message, "bruce", urgent=False)
 
                     if result['success']:
-                        self.logger.info(f"✅ Premarket file contents sent to Bruce ({len(file_contents)} characters)")
+                        self.logger.info(f"✅ Premarket top gainers file contents sent to Bruce ({len(file_contents)} characters)")
                     else:
                         errors = result.get('errors', ['Unknown error'])
                         error_msg = ', '.join(errors) if isinstance(errors, list) else str(errors)
-                        self.logger.error(f"❌ Failed to send premarket file contents to Bruce: {error_msg}")
+                        self.logger.error(f"❌ Failed to send premarket top gainers file contents to Bruce: {error_msg}")
 
             except Exception as file_error:
-                self.logger.error(f"❌ Error reading premarket file: {file_error}")
+                self.logger.error(f"❌ Error reading premarket top gainers file: {file_error}")
 
                 # Send basic notification even if file reading fails
                 basic_message = (
                     "🌅 **PREMARKET TOP GAINERS FILE GENERATED**\n\n"
                     "📁 **File:** `top_gainers_nasdaq_amex.csv`\n"
                     f"⏰ **Time:** {datetime.now(self.et_tz).strftime('%H:%M:%S ET')}\n"
-                    f"📂 **Path:** `{self.premarket_csv_path}`\n\n"
+                    f"📂 **Path:** `{self.csv_file_path}`\n\n"
                     "⚠️ **Note:** Could not read file contents for sending"
                 )
 
@@ -930,7 +853,11 @@ class MomentumAlertsSystem:
                     self.telegram_poster.send_message_to_user(basic_message, "bruce", urgent=False)
 
         except Exception as e:
-            self.logger.error(f"❌ Error sending premarket file contents: {e}")
+            self.logger.error(f"❌ Error sending premarket top gainers file contents: {e}")
+
+    # REMOVED: _send_premarket_file_to_bruce() is now redundant
+    # The premarket CSV is now the main CSV file (self.csv_file_path)
+    # and is sent via _send_top_gainers_file_to_bruce()
 
     async def _run_volume_surge_scanner(self) -> bool:
         """
@@ -1230,7 +1157,7 @@ class MomentumAlertsSystem:
 
     def _load_csv_symbols(self) -> Dict[str, Dict]:
         """
-        Load symbols from the gainers CSV file, volume surge CSV file, and additional data/{YYYYMMDD}.csv file.
+        Load symbols from the premarket top gainers CSV file, volume surge CSV file, and additional data/{YYYYMMDD}.csv file.
 
         Limits to first 40 symbols from each source that don't end in 'W'.
         Tracks source with boolean fields: from_gainers, from_volume_surge, oracle.
@@ -1240,7 +1167,7 @@ class MomentumAlertsSystem:
         """
         symbols_dict = {}  # Use dict to store symbol metadata
 
-        # Load from gainers CSV file - keep symbols with gain >= 20% that don't end in 'W'
+        # Load from premarket top gainers CSV file - keep first 40 symbols that don't end in 'W'
         if self.csv_file_path.exists():
             try:
                 gainers_count = 0
@@ -1248,31 +1175,28 @@ class MomentumAlertsSystem:
                     reader = csv.DictReader(f)
                     for row in reader:
                         symbol = row.get('symbol', '').strip().upper()
-                        gain_percent = row.get('gain_percent', None)
 
-                        # Filter: must have symbol, not end in 'W', and gain >= 20%
+                        # Filter: must have symbol and not end in 'W'
                         if symbol and not symbol.endswith('W'):
-                            try:
-                                gain = float(gain_percent) if gain_percent else 0
-                                if gain >= 20.0:  # Only keep stocks with gain >= 20%
-                                    # Store symbol with market open price from CSV
-                                    market_open_price = row.get('market_open_price', None)
-                                    symbols_dict[symbol] = {
-                                        'source': 'gainers_csv',
-                                        'market_open_price': float(market_open_price) if market_open_price else None,
-                                        'from_gainers': True,
-                                        'from_volume_surge': False,
-                                        'oracle': False
-                                    }
-                                    gainers_count += 1
-                            except ValueError:
-                                # Skip if gain_percent cannot be converted to float
-                                continue
+                            if gainers_count < 40:  # Only keep first 40 symbols
+                                # Store symbol with market open price from CSV
+                                market_open_price = row.get('market_open_price', row.get('premarket_price', None))
+                                symbols_dict[symbol] = {
+                                    'source': 'premarket_csv',
+                                    'market_open_price': float(market_open_price) if market_open_price else None,
+                                    'from_gainers': True,
+                                    'from_volume_surge': False,
+                                    'oracle': False,
+                                    'from_premarket': True
+                                }
+                                gainers_count += 1
+                            else:
+                                break  # Stop after first 40
 
-                self.logger.info(f"📊 Loaded {gainers_count} symbols from gainers CSV (gain >= 20%, non-W symbols)")
+                self.logger.info(f"🌅 Loaded {gainers_count} symbols from premarket top gainers CSV (first 40 non-W symbols)")
 
             except Exception as e:
-                self.logger.error(f"❌ Error loading gainers CSV file: {e}")
+                self.logger.error(f"❌ Error loading premarket top gainers CSV file: {e}")
 
         # Load from volume surge CSV file - keep first 40 symbols that don't end in 'W'
         if self.volume_surge_csv_path.exists():
@@ -1351,47 +1275,6 @@ class MomentumAlertsSystem:
                 self.logger.error(f"❌ Error loading data CSV file {data_csv_path}: {e}")
         else:
             self.logger.debug(f"📄 Data CSV file not found: {data_csv_path}")
-
-        # Load from premarket CSV file - keep first 40 symbols that don't end in 'W'
-        if self.premarket_csv_path.exists():
-            try:
-                premarket_count = 0
-                premarket_updated_count = 0
-                with open(self.premarket_csv_path, 'r') as f:
-                    reader = csv.DictReader(f)
-                    for row in reader:
-                        symbol = row.get('symbol', '').strip().upper()
-                        # Filter: must have symbol and not end in 'W'
-                        if symbol and not symbol.endswith('W'):
-                            if symbol in symbols_dict:
-                                # Symbol already exists - mark as from_premarket
-                                symbols_dict[symbol]['from_premarket'] = True
-                                premarket_updated_count += 1
-                            elif premarket_count < 40:  # Only add first 40 new symbols
-                                # Store symbol with premarket price from CSV if available
-                                premarket_price = row.get('premarket_price', None)
-                                symbols_dict[symbol] = {
-                                    'source': 'premarket_csv',
-                                    'market_open_price': float(premarket_price) if premarket_price else None,
-                                    'from_gainers': False,
-                                    'from_volume_surge': False,
-                                    'oracle': False,
-                                    'from_premarket': True
-                                }
-                                premarket_count += 1
-                            else:
-                                continue  # Skip additional symbols beyond first 40 new ones
-
-                self.logger.info(
-                    f"🌅 Added {premarket_count} unique symbols from "
-                    f"premarket CSV (first 40 non-W symbols), updated "
-                    f"{premarket_updated_count} existing: "
-                    f"{self.premarket_csv_path}")
-
-            except Exception as e:
-                self.logger.error(f"❌ Error loading premarket CSV file {self.premarket_csv_path}: {e}")
-        else:
-            self.logger.debug(f"🌅 Premarket CSV file not found: {self.premarket_csv_path}")
 
         # Initialize from_premarket field for symbols that don't have it
         for symbol in symbols_dict:

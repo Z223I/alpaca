@@ -57,7 +57,7 @@ def get_watch_list_symbols() -> List[Dict]:
     Load watch list symbols from CSV files and return with source indicators.
 
     Reads from:
-    1. historical_data/{YYYY-MM-DD}/market/gainers_nasdaq_amex.csv (top gainers)
+    1. historical_data/{YYYY-MM-DD}/top_gainers_nasdaq_amex.csv (premarket top gainers)
     2. historical_data/{YYYY-MM-DD}/volume_surge/relative_volume_nasdaq_amex.csv (surge)
     3. data/{YYYYMMDD}.csv (oracle) - falls back to latest CSV if today's not found
 
@@ -66,7 +66,7 @@ def get_watch_list_symbols() -> List[Dict]:
         - symbol: Stock symbol
         - oracle: Boolean - from Oracle data source
         - manual: Boolean - manually added (always False for now)
-        - top_gainers: Boolean - from top gainers list
+        - top_gainers: Boolean - from premarket top gainers list
         - surge: Boolean - from volume surge list
     """
     et_tz = pytz.timezone('US/Eastern')
@@ -74,7 +74,7 @@ def get_watch_list_symbols() -> List[Dict]:
     compact_date = datetime.now(et_tz).strftime('%Y%m%d')
 
     # File paths
-    gainers_csv = Path(project_root) / "historical_data" / today / "market" / "gainers_nasdaq_amex.csv"
+    gainers_csv = Path(project_root) / "historical_data" / today / "premarket" / "top_gainers_nasdaq_amex.csv"
     volume_surge_csv = Path(project_root) / "historical_data" / today / "volume_surge" / "relative_volume_nasdaq_amex.csv"
     oracle_csv = Path(project_root) / "data" / f"{compact_date}.csv"
 
@@ -87,7 +87,7 @@ def get_watch_list_symbols() -> List[Dict]:
 
     symbols_dict = {}
 
-    # Load from gainers CSV file - keep first 40 symbols that don't end in 'W'
+    # Load from premarket top gainers CSV file - keep first 40 symbols that don't end in 'W'
     if gainers_csv.exists():
         try:
             gainers_count = 0
@@ -108,7 +108,7 @@ def get_watch_list_symbols() -> List[Dict]:
                         else:
                             break  # Stop after first 40
         except Exception as e:
-            print(f"Error loading gainers CSV: {e}", file=sys.stderr)
+            print(f"Error loading premarket top gainers CSV: {e}", file=sys.stderr)
 
     # Load from volume surge CSV file - keep first 40 symbols that don't end in 'W'
     if volume_surge_csv.exists():
