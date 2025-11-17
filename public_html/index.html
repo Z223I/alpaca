@@ -88,6 +88,19 @@
             color: var(--accent-green);
         }
 
+        .premarket-icon-external {
+            cursor: pointer;
+            color: var(--accent-blue);
+            font-size: 24px;
+            margin-left: 20px;
+            transition: color 0.2s ease;
+        }
+
+        .premarket-icon-external:hover {
+            color: var(--accent-green);
+            transform: scale(1.1);
+        }
+
         /* Main Container */
         .main-container {
             display: flex;
@@ -610,6 +623,145 @@
             background-color: var(--accent-green);
         }
 
+        /* Premarket Popup */
+        .premarket-popup {
+            display: none;
+            position: fixed;
+            z-index: 10000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+
+        .premarket-popup-content {
+            background-color: var(--bg-secondary);
+            margin: 5% auto;
+            padding: 0;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            width: 90%;
+            max-width: 1200px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .premarket-popup-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .premarket-popup-header h2 {
+            margin: 0;
+            color: var(--text-primary);
+        }
+
+        .premarket-close-btn {
+            background: none;
+            border: none;
+            font-size: 28px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .premarket-close-btn:hover {
+            color: var(--accent-red);
+        }
+
+        .premarket-popup-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .premarket-loading,
+        .premarket-error {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+            font-size: 16px;
+        }
+
+        .premarket-error {
+            color: var(--accent-red);
+        }
+
+        .premarket-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .premarket-table th {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            padding: 12px 8px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid var(--border-color);
+            cursor: pointer;
+            user-select: none;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .premarket-table th:hover {
+            background-color: var(--bg-primary);
+        }
+
+        .premarket-table th .sort-indicator {
+            margin-left: 5px;
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .premarket-table th.sorted-asc .sort-indicator,
+        .premarket-table th.sorted-desc .sort-indicator {
+            color: var(--accent-blue);
+        }
+
+        .premarket-table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .premarket-table tr:hover {
+            background-color: var(--bg-tertiary);
+        }
+
+        .premarket-table .gain-positive {
+            color: var(--accent-green);
+            font-weight: 600;
+        }
+
+        .premarket-table .gain-negative {
+            color: var(--accent-red);
+            font-weight: 600;
+        }
+
+        .premarket-table .symbol-cell {
+            cursor: pointer;
+            color: var(--accent-blue);
+            font-weight: 600;
+        }
+
+        .premarket-table .symbol-cell:hover {
+            text-decoration: underline;
+        }
+
         /* Watch List Panel */
         .watch-list-panel {
             flex: 1;
@@ -981,6 +1133,38 @@
             />
             <span class="search-icon" onclick="handleSearch()">🔍</span>
         </div>
+        <span class="premarket-icon-external" onclick="openPremarketPopup()" title="View Premarket Top Gainers (Ctrl+G)">🌅</span>
+    </div>
+
+    <!-- Premarket Top Gainers Popup -->
+    <div id="premarketPopup" class="premarket-popup" style="display: none;">
+        <div class="premarket-popup-content">
+            <div class="premarket-popup-header">
+                <h2>🌅 Premarket Top Gainers</h2>
+                <button class="premarket-close-btn" onclick="closePremarketPopup()">✕</button>
+            </div>
+            <div class="premarket-popup-body">
+                <div id="premarketLoading" class="premarket-loading">Loading...</div>
+                <div id="premarketError" class="premarket-error" style="display: none;"></div>
+                <div id="premarketTableContainer" style="display: none;">
+                    <table class="premarket-table" id="premarketTable">
+                        <thead>
+                            <tr>
+                                <th onclick="sortPremarketTable('symbol')">Symbol <span class="sort-indicator"></span></th>
+                                <th onclick="sortPremarketTable('prev_close')">Previous Close <span class="sort-indicator"></span></th>
+                                <th onclick="sortPremarketTable('current_price')">Current Price <span class="sort-indicator"></span></th>
+                                <th onclick="sortPremarketTable('gain_percent')" class="sorted-desc">Gain % <span class="sort-indicator">▼</span></th>
+                                <th onclick="sortPremarketTable('pm_volume')">PM Volume <span class="sort-indicator"></span></th>
+                                <th onclick="sortPremarketTable('pm_range')">PM Range <span class="sort-indicator"></span></th>
+                                <th onclick="sortPremarketTable('volume')">Volume <span class="sort-indicator"></span></th>
+                            </tr>
+                        </thead>
+                        <tbody id="premarketTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Tab Bar -->
@@ -1147,6 +1331,13 @@
         document.addEventListener('keydown', (event) => {
             const searchInput = document.getElementById('symbolSearch');
             const activeElement = document.activeElement;
+
+            // Check for Ctrl+G to open premarket popup
+            if (event.ctrlKey && event.key.toLowerCase() === 'g') {
+                event.preventDefault();
+                openPremarketPopup();
+                return;
+            }
 
             // Don't interfere if user is already typing in any input field or textarea
             if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
@@ -3052,6 +3243,214 @@
             }
 
             return trades.reverse();
+        }
+
+        // ========================================
+        // PREMARKET POPUP FUNCTIONALITY
+        // ========================================
+
+        // Premarket data state
+        const premarketState = {
+            data: [],
+            sortColumn: 'gain_percent',
+            sortDirection: 'desc'
+        };
+
+        function openPremarketPopup() {
+            const popup = document.getElementById('premarketPopup');
+            popup.style.display = 'block';
+            loadPremarketData();
+        }
+
+        function closePremarketPopup() {
+            const popup = document.getElementById('premarketPopup');
+            popup.style.display = 'none';
+        }
+
+        // Close popup when clicking outside of it
+        window.onclick = function(event) {
+            const popup = document.getElementById('premarketPopup');
+            if (event.target === popup) {
+                closePremarketPopup();
+            }
+        }
+
+        async function loadPremarketData() {
+            const loadingDiv = document.getElementById('premarketLoading');
+            const errorDiv = document.getElementById('premarketError');
+            const tableContainer = document.getElementById('premarketTableContainer');
+
+            // Show loading state
+            loadingDiv.style.display = 'block';
+            errorDiv.style.display = 'none';
+            tableContainer.style.display = 'none';
+
+            try {
+                // Get today's date in YYYY-MM-DD format (ET timezone)
+                const today = new Date().toLocaleDateString('en-US', {
+                    timeZone: 'America/New_York',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                }).split('/');
+                const dateStr = `${today[2]}-${today[0]}-${today[1]}`;
+
+                const csvPath = `historical_data/${dateStr}/premarket/top_gainers_nasdaq_amex.csv`;
+
+                console.log('Loading premarket CSV from:', csvPath);
+
+                const response = await fetch(csvPath);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const csvText = await response.text();
+
+                // Parse CSV
+                premarketState.data = parsePremarketCSV(csvText);
+
+                if (premarketState.data.length === 0) {
+                    throw new Error('No data found in CSV file');
+                }
+
+                // Sort by gain% descending (default)
+                sortPremarketData('gain_percent', 'desc');
+
+                // Render table
+                renderPremarketTable();
+
+                // Hide loading, show table
+                loadingDiv.style.display = 'none';
+                tableContainer.style.display = 'block';
+
+            } catch (error) {
+                console.error('Error loading premarket data:', error);
+                loadingDiv.style.display = 'none';
+                errorDiv.textContent = `Error loading data: ${error.message}`;
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        function parsePremarketCSV(csvText) {
+            const lines = csvText.trim().split('\n');
+            if (lines.length === 0) return [];
+
+            // Get headers
+            const headers = lines[0].split(',').map(h => h.trim());
+
+            // Parse data rows
+            const data = [];
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',');
+                if (values.length < headers.length) continue;
+
+                const row = {};
+                headers.forEach((header, index) => {
+                    row[header] = values[index] ? values[index].trim() : '';
+                });
+
+                // Convert numeric fields
+                row.prev_close = parseFloat(row.prev_close) || 0;
+                row.current_price = parseFloat(row.current_price || row.premarket_price) || 0;
+                row.gain_percent = parseFloat(row.gain_percent) || 0;
+                row.pm_volume = parseInt(row.pm_volume || row.premarket_volume) || 0;
+                row.volume = parseInt(row.volume) || 0;
+
+                data.push(row);
+            }
+
+            return data;
+        }
+
+        function sortPremarketTable(column) {
+            if (premarketState.sortColumn === column) {
+                // Toggle direction
+                premarketState.sortDirection = premarketState.sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                // New column, default to descending for numeric columns, ascending for text
+                premarketState.sortColumn = column;
+                premarketState.sortDirection = column === 'symbol' ? 'asc' : 'desc';
+            }
+
+            sortPremarketData(column, premarketState.sortDirection);
+            renderPremarketTable();
+        }
+
+        function sortPremarketData(column, direction) {
+            premarketState.data.sort((a, b) => {
+                let valA = a[column];
+                let valB = b[column];
+
+                // Handle numeric vs string comparison
+                if (typeof valA === 'number' && typeof valB === 'number') {
+                    return direction === 'asc' ? valA - valB : valB - valA;
+                } else {
+                    valA = String(valA).toLowerCase();
+                    valB = String(valB).toLowerCase();
+                    if (direction === 'asc') {
+                        return valA < valB ? -1 : valA > valB ? 1 : 0;
+                    } else {
+                        return valA > valB ? -1 : valA < valB ? 1 : 0;
+                    }
+                }
+            });
+        }
+
+        function renderPremarketTable() {
+            const tbody = document.getElementById('premarketTableBody');
+            const headers = document.querySelectorAll('.premarket-table th');
+
+            // Update sort indicators
+            headers.forEach(th => {
+                const column = th.getAttribute('onclick')?.match(/sortPremarketTable\('(.+?)'\)/)?.[1];
+                const indicator = th.querySelector('.sort-indicator');
+
+                if (column === premarketState.sortColumn) {
+                    th.className = premarketState.sortDirection === 'asc' ? 'sorted-asc' : 'sorted-desc';
+                    indicator.textContent = premarketState.sortDirection === 'asc' ? '▲' : '▼';
+                } else {
+                    th.className = '';
+                    indicator.textContent = '';
+                }
+            });
+
+            // Render rows
+            tbody.innerHTML = premarketState.data.map(row => {
+                const gainClass = row.gain_percent >= 0 ? 'gain-positive' : 'gain-negative';
+                return `
+                    <tr>
+                        <td class="symbol-cell" onclick="loadSymbolFromPremarket('${row.symbol}')">${row.symbol}</td>
+                        <td>$${row.prev_close.toFixed(2)}</td>
+                        <td>$${row.current_price.toFixed(2)}</td>
+                        <td class="${gainClass}">${row.gain_percent >= 0 ? '+' : ''}${row.gain_percent.toFixed(2)}%</td>
+                        <td>${formatVolume(row.pm_volume)}</td>
+                        <td>${row.pm_range || row.premarket_range || 'N/A'}</td>
+                        <td>${formatVolume(row.volume)}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function formatVolume(vol) {
+            if (vol >= 1000000) {
+                return (vol / 1000000).toFixed(2) + 'M';
+            } else if (vol >= 1000) {
+                return (vol / 1000).toFixed(2) + 'K';
+            }
+            return vol.toString();
+        }
+
+        function loadSymbolFromPremarket(symbol) {
+            closePremarketPopup();
+
+            // Set search input and load chart
+            const searchInput = document.getElementById('symbolSearch');
+            if (searchInput) {
+                searchInput.value = symbol.toUpperCase();
+            }
+
+            handleSearch();
         }
 
         // ========================================

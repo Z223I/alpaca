@@ -7,11 +7,11 @@ volume surge, Oracle data) and generates momentum alerts based on VWAP and EMA9 
 It follows the specification in specs/momentum_alert.md.
 
 Process:
-1. Premarket Scanning: Run premarket_top_gainers.py from 04:00 to 20:00 ET every 20 minutes
+1. Premarket Scanning: Run premarket_top_gainers.py from 04:00 to 20:00 ET every 10 minutes
    - Runs on separate CPU core (core 1) using taskset
-   - Generates top_gainers_nasdaq_amex.csv in ./historical_data/{YYYY-MM-DD}/market/
+   - Generates top_gainers_nasdaq_amex.csv in ./historical_data/{YYYY-MM-DD}/premarket/
    - Monitors premarket top gainers continuously
-   - Runs every day including weekends for continuous data collection
+   - Runs on weekdays only (Monday-Friday)
 2. Market Open Scanning: Run market_open_top_gainers.py starting at 9:40 ET, every 20 minutes
    - Generates gainers_nasdaq_amex.csv
    - Runs every day including weekends for continuous data collection
@@ -28,7 +28,7 @@ Process:
 7. Integration: Send alerts to all users with momentum_alerts=true via Telegram
 
 CSV Files Generated:
-- ./historical_data/{YYYY-MM-DD}/market/top_gainers_nasdaq_amex.csv (premarket)
+- ./historical_data/{YYYY-MM-DD}/premarket/top_gainers_nasdaq_amex.csv (premarket)
 - ./historical_data/{YYYY-MM-DD}/market/gainers_nasdaq_amex.csv (market open)
 - ./historical_data/{YYYY-MM-DD}/volume_surge/relative_volume_nasdaq_amex.csv
 - ./historical_data/{YYYY-MM-DD}/scanner/symbol_list.csv
@@ -280,14 +280,14 @@ class MomentumAlertsSystem:
 
     def _schedule_premarket_runs(self):
         """
-        Schedule the premarket script to run from 04:00 to 20:00 ET, every 20 minutes.
+        Schedule the premarket script to run from 04:00 to 20:00 ET, every 10 minutes.
 
         Runs on weekdays only (Monday-Friday) during market hours.
         Simple approach: Calculate next run time based on current time.
         """
         current_time = datetime.now(self.et_tz)
 
-        # Calculate next run time from 04:00 to 20:00 ET, every 20 minutes
+        # Calculate next run time from 04:00 to 20:00 ET, every 10 minutes
         # Base time is 04:00 ET (hour=4, minute=0)
 
         # Get minutes since midnight
@@ -306,12 +306,12 @@ class MomentumAlertsSystem:
             # After 20:00 today, schedule for 04:00 tomorrow
             next_run = (current_time + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
         else:
-            # Between 04:00 and 20:00 - calculate how many 20-minute intervals have passed since 04:00 today
+            # Between 04:00 and 20:00 - calculate how many 10-minute intervals have passed since 04:00 today
             minutes_since_0400 = current_minutes_since_midnight - first_run_minutes
-            intervals_passed = minutes_since_0400 // 20
+            intervals_passed = minutes_since_0400 // 10
 
-            # Next run is the next 20-minute interval
-            next_interval_minutes = first_run_minutes + ((intervals_passed + 1) * 20)
+            # Next run is the next 10-minute interval
+            next_interval_minutes = first_run_minutes + ((intervals_passed + 1) * 10)
 
             # If we've gone past 20:00, schedule for 04:00 tomorrow
             if next_interval_minutes >= last_run_minutes:
@@ -332,7 +332,7 @@ class MomentumAlertsSystem:
         self.premarket_schedule = [next_run]
 
         self.logger.info(f"🌅 Next premarket script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
-        self.logger.info(f"⏰ Runs every 20 minutes from 04:00 to 20:00 ET on weekdays only")
+        self.logger.info(f"⏰ Runs every 10 minutes from 04:00 to 20:00 ET on weekdays only")
 
     def _schedule_volume_surge_runs(self):
         """
@@ -590,7 +590,7 @@ class MomentumAlertsSystem:
         """
         Check if it's time to run a premarket script.
 
-        After each run, automatically schedule the next one (every 20 minutes).
+        After each run, automatically schedule the next one (every 10 minutes).
         Only runs between 04:00 and 20:00 ET on weekdays (Monday-Friday).
         """
         current_time = datetime.now(self.et_tz)
@@ -603,10 +603,10 @@ class MomentumAlertsSystem:
                 asyncio.create_task(self._run_premarket_script())
                 self.premarket_runs_completed += 1
 
-            # Immediately schedule the next run (20 minutes from now)
-            next_run = current_time + timedelta(minutes=20)
-            # Align to the next 20-minute boundary based on 04:00 start
-            # Round to nearest 20-minute mark: 04:00, 04:20, 04:40, 05:00, etc.
+            # Immediately schedule the next run (10 minutes from now)
+            next_run = current_time + timedelta(minutes=10)
+            # Align to the next 10-minute boundary based on 04:00 start
+            # Round to nearest 10-minute mark: 04:00, 04:10, 04:20, 04:30, etc.
             minutes_since_midnight = next_run.hour * 60 + next_run.minute
             first_run_minutes = 4 * 60  # 240 minutes (04:00)
             last_run_minutes = 20 * 60  # 1200 minutes (20:00)
@@ -618,10 +618,10 @@ class MomentumAlertsSystem:
                 # After 20:00, schedule for 04:00 tomorrow
                 next_run = (next_run + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
             else:
-                # Between 04:00 and 20:00, round to next 20-minute interval from 04:00
+                # Between 04:00 and 20:00, round to next 10-minute interval from 04:00
                 minutes_since_0400 = minutes_since_midnight - first_run_minutes
-                intervals_from_0400 = (minutes_since_0400 // 20) + 1
-                next_interval_minutes = first_run_minutes + (intervals_from_0400 * 20)
+                intervals_from_0400 = (minutes_since_0400 // 10) + 1
+                next_interval_minutes = first_run_minutes + (intervals_from_0400 * 10)
 
                 if next_interval_minutes >= last_run_minutes:
                     # Past 20:00, schedule for 04:00 tomorrow
