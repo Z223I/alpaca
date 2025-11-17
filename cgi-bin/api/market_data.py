@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/home/wilsonb/miniconda3/envs/alpaca/bin/python3
 """
 Market Sentinel Flask API
 
