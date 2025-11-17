@@ -33,6 +33,9 @@ from atoms.api.get_latest_quote import get_latest_quote  # noqa: E402
 from alpaca.data.historical import StockHistoricalDataClient  # noqa: E402
 from alpaca.data.requests import StockBarsRequest, StockTradesRequest  # noqa: E402
 from alpaca.data.timeframe import TimeFrame, TimeFrameUnit  # noqa: E402
+from alpaca.trading.client import TradingClient  # noqa: E402
+from pathlib import Path  # noqa: E402
+import csv  # noqa: E402
 
 
 class AlpacaMarketData:
@@ -89,8 +92,14 @@ class AlpacaMarketData:
         api_key, secret_key, base_url = get_api_credentials(provider, account_name, account)
         self.hist_client = StockHistoricalDataClient(api_key, secret_key)
 
+        # Initialize trading client for asset information
+        self.trading_client = TradingClient(api_key, secret_key, paper=(account == "paper"))
+
         # Eastern Time timezone for market hours
         self.et_tz = pytz.timezone('America/New_York')
+
+        # Store repo root for CSV access
+        self.repo_root = repo_root
 
     def get_latest_quote_data(self, symbol: str) -> Dict[str, Any]:
         """
@@ -132,6 +141,112 @@ class AlpacaMarketData:
                 'error': str(e),
                 'timestamp': datetime.now(self.et_tz).isoformat()
             }
+
+    def _clean_company_name(self, full_name: str) -> str:
+        """
+        Clean company name by removing common suffixes like 'Common Stock', 'Inc.', etc.
+
+        Args:
+            full_name: Full asset name from Alpaca API
+
+        Returns:
+            Cleaned company name
+        """
+        if not full_name or full_name == "N/A":
+            return full_name
+
+        # List of suffixes to remove (order matters - more specific first)
+        suffixes_to_remove = [
+            ' Class A Ordinary Shares',
+            ' Class B Ordinary Shares',
+            ' Class C Ordinary Shares',
+            ' Class A Common Stock',
+            ' Class B Common Stock',
+            ' Class C Common Stock',
+            ' Common Stock',
+            ' Ordinary Shares',
+            ' American Depositary Shares',
+            ' American Depositary Receipt',
+            ' Depositary Shares',
+            ' ETF Trust',
+            ' Shares',
+            ' Inc.',
+            ' Inc',
+            ' Corporation',
+            ' Corp.',
+            ' Corp',
+            ' Limited',
+            ' Ltd.',
+            ' Ltd',
+            ' L.P.',
+            ' LP',
+            ' LLC',
+            ' PLC',
+            ' plc',
+            ' S.A.',
+            ' SA',
+            ' N.V.',
+            ' NV',
+            ' AG',
+        ]
+
+        cleaned = full_name.strip()
+
+        # Remove suffixes
+        for suffix in suffixes_to_remove:
+            if cleaned.endswith(suffix):
+                cleaned = cleaned[:-len(suffix)].strip()
+                # Check again for multiple suffixes (e.g., "Company Inc. Common Stock")
+                for suffix2 in suffixes_to_remove:
+                    if cleaned.endswith(suffix2):
+                        cleaned = cleaned[:-len(suffix2)].strip()
+                        break
+                break
+
+        # Remove trailing comma if present
+        cleaned = cleaned.rstrip(',').strip()
+
+        return cleaned
+
+    def get_company_name(self, symbol: str) -> Optional[str]:
+        """
+        Get company name for a symbol from master.csv or Alpaca API.
+
+        This method first tries to read from data_master/master.csv.
+        If not found, it falls back to the Alpaca API using the TradingClient.
+
+        Args:
+            symbol: Stock symbol to look up
+
+        Returns:
+            Company name string if found, None otherwise
+        """
+        # First try: read from master.csv
+        master_csv_path = Path(self.repo_root) / "data_master" / "master.csv"
+
+        if master_csv_path.exists():
+            try:
+                with open(master_csv_path, 'r') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        if row.get('symbol', '').upper() == symbol.upper():
+                            company_name = row.get('company_name', '').strip()
+                            if company_name and company_name != 'N/A':
+                                return company_name
+            except Exception as e:
+                print(f"Error reading master.csv: {e}", file=sys.stderr)
+
+        # Fallback: fetch from Alpaca API using TradingClient
+        print(f"Company name not found in master.csv for {symbol}, falling back to Alpaca API", file=sys.stderr)
+        try:
+            asset = self.trading_client.get_asset(symbol)
+            if asset and hasattr(asset, 'name') and asset.name:
+                return self._clean_company_name(asset.name)
+        except Exception as e:
+            print(f"Error fetching asset from Alpaca for {symbol}: {e}", file=sys.stderr)
+            return None
+
+        return None
 
     def get_bar_data(self, symbol: str, timeframe: str, start_date: datetime, end_date: datetime) -> pd.DataFrame:
         """

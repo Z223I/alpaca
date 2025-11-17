@@ -1635,8 +1635,10 @@
             tab.className = 'tab';
             tab.id = `tab-${symbol}`;
             tab.onclick = () => activateChart(symbol);
+            // Use symbolDisplay (with company name) in tab if available, otherwise just symbol
+            const tabText = symbolDisplay || symbol;
             tab.innerHTML = `
-                <span>${symbol}</span>
+                <span title="${tabText}">${symbol}</span>
                 <span class="tab-close" onclick="closeChart('${symbol}', event)">×</span>
             `;
             tabBar.appendChild(tab);
@@ -1750,6 +1752,7 @@
             state.charts.set(symbol, {
                 interval: '1m',
                 range: '1d',
+                companyName: companyName,  // Store company name for legend updates
                 indicators: {
                     ema9: false,
                     ema21: false,
@@ -1761,6 +1764,12 @@
                 chart: null,
                 lastPrice: null
             });
+
+            // Update legend with company name (if available)
+            const legendSymbolElement = document.querySelector(`#legend-${symbol} .legend-symbol`);
+            if (legendSymbolElement && companyName) {
+                legendSymbolElement.textContent = `${symbol} - ${companyName}`;
+            }
 
             // Activate the new chart
             activateChart(symbol);
@@ -2892,8 +2901,15 @@
             const priceElement = document.getElementById(`legend-price-${symbol}`);
             const detailsElement = document.getElementById(`legend-details-${symbol}`);
             const volumeElement = document.getElementById(`legend-volume-${symbol}`);
+            const symbolElement = document.querySelector(`#legend-${symbol} .legend-symbol`);
 
             if (!priceElement || !detailsElement) return;
+
+            // Update symbol display with company name if available
+            const chartData = state.charts.get(symbol);
+            if (symbolElement && chartData && chartData.companyName) {
+                symbolElement.textContent = `${symbol} - ${chartData.companyName}`;
+            }
 
             const isUp = bar.close >= bar.open;
             const change = bar.close - bar.open;

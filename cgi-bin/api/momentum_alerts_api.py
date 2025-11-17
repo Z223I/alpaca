@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/home/wilsonb/miniconda3/envs/alpaca/bin/python3
 """
 Momentum Alerts API
 
@@ -29,6 +29,11 @@ else:
     project_root = os.path.dirname(cgi_bin_dir)
 
 sys.path.insert(0, project_root)
+
+# Add cgi-bin/molecules to path for AlpacaMarketData
+molecules_path = os.path.join(project_root, 'cgi-bin', 'molecules')
+if molecules_path not in sys.path:
+    sys.path.insert(0, molecules_path)
 
 # CGI headers
 print("Content-Type: application/json")
@@ -163,112 +168,17 @@ def get_new_alerts(since_timestamp):
     return alerts
 
 
-def clean_company_name(full_name: str) -> str:
-    """
-    Clean company name by removing common suffixes like 'Common Stock', 'Inc.', etc.
-
-    Args:
-        full_name: Full asset name from Alpaca API
-
-    Returns:
-        Cleaned company name
-    """
-    if not full_name or full_name == "N/A":
-        return full_name
-
-    # List of suffixes to remove (order matters - more specific first)
-    suffixes_to_remove = [
-        ' Class A Ordinary Shares',
-        ' Class B Ordinary Shares',
-        ' Class C Ordinary Shares',
-        ' Class A Common Stock',
-        ' Class B Common Stock',
-        ' Class C Common Stock',
-        ' Common Stock',
-        ' Ordinary Shares',
-        ' American Depositary Shares',
-        ' American Depositary Receipt',
-        ' Depositary Shares',
-        ' ETF Trust',
-        ' Shares',
-        ' Inc.',
-        ' Inc',
-        ' Corporation',
-        ' Corp.',
-        ' Corp',
-        ' Limited',
-        ' Ltd.',
-        ' Ltd',
-        ' L.P.',
-        ' LP',
-        ' LLC',
-        ' PLC',
-        ' plc',
-        ' S.A.',
-        ' SA',
-        ' N.V.',
-        ' NV',
-        ' AG',
-    ]
-
-    cleaned = full_name.strip()
-
-    # Remove suffixes
-    for suffix in suffixes_to_remove:
-        if cleaned.endswith(suffix):
-            cleaned = cleaned[:-len(suffix)].strip()
-            # Check again for multiple suffixes (e.g., "Company Inc. Common Stock")
-            for suffix2 in suffixes_to_remove:
-                if cleaned.endswith(suffix2):
-                    cleaned = cleaned[:-len(suffix2)].strip()
-                    break
-            break
-
-    # Remove trailing comma if present
-    cleaned = cleaned.rstrip(',').strip()
-
-    return cleaned
-
-
-def get_company_name_from_alpaca(symbol: str) -> str:
-    """
-    Fetch company name from Alpaca API as fallback.
-
-    Args:
-        symbol: Stock symbol to look up
-
-    Returns:
-        Company name string if found, None otherwise
-    """
-    try:
-        # Add atoms directory to path for imports
-        atoms_api_path = os.path.join(project_root, 'atoms', 'api')
-        if atoms_api_path not in sys.path:
-            sys.path.insert(0, atoms_api_path)
-
-        from init_alpaca_client import init_alpaca_client
-
-        # Initialize Alpaca client (using Bruce/paper as default)
-        client = init_alpaca_client("alpaca", "Bruce", "paper")
-
-        # Fetch asset information for the symbol
-        try:
-            asset = client.get_asset(symbol)
-            if asset and asset.name:
-                return clean_company_name(asset.name)
-        except Exception as e:
-            print(f"Error fetching asset from Alpaca for {symbol}: {e}", file=sys.stderr)
-            return None
-
-    except Exception as e:
-        print(f"Error initializing Alpaca client: {e}", file=sys.stderr)
-        return None
+# Global market data client instance (initialized lazily)
+_market_data_client = None
 
 
 def get_company_name(symbol):
     """
-    Get company name for a symbol from data_master/master.csv.
-    If not found, falls back to Alpaca API (same mechanism as add_company_names.py).
+    Get company name for a symbol using AlpacaMarketData class.
+
+    This method uses the AlpacaMarketData class which first tries to read from
+    data_master/master.csv, and if not found, falls back to the Alpaca API using
+    the newer alpaca-py package.
 
     Args:
         symbol: Stock symbol to look up
@@ -276,26 +186,22 @@ def get_company_name(symbol):
     Returns:
         Company name string if found, None otherwise
     """
-    import csv
+    global _market_data_client
 
-    master_csv_path = Path(project_root) / "data_master" / "master.csv"
+    try:
+        # Initialize market data client if not already done
+        if _market_data_client is None:
+            from alpaca_molecules.market_data import AlpacaMarketData
+            _market_data_client = AlpacaMarketData(provider="alpaca", account_name="Bruce", account="paper")
 
-    # First try: read from master.csv
-    if master_csv_path.exists():
-        try:
-            with open(master_csv_path, 'r') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    if row.get('symbol', '').upper() == symbol.upper():
-                        company_name = row.get('company_name', '').strip()
-                        if company_name and company_name != 'N/A':
-                            return company_name
-        except Exception as e:
-            print(f"Error reading master.csv: {e}", file=sys.stderr)
+        # Use the get_company_name method from AlpacaMarketData
+        return _market_data_client.get_company_name(symbol)
 
-    # Fallback: fetch from Alpaca API (same mechanism as add_company_names.py)
-    print(f"Company name not found in master.csv for {symbol}, falling back to Alpaca API", file=sys.stderr)
-    return get_company_name_from_alpaca(symbol)
+    except Exception as e:
+        print(f"Error getting company name for {symbol}: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        return None
 
 
 def main():
