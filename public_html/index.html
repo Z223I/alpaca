@@ -1610,9 +1610,24 @@
         }
 
         // Create a new chart panel
-        function createChartPanel(symbol) {
+        async function createChartPanel(symbol) {
             // Hide welcome message
             document.getElementById('welcomeMessage').style.display = 'none';
+
+            // Fetch company name from backend
+            let companyName = '';
+            try {
+                const response = await fetch(`cgi-bin/api/momentum_alerts_api.py?action=company_name&symbol=${symbol}`);
+                const result = await response.json();
+                if (result.success && result.company_name) {
+                    companyName = result.company_name;
+                }
+            } catch (error) {
+                console.error(`Failed to fetch company name for ${symbol}:`, error);
+            }
+
+            // Create display text for symbol (with company name if available)
+            const symbolDisplay = companyName ? `${symbol} - ${companyName}` : symbol;
 
             // Create tab
             const tabBar = document.getElementById('tabBar');
@@ -1688,7 +1703,7 @@
                         <div class="canvas-container" id="canvas-${symbol}" style="display: none;">
                             <div class="main-chart" id="chart-${symbol}">
                                 <div class="chart-legend" id="legend-${symbol}">
-                                    <div class="legend-symbol">${symbol}</div>
+                                    <div class="legend-symbol">${symbolDisplay}</div>
                                     <div class="legend-price" id="legend-price-${symbol}">--</div>
                                     <div class="legend-details" id="legend-details-${symbol}">
                                         O: -- H: -- L: -- C: --

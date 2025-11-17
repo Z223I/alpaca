@@ -228,14 +228,17 @@ Add company names to index.html
 
 ## Top Pre-market Gainers is Wrong
 
-- [ ] Oops it is using top gainers instead.
+- [ ] Oops it is using top gainers instead.  This might be from the Nano.  I need to do a betting job documenting this when I figure out what I meant.
 
+## Stock Symbol Name
 
+- [X] THINK HARD.  Update public_html/index.html and cgi-bin/molecules/alpaca_molecules/momentum_alerts.py: When index.html is preparing a chart, have it also display the company name.  It is to use momentum_alerts.py to retrieve the company_name field from data_master/master.csv.
+- [ ] THINK HARD.  Update cgi-bin/molecules/alpaca_molecules/momentum_alerts.py: if unable to retrieve the company_name field from data_master/master.csv, use the same mechanism to retrieve the company name as in molecules/add_company_names.py.
 
 ## Premarket Top Gainer to Accept File
 
-- [ ] THINK HARD.  Update code/premarket_top_gainers.py to accept a file of symbols like code/alpaca_screener.py does.
-- [ ] Update cgi-bin/molecules/alpaca_molecules/momentum_alerts.py to call "premarket_top_gainers.py" (See line 492) with "--symbols-file", "data_master/master.csv".
+- [X] THINK HARD.  Update code/premarket_top_gainers.py to accept a file of symbols like code/alpaca_screener.py does.
+- [X] Update cgi-bin/molecules/alpaca_molecules/momentum_alerts.py to call "premarket_top_gainers.py" (See line 492) with "--symbols-file", "data_master/master.csv".
 
 ## Other
 
