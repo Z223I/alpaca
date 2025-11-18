@@ -281,10 +281,8 @@ class PremarketTopGainersScanner:
         # Find the most recent completed trading day
         target_date = current_date
 
-        # If market is still open today or it's after hours today, use yesterday
-        if (current_et.weekday() < 5 and
-            (current_time < self.market_close or
-             (current_time >= self.market_close and current_time < dt_time(20, 0)))):
+        # If market hasn't closed yet today, use yesterday
+        if current_et.weekday() < 5 and current_time < self.market_close:
             target_date = current_date - timedelta(days=1)
 
         # Skip back to most recent weekday
@@ -438,10 +436,8 @@ class PremarketTopGainersScanner:
             current_et = datetime.now(self.et_tz)
             target_date = current_et.date()
 
-            # If market is still open today or it's after hours today, use yesterday
-            if (current_et.weekday() < 5 and
-                (current_et.time() < self.market_close or
-                 (current_et.time() >= self.market_close and current_et.time() < dt_time(20, 0)))):
+            # If market hasn't closed yet today, use yesterday
+            if current_et.weekday() < 5 and current_et.time() < self.market_close:
                 target_date = current_et.date() - timedelta(days=1)
 
             # Skip backwards to most recent weekday
