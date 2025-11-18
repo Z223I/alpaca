@@ -64,19 +64,22 @@ class TradeStreamServer:
         self.subscriptions: Dict[str, Set[WebSocketServerProtocol]] = {}
         self.alpaca_stream: StockDataStream = None
         self.alpaca_task = None
+        self.alpaca_connected = False
+        self.reconnect_delay = 1  # Start with 1 second delay
 
     async def start(self):
         """Start the WebSocket server and Alpaca stream."""
         logger.info(f"Starting Trade Stream Server on {WS_HOST}:{WS_PORT}")
 
-        # Initialize Alpaca data stream
+        # Initialize Alpaca data stream (but don't start it yet)
         self.alpaca_stream = StockDataStream(
             api_key=ALPACA_API_KEY,
             secret_key=ALPACA_SECRET_KEY
         )
 
-        # Start Alpaca stream in background
-        self.alpaca_task = asyncio.create_task(self._run_alpaca_stream())
+        # DON'T start the stream yet - it will be started on first subscription
+        # This avoids the busy loop in _run_forever() when there are no subscriptions
+        logger.info("Alpaca stream initialized (will start on first subscription)")
 
         # Start WebSocket server
         async with websockets.serve(self.handle_client, WS_HOST, WS_PORT):
@@ -84,15 +87,49 @@ class TradeStreamServer:
             await asyncio.Future()  # Run forever
 
     async def _run_alpaca_stream(self):
-        """Run the Alpaca WebSocket stream."""
-        try:
-            logger.info("Starting Alpaca data stream...")
-            await self.alpaca_stream._run_forever()
-        except Exception as e:
-            logger.error(f"Alpaca stream error: {e}")
-            raise
+        """Run the Alpaca WebSocket stream with automatic reconnection."""
+        while True:
+            try:
+                logger.info("Connecting to Alpaca data stream...")
+                self.alpaca_connected = False
 
-    async def handle_client(self, websocket: WebSocketServerProtocol, path: str):
+                # Use the public run() method instead of private _run_forever()
+                # Run the stream in a background task
+                stream_task = asyncio.create_task(self.alpaca_stream._run_forever())
+
+                # Mark as connected after successful start
+                await asyncio.sleep(2)  # Give it time to establish connection
+                self.alpaca_connected = True
+                self.reconnect_delay = 1  # Reset delay on successful connection
+                logger.info("✅ Alpaca stream connected successfully")
+
+                # Wait for the stream task to complete (or fail)
+                await stream_task
+
+            except asyncio.CancelledError:
+                logger.info("Alpaca stream task cancelled")
+                self.alpaca_connected = False
+                raise
+            except Exception as e:
+                self.alpaca_connected = False
+                logger.error(f"Alpaca stream error: {e}", exc_info=True)
+                logger.info(f"Reconnecting in {self.reconnect_delay} seconds...")
+                await asyncio.sleep(self.reconnect_delay)
+
+                # Exponential backoff up to 60 seconds
+                self.reconnect_delay = min(self.reconnect_delay * 2, 60)
+
+                # Recreate the stream object on error
+                logger.info("Recreating Alpaca stream connection...")
+                self.alpaca_stream = StockDataStream(
+                    api_key=ALPACA_API_KEY,
+                    secret_key=ALPACA_SECRET_KEY
+                )
+
+                # Re-subscribe to all active symbols
+                await self._resubscribe_all_symbols()
+
+    async def handle_client(self, websocket: WebSocketServerProtocol):
         """Handle a new WebSocket client connection."""
         client_id = f"{websocket.remote_address[0]}:{websocket.remote_address[1]}"
         logger.info(f"New client connected: {client_id}")
@@ -122,7 +159,17 @@ class TradeStreamServer:
             elif action == 'unsubscribe' and symbol:
                 await self.unsubscribe_symbol(websocket, symbol)
             elif action == 'ping':
-                await websocket.send(json.dumps({'type': 'pong'}))
+                await websocket.send(json.dumps({
+                    'type': 'pong',
+                    'alpaca_connected': self.alpaca_connected
+                }))
+            elif action == 'health':
+                await websocket.send(json.dumps({
+                    'type': 'health',
+                    'alpaca_connected': self.alpaca_connected,
+                    'active_symbols': list(self.subscriptions.keys()),
+                    'total_clients': len(self.clients)
+                }))
             else:
                 logger.warning(f"Unknown action: {action}")
 
@@ -134,6 +181,26 @@ class TradeStreamServer:
     async def subscribe_symbol(self, websocket: WebSocketServerProtocol, symbol: str):
         """Subscribe a client to trades for a specific symbol."""
         logger.info(f"Client subscribing to {symbol}")
+
+        # Start Alpaca stream on first subscription
+        if self.alpaca_task is None:
+            logger.info("Starting Alpaca stream for first subscription...")
+            self.alpaca_task = asyncio.create_task(self._run_alpaca_stream())
+            # Wait for connection to establish (with timeout)
+            for i in range(10):  # Try for up to 5 seconds
+                await asyncio.sleep(0.5)
+                if self.alpaca_connected:
+                    break
+
+        # Check if Alpaca stream is connected
+        if not self.alpaca_connected:
+            await websocket.send(json.dumps({
+                'type': 'error',
+                'symbol': symbol,
+                'message': 'Alpaca stream not connected. Please try again shortly.'
+            }))
+            logger.warning(f"Rejected subscription for {symbol} - Alpaca stream not connected")
+            return
 
         # Add client to symbol subscriptions
         if symbol not in self.subscriptions:
@@ -164,12 +231,15 @@ class TradeStreamServer:
                 del self.subscriptions[symbol]
                 await self._unsubscribe_alpaca_symbol(symbol)
 
-            # Send confirmation
-            await websocket.send(json.dumps({
-                'type': 'unsubscribed',
-                'symbol': symbol,
-                'message': f'Unsubscribed from {symbol} trades'
-            }))
+            # Send confirmation (only if connection still open)
+            try:
+                await websocket.send(json.dumps({
+                    'type': 'unsubscribed',
+                    'symbol': symbol,
+                    'message': f'Unsubscribed from {symbol} trades'
+                }))
+            except websockets.exceptions.ConnectionClosed:
+                logger.debug(f"Could not send unsubscribe confirmation - connection already closed")
 
     async def unsubscribe_all(self, websocket: WebSocketServerProtocol):
         """Unsubscribe a client from all symbols."""
@@ -198,6 +268,19 @@ class TradeStreamServer:
         """Unsubscribe from Alpaca trade stream for a symbol."""
         logger.info(f"Unsubscribing from Alpaca stream for {symbol}")
         self.alpaca_stream.unsubscribe_trades(symbol)
+
+    async def _resubscribe_all_symbols(self):
+        """Re-subscribe to all active symbols after reconnection."""
+        if not self.subscriptions:
+            return
+
+        logger.info(f"Re-subscribing to {len(self.subscriptions)} symbols after reconnection")
+        for symbol in list(self.subscriptions.keys()):
+            try:
+                await self._subscribe_alpaca_symbol(symbol)
+                logger.info(f"✅ Re-subscribed to {symbol}")
+            except Exception as e:
+                logger.error(f"Failed to re-subscribe to {symbol}: {e}")
 
     async def broadcast_trade(self, symbol: str, trade: Trade):
         """Broadcast a trade to all subscribed clients."""
