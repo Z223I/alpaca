@@ -39,6 +39,7 @@ def get_momentum_alerts() -> List[Dict]:
         - symbol: Stock symbol
         - source: "Momentum"
         - time: Time in ET (HH:MM:SS)
+        - price: Current price
         - gain: Percent gain since market open
         - volume: Current volume
         - text: Combined text with momentum indicators
@@ -86,6 +87,7 @@ def get_momentum_alerts() -> List[Dict]:
 
             # Extract data
             symbol = alert_data.get('symbol', 'N/A')
+            price = alert_data.get('current_price', 0)
             gain = alert_data.get('percent_gain_since_market_open', 0)
             volume = alert_data.get('current_volume', 0)
 
@@ -125,6 +127,7 @@ def get_momentum_alerts() -> List[Dict]:
                 'symbol': symbol,
                 'source': 'Momentum',
                 'time': time_str,
+                'price': price,
                 'gain': gain,
                 'volume': volume,
                 'text': text,

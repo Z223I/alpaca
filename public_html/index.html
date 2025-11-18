@@ -1028,6 +1028,11 @@
             width: 80px;
         }
 
+        .scanner-table th.price-col {
+            text-align: right;
+            width: 70px;
+        }
+
         .scanner-table th.gain-col {
             text-align: right;
             width: 70px;
@@ -1067,6 +1072,12 @@
         .scanner-table td.time-cell {
             color: var(--text-secondary);
             font-size: 12px;
+        }
+
+        .scanner-table td.price-cell {
+            text-align: right;
+            color: var(--text-primary);
+            font-size: 13px;
         }
 
         .scanner-table td.gain-cell {
@@ -1230,6 +1241,7 @@
                             <th>Symbol<div class="resize-handle"></div></th>
                             <th class="source-col">Source<div class="resize-handle"></div></th>
                             <th class="time-col">Time<div class="resize-handle"></div></th>
+                            <th class="price-col">Price<div class="resize-handle"></div></th>
                             <th class="gain-col">Gain<div class="resize-handle"></div></th>
                             <th class="volume-col">Volume<div class="resize-handle"></div></th>
                             <th>Text<div class="resize-handle"></div></th>
@@ -1238,7 +1250,7 @@
                     <tbody id="scannerBody">
                         <!-- Alerts will be populated here -->
                         <tr class="scanner-empty">
-                            <td colspan="6">Loading scanner...</td>
+                            <td colspan="7">Loading scanner...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -3806,7 +3818,7 @@
             if (!scannerState.alerts || scannerState.alerts.length === 0) {
                 tbody.innerHTML = `
                     <tr class="scanner-empty">
-                        <td colspan="6">No momentum alerts</td>
+                        <td colspan="7">No momentum alerts</td>
                     </tr>
                 `;
                 return;
@@ -3820,11 +3832,15 @@
                 // Format volume with commas
                 const volumeStr = alert.volume.toLocaleString();
 
+                // Format price with 2 decimal places
+                const priceStr = alert.price ? `$${alert.price.toFixed(2)}` : 'N/A';
+
                 return `
                     <tr ondblclick="openChartFromScanner('${alert.symbol}')">
                         <td class="symbol-cell">${alert.symbol}</td>
                         <td class="source-cell">${alert.source}</td>
                         <td class="time-cell">${alert.time}</td>
+                        <td class="price-cell">${priceStr}</td>
                         <td class="gain-cell ${gainClass}">${gainStr}</td>
                         <td class="volume-cell">${volumeStr}</td>
                         <td class="text-cell">${alert.text}</td>
@@ -3838,7 +3854,7 @@
             const tbody = document.getElementById('scannerBody');
             tbody.innerHTML = `
                 <tr class="scanner-empty">
-                    <td colspan="6" style="color: var(--accent-red);">${message}</td>
+                    <td colspan="7" style="color: var(--accent-red);">${message}</td>
                 </tr>
             `;
         }
