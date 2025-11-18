@@ -450,13 +450,13 @@ class AlpacaMarketData:
             end_date = datetime.now(self.et_tz)
 
             # Request trade data
-            # Use IEX feed for real-time free data (SIP has 15-min delay on free tier)
+            # Use SIP feed for complete market coverage (all exchanges)
             request_params = StockTradesRequest(
                 symbol_or_symbols=symbol,
                 start=start_date,
                 end=end_date,
                 limit=limit,
-                feed='iex'  # Free real-time data from IEX exchange
+                feed='sip'  # Paid SIP feed - 100% market coverage, all exchanges
             )
 
             trades = self.hist_client.get_stock_trades(request_params)
@@ -466,14 +466,20 @@ class AlpacaMarketData:
             trade_list = []
             if hasattr(trades, 'data') and symbol in trades.data:
                 for trade in trades.data[symbol]:
-                    # Ensure timestamp is in ET timezone before converting to ISO format
+                    # Alpaca returns timestamps in UTC - convert to ET
+                    # Note: IEX feed timestamps appear to be -1 hour off, so we add 1 hour
                     timestamp = trade.timestamp if hasattr(trade, 'timestamp') else datetime.now(self.et_tz)
-                    # Convert UTC timestamp to ET
-                    if timestamp.tzinfo is None:
+
+                    # Convert to ET
+                    if timestamp.tzinfo is not None:
+                        timestamp_et = timestamp.astimezone(self.et_tz)
+                    else:
                         # If naive, assume UTC
                         import pytz
-                        timestamp = pytz.UTC.localize(timestamp)
-                    timestamp_et = timestamp.astimezone(self.et_tz)
+                        timestamp_et = pytz.UTC.localize(timestamp).astimezone(self.et_tz)
+
+                    # IEX feed appears to be 1 hour behind - add correction
+                    timestamp_et = timestamp_et + timedelta(hours=1)
 
                     trade_list.append({
                         'timestamp': timestamp_et.isoformat(),

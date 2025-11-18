@@ -261,7 +261,9 @@ class TradeStreamServer:
             await self.broadcast_trade(symbol, trade)
 
         # Subscribe to trades for this symbol
-        self.alpaca_stream.subscribe_trades(trade_handler, symbol)
+        # Run in executor to avoid blocking the event loop
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, self.alpaca_stream.subscribe_trades, trade_handler, symbol)
         logger.info(f"✅ Trade handler registered for {symbol}")
 
     async def _unsubscribe_alpaca_symbol(self, symbol: str):
