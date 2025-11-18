@@ -1156,7 +1156,6 @@
                                 <th onclick="sortPremarketTable('gain_percent')" class="sorted-desc">Gain % <span class="sort-indicator">▼</span></th>
                                 <th onclick="sortPremarketTable('pm_volume')">PM Volume <span class="sort-indicator"></span></th>
                                 <th onclick="sortPremarketTable('pm_range')">PM Range <span class="sort-indicator"></span></th>
-                                <th onclick="sortPremarketTable('volume')">Volume <span class="sort-indicator"></span></th>
                             </tr>
                         </thead>
                         <tbody id="premarketTableBody">
@@ -3351,11 +3350,11 @@
                 });
 
                 // Convert numeric fields
-                row.prev_close = parseFloat(row.prev_close) || 0;
+                row.prev_close = parseFloat(row.previous_close || row.prev_close) || 0;
                 row.current_price = parseFloat(row.current_price || row.premarket_price) || 0;
                 row.gain_percent = parseFloat(row.gain_percent) || 0;
-                row.pm_volume = parseInt(row.pm_volume || row.premarket_volume) || 0;
-                row.volume = parseInt(row.volume) || 0;
+                row.pm_volume = parseInt(row.premarket_volume || row.pm_volume) || 0;
+                row.pm_range = parseFloat(row.premarket_range || row.pm_range) || 0;
 
                 data.push(row);
             }
@@ -3425,8 +3424,7 @@
                         <td>$${row.current_price.toFixed(2)}</td>
                         <td class="${gainClass}">${row.gain_percent >= 0 ? '+' : ''}${row.gain_percent.toFixed(2)}%</td>
                         <td>${formatVolume(row.pm_volume)}</td>
-                        <td>${row.pm_range || row.premarket_range || 'N/A'}</td>
-                        <td>${formatVolume(row.volume)}</td>
+                        <td>${row.pm_range > 0 ? '$' + row.pm_range.toFixed(2) : 'N/A'}</td>
                     </tr>
                 `;
             }).join('');
