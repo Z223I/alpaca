@@ -431,7 +431,7 @@
                 4. WebSocket Real-Time Streaming
                 <span class="status-badge pending" id="ws-status">PENDING</span>
             </h2>
-            <div class="endpoint-url">WebSocket ws://localhost:8765</div>
+            <div class="endpoint-url" id="ws-endpoint-url">WebSocket ws://localhost:8766 (via proxy)</div>
 
             <div class="controls">
                 <div class="input-group">
@@ -469,6 +469,7 @@
     <script>
         let ws = null;
         let wsTradesCount = 0;
+        let connectionTimeout = null;
 
         // Test Quote Endpoint
         async function testQuote() {
@@ -665,11 +666,37 @@
         }
 
         // Test WebSocket
-        function testWebSocket() {
+        async function testWebSocket() {
             const symbol = document.getElementById('ws-symbol').value.trim().toUpperCase();
             if (!symbol) {
                 alert('Please enter a symbol');
                 return;
+            }
+
+            // Close any existing WebSocket connection first
+            if (ws !== null) {
+                // Clear any pending timeout
+                if (connectionTimeout) {
+                    clearTimeout(connectionTimeout);
+                    connectionTimeout = null;
+                }
+
+                // Force close the old connection
+                try {
+                    ws.onopen = null;
+                    ws.onmessage = null;
+                    ws.onerror = null;
+                    ws.onclose = null;
+                    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+                        ws.close();
+                    }
+                } catch (e) {
+                    console.error('Error closing old WebSocket:', e);
+                }
+                ws = null;
+
+                // Wait a moment for cleanup
+                await new Promise(resolve => setTimeout(resolve, 100));
             }
 
             const statusBadge = document.getElementById('ws-status');
@@ -682,9 +709,34 @@
             wsTradesCount = 0;
 
             try {
-                ws = new WebSocket('ws://localhost:8765');
+                // Determine WebSocket URL (support both localhost and network access)
+                // Use proxy on port 8766 for better browser compatibility
+                const wsUrl = 'ws://' + (window.location.hostname || 'localhost') + ':8766';
+                console.log('Connecting to:', wsUrl);
+                ws = new WebSocket(wsUrl);
+
+                // Set a connection timeout (10 seconds)
+                console.log('Setting connection timeout, current time:', Date.now());
+                connectionTimeout = setTimeout(() => {
+                    console.log('Timeout fired, current time:', Date.now());
+                    console.log('WebSocket state:', ws ? ws.readyState : 'null', 'CONNECTING=', WebSocket.CONNECTING);
+                    if (ws && ws.readyState === WebSocket.CONNECTING) {
+                        console.error('Connection timeout');
+                        ws.close();
+                        statusBadge.textContent = 'TIMEOUT';
+                        statusBadge.className = 'status-badge error';
+                        tradesDiv.innerHTML = '❌ Connection timeout. Server may be unresponsive. Try restarting the server:<br><br><code>./services/start_trade_stream.sh</code>';
+                    } else {
+                        console.log('Timeout fired but WebSocket not in CONNECTING state, ignoring');
+                    }
+                }, 10000);
 
                 ws.onopen = () => {
+                    // Clear the connection timeout
+                    if (connectionTimeout) {
+                        clearTimeout(connectionTimeout);
+                        connectionTimeout = null;
+                    }
                     console.log('WebSocket connected');
                     statusBadge.textContent = 'CONNECTED';
                     statusBadge.className = 'status-badge success';
@@ -706,8 +758,14 @@
                     const data = JSON.parse(event.data);
                     console.log('WebSocket message:', data);
 
-                    if (data.type === 'subscribed') {
+                    if (data.type === 'connecting') {
+                        tradesDiv.innerHTML = `🔄 ${data.message}<br><br>`;
+                    } else if (data.type === 'subscribed') {
                         tradesDiv.innerHTML = `✅ Subscribed to ${data.symbol}. Waiting for trades...<br><br>`;
+                    } else if (data.type === 'error') {
+                        statusBadge.textContent = 'ERROR';
+                        statusBadge.className = 'status-badge error';
+                        tradesDiv.innerHTML = `❌ Error: ${data.message}`;
                     } else if (data.type === 'trade') {
                         wsTradesCount++;
                         document.getElementById('ws-trades-count').textContent = wsTradesCount;
@@ -736,10 +794,21 @@
                     console.error('WebSocket error:', error);
                     statusBadge.textContent = 'ERROR';
                     statusBadge.className = 'status-badge error';
-                    tradesDiv.innerHTML = '❌ WebSocket error. Make sure the trade stream server is running:<br><br><code>./services/start_trade_stream.sh</code>';
+                    tradesDiv.innerHTML = `❌ WebSocket connection error.<br><br>` +
+                        `Attempted to connect to: <code>${wsUrl}</code><br><br>` +
+                        `Make sure both servers are running:<br><br>` +
+                        `<code>./services/start_trade_stream.sh</code><br>` +
+                        `<code>python3 services/browser_proxy.py</code><br><br>` +
+                        `Or check browser console for details.`;
                 };
 
                 ws.onclose = () => {
+                    // Clear the connection timeout if still running
+                    if (connectionTimeout) {
+                        clearTimeout(connectionTimeout);
+                        connectionTimeout = null;
+                    }
+
                     console.log('WebSocket disconnected');
                     statusBadge.textContent = 'DISCONNECTED';
                     statusBadge.className = 'status-badge pending';
@@ -755,9 +824,26 @@
         }
 
         function disconnectWebSocket() {
-            if (ws) {
-                ws.close();
+            // Clear any pending connection timeout
+            if (connectionTimeout) {
+                clearTimeout(connectionTimeout);
+                connectionTimeout = null;
+            }
+
+            if (ws !== null) {
+                // Only close if connection is open or connecting
+                if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+                    ws.close();
+                }
                 ws = null;
+
+                // Update UI
+                const statusBadge = document.getElementById('ws-status');
+                statusBadge.textContent = 'DISCONNECTED';
+                statusBadge.className = 'status-badge pending';
+
+                document.getElementById('ws-connection').textContent = 'Disconnected';
+                document.getElementById('ws-connection').className = 'stat-value error';
             }
         }
 
@@ -775,6 +861,16 @@
         document.addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.key === 'Enter') {
                 testAllEndpoints();
+            }
+        });
+
+        // Update WebSocket endpoint URL on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            const hostname = window.location.hostname || 'localhost';
+            const wsUrl = `ws://${hostname}:8766`;
+            const endpointDiv = document.getElementById('ws-endpoint-url');
+            if (endpointDiv) {
+                endpointDiv.textContent = `WebSocket ${wsUrl} (via proxy)`;
             }
         });
     </script>

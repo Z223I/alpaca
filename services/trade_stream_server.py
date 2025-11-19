@@ -24,7 +24,7 @@ import logging
 
 # Third-party imports
 import websockets
-from websockets.server import WebSocketServerProtocol
+from websockets.legacy.server import WebSocketServerProtocol
 from alpaca.data.live import StockDataStream
 from alpaca.data.models import Trade
 from dotenv import load_dotenv
@@ -62,6 +62,7 @@ class TradeStreamServer:
     def __init__(self):
         self.clients: Set[WebSocketServerProtocol] = set()
         self.subscriptions: Dict[str, Set[WebSocketServerProtocol]] = {}
+        self.alpaca_subscribed: Set[str] = set()  # Track which symbols are actually subscribed to Alpaca
         self.alpaca_stream: StockDataStream = None
         self.alpaca_task = None
         self.alpaca_connected = False
@@ -103,6 +104,15 @@ class TradeStreamServer:
                 self.reconnect_delay = 1  # Reset delay on successful connection
                 logger.info("✅ Alpaca stream connected successfully")
 
+                # Subscribe to any pending symbols that were added before connection
+                if self.subscriptions:
+                    logger.info(f"Subscribing to {len(self.subscriptions)} pending symbols")
+                    for symbol in list(self.subscriptions.keys()):
+                        try:
+                            await self._subscribe_alpaca_symbol(symbol)
+                        except Exception as e:
+                            logger.error(f"Failed to subscribe to pending symbol {symbol}: {e}")
+
                 # Wait for the stream task to complete (or fail)
                 await stream_task
 
@@ -131,7 +141,10 @@ class TradeStreamServer:
 
     async def handle_client(self, websocket: WebSocketServerProtocol):
         """Handle a new WebSocket client connection."""
-        client_id = f"{websocket.remote_address[0]}:{websocket.remote_address[1]}"
+        try:
+            client_id = f"{websocket.remote_address[0]}:{websocket.remote_address[1]}"
+        except:
+            client_id = "unknown"
         logger.info(f"New client connected: {client_id}")
 
         self.clients.add(websocket)
@@ -186,27 +199,27 @@ class TradeStreamServer:
         if self.alpaca_task is None:
             logger.info("Starting Alpaca stream for first subscription...")
             self.alpaca_task = asyncio.create_task(self._run_alpaca_stream())
-            # Wait for connection to establish (with timeout)
-            for i in range(10):  # Try for up to 5 seconds
-                await asyncio.sleep(0.5)
-                if self.alpaca_connected:
-                    break
 
         # Check if Alpaca stream is connected
+        # IMPORTANT: Don't block waiting for connection - just inform client if not ready
         if not self.alpaca_connected:
+            # Send a "connecting" status instead of rejecting
             await websocket.send(json.dumps({
-                'type': 'error',
+                'type': 'connecting',
                 'symbol': symbol,
-                'message': 'Alpaca stream not connected. Please try again shortly.'
+                'message': f'Connecting to Alpaca stream for {symbol}. Subscription will be activated when ready.'
             }))
-            logger.warning(f"Rejected subscription for {symbol} - Alpaca stream not connected")
-            return
+            logger.info(f"Alpaca stream not yet connected for {symbol} - subscription will activate when ready")
+            # Don't return - let the subscription continue so it's ready when Alpaca connects
 
         # Add client to symbol subscriptions
         if symbol not in self.subscriptions:
             self.subscriptions[symbol] = set()
-            # Subscribe to Alpaca stream for this symbol
-            await self._subscribe_alpaca_symbol(symbol)
+            # Subscribe to Alpaca stream for this symbol (only if connected)
+            if self.alpaca_connected:
+                await self._subscribe_alpaca_symbol(symbol)
+            else:
+                logger.info(f"Deferring Alpaca subscription for {symbol} until stream connects")
 
         self.subscriptions[symbol].add(websocket)
 
@@ -261,15 +274,27 @@ class TradeStreamServer:
             await self.broadcast_trade(symbol, trade)
 
         # Subscribe to trades for this symbol
-        # Run in executor to avoid blocking the event loop
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, self.alpaca_stream.subscribe_trades, trade_handler, symbol)
-        logger.info(f"✅ Trade handler registered for {symbol}")
+        # This is a synchronous call but it just registers the handler, doesn't block
+        try:
+            self.alpaca_stream.subscribe_trades(trade_handler, symbol)
+            self.alpaca_subscribed.add(symbol)  # Track that we subscribed
+            logger.info(f"✅ Trade handler registered for {symbol}")
+        except Exception as e:
+            logger.error(f"Failed to subscribe to {symbol}: {e}")
 
     async def _unsubscribe_alpaca_symbol(self, symbol: str):
         """Unsubscribe from Alpaca trade stream for a symbol."""
+        # Only unsubscribe if we actually subscribed to Alpaca
+        if symbol not in self.alpaca_subscribed:
+            logger.info(f"Symbol {symbol} was never subscribed to Alpaca, skipping unsubscribe")
+            return
+
         logger.info(f"Unsubscribing from Alpaca stream for {symbol}")
-        self.alpaca_stream.unsubscribe_trades(symbol)
+        try:
+            self.alpaca_stream.unsubscribe_trades(symbol)
+            self.alpaca_subscribed.discard(symbol)  # Remove from tracking
+        except Exception as e:
+            logger.error(f"Error unsubscribing from {symbol}: {e}")
 
     async def _resubscribe_all_symbols(self):
         """Re-subscribe to all active symbols after reconnection."""

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple WebSocket Test</title>
+</head>
+<body>
+    <h1>WebSocket Connection Test</h1>
+    <button onclick="testConnection()">Test Connection</button>
+    <button onclick="testReconnect()">Test Reconnect</button>
+    <div id="output" style="margin-top: 20px; font-family: monospace; white-space: pre-wrap;"></div>
+
+    <script>
+        let ws = null;
+        const output = document.getElementById('output');
+
+        function log(msg) {
+            output.textContent += new Date().toLocaleTimeString() + ' - ' + msg + '\n';
+            console.log(msg);
+        }
+
+        function testConnection() {
+            log('Starting connection test...');
+
+            if (ws) {
+                log('Closing existing connection...');
+                ws.close();
+                ws = null;
+            }
+
+            const wsUrl = 'ws://localhost:8765';
+            log('Connecting to: ' + wsUrl);
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                log('✅ CONNECTED!');
+                const msg = JSON.stringify({action: 'subscribe', symbol: 'AAPL'});
+                log('Sending: ' + msg);
+                ws.send(msg);
+            };
+
+            ws.onmessage = (event) => {
+                log('📨 Received: ' + event.data);
+            };
+
+            ws.onerror = (error) => {
+                log('❌ ERROR: ' + error);
+            };
+
+            ws.onclose = () => {
+                log('Connection closed');
+            };
+        }
+
+        function testReconnect() {
+            log('\n=== RECONNECT TEST ===');
+            if (ws) {
+                log('Closing connection...');
+                ws.close();
+                ws = null;
+                setTimeout(() => {
+                    log('Reconnecting...');
+                    testConnection();
+                }, 500);
+            } else {
+                testConnection();
+            }
+        }
+    </script>
+</body>
+</html>
