@@ -3055,12 +3055,12 @@
                 console.log(`Current time: ${now.toISOString()}`);
             }
 
-            // Reverse trades so newest are at the top
-            const reversedTrades = [...trades].reverse();
-
-            container.innerHTML = reversedTrades.map(trade => {
-                const priceClass = chartData.lastPrice && trade.price > chartData.lastPrice ? 'up' :
-                                  chartData.lastPrice && trade.price < chartData.lastPrice ? 'down' : '';
+            // Map trades with price comparison to PREVIOUS trade in chronological order
+            const tradeItems = trades.map((trade, index) => {
+                // Compare to previous trade in time sequence (not display sequence)
+                const prevPrice = index > 0 ? trades[index - 1].price : null;
+                const priceClass = prevPrice && trade.price > prevPrice ? 'up' :
+                                  prevPrice && trade.price < prevPrice ? 'down' : '';
 
                 // Format time in ET timezone (backend returns ISO strings with ET offset)
                 const tradeDate = new Date(trade.timestamp);
@@ -3081,7 +3081,10 @@
                         <div class="trade-size">${trade.size.toLocaleString()}</div>
                     </div>
                 `;
-            }).join('');
+            });
+
+            // Reverse so newest trades appear at the top
+            container.innerHTML = tradeItems.reverse().join('');
 
             if (trades.length > 0) {
                 // Use the most recent trade (last in original array, first in reversed)
