@@ -434,18 +434,30 @@
             <div class="endpoint-url" id="ws-endpoint-url">WebSocket ws://localhost:8766 (via proxy)</div>
 
             <div class="controls">
-                <div class="input-group">
-                    <label>Symbol</label>
-                    <input type="text" id="ws-symbol" value="AAPL" placeholder="e.g., AAPL">
+                <h3 style="margin: 0 0 10px 0; font-size: 16px;">Connection</h3>
+                <button onclick="connectWebSocket()" id="btn-connect">Connect to WebSocket</button>
+                <button onclick="disconnectWebSocket()" id="btn-disconnect" disabled>Disconnect</button>
+            </div>
+
+            <div style="margin: 20px 0; padding: 20px; background: #1e1e1e; border-radius: 8px; border: 1px solid #333;">
+                <h3 style="margin: 0 0 15px 0; font-size: 16px;">Subscription</h3>
+                <div class="input-group" style="margin-bottom: 15px;">
+                    <label>Symbols (comma-separated)</label>
+                    <input type="text" id="ws-symbol" value="AAPL" placeholder="e.g., AAPL, TSLA, MSFT" style="text-transform: uppercase">
                 </div>
-                <button onclick="testWebSocket()">Connect & Subscribe</button>
-                <button onclick="disconnectWebSocket()">Disconnect</button>
+                <button onclick="subscribeSymbol()" id="btn-subscribe" disabled>Add Symbol(s)</button>
+                <button onclick="unsubscribeSymbol()" id="btn-unsubscribe" disabled>Remove Symbol(s)</button>
+                <button onclick="unsubscribeAll()" id="btn-unsubscribe-all" disabled>Clear All</button>
             </div>
 
             <div class="stats" id="ws-stats" style="display: none;">
                 <div class="stat-item">
                     <div class="stat-label">Connection</div>
-                    <div class="stat-value" id="ws-connection">-</div>
+                    <div class="stat-value" id="ws-connection">Disconnected</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Active Symbols</div>
+                    <div class="stat-value" id="ws-active-symbols">-</div>
                 </div>
                 <div class="stat-item">
                     <div class="stat-label">Trades Received</div>
@@ -454,6 +466,10 @@
                 <div class="stat-item">
                     <div class="stat-label">Last Price</div>
                     <div class="stat-value success" id="ws-last-price">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Exchange</div>
+                    <div class="stat-value" id="ws-last-exchange">-</div>
                 </div>
             </div>
 
@@ -470,6 +486,40 @@
         let ws = null;
         let wsTradesCount = 0;
         let connectionTimeout = null;
+        let activeSubscriptions = new Set();  // Track all subscribed symbols
+
+        // Exchange code to name mapping (Source: Alpaca API Documentation)
+        // Updated: 2025-11-20 - Full exchange names displayed
+        const EXCHANGE_NAMES = {
+            'A': 'NYSE American (AMEX)',
+            'B': 'NASDAQ OMX BX',
+            'C': 'National Stock Exchange',
+            'D': 'FINRA ADF',
+            'E': 'Market Independent',
+            'H': 'MIAX',
+            'I': 'International Securities Exchange',
+            'J': 'Cboe EDGA',
+            'K': 'Cboe EDGX',
+            'L': 'Long Term Stock Exchange',
+            'M': 'Chicago Stock Exchange',
+            'N': 'New York Stock Exchange',
+            'P': 'NYSE Arca',
+            'Q': 'NASDAQ OMX',
+            'S': 'NASDAQ Small Cap',
+            'T': 'NASDAQ Int',
+            'U': 'Members Exchange',
+            'V': 'IEX',
+            'W': 'CBOE',
+            'X': 'NASDAQ OMX PSX',
+            'Y': 'Cboe BYX',
+            'Z': 'Cboe BZX'
+        };
+
+        // Convert exchange code to full name
+        function getExchangeName(code) {
+            if (!code) return 'N/A';
+            return EXCHANGE_NAMES[code] || code;
+        }
 
         // Test Quote Endpoint
         async function testQuote() {
@@ -665,38 +715,11 @@
             }
         }
 
-        // Test WebSocket
-        async function testWebSocket() {
-            const symbol = document.getElementById('ws-symbol').value.trim().toUpperCase();
-            if (!symbol) {
-                alert('Please enter a symbol');
+        // Connect to WebSocket (without subscribing)
+        function connectWebSocket() {
+            if (ws !== null && ws.readyState === WebSocket.OPEN) {
+                alert('Already connected!');
                 return;
-            }
-
-            // Close any existing WebSocket connection first
-            if (ws !== null) {
-                // Clear any pending timeout
-                if (connectionTimeout) {
-                    clearTimeout(connectionTimeout);
-                    connectionTimeout = null;
-                }
-
-                // Force close the old connection
-                try {
-                    ws.onopen = null;
-                    ws.onmessage = null;
-                    ws.onerror = null;
-                    ws.onclose = null;
-                    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-                        ws.close();
-                    }
-                } catch (e) {
-                    console.error('Error closing old WebSocket:', e);
-                }
-                ws = null;
-
-                // Wait a moment for cleanup
-                await new Promise(resolve => setTimeout(resolve, 100));
             }
 
             const statusBadge = document.getElementById('ws-status');
@@ -706,33 +729,25 @@
             statusBadge.textContent = 'CONNECTING...';
             statusBadge.className = 'status-badge testing';
             tradesDiv.innerHTML = 'Connecting to WebSocket server...';
-            wsTradesCount = 0;
 
             try {
-                // Determine WebSocket URL (support both localhost and network access)
-                // Use proxy on port 8766 for better browser compatibility
                 const wsUrl = 'ws://' + (window.location.hostname || 'localhost') + ':8766';
                 console.log('Connecting to:', wsUrl);
                 ws = new WebSocket(wsUrl);
 
                 // Set a connection timeout (10 seconds)
-                console.log('Setting connection timeout, current time:', Date.now());
                 connectionTimeout = setTimeout(() => {
-                    console.log('Timeout fired, current time:', Date.now());
-                    console.log('WebSocket state:', ws ? ws.readyState : 'null', 'CONNECTING=', WebSocket.CONNECTING);
                     if (ws && ws.readyState === WebSocket.CONNECTING) {
                         console.error('Connection timeout');
                         ws.close();
                         statusBadge.textContent = 'TIMEOUT';
                         statusBadge.className = 'status-badge error';
-                        tradesDiv.innerHTML = '❌ Connection timeout. Server may be unresponsive. Try restarting the server:<br><br><code>./services/start_trade_stream.sh</code>';
-                    } else {
-                        console.log('Timeout fired but WebSocket not in CONNECTING state, ignoring');
+                        tradesDiv.innerHTML = '❌ Connection timeout. Server may be unresponsive.';
+                        updateButtonStates();
                     }
                 }, 10000);
 
                 ws.onopen = () => {
-                    // Clear the connection timeout
                     if (connectionTimeout) {
                         clearTimeout(connectionTimeout);
                         connectionTimeout = null;
@@ -745,13 +760,8 @@
                     document.getElementById('ws-connection').textContent = 'Connected';
                     document.getElementById('ws-connection').className = 'stat-value success';
 
-                    tradesDiv.innerHTML = `Connected! Subscribing to ${symbol}...`;
-
-                    // Subscribe to symbol
-                    ws.send(JSON.stringify({
-                        action: 'subscribe',
-                        symbol: symbol
-                    }));
+                    tradesDiv.innerHTML = 'Connected! Use Subscribe button to start receiving trades.';
+                    updateButtonStates();
                 };
 
                 ws.onmessage = (event) => {
@@ -761,25 +771,35 @@
                     if (data.type === 'connecting') {
                         tradesDiv.innerHTML = `🔄 ${data.message}<br><br>`;
                     } else if (data.type === 'subscribed') {
-                        tradesDiv.innerHTML = `✅ Subscribed to ${data.symbol}. Waiting for trades...<br><br>`;
+                        activeSubscriptions.add(data.symbol);
+                        updateActiveSymbolsDisplay();
+                        tradesDiv.innerHTML = `✅ Subscribed to ${data.symbol}. Waiting for trades...<br><br>` + tradesDiv.innerHTML;
+                        updateButtonStates();
+                    } else if (data.type === 'unsubscribed') {
+                        console.log('Processing unsubscribed message for:', data.symbol);
+                        activeSubscriptions.delete(data.symbol);
+                        updateActiveSymbolsDisplay();
+                        tradesDiv.innerHTML = `✅ Unsubscribed from ${data.symbol}.<br><br>` + tradesDiv.innerHTML;
+                        updateButtonStates();
                     } else if (data.type === 'error') {
-                        statusBadge.textContent = 'ERROR';
-                        statusBadge.className = 'status-badge error';
-                        tradesDiv.innerHTML = `❌ Error: ${data.message}`;
+                        tradesDiv.innerHTML = `❌ Error: ${data.message}<br><br>` + tradesDiv.innerHTML;
                     } else if (data.type === 'trade') {
                         wsTradesCount++;
                         document.getElementById('ws-trades-count').textContent = wsTradesCount;
                         document.getElementById('ws-last-price').textContent = '$' + data.data.price.toFixed(2);
 
+                        const exchangeName = getExchangeName(data.data.exchange);
+                        document.getElementById('ws-last-exchange').textContent = exchangeName;
+
                         const tradeTime = new Date(data.data.timestamp).toLocaleTimeString();
+                        const exchangeText = data.data.exchange ? ` [${exchangeName}]` : '';
                         const tradeHtml = `
                             <div class="trade-item">
-                                <strong>${data.symbol}</strong> @ ${tradeTime} -
+                                <strong>${data.symbol}</strong> @ ${tradeTime}${exchangeText} -
                                 <span style="color: var(--accent-green)">$${data.data.price.toFixed(2)}</span> x ${data.data.size.toLocaleString()}
                             </div>
                         `;
 
-                        // Prepend new trade
                         tradesDiv.innerHTML = tradeHtml + tradesDiv.innerHTML;
 
                         // Keep only last 20 trades
@@ -794,16 +814,11 @@
                     console.error('WebSocket error:', error);
                     statusBadge.textContent = 'ERROR';
                     statusBadge.className = 'status-badge error';
-                    tradesDiv.innerHTML = `❌ WebSocket connection error.<br><br>` +
-                        `Attempted to connect to: <code>${wsUrl}</code><br><br>` +
-                        `Make sure both servers are running:<br><br>` +
-                        `<code>./services/start_trade_stream.sh</code><br>` +
-                        `<code>python3 services/browser_proxy.py</code><br><br>` +
-                        `Or check browser console for details.`;
+                    tradesDiv.innerHTML = `❌ WebSocket connection error.`;
+                    updateButtonStates();
                 };
 
                 ws.onclose = () => {
-                    // Clear the connection timeout if still running
                     if (connectionTimeout) {
                         clearTimeout(connectionTimeout);
                         connectionTimeout = null;
@@ -814,37 +829,197 @@
                     statusBadge.className = 'status-badge pending';
                     document.getElementById('ws-connection').textContent = 'Disconnected';
                     document.getElementById('ws-connection').className = 'stat-value error';
+                    activeSubscriptions.clear();
+                    updateActiveSymbolsDisplay();
+                    updateButtonStates();
                 };
 
             } catch (error) {
                 statusBadge.textContent = 'ERROR';
                 statusBadge.className = 'status-badge error';
                 tradesDiv.innerHTML = 'Error: ' + error.message;
+                updateButtonStates();
             }
         }
 
+        // Subscribe to symbol(s) - supports comma-separated list
+        function subscribeSymbol() {
+            const input = document.getElementById('ws-symbol').value.trim();
+            if (!input) {
+                alert('Please enter at least one symbol');
+                return;
+            }
+
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected! Click "Connect to WebSocket" first.');
+                return;
+            }
+
+            // Parse comma-separated symbols
+            const symbols = input.split(',')
+                .map(s => s.trim().toUpperCase())
+                .filter(s => s.length > 0);
+
+            if (symbols.length === 0) {
+                alert('Please enter valid symbol(s)');
+                return;
+            }
+
+            // Subscribe to each symbol
+            let newSubscriptions = 0;
+            symbols.forEach(symbol => {
+                if (activeSubscriptions.has(symbol)) {
+                    console.log(`Already subscribed to ${symbol}, skipping`);
+                } else {
+                    console.log('Subscribing to:', symbol);
+                    ws.send(JSON.stringify({
+                        action: 'subscribe',
+                        symbol: symbol
+                    }));
+                    newSubscriptions++;
+                }
+            });
+
+            if (newSubscriptions === 0) {
+                alert('Already subscribed to all entered symbols');
+            }
+
+            // Clear input after successful subscription
+            document.getElementById('ws-symbol').value = '';
+        }
+
+        // Unsubscribe from symbol(s) - supports comma-separated list
+        function unsubscribeSymbol() {
+            const input = document.getElementById('ws-symbol').value.trim();
+            if (!input) {
+                alert('Please enter symbol(s) to unsubscribe, or use "Clear All"');
+                return;
+            }
+
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected!');
+                return;
+            }
+
+            if (activeSubscriptions.size === 0) {
+                alert('No active subscriptions!');
+                return;
+            }
+
+            // Parse comma-separated symbols
+            const symbols = input.split(',')
+                .map(s => s.trim().toUpperCase())
+                .filter(s => s.length > 0);
+
+            if (symbols.length === 0) {
+                alert('Please enter valid symbol(s)');
+                return;
+            }
+
+            // Unsubscribe from each symbol
+            let unsubscribed = 0;
+            symbols.forEach(symbol => {
+                if (activeSubscriptions.has(symbol)) {
+                    console.log('Unsubscribing from:', symbol);
+                    ws.send(JSON.stringify({
+                        action: 'unsubscribe',
+                        symbol: symbol
+                    }));
+                    unsubscribed++;
+                } else {
+                    console.log(`Not subscribed to ${symbol}, skipping`);
+                }
+            });
+
+            if (unsubscribed === 0) {
+                alert('Not subscribed to any of the entered symbols');
+            } else {
+                // Clear input after successful unsubscription
+                document.getElementById('ws-symbol').value = '';
+            }
+        }
+
+        // Unsubscribe from all symbols
+        function unsubscribeAll() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected!');
+                return;
+            }
+
+            if (activeSubscriptions.size === 0) {
+                alert('No active subscriptions!');
+                return;
+            }
+
+            console.log('Unsubscribing from all symbols:', Array.from(activeSubscriptions));
+            activeSubscriptions.forEach(symbol => {
+                ws.send(JSON.stringify({
+                    action: 'unsubscribe',
+                    symbol: symbol
+                }));
+            });
+        }
+
+        // Update active symbols display
+        function updateActiveSymbolsDisplay() {
+            const symbolsElement = document.getElementById('ws-active-symbols');
+            if (activeSubscriptions.size === 0) {
+                symbolsElement.textContent = '-';
+                symbolsElement.className = 'stat-value';
+            } else {
+                const symbolsList = Array.from(activeSubscriptions).sort().join(', ');
+                symbolsElement.textContent = symbolsList;
+                symbolsElement.className = 'stat-value success';
+            }
+        }
+
+        // Update button enabled/disabled states
+        function updateButtonStates() {
+            const isConnected = ws !== null && ws.readyState === WebSocket.OPEN;
+            const hasSubscriptions = activeSubscriptions.size > 0;
+
+            document.getElementById('btn-connect').disabled = isConnected;
+            document.getElementById('btn-disconnect').disabled = !isConnected;
+            document.getElementById('btn-subscribe').disabled = !isConnected;
+            document.getElementById('btn-unsubscribe').disabled = !isConnected;
+            document.getElementById('btn-unsubscribe-all').disabled = !isConnected || !hasSubscriptions;
+        }
+
         function disconnectWebSocket() {
+            if (!ws) {
+                alert('Not connected!');
+                return;
+            }
+
             // Clear any pending connection timeout
             if (connectionTimeout) {
                 clearTimeout(connectionTimeout);
                 connectionTimeout = null;
             }
 
-            if (ws !== null) {
-                // Only close if connection is open or connecting
-                if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-                    ws.close();
-                }
-                ws = null;
-
-                // Update UI
-                const statusBadge = document.getElementById('ws-status');
-                statusBadge.textContent = 'DISCONNECTED';
-                statusBadge.className = 'status-badge pending';
-
-                document.getElementById('ws-connection').textContent = 'Disconnected';
-                document.getElementById('ws-connection').className = 'stat-value error';
+            // Close WebSocket
+            if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+                ws.close();
             }
+            ws = null;
+            activeSubscriptions.clear();
+
+            // Update UI
+            const statusBadge = document.getElementById('ws-status');
+            statusBadge.textContent = 'DISCONNECTED';
+            statusBadge.className = 'status-badge pending';
+
+            document.getElementById('ws-connection').textContent = 'Disconnected';
+            document.getElementById('ws-connection').className = 'stat-value error';
+            document.getElementById('ws-trades-count').textContent = '0';
+            document.getElementById('ws-last-price').textContent = '-';
+            document.getElementById('ws-last-exchange').textContent = '-';
+
+            // Reset trades count
+            wsTradesCount = 0;
+
+            updateActiveSymbolsDisplay();
+            updateButtonStates();
         }
 
         // Test All Endpoints
@@ -872,6 +1047,8 @@
             if (endpointDiv) {
                 endpointDiv.textContent = `WebSocket ${wsUrl} (via proxy)`;
             }
+            // Initialize button states
+            updateButtonStates();
         });
     </script>
 </body>

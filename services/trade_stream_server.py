@@ -27,6 +27,7 @@ import websockets
 from websockets.legacy.server import WebSocketServerProtocol
 from alpaca.data.live import StockDataStream
 from alpaca.data.models import Trade
+from alpaca.data.enums import DataFeed
 from dotenv import load_dotenv
 
 # Configure logging
@@ -73,9 +74,12 @@ class TradeStreamServer:
         logger.info(f"Starting Trade Stream Server on {WS_HOST}:{WS_PORT}")
 
         # Initialize Alpaca data stream (but don't start it yet)
+        # Use DataFeed.SIP for real-time data from all exchanges (requires paid subscription)
+        # Use DataFeed.IEX for free IEX-only data
         self.alpaca_stream = StockDataStream(
             api_key=ALPACA_API_KEY,
-            secret_key=ALPACA_SECRET_KEY
+            secret_key=ALPACA_SECRET_KEY,
+            feed=DataFeed.SIP  # SIP feed includes all exchanges (NYSE, NASDAQ, FINRA, Cboe, etc.)
         )
 
         # DON'T start the stream yet - it will be started on first subscription
@@ -99,7 +103,9 @@ class TradeStreamServer:
                 stream_task = asyncio.create_task(self.alpaca_stream._run_forever())
 
                 # Mark as connected after successful start
-                await asyncio.sleep(2)  # Give it time to establish connection
+                # CRITICAL FIX: Wait longer (5 seconds) to allow full WebSocket authentication
+                # The Alpaca WebSocket needs time to: connect -> authenticate -> be ready for subscriptions
+                await asyncio.sleep(5)  # Give it time to establish connection and authenticate
                 self.alpaca_connected = True
                 self.reconnect_delay = 1  # Reset delay on successful connection
                 logger.info("✅ Alpaca stream connected successfully")
@@ -133,7 +139,8 @@ class TradeStreamServer:
                 logger.info("Recreating Alpaca stream connection...")
                 self.alpaca_stream = StockDataStream(
                     api_key=ALPACA_API_KEY,
-                    secret_key=ALPACA_SECRET_KEY
+                    secret_key=ALPACA_SECRET_KEY,
+                    feed=DataFeed.SIP  # SIP feed includes all exchanges
                 )
 
                 # Re-subscribe to all active symbols
@@ -215,9 +222,11 @@ class TradeStreamServer:
         # Add client to symbol subscriptions
         if symbol not in self.subscriptions:
             self.subscriptions[symbol] = set()
-            # Subscribe to Alpaca stream for this symbol (only if connected)
-            if self.alpaca_connected:
+            # Subscribe to Alpaca stream for this symbol (only if connected and not already subscribed)
+            if self.alpaca_connected and symbol not in self.alpaca_subscribed:
                 await self._subscribe_alpaca_symbol(symbol)
+            elif symbol in self.alpaca_subscribed:
+                logger.info(f"Symbol {symbol} already subscribed in Alpaca, reusing existing subscription")
             else:
                 logger.info(f"Deferring Alpaca subscription for {symbol} until stream connects")
 
@@ -239,10 +248,14 @@ class TradeStreamServer:
         if symbol in self.subscriptions:
             self.subscriptions[symbol].discard(websocket)
 
-            # If no more subscribers, unsubscribe from Alpaca
+            # If no more subscribers, clean up but KEEP Alpaca subscription active
+            # This prevents Alpaca stream from closing and restarting on reconnect
             if not self.subscriptions[symbol]:
                 del self.subscriptions[symbol]
-                await self._unsubscribe_alpaca_symbol(symbol)
+                # FIXED: Don't unsubscribe from Alpaca to keep stream alive for fast reconnection
+                logger.info(f"No more clients for {symbol}, but keeping Alpaca subscription active for fast reconnection")
+                # NOTE: We keep the symbol in alpaca_subscribed set and don't call _unsubscribe_alpaca_symbol
+                # This wastes minimal resources but ensures instant reconnection without 5-second auth delay
 
             # Send confirmation (only if connection still open)
             try:
@@ -266,6 +279,11 @@ class TradeStreamServer:
 
     async def _subscribe_alpaca_symbol(self, symbol: str):
         """Subscribe to Alpaca trade stream for a symbol."""
+        # Only subscribe if Alpaca is connected
+        if not self.alpaca_connected:
+            logger.warning(f"Cannot subscribe to {symbol} - Alpaca stream not connected yet")
+            return
+
         logger.info(f"Subscribing to Alpaca stream for {symbol}")
 
         async def trade_handler(trade: Trade):
@@ -287,6 +305,13 @@ class TradeStreamServer:
         # Only unsubscribe if we actually subscribed to Alpaca
         if symbol not in self.alpaca_subscribed:
             logger.info(f"Symbol {symbol} was never subscribed to Alpaca, skipping unsubscribe")
+            return
+
+        # CRITICAL FIX: Don't unsubscribe if Alpaca isn't connected yet
+        # This prevents sending invalid commands during authentication
+        if not self.alpaca_connected:
+            logger.warning(f"Alpaca stream not connected, deferring unsubscribe for {symbol}")
+            self.alpaca_subscribed.discard(symbol)  # Remove from tracking but don't send command
             return
 
         logger.info(f"Unsubscribing from Alpaca stream for {symbol}")

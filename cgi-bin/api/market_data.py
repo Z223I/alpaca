@@ -162,6 +162,15 @@ def get_chart_data(symbol):
                 'range': range_str
             }), 500
 
+        # Calculate indicators if requested
+        indicators_param = request.args.get('indicators', '')
+        if indicators_param and chart_data.get('bars'):
+            indicators = indicators_param.split(',')
+            # Filter out VWAP if not a 1-day chart (VWAP only valid for intraday)
+            if range_str != '1d' and 'vwap' in indicators:
+                indicators = [ind for ind in indicators if ind != 'vwap']
+            chart_data['indicators'] = calculate_indicators(chart_data['bars'], indicators, range_str)
+
         return jsonify(chart_data)
 
     except Exception as e:
@@ -251,6 +260,167 @@ def internal_error(error):
     }), 500
 
 
+def calculate_indicators(bars, indicators, range_str='1d'):
+    """
+    Calculate technical indicators for the chart.
+
+    Args:
+        bars: List of bar dictionaries
+        indicators: List of indicator names to calculate
+        range_str: Time range of the chart (e.g., '1d', '5d', '1mo', '1y')
+
+    Returns:
+        Dictionary of indicator data
+    """
+    if not bars:
+        return {}
+
+    import pandas as pd
+    import numpy as np
+
+    # Convert bars to DataFrame
+    df = pd.DataFrame(bars)
+
+    result = {}
+
+    for indicator in indicators:
+        indicator = indicator.strip().lower()
+
+        if indicator == 'ema9':
+            result['ema9'] = calculate_ema(df, 9)
+        elif indicator == 'ema21':
+            result['ema21'] = calculate_ema(df, 21)
+        elif indicator == 'ema50':
+            result['ema50'] = calculate_ema(df, 50)
+        elif indicator == 'ema200':
+            result['ema200'] = calculate_ema(df, 200)
+        elif indicator == 'vwap':
+            result['vwap'] = calculate_vwap(df)
+        elif indicator == 'macd':
+            result['macd'] = calculate_macd(df)
+        elif indicator == 'volume':
+            result['volume'] = calculate_volume_data(df)
+
+    return result
+
+
+def calculate_ema(df, period):
+    """Calculate Exponential Moving Average."""
+    import pandas as pd
+    import numpy as np
+
+    if len(df) < period:
+        return []
+
+    ema = df['close'].ewm(span=period, adjust=False).mean()
+
+    # Return as list of {time, value} objects, filtering out invalid values
+    result = []
+    for i, (timestamp, value) in enumerate(zip(df['timestamp'], ema)):
+        # Only include valid, finite, non-NaN values
+        if not pd.isna(value) and not np.isinf(value) and value > 0:
+            result.append({
+                'time': timestamp,
+                'value': float(value)
+            })
+
+    return result
+
+
+def calculate_vwap(df):
+    """Calculate Volume Weighted Average Price (resets daily)."""
+    import pandas as pd
+    import numpy as np
+
+    if 'volume' not in df.columns or len(df) == 0:
+        return []
+
+    # Convert timestamps to datetime for grouping by day
+    df = df.copy()
+
+    # Ensure proper datetime conversion - timestamps may be strings or datetime objects
+    if not pd.api.types.is_datetime64_any_dtype(df['timestamp']):
+        # If not datetime, convert (may be ISO strings)
+        df['datetime'] = pd.to_datetime(df['timestamp'], utc=True)
+    else:
+        # Already datetime, just copy
+        df['datetime'] = df['timestamp']
+
+    df['date'] = df['datetime'].dt.date
+
+    result = []
+
+    # Calculate VWAP separately for each trading day
+    for date, day_df in df.groupby('date'):
+        typical_price = (day_df['high'] + day_df['low'] + day_df['close']) / 3
+
+        # Calculate cumulative VWAP for this day
+        cumulative_tp_volume = (typical_price * day_df['volume']).cumsum()
+        cumulative_volume = day_df['volume'].cumsum()
+
+        # Avoid division by zero
+        vwap = cumulative_tp_volume / cumulative_volume.replace(0, np.nan)
+
+        for timestamp, value, vol in zip(day_df['timestamp'], vwap, day_df['volume']):
+            # Only include valid values with actual volume
+            if not pd.isna(value) and vol > 0 and not np.isinf(value):
+                result.append({
+                    'time': timestamp,
+                    'value': float(value)
+                })
+
+    return result
+
+
+def calculate_macd(df):
+    """Calculate MACD indicator."""
+    import pandas as pd
+
+    if len(df) < 26:
+        return {'macd': [], 'signal': [], 'histogram': []}
+
+    # Calculate MACD components
+    ema12 = df['close'].ewm(span=12, adjust=False).mean()
+    ema26 = df['close'].ewm(span=26, adjust=False).mean()
+    macd_line = ema12 - ema26
+    signal_line = macd_line.ewm(span=9, adjust=False).mean()
+    histogram = macd_line - signal_line
+
+    # Format for TradingView Lightweight Charts
+    macd_data = []
+    signal_data = []
+    histogram_data = []
+
+    for i, (timestamp, macd_val, signal_val, hist_val) in enumerate(
+        zip(df['timestamp'], macd_line, signal_line, histogram)
+    ):
+        if not pd.isna(macd_val):
+            macd_data.append({'time': timestamp, 'value': float(macd_val)})
+            signal_data.append({'time': timestamp, 'value': float(signal_val)})
+            histogram_data.append({'time': timestamp, 'value': float(hist_val)})
+
+    return {
+        'macd': macd_data,
+        'signal': signal_data,
+        'histogram': histogram_data
+    }
+
+
+def calculate_volume_data(df):
+    """Format volume data for display."""
+    if 'volume' not in df.columns:
+        return []
+
+    result = []
+    for timestamp, volume in zip(df['timestamp'], df['volume']):
+        result.append({
+            'time': timestamp,
+            'value': int(volume)
+        })
+
+    return result
+
+
 # CGI Handler
 def application(environ, start_response):
     """
@@ -272,9 +442,9 @@ if __name__ == '__main__':
     print("  GET /api/trades/<symbol>?limit=100")
     print()
 
-    # Run development server
+    # Run production server (debug=False to avoid conflicts with local 'code' module)
     app.run(
         host='0.0.0.0',
         port=5000,
-        debug=True
+        debug=False
     )

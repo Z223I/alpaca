@@ -1,0 +1,19 @@
+[Unit]
+Description=Market Data API Flask Service
+After=network.target
+
+[Service]
+Type=simple
+User=wilsonb
+WorkingDirectory=/home/wilsonb/dl/github.com/Z223I/alpaca
+ExecStart=/home/wilsonb/dl/github.com/Z223I/alpaca/services/market_data_api_service.sh
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Environment
+Environment="PATH=/home/wilsonb/miniconda3/envs/alpaca/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+[Install]
+WantedBy=multi-user.target

@@ -226,9 +226,30 @@ Are manually added watch list items being sent to momentum_alerts.py?
 Add company names to index.html
 
 
+## Web Socket
+
+- [ ] Create ./wss_test dir.  Create ./wss_test/quotes.py from the code below.  Use the keys from .env.
+
+```python
+from alpaca.data.live import StockDataStream
+
+# Initialize the stream client (requires API keys)
+wss_client = StockDataStream('api-key', 'secret-key')
+
+# Define an async handler for quote data
+async def quote_data_handler(data):
+    print(data)  # Process quote data here
+
+# Subscribe to quotes for specific symbols
+wss_client.subscribe_quotes(quote_data_handler, "SPY")
+
+# Start receiving data
+wss_client.run()
+```
+
 ## Top Pre-market Gainers is Wrong
 
-- [ ] Oops it is using top gainers instead.  This might be from the Nano.  I need to do a betting job documenting this when I figure out what I meant.
+- [X] Oops it is using top gainers instead.  This might be from the Nano.  I need to do a betting job documenting this when I figure out what I meant.
 
 ## Stock Symbol Name
 
