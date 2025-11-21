@@ -84,10 +84,8 @@ async def test_symbol(symbol, test_num, duration=12):
 
             if trades_received > 0:
                 print(f"  ✅ Live trades received for {symbol}")
-            elif symbol == 'SGBX':
-                print(f"  ℹ️  No trades for {symbol} (may be low volume)")
             else:
-                print(f"  ⚠️  No trades received for {symbol}")
+                print(f"  ℹ️  No trades for {symbol} (may be low volume or off-market hours)")
 
             print(f"\n🔌 Disconnecting from {symbol}...")
             await ws.close()
@@ -102,10 +100,10 @@ async def test_symbol(symbol, test_num, duration=12):
         return False
 
 async def main():
-    """Test AAPL then SGBX."""
+    """Test AAPL then TSLA."""
 
     print("=" * 70)
-    print("SYMBOL SWITCHING TEST: AAPL → SGBX")
+    print("SYMBOL SWITCHING TEST: AAPL → TSLA")
     print("=" * 70)
     print(f"Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("\nThis test will:")
@@ -113,7 +111,7 @@ async def main():
     print("2. Wait for trades/confirmation")
     print("3. Disconnect")
     print("4. Wait 3 seconds")
-    print("5. Reconnect and subscribe to SGBX")
+    print("5. Reconnect and subscribe to TSLA")
     print("6. Wait for trades/confirmation")
 
     # Test 1: AAPL
@@ -125,17 +123,17 @@ async def main():
     print(f"{'='*70}")
     await asyncio.sleep(3)
 
-    # Test 2: SGBX
-    sgbx_success = await test_symbol("SGBX", 2, duration=12)
+    # Test 2: TSLA
+    tsla_success = await test_symbol("TSLA", 2, duration=12)
 
     # Final summary
     print("\n" + "=" * 70)
     print("FINAL RESULTS")
     print("=" * 70)
     print(f"AAPL Test: {'✅ PASSED' if aapl_success else '❌ FAILED'}")
-    print(f"SGBX Test: {'✅ PASSED' if sgbx_success else '❌ FAILED'}")
+    print(f"TSLA Test: {'✅ PASSED' if tsla_success else '❌ FAILED'}")
 
-    if aapl_success and sgbx_success:
+    if aapl_success and tsla_success:
         print("\n✅ SYMBOL SWITCHING TEST PASSED")
         print("   Backend correctly handles reconnection with different symbols")
     else:
@@ -143,7 +141,7 @@ async def main():
 
     print("=" * 70)
 
-    return aapl_success and sgbx_success
+    return aapl_success and tsla_success
 
 if __name__ == "__main__":
     try:
