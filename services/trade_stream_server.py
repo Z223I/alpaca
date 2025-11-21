@@ -288,8 +288,11 @@ class TradeStreamServer:
 
         async def trade_handler(trade: Trade):
             """Handler for incoming trades from Alpaca."""
-            logger.info(f"🔔 Received trade from Alpaca for {symbol}: ${trade.price:.2f} x {trade.size}")
-            await self.broadcast_trade(symbol, trade)
+            # CRITICAL FIX: Use trade.symbol from the Trade object instead of closure variable
+            # The closure variable causes all handlers to use the last subscribed symbol
+            actual_symbol = trade.symbol
+            logger.info(f"🔔 Received trade from Alpaca for {actual_symbol}: ${trade.price:.2f} x {trade.size}")
+            await self.broadcast_trade(actual_symbol, trade)
 
         # Subscribe to trades for this symbol
         # This is a synchronous call but it just registers the handler, doesn't block
