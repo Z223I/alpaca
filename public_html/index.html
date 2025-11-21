@@ -3861,8 +3861,10 @@
 
             tbody.innerHTML = scannerState.alerts.map(alert => {
                 // Format gain with + sign for positive values
-                const gainStr = alert.gain >= 0 ? `+${alert.gain.toFixed(2)}%` : `${alert.gain.toFixed(2)}%`;
-                const gainClass = alert.gain >= 0 ? 'positive' : 'negative';
+                const gainStr = (alert.gain != null)
+                    ? (alert.gain >= 0 ? `+${alert.gain.toFixed(2)}%` : `${alert.gain.toFixed(2)}%`)
+                    : 'N/A';
+                const gainClass = (alert.gain != null && alert.gain >= 0) ? 'positive' : 'negative';
 
                 // Format volume with commas
                 const volumeStr = alert.volume.toLocaleString();
