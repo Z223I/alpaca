@@ -28,7 +28,8 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import List, Set, Dict
+from typing import List, Set, Dict, Deque
+from collections import deque
 import websockets
 
 # Add project root to path
@@ -37,6 +38,9 @@ molecules_dir = os.path.dirname(script_dir)  # cgi-bin/molecules/
 cgi_bin_dir = os.path.dirname(molecules_dir)  # cgi-bin/
 project_root = os.path.dirname(cgi_bin_dir)  # project root
 sys.path.insert(0, project_root)
+
+from atoms.telegram.telegram_post import TelegramPoster
+from atoms.telegram.user_manager import UserManager
 
 
 class SqueezeAlertsMonitor:
@@ -50,7 +54,8 @@ class SqueezeAlertsMonitor:
         verbose: bool = False,
         websocket_url: str = "ws://localhost:8766",
         test_duration: int = None,
-        use_existing: bool = False
+        use_existing: bool = False,
+        squeeze_percent: float = 0.2
     ):
         """
         Initialize Squeeze Alerts Monitor.
@@ -63,6 +68,7 @@ class SqueezeAlertsMonitor:
             websocket_url: WebSocket server URL
             test_duration: Run for N seconds then stop and print summary (test mode)
             use_existing: Auto-subscribe to existing symbols from other clients
+            squeeze_percent: Percent price increase in 10 seconds to trigger squeeze alert
         """
         self.symbols_to_monitor: List[str] = []
         self.max_symbols = max_symbols
@@ -70,6 +76,7 @@ class SqueezeAlertsMonitor:
         self.verbose = verbose
         self.test_duration = test_duration
         self.use_existing = use_existing
+        self.squeeze_percent = squeeze_percent
 
         # Setup logging
         self.logger = self._setup_logging(verbose)
@@ -80,6 +87,16 @@ class SqueezeAlertsMonitor:
         self.active_subscriptions: Set[str] = set()
         self.start_time = None
         self.test_mode = test_duration is not None
+
+        # Squeeze detection: rolling 10-second window of trades per symbol
+        # Each symbol stores: deque of (timestamp, price) tuples
+        self.price_history: Dict[str, Deque[tuple]] = {}
+        self.squeeze_count = 0
+        self.squeezes_by_symbol: Dict[str, int] = {}
+
+        # Telegram integration
+        self.telegram_poster = TelegramPoster()
+        self.user_manager = UserManager()
 
         # Load symbols
         if use_existing:
@@ -297,7 +314,7 @@ class SqueezeAlertsMonitor:
 
     async def _handle_trade(self, trade_data: dict):
         """
-        Handle incoming trade data (Phase 1: Just log).
+        Handle incoming trade data and detect squeezes.
 
         Args:
             trade_data: Trade data from WebSocket
@@ -320,23 +337,164 @@ class SqueezeAlertsMonitor:
         self.trade_count += 1
         self.trades_by_symbol[symbol] = self.trades_by_symbol.get(symbol, 0) + 1
 
+        # Extract trade info
+        price = data['price']
+        size = data['size']
+        exchange = data.get('exchange', 'N/A')
+        timestamp_str = data['timestamp']
+
+        # Parse timestamp
+        from dateutil import parser as date_parser
+        timestamp = date_parser.parse(timestamp_str)
+
         # Log trade (suppress in test mode unless verbose)
         if not self.test_mode or self.verbose:
-            price = data['price']
-            size = data['size']
-            exchange = data.get('exchange', 'N/A')
-            timestamp = data['timestamp']
-
             self.logger.info(
                 f"📊 {symbol:6s} @ ${price:8.2f} x {size:6,d} shares  "
-                f"[{exchange}]  {timestamp}"
+                f"[{exchange}]  {timestamp_str}"
             )
 
-        # TODO Phase 2: Add squeeze detection logic here
-        # - Track volume
-        # - Detect price compression
-        # - Monitor volatility changes
-        # - Generate alerts on squeeze conditions
+        # Squeeze detection: Track prices in 10-second rolling window
+        await self._detect_squeeze(symbol, timestamp, price, size)
+
+    async def _detect_squeeze(self, symbol: str, timestamp: datetime, price: float, size: int):
+        """
+        Detect if a squeeze is happening based on 10-second rolling window.
+
+        A squeeze is detected when price increases by >= squeeze_percent in 10 seconds.
+
+        Args:
+            symbol: Stock symbol
+            timestamp: Trade timestamp
+            price: Trade price
+            size: Trade size
+        """
+        # Initialize price history for this symbol if needed
+        if symbol not in self.price_history:
+            self.price_history[symbol] = deque()
+
+        # Add current trade to history
+        self.price_history[symbol].append((timestamp, price))
+
+        # Remove trades older than 10 seconds
+        from datetime import timedelta
+        cutoff_time = timestamp - timedelta(seconds=10)
+
+        while self.price_history[symbol] and self.price_history[symbol][0][0] < cutoff_time:
+            self.price_history[symbol].popleft()
+
+        # Need at least 2 prices to detect a squeeze
+        if len(self.price_history[symbol]) < 2:
+            return
+
+        # Get lowest and highest prices in the window
+        prices = [p for _, p in self.price_history[symbol]]
+        low_price = min(prices)
+        high_price = max(prices)
+
+        # Calculate percent change from low to high
+        if low_price > 0:
+            percent_change = ((high_price - low_price) / low_price) * 100
+
+            # Check if we have a squeeze
+            if percent_change >= self.squeeze_percent:
+                # Check if we already reported this squeeze recently
+                # Only report once per symbol per 10-second window to avoid spam
+                last_squeeze_time = getattr(self, '_last_squeeze_time', {})
+                if symbol not in last_squeeze_time or (timestamp - last_squeeze_time[symbol]).total_seconds() > 10:
+                    self._report_squeeze(symbol, low_price, high_price, percent_change, timestamp, size)
+
+                    # Track last squeeze time
+                    if not hasattr(self, '_last_squeeze_time'):
+                        self._last_squeeze_time = {}
+                    self._last_squeeze_time[symbol] = timestamp
+
+    def _report_squeeze(self, symbol: str, low_price: float, high_price: float,
+                       percent_change: float, timestamp: datetime, size: int):
+        """
+        Report a detected squeeze to stdout and Telegram.
+
+        Args:
+            symbol: Stock symbol
+            low_price: Lowest price in 10-second window
+            high_price: Highest price in 10-second window
+            percent_change: Percent increase
+            timestamp: Current timestamp
+            size: Current trade size
+        """
+        self.squeeze_count += 1
+        self.squeezes_by_symbol[symbol] = self.squeezes_by_symbol.get(symbol, 0) + 1
+
+        # Print to stdout (not logger, so it's always visible)
+        print(f"\n{'='*70}")
+        print(f"🚀 SQUEEZE DETECTED - {symbol}")
+        print(f"{'='*70}")
+        print(f"Time:           {timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"Price Range:    ${low_price:.2f} → ${high_price:.2f}")
+        print(f"Change:         +{percent_change:.2f}% in 10 seconds")
+        print(f"Current Size:   {size:,} shares")
+        print(f"Window Trades:  {len(self.price_history[symbol])} trades")
+        print(f"Total Squeezes: {self.squeeze_count} ({self.squeezes_by_symbol[symbol]} for {symbol})")
+        print(f"{'='*70}\n")
+
+        # Also log it
+        self.logger.info(f"🚀 SQUEEZE: {symbol} +{percent_change:.2f}% (${low_price:.2f} → ${high_price:.2f})")
+
+        # Send Telegram alert to users with squeeze_alerts=true
+        self._send_telegram_alert(symbol, low_price, high_price, percent_change, timestamp, size)
+
+    def _send_telegram_alert(self, symbol: str, low_price: float, high_price: float,
+                            percent_change: float, timestamp: datetime, size: int):
+        """
+        Send Telegram alert to users with squeeze_alerts=true.
+
+        Args:
+            symbol: Stock symbol
+            low_price: Lowest price in 10-second window
+            high_price: Highest price in 10-second window
+            percent_change: Percent increase
+            timestamp: Current timestamp
+            size: Current trade size
+        """
+        try:
+            # Get users with squeeze_alerts=true
+            squeeze_users = self.user_manager.get_squeeze_alert_users()
+
+            if not squeeze_users:
+                self.logger.debug("No users with squeeze_alerts=true found")
+                return
+
+            # Format Telegram message
+            message = (
+                f"🚀 <b>SQUEEZE ALERT - {symbol}</b>\n\n"
+                f"⏰ Time: {timestamp.strftime('%H:%M:%S ET')}\n"
+                f"📈 Price: ${low_price:.2f} → ${high_price:.2f}\n"
+                f"📊 Change: <b>+{percent_change:.2f}%</b> in 10 seconds\n"
+                f"💰 Size: {size:,} shares\n"
+                f"📉 Trades: {len(self.price_history[symbol])} in window\n\n"
+                f"#Squeeze #{symbol}"
+            )
+
+            # Send to all squeeze alert users
+            sent_count = 0
+            for user in squeeze_users:
+                username = user.get('username', 'Unknown')
+                result = self.telegram_poster.send_message_to_user(
+                    message, username, urgent=True)  # Use urgent=True for squeeze alerts
+
+                if result['success']:
+                    sent_count += 1
+                    self.logger.debug(f"Sent squeeze alert to {username}")
+                else:
+                    self.logger.warning(f"Failed to send squeeze alert to {username}: {result.get('error')}")
+
+            if sent_count > 0:
+                self.logger.info(f"✅ Sent squeeze alert to {sent_count} user(s)")
+
+        except Exception as e:
+            self.logger.error(f"Error sending Telegram alert: {e}")
+            import traceback
+            traceback.print_exc()
 
     def _print_statistics(self):
         """Print monitoring statistics."""
@@ -351,6 +509,8 @@ class SqueezeAlertsMonitor:
         self.logger.info(f"Runtime: {runtime:.1f} seconds")
         self.logger.info(f"Total trades received: {self.trade_count:,}")
         self.logger.info(f"Active subscriptions: {len(self.active_subscriptions)}")
+        self.logger.info(f"Squeeze threshold: {self.squeeze_percent}%")
+        self.logger.info(f"Total squeezes detected: {self.squeeze_count}")
 
         if self.trade_count > 0:
             self.logger.info(f"Trades per second: {self.trade_count/runtime:.2f}")
@@ -365,6 +525,17 @@ class SqueezeAlertsMonitor:
                 self.logger.info("\nTop 10 Most Active Symbols:")
                 for i, (symbol, count) in enumerate(sorted_symbols[:10], 1):
                     self.logger.info(f"   {i:2d}. {symbol:6s} - {count:5,d} trades")
+
+            # Symbols with squeezes
+            if self.squeezes_by_symbol:
+                self.logger.info("\nSymbols with Squeezes:")
+                sorted_squeezes = sorted(
+                    self.squeezes_by_symbol.items(),
+                    key=lambda x: x[1],
+                    reverse=True
+                )
+                for i, (symbol, count) in enumerate(sorted_squeezes, 1):
+                    self.logger.info(f"   {i:2d}. {symbol:6s} - {count} squeeze(s)")
 
         self.logger.info("="*70)
 
@@ -443,6 +614,14 @@ Examples:
         help='Auto-subscribe to existing symbols from other clients (ignores --symbols and --symbols-file)'
     )
 
+    parser.add_argument(
+        '--squeeze-percent',
+        type=float,
+        default=0.2,
+        metavar='PERCENT',
+        help='Percent price increase in 10 seconds to trigger squeeze alert (default: 0.2%%)'
+    )
+
     args = parser.parse_args()
 
     # Parse symbols if provided
@@ -463,7 +642,8 @@ Examples:
         verbose=args.verbose,
         websocket_url=args.websocket_url,
         test_duration=args.test,
-        use_existing=use_existing
+        use_existing=use_existing,
+        squeeze_percent=args.squeeze_percent
     )
 
     await monitor.connect_and_monitor()

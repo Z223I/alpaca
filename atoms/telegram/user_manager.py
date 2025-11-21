@@ -136,6 +136,52 @@ class UserManager:
 
         return users
 
+    def get_squeeze_alert_users(self) -> List[Dict[str, str]]:
+        """
+        Return list of enabled users who have squeeze_alerts=true.
+
+        Returns:
+            List of user dicts with squeeze_alerts enabled
+        """
+        users = []
+
+        if not os.path.exists(self.csv_path):
+            print(f"CSV file does not exist: {self.csv_path}")
+            return users
+
+        try:
+            with open(self.csv_path, 'r', encoding='utf-8') as file:
+                reader = csv.DictReader(file)
+                for row in reader:
+                    chat_id = row.get('chat_id', '').strip()
+
+                    # Skip comment lines, empty rows, and header duplicates
+                    if (not chat_id or
+                            chat_id.startswith('#') or
+                            chat_id == 'chat_id'):
+                        continue
+
+                    # Only include enabled users with squeeze_alerts=true
+                    enabled = row.get('enabled', '').strip().lower()
+                    squeeze_alerts = row.get(
+                        'squeeze_alerts', '').strip().lower()
+
+                    if enabled == 'true' and squeeze_alerts == 'true':
+                        user = {
+                            'chat_id': chat_id,
+                            'username': row.get('username', '').strip(),
+                            'notes': row.get('notes', '').strip(),
+                            'squeeze_alerts': squeeze_alerts
+                        }
+                        users.append(user)
+
+        except Exception as e:
+            print(f"Error reading squeeze alert users from CSV: {e}")
+            import traceback
+            traceback.print_exc()
+
+        return users
+
     def add_user(self, chat_id: str, username: str = "", enabled: bool = True, notes: str = "") -> bool:
         """Add new user to CSV file."""
         try:
@@ -220,7 +266,7 @@ class UserManager:
             if users:
                 fieldnames = [
                     'chat_id', 'username', 'enabled',
-                    'created_date', 'notes', 'momentum_alerts'
+                    'created_date', 'notes', 'momentum_alerts', 'squeeze_alerts'
                 ]
                 writer = csv.DictWriter(file, fieldnames=fieldnames)
                 writer.writeheader()
