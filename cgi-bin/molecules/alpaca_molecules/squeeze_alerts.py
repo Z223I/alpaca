@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import List, Set, Dict, Deque
 from collections import deque
 import websockets
+import pytz
 
 # Add project root to path
 script_dir = os.path.dirname(os.path.abspath(__file__))  # cgi-bin/molecules/alpaca_molecules/
@@ -97,6 +98,12 @@ class SqueezeAlertsMonitor:
         # Telegram integration
         self.telegram_poster = TelegramPoster()
         self.user_manager = UserManager()
+
+        # Setup directories for saving squeeze alerts
+        self.et_tz = pytz.timezone('US/Eastern')
+        self.today = datetime.now(self.et_tz).strftime('%Y-%m-%d')
+        self.squeeze_alerts_sent_dir = Path(project_root) / "historical_data" / self.today / "squeeze_alerts_sent"
+        self.squeeze_alerts_sent_dir.mkdir(parents=True, exist_ok=True)
 
         # Load symbols
         if use_existing:
@@ -399,9 +406,9 @@ class SqueezeAlertsMonitor:
             # Check if we have a squeeze
             if percent_change >= self.squeeze_percent:
                 # Check if we already reported this squeeze recently
-                # Only report once per symbol per 10-second window to avoid spam
+                # Only report once per symbol per 30-second window to avoid spam
                 last_squeeze_time = getattr(self, '_last_squeeze_time', {})
-                if symbol not in last_squeeze_time or (timestamp - last_squeeze_time[symbol]).total_seconds() > 10:
+                if symbol not in last_squeeze_time or (timestamp - last_squeeze_time[symbol]).total_seconds() > 30:
                     self._report_squeeze(symbol, low_price, high_price, percent_change, timestamp, size)
 
                     # Track last squeeze time
@@ -441,7 +448,10 @@ class SqueezeAlertsMonitor:
         self.logger.info(f"🚀 SQUEEZE: {symbol} +{percent_change:.2f}% (${low_price:.2f} → ${high_price:.2f})")
 
         # Send Telegram alert to users with squeeze_alerts=true
-        self._send_telegram_alert(symbol, low_price, high_price, percent_change, timestamp, size)
+        sent_users = self._send_telegram_alert(symbol, low_price, high_price, percent_change, timestamp, size)
+
+        # Save squeeze alert to JSON file for scanner display
+        self._save_squeeze_alert_sent(symbol, low_price, high_price, percent_change, timestamp, size, sent_users)
 
     def _send_telegram_alert(self, symbol: str, low_price: float, high_price: float,
                             percent_change: float, timestamp: datetime, size: int):
@@ -491,8 +501,63 @@ class SqueezeAlertsMonitor:
             if sent_count > 0:
                 self.logger.info(f"✅ Sent squeeze alert to {sent_count} user(s)")
 
+            # Return list of usernames who received the alert
+            return [user.get('username', 'Unknown') for user in squeeze_users]
+
         except Exception as e:
             self.logger.error(f"Error sending Telegram alert: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+
+    def _save_squeeze_alert_sent(self, symbol: str, low_price: float, high_price: float,
+                                  percent_change: float, timestamp: datetime, size: int,
+                                  sent_to_users: List[str]) -> None:
+        """
+        Save sent squeeze alert to JSON file for scanner display.
+
+        Args:
+            symbol: Stock symbol
+            low_price: Lowest price in 10-second window
+            high_price: Highest price in 10-second window
+            percent_change: Percent increase
+            timestamp: Current timestamp
+            size: Current trade size
+            sent_to_users: List of usernames who received the alert
+        """
+        try:
+            # Create filename with timestamp
+            filename = f"alert_{symbol}_{timestamp.strftime('%Y-%m-%d_%H%M%S')}.json"
+            filepath = self.squeeze_alerts_sent_dir / filename
+
+            # Ensure timestamp is timezone-aware in ET
+            if timestamp.tzinfo is None:
+                timestamp = self.et_tz.localize(timestamp)
+            else:
+                timestamp = timestamp.astimezone(self.et_tz)
+
+            # Build alert data
+            alert_json = {
+                'symbol': symbol,
+                'timestamp': timestamp.isoformat(),
+                'low_price': float(low_price),
+                'high_price': float(high_price),
+                'percent_change': float(percent_change),
+                'size': int(size),
+                'window_trades': len(self.price_history.get(symbol, [])),
+                'squeeze_threshold': float(self.squeeze_percent),
+                'sent_to_users': sent_to_users,
+                'sent_count': len(sent_to_users)
+            }
+
+            # Save to JSON file
+            with open(filepath, 'w') as f:
+                json.dump(alert_json, f, indent=2)
+
+            self.logger.debug(f"📝 Saved squeeze alert for {symbol} to {filename}")
+
+        except Exception as e:
+            self.logger.error(f"❌ Error saving squeeze alert: {e}")
             import traceback
             traceback.print_exc()
 

@@ -1069,6 +1069,10 @@
             color: var(--accent-green);
         }
 
+        .scanner-table td.source-cell.squeeze-source {
+            color: var(--accent-orange);
+        }
+
         .scanner-table td.time-cell {
             color: var(--text-secondary);
             font-size: 12px;
@@ -3853,7 +3857,7 @@
             if (!scannerState.alerts || scannerState.alerts.length === 0) {
                 tbody.innerHTML = `
                     <tr class="scanner-empty">
-                        <td colspan="7">No momentum alerts</td>
+                        <td colspan="7">No alerts</td>
                     </tr>
                 `;
                 return;
@@ -3872,10 +3876,14 @@
                 // Format price with 2 decimal places
                 const priceStr = alert.price ? `$${alert.price.toFixed(2)}` : 'N/A';
 
+                // Style source based on alert type
+                const sourceClass = alert.source === 'Squeeze' ? 'squeeze-source' : '';
+                const sourceDisplay = alert.source === 'Squeeze' ? '🚀 Squeeze' : '📈 Momentum';
+
                 return `
                     <tr ondblclick="openChartFromScanner('${alert.symbol}')">
                         <td class="symbol-cell">${alert.symbol}</td>
-                        <td class="source-cell">${alert.source}</td>
+                        <td class="source-cell ${sourceClass}">${sourceDisplay}</td>
                         <td class="time-cell">${alert.time}</td>
                         <td class="price-cell">${priceStr}</td>
                         <td class="gain-cell ${gainClass}">${gainStr}</td>

@@ -27,6 +27,98 @@ sys.path.insert(0, str(project_root))
 import pytz
 
 
+def get_squeeze_alerts() -> List[Dict]:
+    """
+    Load recent squeeze alerts from the sent directory.
+
+    Reads from:
+    historical_data/{YYYY-MM-DD}/squeeze_alerts_sent/alert_*.json
+
+    Returns:
+        List of dictionaries with fields:
+        - symbol: Stock symbol
+        - source: "Squeeze"
+        - time: Time in ET (HH:MM:SS)
+        - price: High price from squeeze
+        - gain: Percent change during squeeze
+        - volume: Trade size
+        - text: Squeeze details
+        - timestamp: ISO timestamp for sorting
+    """
+    et_tz = pytz.timezone('US/Eastern')
+    today = datetime.now(et_tz).strftime('%Y-%m-%d')
+
+    # Directory path for squeeze alerts sent
+    alerts_dir = Path(project_root) / "historical_data" / today / "squeeze_alerts_sent"
+
+    alerts_list = []
+
+    # Check if directory exists
+    if not alerts_dir.exists():
+        print(f"Squeeze alerts directory not found: {alerts_dir}", file=sys.stderr)
+        return alerts_list
+
+    # Find all JSON alert files
+    alert_files = sorted(alerts_dir.glob('alert_*.json'), key=lambda x: x.stat().st_mtime, reverse=True)
+
+    # Limit to last 50 alerts
+    alert_files = alert_files[:50]
+
+    print(f"Found {len(alert_files)} squeeze alert files", file=sys.stderr)
+
+    for alert_file in alert_files:
+        try:
+            with open(alert_file, 'r') as f:
+                alert_data = json.load(f)
+
+            # Parse timestamp
+            timestamp_str = alert_data.get('timestamp', '')
+            if timestamp_str:
+                # Parse ISO timestamp with timezone
+                timestamp_dt = datetime.fromisoformat(timestamp_str)
+                # Ensure it's in ET
+                if timestamp_dt.tzinfo is None:
+                    timestamp_dt = et_tz.localize(timestamp_dt)
+                else:
+                    timestamp_dt = timestamp_dt.astimezone(et_tz)
+                time_str = timestamp_dt.strftime('%H:%M:%S')
+            else:
+                time_str = "N/A"
+
+            # Extract data
+            symbol = alert_data.get('symbol', 'N/A')
+            low_price = alert_data.get('low_price', 0)
+            high_price = alert_data.get('high_price', 0)
+            percent_change = alert_data.get('percent_change', 0)
+            size = alert_data.get('size', 0)
+            window_trades = alert_data.get('window_trades', 0)
+
+            # Build text field
+            text = f"🚀 +{percent_change:.2f}% squeeze | ${low_price:.2f} → ${high_price:.2f} | {window_trades} trades"
+
+            alert_obj = {
+                'symbol': symbol,
+                'source': 'Squeeze',
+                'time': time_str,
+                'price': high_price,  # Show high price
+                'gain': percent_change,  # Show percent change as "gain"
+                'volume': size,  # Show trade size as "volume"
+                'text': text,
+                'timestamp': timestamp_str  # For sorting
+            }
+
+            alerts_list.append(alert_obj)
+
+        except Exception as e:
+            print(f"Error reading squeeze alert file {alert_file}: {e}", file=sys.stderr)
+            continue
+
+    # Sort by timestamp descending (newest first)
+    alerts_list.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+
+    return alerts_list
+
+
 def get_momentum_alerts() -> List[Dict]:
     """
     Load recent momentum alerts from the sent directory.
@@ -154,12 +246,23 @@ def main():
     print("")  # End of headers
 
     try:
-        alerts = get_momentum_alerts()
+        # Get both momentum and squeeze alerts
+        momentum_alerts = get_momentum_alerts()
+        squeeze_alerts = get_squeeze_alerts()
+
+        # Combine and sort by timestamp
+        all_alerts = momentum_alerts + squeeze_alerts
+        all_alerts.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+
+        # Limit to 50 most recent alerts total
+        all_alerts = all_alerts[:50]
 
         response = {
             'success': True,
-            'count': len(alerts),
-            'data': alerts
+            'count': len(all_alerts),
+            'momentum_count': len(momentum_alerts),
+            'squeeze_count': len(squeeze_alerts),
+            'data': all_alerts
         }
 
         print(json.dumps(response, indent=2))
