@@ -1296,7 +1296,6 @@
             charts: new Map(),
             activeChart: null,
             updateIntervals: new Map(),
-            timeSalesIntervals: new Map(),
             tradeWebSocket: null,
             tradeBuffer: new Map(),  // Buffer for real-time trades
             wsReconnectAttempts: 0,
@@ -2046,15 +2045,10 @@
             const updateInterval = setInterval(() => loadChartData(symbol), refreshInterval);
             state.updateIntervals.set(symbol, updateInterval);
 
-            // Load initial historical trades
+            // Load initial historical trades (one-time load for initial display)
             loadTimeSales(symbol);
 
-            // Periodically refresh historical trades (every 2 seconds)
-            // This ensures T&S updates even during after-hours/market closed
-            const tradesInterval = setInterval(() => loadTimeSales(symbol), 2000);
-            state.updateIntervals.set(`trades_${symbol}`, tradesInterval);
-
-            // Subscribe to real-time trades via WebSocket
+            // Subscribe to real-time trades via WebSocket (replaces batch polling)
             subscribeToSymbol(symbol);
         }
 
@@ -2078,19 +2072,10 @@
             // Unsubscribe from real-time trades
             unsubscribeFromSymbol(symbol);
 
-            // Clear intervals
+            // Clear chart update interval
             if (state.updateIntervals.has(symbol)) {
                 clearInterval(state.updateIntervals.get(symbol));
                 state.updateIntervals.delete(symbol);
-            }
-            // Clear trades polling interval
-            if (state.updateIntervals.has(`trades_${symbol}`)) {
-                clearInterval(state.updateIntervals.get(`trades_${symbol}`));
-                state.updateIntervals.delete(`trades_${symbol}`);
-            }
-            if (state.timeSalesIntervals.has(symbol)) {
-                clearInterval(state.timeSalesIntervals.get(symbol));
-                state.timeSalesIntervals.delete(symbol);
             }
 
             // Clean up chart and resize observer
