@@ -101,6 +101,156 @@
             transform: scale(1.1);
         }
 
+        /* Fundamentals Icon in Header */
+        .fundamentals-icon-header {
+            cursor: pointer;
+            color: var(--accent-blue);
+            font-size: 24px;
+            margin-left: 20px;
+            transition: all 0.2s ease;
+        }
+
+        .fundamentals-icon-header:hover {
+            color: var(--accent-green);
+            transform: scale(1.1);
+        }
+
+        /* Fundamentals Popup */
+        .fundamentals-popup {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .fundamentals-popup-content {
+            background-color: var(--bg-secondary);
+            border: 2px solid var(--accent-blue);
+            border-radius: 10px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .fundamentals-popup-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .fundamentals-popup-header h2 {
+            font-size: 22px;
+            color: var(--accent-green);
+            margin: 0;
+        }
+
+        .fundamentals-close-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 28px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s;
+        }
+
+        .fundamentals-close-btn:hover {
+            color: var(--accent-red);
+        }
+
+        .fundamentals-input-container {
+            margin-bottom: 20px;
+        }
+
+        .fundamentals-input-container label {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .fundamentals-input-container input {
+            width: 100%;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            color: var(--text-primary);
+            font-size: 16px;
+            padding: 12px;
+            text-transform: uppercase;
+        }
+
+        .fundamentals-input-container input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .fundamentals-fetch-btn {
+            width: 100%;
+            background-color: var(--accent-blue);
+            border: none;
+            border-radius: 5px;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            padding: 12px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .fundamentals-fetch-btn:hover {
+            background-color: var(--accent-green);
+        }
+
+        .fundamentals-fetch-btn:disabled {
+            background-color: var(--text-secondary);
+            cursor: not-allowed;
+        }
+
+        .fundamentals-popup-data {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .fundamentals-popup-data h3 {
+            font-size: 18px;
+            color: var(--accent-blue);
+            margin-bottom: 15px;
+        }
+
+        .fundamentals-popup-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .fundamentals-popup-label {
+            color: var(--text-secondary);
+        }
+
+        .fundamentals-popup-value {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
         /* Main Container */
         .main-container {
             display: flex;
@@ -306,7 +456,7 @@
             z-index: 100;
             font-size: 14px;
             line-height: 1.6;
-            pointer-events: none;
+            pointer-events: auto;
         }
 
         .legend-symbol {
@@ -379,6 +529,78 @@
         .legend-volume-value {
             color: var(--text-primary);
             font-weight: 500;
+        }
+
+        /* Fundamentals Link Icon and Dropdown */
+        .fundamentals-link-icon {
+            display: inline-block;
+            margin-left: 8px;
+            font-size: 14px;
+            color: var(--accent-blue);
+            cursor: pointer;
+            pointer-events: auto;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .fundamentals-link-icon:hover {
+            color: var(--accent-green);
+            transform: scale(1.2);
+        }
+
+        .fundamentals-dropdown {
+            position: absolute;
+            top: 30px;
+            left: 0;
+            background-color: rgba(22, 33, 62, 0.98);
+            border: 1px solid var(--accent-blue);
+            border-radius: 6px;
+            padding: 12px 15px;
+            min-width: 280px;
+            z-index: 1000;
+            display: none;
+            pointer-events: auto;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+
+        .fundamentals-dropdown.show {
+            display: block;
+        }
+
+        .fundamentals-dropdown-header {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent-green);
+            margin-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 6px;
+        }
+
+        .fundamentals-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 12px;
+        }
+
+        .fundamentals-label {
+            color: var(--text-secondary);
+        }
+
+        .fundamentals-value {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .fundamentals-loading {
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-style: italic;
+        }
+
+        .fundamentals-error {
+            color: var(--accent-red);
+            font-size: 11px;
         }
 
         .volume-chart {
@@ -1149,6 +1371,33 @@
             <span class="search-icon" onclick="handleSearch()">🔍</span>
         </div>
         <span class="premarket-icon-external" onclick="openPremarketPopup()" title="View Premarket Top Gainers (Ctrl+G)">🌅</span>
+        <span class="fundamentals-icon-header" onclick="openFundamentalsPopup()" title="View Stock Fundamentals">📊</span>
+    </div>
+
+    <!-- Fundamentals Popup -->
+    <div id="fundamentalsPopup" class="fundamentals-popup" style="display: none;">
+        <div class="fundamentals-popup-content">
+            <div class="fundamentals-popup-header">
+                <h2>Company Fundamentals</h2>
+                <button class="fundamentals-close-btn" onclick="closeFundamentalsPopup()">✕</button>
+            </div>
+
+            <div class="fundamentals-input-container">
+                <label for="fundamentalsSymbolInput">Enter Stock Symbol</label>
+                <input
+                    type="text"
+                    id="fundamentalsSymbolInput"
+                    placeholder="e.g., AAPL, NVDA, TSLA"
+                    onkeypress="handleFundamentalsKeypress(event)"
+                />
+            </div>
+
+            <button class="fundamentals-fetch-btn" onclick="fetchFundamentalsForPopup()">Get Fundamentals</button>
+
+            <div id="fundamentalsPopupData" style="display: none;" class="fundamentals-popup-data">
+                <!-- Fundamentals data will be populated here -->
+            </div>
+        </div>
     </div>
 
     <!-- Premarket Top Gainers Popup -->
@@ -1952,7 +2201,14 @@
                         <div class="canvas-container" id="canvas-${symbol}" style="display: none;">
                             <div class="main-chart" id="chart-${symbol}">
                                 <div class="chart-legend" id="legend-${symbol}">
-                                    <div class="legend-symbol">${symbolDisplay}</div>
+                                    <div class="legend-symbol">
+                                        ${symbolDisplay}
+                                        <span class="fundamentals-link-icon" id="fundamentals-icon-${symbol}" onclick="toggleFundamentals('${symbol}', event)" title="View Fundamentals">🔗</span>
+                                        <div class="fundamentals-dropdown" id="fundamentals-dropdown-${symbol}">
+                                            <div class="fundamentals-dropdown-header">Company Fundamentals</div>
+                                            <div id="fundamentals-content-${symbol}" class="fundamentals-loading">Loading...</div>
+                                        </div>
+                                    </div>
                                     <div class="legend-price" id="legend-price-${symbol}">--</div>
                                     <div class="legend-details" id="legend-details-${symbol}">
                                         O: -- H: -- L: -- C: --
@@ -3317,11 +3573,109 @@
             popup.style.display = 'none';
         }
 
+        // ==================== Fundamentals Popup Functions ====================
+
+        function openFundamentalsPopup() {
+            const popup = document.getElementById('fundamentalsPopup');
+            popup.style.display = 'flex';
+            // Focus on input field
+            document.getElementById('fundamentalsSymbolInput').focus();
+        }
+
+        function closeFundamentalsPopup() {
+            const popup = document.getElementById('fundamentalsPopup');
+            popup.style.display = 'none';
+            // Reset popup
+            document.getElementById('fundamentalsSymbolInput').value = '';
+            document.getElementById('fundamentalsPopupData').style.display = 'none';
+            document.getElementById('fundamentalsPopupData').innerHTML = '';
+        }
+
+        function handleFundamentalsKeypress(event) {
+            if (event.key === 'Enter') {
+                fetchFundamentalsForPopup();
+            }
+        }
+
+        async function fetchFundamentalsForPopup() {
+            const input = document.getElementById('fundamentalsSymbolInput');
+            const symbol = input.value.trim().toUpperCase();
+            const dataDiv = document.getElementById('fundamentalsPopupData');
+            const fetchBtn = document.querySelector('.fundamentals-fetch-btn');
+
+            if (!symbol) {
+                alert('Please enter a stock symbol');
+                return;
+            }
+
+            try {
+                // Disable button and show loading
+                fetchBtn.disabled = true;
+                fetchBtn.textContent = 'Loading...';
+                dataDiv.style.display = 'block';
+                dataDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-secondary);">Loading fundamentals...</div>';
+
+                const response = await fetch(`cgi-bin/api/stock_fundamentals_api.py?symbol=${symbol}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    displayPopupFundamentals(symbol, data);
+                } else {
+                    dataDiv.innerHTML = `<div style="color: var(--accent-red); text-align: center; padding: 20px;">Error: ${data.error || 'Failed to load fundamentals'}</div>`;
+                }
+            } catch (error) {
+                console.error('Error fetching fundamentals:', error);
+                dataDiv.innerHTML = `<div style="color: var(--accent-red); text-align: center; padding: 20px;">Error: ${error.message}</div>`;
+            } finally {
+                // Re-enable button
+                fetchBtn.disabled = false;
+                fetchBtn.textContent = 'Get Fundamentals';
+            }
+        }
+
+        function displayPopupFundamentals(symbol, data) {
+            const dataDiv = document.getElementById('fundamentalsPopupData');
+
+            dataDiv.innerHTML = `
+                <h3>${symbol}${data.company_name ? ' - ' + data.company_name : ''}</h3>
+                <div class="fundamentals-popup-item">
+                    <span class="fundamentals-popup-label">Market Cap:</span>
+                    <span class="fundamentals-popup-value">${data.market_cap_formatted}</span>
+                </div>
+                <div class="fundamentals-popup-item">
+                    <span class="fundamentals-popup-label">Shares Outstanding:</span>
+                    <span class="fundamentals-popup-value">${data.shares_outstanding_formatted}</span>
+                </div>
+                <div class="fundamentals-popup-item">
+                    <span class="fundamentals-popup-label">Float Shares:</span>
+                    <span class="fundamentals-popup-value">${data.float_shares_formatted}</span>
+                </div>
+                ${data.sector !== 'N/A' ? `
+                <div class="fundamentals-popup-item" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-color);">
+                    <span class="fundamentals-popup-label">Sector:</span>
+                    <span class="fundamentals-popup-value">${data.sector}</span>
+                </div>
+                ` : ''}
+                ${data.industry !== 'N/A' ? `
+                <div class="fundamentals-popup-item">
+                    <span class="fundamentals-popup-label">Industry:</span>
+                    <span class="fundamentals-popup-value">${data.industry}</span>
+                </div>
+                ` : ''}
+            `;
+        }
+
         // Close popup when clicking outside of it
         window.onclick = function(event) {
-            const popup = document.getElementById('premarketPopup');
-            if (event.target === popup) {
+            const premarketPopup = document.getElementById('premarketPopup');
+            const fundamentalsPopup = document.getElementById('fundamentalsPopup');
+
+            if (event.target === premarketPopup) {
                 closePremarketPopup();
+            }
+
+            if (event.target === fundamentalsPopup) {
+                closeFundamentalsPopup();
             }
         }
 
@@ -3901,6 +4255,104 @@
                 <tr class="scanner-empty">
                     <td colspan="7" style="color: var(--accent-red);">${message}</td>
                 </tr>
+            `;
+        }
+
+        // ==================== Fundamentals Functions ====================
+
+        // Store fundamentals data to avoid repeated API calls
+        const fundamentalsCache = new Map();
+
+        // Toggle fundamentals dropdown
+        function toggleFundamentals(symbol, event) {
+            event.stopPropagation();
+
+            const dropdown = document.getElementById(`fundamentals-dropdown-${symbol}`);
+            const isCurrentlyShown = dropdown.classList.contains('show');
+
+            // Close all other dropdowns first
+            document.querySelectorAll('.fundamentals-dropdown').forEach(dd => {
+                dd.classList.remove('show');
+            });
+
+            if (!isCurrentlyShown) {
+                dropdown.classList.add('show');
+
+                // Load fundamentals if not already loaded
+                if (!fundamentalsCache.has(symbol)) {
+                    loadFundamentals(symbol);
+                }
+            }
+        }
+
+        // Close fundamentals dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            if (!event.target.closest('.fundamentals-link-icon') &&
+                !event.target.closest('.fundamentals-dropdown')) {
+                document.querySelectorAll('.fundamentals-dropdown').forEach(dd => {
+                    dd.classList.remove('show');
+                });
+            }
+        });
+
+        // Load fundamentals from API
+        async function loadFundamentals(symbol) {
+            const contentElement = document.getElementById(`fundamentals-content-${symbol}`);
+
+            try {
+                contentElement.className = 'fundamentals-loading';
+                contentElement.textContent = 'Loading...';
+
+                const response = await fetch(`cgi-bin/api/stock_fundamentals_api.py?symbol=${symbol}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    // Cache the data
+                    fundamentalsCache.set(symbol, data);
+
+                    // Display fundamentals
+                    displayFundamentals(symbol, data);
+                } else {
+                    contentElement.className = 'fundamentals-error';
+                    contentElement.textContent = `Error: ${data.error || 'Failed to load fundamentals'}`;
+                }
+            } catch (error) {
+                console.error(`Error loading fundamentals for ${symbol}:`, error);
+                contentElement.className = 'fundamentals-error';
+                contentElement.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        // Display fundamentals data
+        function displayFundamentals(symbol, data) {
+            const contentElement = document.getElementById(`fundamentals-content-${symbol}`);
+
+            contentElement.className = '';
+            contentElement.innerHTML = `
+                <div class="fundamentals-item">
+                    <span class="fundamentals-label">Market Cap:</span>
+                    <span class="fundamentals-value">${data.market_cap_formatted}</span>
+                </div>
+                <div class="fundamentals-item">
+                    <span class="fundamentals-label">Shares Outstanding:</span>
+                    <span class="fundamentals-value">${data.shares_outstanding_formatted}</span>
+                </div>
+                <div class="fundamentals-item">
+                    <span class="fundamentals-label">Float Shares:</span>
+                    <span class="fundamentals-value">${data.float_shares_formatted}</span>
+                </div>
+                ${data.sector !== 'N/A' ? `
+                <div class="fundamentals-item" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-color);">
+                    <span class="fundamentals-label">Sector:</span>
+                    <span class="fundamentals-value">${data.sector}</span>
+                </div>
+                ` : ''}
+                ${data.industry !== 'N/A' ? `
+                <div class="fundamentals-item">
+                    <span class="fundamentals-label">Industry:</span>
+                    <span class="fundamentals-value">${data.industry}</span>
+                </div>
+                ` : ''}
             `;
         }
 
