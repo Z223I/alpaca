@@ -2153,6 +2153,7 @@
                                     </div>
                                     <div class="legend-fundamentals" id="legend-fundamentals-${symbol}">
                                         <div class="legend-fundamentals-item">Float: <span id="legend-float-${symbol}">--</span></div>
+                                        <div class="legend-fundamentals-item">Float Rotation: <span id="legend-float-rotation-${symbol}">--</span></div>
                                         <div class="legend-fundamentals-item">Sector: <span id="legend-sector-${symbol}">--</span></div>
                                         <div class="legend-fundamentals-item">Industry: <span id="legend-industry-${symbol}">--</span></div>
                                     </div>
@@ -2261,10 +2262,11 @@
         // Load fundamentals for chart legend
         async function loadLegendFundamentals(symbol) {
             const floatElement = document.getElementById(`legend-float-${symbol}`);
+            const floatRotationElement = document.getElementById(`legend-float-rotation-${symbol}`);
             const sectorElement = document.getElementById(`legend-sector-${symbol}`);
             const industryElement = document.getElementById(`legend-industry-${symbol}`);
 
-            if (!floatElement || !sectorElement || !industryElement) return;
+            if (!floatElement || !floatRotationElement || !sectorElement || !industryElement) return;
 
             try {
                 const response = await fetch(`cgi-bin/api/stock_fundamentals_api.py?symbol=${symbol}`);
@@ -2272,17 +2274,20 @@
 
                 if (data.success) {
                     floatElement.textContent = data.float_shares_formatted || 'N/A';
+                    floatRotationElement.textContent = data.float_rotation_formatted || 'N/A';
                     sectorElement.textContent = data.sector || 'N/A';
                     industryElement.textContent = data.industry || 'N/A';
                 } else {
                     console.error(`Failed to load fundamentals for ${symbol}:`, data.error);
                     floatElement.textContent = 'N/A';
+                    floatRotationElement.textContent = 'N/A';
                     sectorElement.textContent = 'N/A';
                     industryElement.textContent = 'N/A';
                 }
             } catch (error) {
                 console.error(`Error loading fundamentals for ${symbol}:`, error);
                 floatElement.textContent = 'N/A';
+                floatRotationElement.textContent = 'N/A';
                 sectorElement.textContent = 'N/A';
                 industryElement.textContent = 'N/A';
             }
@@ -3626,6 +3631,16 @@
                     <span class="fundamentals-popup-label">Float Shares:</span>
                     <span class="fundamentals-popup-value">${data.float_shares_formatted}</span>
                 </div>
+                <div class="fundamentals-popup-item">
+                    <span class="fundamentals-popup-label">Float Rotation (Today):</span>
+                    <span class="fundamentals-popup-value">${data.float_rotation_formatted || 'N/A'}</span>
+                </div>
+                ${data.todays_volume_formatted && data.todays_volume_formatted !== 'N/A' ? `
+                <div class="fundamentals-popup-item">
+                    <span class="fundamentals-popup-label">Volume (Today):</span>
+                    <span class="fundamentals-popup-value">${data.todays_volume_formatted}</span>
+                </div>
+                ` : ''}
                 ${data.sector !== 'N/A' ? `
                 <div class="fundamentals-popup-item" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-color);">
                     <span class="fundamentals-popup-label">Sector:</span>

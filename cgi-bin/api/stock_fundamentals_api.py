@@ -10,7 +10,8 @@ import json
 import sys
 import os
 import yfinance as yf
-from datetime import datetime
+from datetime import datetime, time as dt_time
+import pytz
 
 # Add project root to path
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -62,6 +63,44 @@ def format_large_number(num):
         return "N/A"
 
 
+def get_todays_volume(symbol):
+    """
+    Get today's total volume so far using 1-hour bars from 04:00 ET to now.
+    This matches the methodology used in momentum_alerts.py.
+
+    Args:
+        symbol: Stock ticker symbol
+
+    Returns:
+        Total volume since 04:00 ET today, or None if not available
+    """
+    try:
+        et_tz = pytz.timezone('America/New_York')
+        now_et = datetime.now(et_tz)
+        today_date = now_et.date()
+
+        # Start time: 04:00 ET today
+        start_time = et_tz.localize(datetime.combine(today_date, dt_time(4, 0)))
+
+        # Don't fetch future data
+        end_time = now_et
+
+        # Fetch 1-hour bars
+        stock = yf.Ticker(symbol)
+        hist = stock.history(start=start_time, end=end_time, interval='1h')
+
+        if hist.empty:
+            return None
+
+        # Sum all volume from today's 1-hour bars
+        total_volume = int(hist['Volume'].sum())
+        return total_volume if total_volume > 0 else None
+
+    except Exception as e:
+        # Silently fail for volume - not critical
+        return None
+
+
 def get_stock_fundamentals(symbol):
     """
     Fetch stock fundamentals using yfinance.
@@ -70,7 +109,7 @@ def get_stock_fundamentals(symbol):
         symbol: Stock ticker symbol
 
     Returns:
-        Dictionary with fundamental data
+        Dictionary with fundamental data including float rotation
     """
     try:
         # Fetch stock info
@@ -87,6 +126,18 @@ def get_stock_fundamentals(symbol):
         sector = info.get('sector', 'N/A')
         industry = info.get('industry', 'N/A')
 
+        # Get today's volume and calculate float rotation
+        todays_volume = get_todays_volume(symbol)
+        float_rotation = None
+        float_rotation_percent = None
+        float_rotation_formatted = "N/A"
+
+        if float_shares and float_shares > 0 and todays_volume is not None:
+            # Float Rotation = Total Volume (since 04:00 ET) / Float Shares
+            float_rotation = todays_volume / float_shares
+            float_rotation_percent = float_rotation * 100
+            float_rotation_formatted = f"{float_rotation:.2f}x"
+
         return {
             'success': True,
             'symbol': symbol,
@@ -99,6 +150,11 @@ def get_stock_fundamentals(symbol):
             'market_cap_formatted': format_large_number(market_cap),
             'sector': sector,
             'industry': industry,
+            'todays_volume': todays_volume,
+            'todays_volume_formatted': format_large_number(todays_volume) if todays_volume else "N/A",
+            'float_rotation': float_rotation,
+            'float_rotation_percent': float_rotation_percent,
+            'float_rotation_formatted': float_rotation_formatted,
             'timestamp': datetime.now().isoformat()
         }
 
