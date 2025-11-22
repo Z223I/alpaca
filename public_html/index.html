@@ -531,76 +531,21 @@
             font-weight: 500;
         }
 
-        /* Fundamentals Link Icon and Dropdown */
-        .fundamentals-link-icon {
-            display: inline-block;
-            margin-left: 8px;
-            font-size: 14px;
-            color: var(--accent-blue);
-            cursor: pointer;
-            pointer-events: auto;
-            transition: all 0.2s;
-            position: relative;
-        }
-
-        .fundamentals-link-icon:hover {
-            color: var(--accent-green);
-            transform: scale(1.2);
-        }
-
-        .fundamentals-dropdown {
-            position: absolute;
-            top: 30px;
-            left: 0;
-            background-color: rgba(22, 33, 62, 0.98);
-            border: 1px solid var(--accent-blue);
-            border-radius: 6px;
-            padding: 12px 15px;
-            min-width: 280px;
-            z-index: 1000;
-            display: none;
-            pointer-events: auto;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-        }
-
-        .fundamentals-dropdown.show {
-            display: block;
-        }
-
-        .fundamentals-dropdown-header {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--accent-green);
-            margin-bottom: 10px;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 6px;
-        }
-
-        .fundamentals-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 4px 0;
-            font-size: 12px;
-        }
-
-        .fundamentals-label {
+        .legend-fundamentals {
+            font-size: 10px;
             color: var(--text-secondary);
+            margin-top: 5px;
+            padding-top: 5px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .fundamentals-value {
+        .legend-fundamentals-item {
+            margin: 2px 0;
+        }
+
+        .legend-fundamentals-item span {
             color: var(--text-primary);
             font-weight: 500;
-        }
-
-        .fundamentals-loading {
-            color: var(--text-secondary);
-            font-size: 12px;
-            font-style: italic;
-        }
-
-        .fundamentals-error {
-            color: var(--accent-red);
-            font-size: 11px;
         }
 
         .volume-chart {
@@ -2201,17 +2146,15 @@
                         <div class="canvas-container" id="canvas-${symbol}" style="display: none;">
                             <div class="main-chart" id="chart-${symbol}">
                                 <div class="chart-legend" id="legend-${symbol}">
-                                    <div class="legend-symbol">
-                                        ${symbolDisplay}
-                                        <span class="fundamentals-link-icon" id="fundamentals-icon-${symbol}" onclick="toggleFundamentals('${symbol}', event)" title="View Fundamentals">🔗</span>
-                                        <div class="fundamentals-dropdown" id="fundamentals-dropdown-${symbol}">
-                                            <div class="fundamentals-dropdown-header">Company Fundamentals</div>
-                                            <div id="fundamentals-content-${symbol}" class="fundamentals-loading">Loading...</div>
-                                        </div>
-                                    </div>
+                                    <div class="legend-symbol">${symbolDisplay}</div>
                                     <div class="legend-price" id="legend-price-${symbol}">--</div>
                                     <div class="legend-details" id="legend-details-${symbol}">
                                         O: -- H: -- L: -- C: --
+                                    </div>
+                                    <div class="legend-fundamentals" id="legend-fundamentals-${symbol}">
+                                        <div class="legend-fundamentals-item">Float: <span id="legend-float-${symbol}">--</span></div>
+                                        <div class="legend-fundamentals-item">Sector: <span id="legend-sector-${symbol}">--</span></div>
+                                        <div class="legend-fundamentals-item">Industry: <span id="legend-industry-${symbol}">--</span></div>
                                     </div>
                                     <div class="legend-volume" id="legend-volume-${symbol}"></div>
                                     <div class="legend-indicators" id="legend-indicators-${symbol}"></div>
@@ -2286,6 +2229,9 @@
             // Load chart data
             loadChartData(symbol);
 
+            // Load fundamentals for legend
+            loadLegendFundamentals(symbol);
+
             // Start auto-update with adaptive refresh rate based on chart interval
             const getRefreshInterval = (interval) => {
                 switch(interval) {
@@ -2310,6 +2256,36 @@
 
             // Subscribe to real-time trades via WebSocket (replaces batch polling)
             subscribeToSymbol(symbol);
+        }
+
+        // Load fundamentals for chart legend
+        async function loadLegendFundamentals(symbol) {
+            const floatElement = document.getElementById(`legend-float-${symbol}`);
+            const sectorElement = document.getElementById(`legend-sector-${symbol}`);
+            const industryElement = document.getElementById(`legend-industry-${symbol}`);
+
+            if (!floatElement || !sectorElement || !industryElement) return;
+
+            try {
+                const response = await fetch(`cgi-bin/api/stock_fundamentals_api.py?symbol=${symbol}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    floatElement.textContent = data.float_shares_formatted || 'N/A';
+                    sectorElement.textContent = data.sector || 'N/A';
+                    industryElement.textContent = data.industry || 'N/A';
+                } else {
+                    console.error(`Failed to load fundamentals for ${symbol}:`, data.error);
+                    floatElement.textContent = 'N/A';
+                    sectorElement.textContent = 'N/A';
+                    industryElement.textContent = 'N/A';
+                }
+            } catch (error) {
+                console.error(`Error loading fundamentals for ${symbol}:`, error);
+                floatElement.textContent = 'N/A';
+                sectorElement.textContent = 'N/A';
+                industryElement.textContent = 'N/A';
+            }
         }
 
         // Activate a chart panel
@@ -4259,102 +4235,6 @@
         }
 
         // ==================== Fundamentals Functions ====================
-
-        // Store fundamentals data to avoid repeated API calls
-        const fundamentalsCache = new Map();
-
-        // Toggle fundamentals dropdown
-        function toggleFundamentals(symbol, event) {
-            event.stopPropagation();
-
-            const dropdown = document.getElementById(`fundamentals-dropdown-${symbol}`);
-            const isCurrentlyShown = dropdown.classList.contains('show');
-
-            // Close all other dropdowns first
-            document.querySelectorAll('.fundamentals-dropdown').forEach(dd => {
-                dd.classList.remove('show');
-            });
-
-            if (!isCurrentlyShown) {
-                dropdown.classList.add('show');
-
-                // Load fundamentals if not already loaded
-                if (!fundamentalsCache.has(symbol)) {
-                    loadFundamentals(symbol);
-                }
-            }
-        }
-
-        // Close fundamentals dropdown when clicking outside
-        document.addEventListener('click', function(event) {
-            if (!event.target.closest('.fundamentals-link-icon') &&
-                !event.target.closest('.fundamentals-dropdown')) {
-                document.querySelectorAll('.fundamentals-dropdown').forEach(dd => {
-                    dd.classList.remove('show');
-                });
-            }
-        });
-
-        // Load fundamentals from API
-        async function loadFundamentals(symbol) {
-            const contentElement = document.getElementById(`fundamentals-content-${symbol}`);
-
-            try {
-                contentElement.className = 'fundamentals-loading';
-                contentElement.textContent = 'Loading...';
-
-                const response = await fetch(`cgi-bin/api/stock_fundamentals_api.py?symbol=${symbol}`);
-                const data = await response.json();
-
-                if (data.success) {
-                    // Cache the data
-                    fundamentalsCache.set(symbol, data);
-
-                    // Display fundamentals
-                    displayFundamentals(symbol, data);
-                } else {
-                    contentElement.className = 'fundamentals-error';
-                    contentElement.textContent = `Error: ${data.error || 'Failed to load fundamentals'}`;
-                }
-            } catch (error) {
-                console.error(`Error loading fundamentals for ${symbol}:`, error);
-                contentElement.className = 'fundamentals-error';
-                contentElement.textContent = `Error: ${error.message}`;
-            }
-        }
-
-        // Display fundamentals data
-        function displayFundamentals(symbol, data) {
-            const contentElement = document.getElementById(`fundamentals-content-${symbol}`);
-
-            contentElement.className = '';
-            contentElement.innerHTML = `
-                <div class="fundamentals-item">
-                    <span class="fundamentals-label">Market Cap:</span>
-                    <span class="fundamentals-value">${data.market_cap_formatted}</span>
-                </div>
-                <div class="fundamentals-item">
-                    <span class="fundamentals-label">Shares Outstanding:</span>
-                    <span class="fundamentals-value">${data.shares_outstanding_formatted}</span>
-                </div>
-                <div class="fundamentals-item">
-                    <span class="fundamentals-label">Float Shares:</span>
-                    <span class="fundamentals-value">${data.float_shares_formatted}</span>
-                </div>
-                ${data.sector !== 'N/A' ? `
-                <div class="fundamentals-item" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-color);">
-                    <span class="fundamentals-label">Sector:</span>
-                    <span class="fundamentals-value">${data.sector}</span>
-                </div>
-                ` : ''}
-                ${data.industry !== 'N/A' ? `
-                <div class="fundamentals-item">
-                    <span class="fundamentals-label">Industry:</span>
-                    <span class="fundamentals-value">${data.industry}</span>
-                </div>
-                ` : ''}
-            `;
-        }
 
         // Open chart from scanner (double-click)
         function openChartFromScanner(symbol) {
