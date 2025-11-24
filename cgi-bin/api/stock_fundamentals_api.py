@@ -65,8 +65,8 @@ def format_large_number(num):
 
 def get_todays_volume(symbol):
     """
-    Get today's total volume so far using 1-hour bars from 04:00 ET to now.
-    This matches the methodology used in momentum_alerts.py.
+    Get today's total volume so far using 1-minute bars from 04:00 ET to now.
+    Using 1-minute bars ensures we capture premarket volume accurately.
 
     Args:
         symbol: Stock ticker symbol
@@ -85,9 +85,18 @@ def get_todays_volume(symbol):
         # Don't fetch future data
         end_time = now_et
 
-        # Fetch 1-hour bars
+        # Try 1-minute bars first for better premarket coverage
         stock = yf.Ticker(symbol)
-        hist = stock.history(start=start_time, end=end_time, interval='1h')
+        hist = stock.history(start=start_time, end=end_time, interval='1m', prepost=True)
+
+        if not hist.empty:
+            # Sum all volume from today's 1-minute bars
+            total_volume = int(hist['Volume'].sum())
+            if total_volume > 0:
+                return total_volume
+
+        # Fallback to 1-hour bars if 1-minute fails (for older data or API limits)
+        hist = stock.history(start=start_time, end=end_time, interval='1h', prepost=True)
 
         if hist.empty:
             return None

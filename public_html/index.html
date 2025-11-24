@@ -3886,6 +3886,12 @@
                         // Keep if NOT deleted, OR if deleted but manually re-added
                         return !watchListState.deletedSymbols.has(symbol.symbol) ||
                                watchListState.manualSymbols.has(symbol.symbol);
+                    }).map(symbol => {
+                        // Preserve manual flag for symbols that were manually added
+                        if (watchListState.manualSymbols.has(symbol.symbol)) {
+                            return { ...symbol, manual: true };
+                        }
+                        return symbol;
                     });
 
                     // Also add back any manual symbols that aren't in the API response

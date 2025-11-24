@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=/home/wilsonb/dl/github.com/Z223I/alpaca
 Environment="PATH=/home/wilsonb/miniconda3/envs/alpaca/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-ExecStart=/home/wilsonb/miniconda3/envs/alpaca/bin/python cgi-bin/molecules/alpaca_molecules/squeeze_alerts.py --squeeze-percent 1.5
+ExecStart=/home/wilsonb/miniconda3/envs/alpaca/bin/python cgi-bin/molecules/alpaca_molecules/squeeze_alerts.py
 Restart=always
 RestartSec=10
 StandardOutput=append:/home/wilsonb/dl/github.com/Z223I/alpaca/logs/squeeze_alerts.log

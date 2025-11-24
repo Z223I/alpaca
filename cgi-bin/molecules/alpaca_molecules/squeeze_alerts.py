@@ -56,7 +56,7 @@ class SqueezeAlertsMonitor:
         websocket_url: str = "ws://localhost:8766",
         test_duration: int = None,
         use_existing: bool = False,
-        squeeze_percent: float = 0.2
+        squeeze_percent: float = 1.5
     ):
         """
         Initialize Squeeze Alerts Monitor.
@@ -69,7 +69,7 @@ class SqueezeAlertsMonitor:
             websocket_url: WebSocket server URL
             test_duration: Run for N seconds then stop and print summary (test mode)
             use_existing: Auto-subscribe to existing symbols from other clients
-            squeeze_percent: Percent price increase in 10 seconds to trigger squeeze alert
+            squeeze_percent: Percent price increase in 10 seconds to trigger squeeze alert (default: 1.5%)
         """
         self.symbols_to_monitor: List[str] = []
         self.max_symbols = max_symbols
@@ -104,6 +104,10 @@ class SqueezeAlertsMonitor:
         self.today = datetime.now(self.et_tz).strftime('%Y-%m-%d')
         self.squeeze_alerts_sent_dir = Path(project_root) / "historical_data" / self.today / "squeeze_alerts_sent"
         self.squeeze_alerts_sent_dir.mkdir(parents=True, exist_ok=True)
+
+        # Manual symbols file monitoring
+        self.manual_symbols_file = Path(project_root) / "data" / "manual_symbols.json"
+        self.last_subscription_time = None
 
         # Load symbols
         if use_existing:
@@ -150,6 +154,48 @@ class SqueezeAlertsMonitor:
             self.logger.error(f"Error loading symbols from {filepath}: {e}")
             sys.exit(1)
         return symbols
+
+    def _load_manual_symbols(self) -> List[str]:
+        """Load manually added symbols from JSON file."""
+        manual_symbols = []
+
+        if not self.manual_symbols_file.exists():
+            self.logger.debug(f"Manual symbols file not found: {self.manual_symbols_file}")
+            return manual_symbols
+
+        try:
+            with open(self.manual_symbols_file, 'r') as f:
+                data = json.load(f)
+
+            symbols = data.get('symbols', [])
+            manual_symbols = [s.strip().upper() for s in symbols if s.strip()]
+
+            if manual_symbols:
+                self.logger.info(f"Loaded {len(manual_symbols)} manual symbols from {self.manual_symbols_file}")
+
+        except Exception as e:
+            self.logger.error(f"Error loading manual symbols file {self.manual_symbols_file}: {e}")
+
+        return manual_symbols
+
+    def _get_all_symbols_to_monitor(self) -> List[str]:
+        """
+        Get all symbols to monitor from all sources (manual symbols + existing list).
+
+        Returns:
+            Combined list of unique symbols
+        """
+        all_symbols = set()
+
+        # Add existing symbols (from initial load or use_existing)
+        all_symbols.update(self.symbols_to_monitor)
+
+        # Add manual symbols
+        manual_symbols = self._load_manual_symbols()
+        all_symbols.update(manual_symbols)
+
+        # Convert to sorted list
+        return sorted(list(all_symbols))
 
     async def connect_and_monitor(self):
         """Connect to WebSocket and start monitoring trades."""
@@ -206,8 +252,8 @@ class SqueezeAlertsMonitor:
                     self.symbols_to_monitor = active_symbols
                     self.logger.info(f"✅ Found {len(active_symbols)} existing subscriptions: {', '.join(active_symbols)}")
                 else:
-                    self.logger.warning("⚠️  No existing subscriptions found, will use defaults")
-                    self.symbols_to_monitor = ["AAPL", "TSLA", "MSFT"]
+                    self.logger.warning("⚠️  No existing subscriptions found, will not subscribe to any defaults")
+                    self.symbols_to_monitor = []
             else:
                 self.logger.warning(f"⚠️  Unexpected response type: {data['type']}")
 
@@ -218,16 +264,36 @@ class SqueezeAlertsMonitor:
             self.logger.error(f"❌ Error querying existing symbols: {e}")
             sys.exit(1)
 
-    async def _subscribe_all_symbols(self, ws):
-        """Subscribe to all symbols in the monitor list."""
-        if not self.symbols_to_monitor:
+    async def _subscribe_all_symbols(self, ws, refresh: bool = False):
+        """
+        Subscribe to all symbols in the monitor list.
+
+        Args:
+            ws: WebSocket connection
+            refresh: If True, this is a periodic refresh and only subscribes to new symbols
+        """
+        # Get all symbols including manual ones
+        all_symbols = self._get_all_symbols_to_monitor()
+
+        if not all_symbols:
             self.logger.warning("⚠️  No symbols to subscribe to")
             return
 
-        self.logger.info(f"📤 Subscribing to {len(self.symbols_to_monitor)} symbols...")
+        # Determine which symbols need subscription
+        if refresh:
+            # Only subscribe to symbols not already subscribed
+            symbols_to_subscribe = [s for s in all_symbols if s not in self.active_subscriptions]
+            if not symbols_to_subscribe:
+                self.logger.debug("🔄 All symbols already subscribed")
+                return
+            self.logger.info(f"🔄 Subscribing to {len(symbols_to_subscribe)} new symbols (refresh)...")
+        else:
+            # Initial subscription - subscribe to all
+            symbols_to_subscribe = all_symbols
+            self.logger.info(f"📤 Subscribing to {len(symbols_to_subscribe)} symbols...")
 
         # Send subscription requests
-        for symbol in self.symbols_to_monitor:
+        for symbol in symbols_to_subscribe:
             subscribe_msg = json.dumps({
                 "action": "subscribe",
                 "symbol": symbol
@@ -239,9 +305,10 @@ class SqueezeAlertsMonitor:
         # Wait for subscription confirmations
         confirmed = 0
         timeout_count = 0
-        max_messages = len(self.symbols_to_monitor) * 3  # Allow for 'connecting' + 'subscribed' + buffer
+        max_messages = len(symbols_to_subscribe) * 3  # Allow for 'connecting' + 'subscribed' + buffer
 
-        self.logger.info("⏳ Waiting for subscription confirmations...")
+        if not refresh:
+            self.logger.info("⏳ Waiting for subscription confirmations...")
 
         for _ in range(max_messages):
             try:
@@ -255,12 +322,18 @@ class SqueezeAlertsMonitor:
                     symbol = data.get('symbol')
                     self.active_subscriptions.add(symbol)
                     confirmed += 1
-                    self.logger.info(f"   ✅ Subscribed to {symbol} ({confirmed}/{len(self.symbols_to_monitor)})")
+                    if refresh:
+                        self.logger.info(f"   ✅ Subscribed to {symbol}")
+                    else:
+                        self.logger.info(f"   ✅ Subscribed to {symbol} ({confirmed}/{len(symbols_to_subscribe)})")
                 elif data['type'] == 'error':
                     self.logger.error(f"   ❌ Subscription error: {data.get('message')}")
+                elif data['type'] == 'trade':
+                    # During refresh, we might receive trades - just continue waiting
+                    continue
 
                 # Exit early if all subscriptions confirmed
-                if confirmed == len(self.symbols_to_monitor):
+                if confirmed == len(symbols_to_subscribe):
                     break
 
             except asyncio.TimeoutError:
@@ -268,9 +341,15 @@ class SqueezeAlertsMonitor:
                 if timeout_count > 5:  # Stop waiting after 5 consecutive timeouts
                     break
 
-        self.logger.info(f"✅ Successfully subscribed to {confirmed}/{len(self.symbols_to_monitor)} symbols")
-        if confirmed < len(self.symbols_to_monitor):
-            self.logger.warning(f"⚠️  {len(self.symbols_to_monitor) - confirmed} symbols failed to subscribe")
+        if refresh and confirmed > 0:
+            self.logger.info(f"✅ Subscribed to {confirmed} new symbols")
+        elif not refresh:
+            self.logger.info(f"✅ Successfully subscribed to {confirmed}/{len(symbols_to_subscribe)} symbols")
+            if confirmed < len(symbols_to_subscribe):
+                self.logger.warning(f"⚠️  {len(symbols_to_subscribe) - confirmed} symbols failed to subscribe")
+
+        # Update last subscription time
+        self.last_subscription_time = datetime.now()
 
     async def _monitor_trades(self, ws):
         """Monitor and log incoming trades (Phase 1: Eavesdropping)."""
@@ -279,6 +358,7 @@ class SqueezeAlertsMonitor:
             self.logger.info(f"🧪 TEST MODE - Running for {self.test_duration} seconds")
         else:
             self.logger.info("🎧 EAVESDROPPING MODE - Monitoring live trades")
+            self.logger.info("   Refreshing subscriptions every 60 seconds")
             self.logger.info("   Press Ctrl+C to stop")
         self.logger.info("="*70)
 
@@ -292,6 +372,12 @@ class SqueezeAlertsMonitor:
                 # Check if test duration has elapsed
                 if self.test_mode and asyncio.get_event_loop().time() >= end_time:
                     raise KeyboardInterrupt("Test duration completed")
+
+                # Check if we should refresh subscriptions (every 60 seconds)
+                if self.last_subscription_time:
+                    time_since_last_subscription = (datetime.now() - self.last_subscription_time).total_seconds()
+                    if time_since_last_subscription >= 60:
+                        await self._subscribe_all_symbols(ws, refresh=True)
 
                 try:
                     message = await asyncio.wait_for(ws.recv(), timeout=1.0)
@@ -679,13 +765,6 @@ Examples:
         help='Auto-subscribe to existing symbols from other clients (ignores --symbols and --symbols-file)'
     )
 
-    parser.add_argument(
-        '--squeeze-percent',
-        type=float,
-        default=0.2,
-        metavar='PERCENT',
-        help='Percent price increase in 10 seconds to trigger squeeze alert (default: 0.2%%)'
-    )
 
     args = parser.parse_args()
 
@@ -707,8 +786,7 @@ Examples:
         verbose=args.verbose,
         websocket_url=args.websocket_url,
         test_duration=args.test,
-        use_existing=use_existing,
-        squeeze_percent=args.squeeze_percent
+        use_existing=use_existing
     )
 
     await monitor.connect_and_monitor()
