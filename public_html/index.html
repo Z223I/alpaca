@@ -273,12 +273,20 @@
             border: 1px solid var(--border-color);
             border-radius: 5px 5px 0 0;
             padding: 10px 20px;
-            cursor: pointer;
+            cursor: move;
             white-space: nowrap;
             display: flex;
             align-items: center;
             gap: 10px;
             transition: background-color 0.2s;
+        }
+
+        .tab.dragging {
+            opacity: 0.5;
+        }
+
+        .tab.drag-over {
+            border-left: 3px solid var(--accent-green);
         }
 
         .tab:hover {
@@ -2126,6 +2134,7 @@
             const tab = document.createElement('div');
             tab.className = 'tab';
             tab.id = `tab-${symbol}`;
+            tab.draggable = true;
             tab.onclick = () => activateChart(symbol);
             // Use symbolDisplay (with company name) in tab if available, otherwise just symbol
             const tabText = symbolDisplay || symbol;
@@ -2133,6 +2142,14 @@
                 <span title="${tabText}">${symbol}</span>
                 <span class="tab-close" onclick="closeChart('${symbol}', event)">×</span>
             `;
+
+            // Add drag event listeners
+            tab.addEventListener('dragstart', handleTabDragStart);
+            tab.addEventListener('dragend', handleTabDragEnd);
+            tab.addEventListener('dragover', handleTabDragOver);
+            tab.addEventListener('drop', handleTabDrop);
+            tab.addEventListener('dragleave', handleTabDragLeave);
+
             tabBar.appendChild(tab);
 
             // Create chart panel
@@ -2403,6 +2420,74 @@
                 document.getElementById('welcomeMessage').style.display = 'block';
                 state.activeChart = null;
             }
+        }
+
+        // Tab drag-and-drop handlers
+        let draggedTab = null;
+
+        function handleTabDragStart(e) {
+            draggedTab = e.target.closest('.tab');
+            if (draggedTab) {
+                draggedTab.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/html', draggedTab.innerHTML);
+            }
+        }
+
+        function handleTabDragEnd(e) {
+            const tab = e.target.closest('.tab');
+            if (tab) {
+                tab.classList.remove('dragging');
+            }
+            // Remove drag-over class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('drag-over');
+            });
+        }
+
+        function handleTabDragOver(e) {
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+            e.dataTransfer.dropEffect = 'move';
+
+            const targetTab = e.target.closest('.tab');
+            if (targetTab && targetTab !== draggedTab) {
+                // Remove drag-over from all tabs
+                document.querySelectorAll('.tab').forEach(tab => {
+                    tab.classList.remove('drag-over');
+                });
+                // Add drag-over to target
+                targetTab.classList.add('drag-over');
+            }
+
+            return false;
+        }
+
+        function handleTabDrop(e) {
+            if (e.stopPropagation) {
+                e.stopPropagation();
+            }
+
+            const targetTab = e.target.closest('.tab');
+            if (draggedTab !== targetTab && targetTab) {
+                const tabBar = document.getElementById('tabBar');
+                const allTabs = Array.from(tabBar.children);
+                const draggedIndex = allTabs.indexOf(draggedTab);
+                const targetIndex = allTabs.indexOf(targetTab);
+
+                if (draggedIndex < targetIndex) {
+                    tabBar.insertBefore(draggedTab, targetTab.nextSibling);
+                } else {
+                    tabBar.insertBefore(draggedTab, targetTab);
+                }
+            }
+
+            return false;
+        }
+
+        function handleTabDragLeave(e) {
+            e.target.closest('.tab')?.classList.remove('drag-over');
         }
 
         // Control functions

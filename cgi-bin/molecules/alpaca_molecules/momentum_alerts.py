@@ -2546,6 +2546,9 @@ class MomentumAlertsSystem:
             # Main control loop
             while self.running:
                 try:
+                    # Check if date has changed (e.g., past midnight)
+                    self._check_date_change()
+
                     # Check startup schedule
                     self._check_startup_schedule()
 
@@ -2587,6 +2590,59 @@ class MomentumAlertsSystem:
             self.logger.error(f"❌ Error in momentum alerts system: {e}")
         finally:
             await self.stop()
+
+    def _check_date_change(self):
+        """
+        Check if the date has changed and update directories if needed.
+
+        This handles the case where the system runs past midnight and needs
+        to update from one day's directories to the next day's directories.
+        """
+        current_date = datetime.now(self.et_tz).strftime('%Y-%m-%d')
+
+        if current_date != self.today:
+            old_date = self.today
+            self.logger.info(f"📅 Date changed from {old_date} to {current_date}")
+            self._update_date_directories(current_date)
+
+    def _update_date_directories(self, new_date: str):
+        """
+        Update all date-dependent directory paths to use the new date.
+
+        Args:
+            new_date: New date string in YYYY-MM-DD format
+        """
+        try:
+            self.logger.info(f"🔄 Updating directory paths for new date: {new_date}")
+
+            # Update the date
+            self.today = new_date
+
+            # Update all directory paths
+            self.historical_data_dir = Path("historical_data") / self.today / "premarket"
+            self.momentum_alerts_dir = Path("historical_data") / self.today / "momentum_alerts" / "bullish"
+            self.momentum_alerts_sent_dir = Path("historical_data") / self.today / "momentum_alerts_sent" / "bullish"
+            self.volume_surge_dir = Path("historical_data") / self.today / "volume_surge"
+            self.scanner_dir = Path("historical_data") / self.today / "scanner"
+
+            # Create new directories
+            self.momentum_alerts_dir.mkdir(parents=True, exist_ok=True)
+            self.momentum_alerts_sent_dir.mkdir(parents=True, exist_ok=True)
+            self.volume_surge_dir.mkdir(parents=True, exist_ok=True)
+            self.scanner_dir.mkdir(parents=True, exist_ok=True)
+
+            # Update CSV file path
+            self.csv_file_path = self.historical_data_dir / "top_gainers_nasdaq_amex.csv"
+
+            # Reset CSV file monitoring state
+            self.csv_last_modified = None
+
+            self.logger.info(f"✅ Directory paths updated successfully for {new_date}")
+            self.logger.info(f"📁 Momentum alerts dir: {self.momentum_alerts_sent_dir}")
+            self.logger.info(f"📁 Scanner dir: {self.scanner_dir}")
+
+        except Exception as e:
+            self.logger.error(f"❌ Error updating directory paths: {e}")
 
     async def stop(self):
         """Stop the momentum alerts system."""

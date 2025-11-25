@@ -351,6 +351,45 @@ class SqueezeAlertsMonitor:
         # Update last subscription time
         self.last_subscription_time = datetime.now()
 
+    def _check_date_change(self):
+        """
+        Check if the date has changed and update directories if needed.
+
+        This handles the case where the system runs past midnight and needs
+        to update from one day's directories to the next day's directories.
+        """
+        current_date = datetime.now(self.et_tz).strftime('%Y-%m-%d')
+
+        if current_date != self.today:
+            old_date = self.today
+            self.logger.info(f"📅 Date changed from {old_date} to {current_date}")
+            self._update_date_directories(current_date)
+
+    def _update_date_directories(self, new_date: str):
+        """
+        Update all date-dependent directory paths to use the new date.
+
+        Args:
+            new_date: New date string in YYYY-MM-DD format
+        """
+        try:
+            self.logger.info(f"🔄 Updating directory paths for new date: {new_date}")
+
+            # Update the date
+            self.today = new_date
+
+            # Update directory path
+            self.squeeze_alerts_sent_dir = Path(project_root) / "historical_data" / self.today / "squeeze_alerts_sent"
+
+            # Create new directory
+            self.squeeze_alerts_sent_dir.mkdir(parents=True, exist_ok=True)
+
+            self.logger.info(f"✅ Directory paths updated successfully for {new_date}")
+            self.logger.info(f"📁 Squeeze alerts dir: {self.squeeze_alerts_sent_dir}")
+
+        except Exception as e:
+            self.logger.error(f"❌ Error updating directory paths: {e}")
+
     async def _monitor_trades(self, ws):
         """Monitor and log incoming trades (Phase 1: Eavesdropping)."""
         self.logger.info("="*70)
@@ -369,6 +408,9 @@ class SqueezeAlertsMonitor:
 
         try:
             while True:
+                # Check if date has changed (e.g., past midnight)
+                self._check_date_change()
+
                 # Check if test duration has elapsed
                 if self.test_mode and asyncio.get_event_loop().time() >= end_time:
                     raise KeyboardInterrupt("Test duration completed")
