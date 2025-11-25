@@ -140,28 +140,22 @@ def get_watch_list_symbols() -> List[Dict]:
                             except (ValueError, TypeError):
                                 pass
 
-                        # Also get percent_change for gain_percent if available
-                        gain_percent = None
-                        if 'percent_change' in row:
-                            try:
-                                gain_percent = float(row['percent_change'])
-                            except (ValueError, TypeError):
-                                pass
+                        # NOTE: gain_percent is ONLY sourced from premarket top gainers CSV.
+                        # Volume surge CSV does not contribute to gain_percent, even though it has percent_change.
+                        # This ensures consistency and avoids confusion about which gain is being displayed.
 
                         if symbol in symbols_dict:
-                            # Symbol already exists - update surge flag and surge_amount
+                            # Symbol already exists - update surge flag and surge_amount only
                             symbols_dict[symbol]['surge'] = True
                             symbols_dict[symbol]['surge_amount'] = surge_amount
-                            # Update gain_percent only if not already set (prefer top_gainers value)
-                            if symbols_dict[symbol].get('gain_percent') is None:
-                                symbols_dict[symbol]['gain_percent'] = gain_percent
+                            # DO NOT update gain_percent - it remains from top_gainers source only
                         elif volume_surge_count < 40:  # Only add first 40 new symbols
                             symbols_dict[symbol] = {
                                 'oracle': False,
                                 'manual': False,
                                 'top_gainers': False,
                                 'surge': True,
-                                'gain_percent': gain_percent,
+                                'gain_percent': None,  # Only top_gainers provides gain_percent
                                 'surge_amount': surge_amount
                             }
                             volume_surge_count += 1
