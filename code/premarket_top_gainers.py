@@ -53,7 +53,7 @@ class PremarketCriteria:
     min_price: Optional[float] = 0.75
     max_price: Optional[float] = None
     min_volume: Optional[int] = 50_000  # Volume threshold (matches alpaca_screener.py)
-    min_gain_percent: Optional[float] = 1.0  # Minimum gain to be considered
+    min_gain_percent: Optional[float] = 10.0  # Minimum gain to be considered (default: 10%)
 
     # Data collection settings
     feed: str = "sip"  # iex, sip, or other feed names
@@ -861,7 +861,7 @@ Note: This scanner finds stocks gaining since the last market close and can run 
     parser.add_argument('--min-price', type=float, help='Minimum stock price (USD)')
     parser.add_argument('--max-price', type=float, help='Maximum stock price (USD)')
     parser.add_argument('--min-volume', type=int, help='Minimum volume (shares)')
-    parser.add_argument('--min-gain', type=float, help='Minimum gain percentage (e.g., 1.0 for 1%%)')
+    parser.add_argument('--min-gain', type=float, default=10.0, help='Minimum gain percentage (default: 10.0%%)')
 
     # Data source and limits
     parser.add_argument('--max-symbols', type=int, default=1000, help='Maximum symbols to analyze (default: 1000)')

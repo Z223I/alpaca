@@ -68,6 +68,8 @@ def get_watch_list_symbols() -> List[Dict]:
         - manual: Boolean - manually added (always False for now)
         - top_gainers: Boolean - from premarket top gainers list
         - surge: Boolean - from volume surge list
+        - gain_percent: Float or None - percentage gain from top_gainers or volume_surge
+        - surge_amount: Float or None - volume surge ratio from volume_surge
     """
     et_tz = pytz.timezone('US/Eastern')
     today = datetime.now(et_tz).strftime('%Y-%m-%d')
@@ -98,11 +100,21 @@ def get_watch_list_symbols() -> List[Dict]:
                     # Filter: must have symbol and not end in 'W'
                     if symbol and not symbol.endswith('W'):
                         if gainers_count < 40:  # Only keep first 40
+                            # Get gain_percent, default to None if not available
+                            gain_percent = None
+                            if 'gain_percent' in row:
+                                try:
+                                    gain_percent = float(row['gain_percent'])
+                                except (ValueError, TypeError):
+                                    pass
+
                             symbols_dict[symbol] = {
                                 'oracle': False,
                                 'manual': False,
                                 'top_gainers': True,
-                                'surge': False
+                                'surge': False,
+                                'gain_percent': gain_percent,
+                                'surge_amount': None
                             }
                             gainers_count += 1
                         else:
@@ -120,15 +132,37 @@ def get_watch_list_symbols() -> List[Dict]:
                     symbol = row.get('symbol', '').strip().upper()
                     # Filter: must have symbol and not end in 'W'
                     if symbol and not symbol.endswith('W'):
+                        # Get surge_amount (volume_surge_ratio), default to None if not available
+                        surge_amount = None
+                        if 'volume_surge_ratio' in row:
+                            try:
+                                surge_amount = float(row['volume_surge_ratio'])
+                            except (ValueError, TypeError):
+                                pass
+
+                        # Also get percent_change for gain_percent if available
+                        gain_percent = None
+                        if 'percent_change' in row:
+                            try:
+                                gain_percent = float(row['percent_change'])
+                            except (ValueError, TypeError):
+                                pass
+
                         if symbol in symbols_dict:
-                            # Symbol already exists - update surge flag
+                            # Symbol already exists - update surge flag and surge_amount
                             symbols_dict[symbol]['surge'] = True
+                            symbols_dict[symbol]['surge_amount'] = surge_amount
+                            # Update gain_percent only if not already set (prefer top_gainers value)
+                            if symbols_dict[symbol].get('gain_percent') is None:
+                                symbols_dict[symbol]['gain_percent'] = gain_percent
                         elif volume_surge_count < 40:  # Only add first 40 new symbols
                             symbols_dict[symbol] = {
                                 'oracle': False,
                                 'manual': False,
                                 'top_gainers': False,
-                                'surge': True
+                                'surge': True,
+                                'gain_percent': gain_percent,
+                                'surge_amount': surge_amount
                             }
                             volume_surge_count += 1
                         else:
@@ -155,7 +189,9 @@ def get_watch_list_symbols() -> List[Dict]:
                                 'oracle': True,
                                 'manual': False,
                                 'top_gainers': False,
-                                'surge': False
+                                'surge': False,
+                                'gain_percent': None,
+                                'surge_amount': None
                             }
         except Exception as e:
             print(f"Error loading oracle CSV {oracle_csv}: {e}", file=sys.stderr)

@@ -1021,6 +1021,15 @@
             color: var(--text-secondary);
             border-bottom: 2px solid var(--border-color);
             white-space: nowrap;
+            cursor: default;
+        }
+
+        .watch-list-table th[onclick] {
+            cursor: pointer;
+        }
+
+        .watch-list-table th[onclick]:hover {
+            background-color: var(--bg-secondary);
         }
 
         .watch-list-table th.source-col {
@@ -1028,9 +1037,30 @@
             width: 60px;
         }
 
+        .watch-list-table th.surge-col {
+            text-align: right;
+            width: 80px;
+        }
+
+        .watch-list-table th.gain-col {
+            text-align: right;
+            width: 80px;
+        }
+
         .watch-list-table th.del-col {
             text-align: center;
             width: 50px;
+        }
+
+        .watch-list-table th .sort-indicator {
+            margin-left: 5px;
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .watch-list-table th.sorted-asc .sort-indicator,
+        .watch-list-table th.sorted-desc .sort-indicator {
+            color: var(--accent-blue);
         }
 
         .watch-list-table tbody tr {
@@ -1056,6 +1086,26 @@
         .watch-list-table td.source-cell {
             text-align: center;
             font-size: 16px;
+        }
+
+        .watch-list-table td.surge-cell {
+            text-align: right;
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .watch-list-table td.gain-cell {
+            text-align: right;
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .watch-list-table td.gain-cell.positive {
+            color: var(--accent-green);
+        }
+
+        .watch-list-table td.gain-cell.negative {
+            color: var(--accent-red);
         }
 
         .watch-list-table td.del-cell {
@@ -1407,18 +1457,19 @@
                 <table class="watch-list-table">
                     <thead>
                         <tr>
-                            <th>Symbol</th>
+                            <th onclick="sortWatchList('symbol')">Symbol <span class="sort-indicator"></span></th>
                             <th class="source-col" title="Oracle">🔮</th>
                             <th class="source-col" title="Manual">✏️</th>
                             <th class="source-col" title="Premarket Top Gainers">🌅</th>
-                            <th class="source-col" title="Volume Surge">🚀</th>
+                            <th class="surge-col" onclick="sortWatchList('surge_amount')" title="Volume Surge Ratio">Surge <span class="sort-indicator"></span></th>
+                            <th class="gain-col" onclick="sortWatchList('gain_percent')" title="Percent Gain">Gain <span class="sort-indicator"></span></th>
                             <th class="del-col">Del</th>
                         </tr>
                     </thead>
                     <tbody id="watchListBody">
                         <!-- Symbols will be populated here -->
                         <tr class="watch-list-empty">
-                            <td colspan="6">Loading watch list...</td>
+                            <td colspan="8">Loading watch list...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -3856,7 +3907,9 @@
             symbols: [],
             manualSymbols: new Set(),  // Track manually added symbols
             deletedSymbols: new Set(), // Track deleted symbols (to hide on auto-refresh)
-            refreshInterval: null
+            refreshInterval: null,
+            sortColumn: 'symbol',
+            sortDirection: 'asc'
         };
 
         // Initialize watch list on page load
@@ -3904,13 +3957,15 @@
                                 oracle: false,
                                 manual: true,
                                 top_gainers: false,
-                                surge: false
+                                surge: false,
+                                gain_percent: null,
+                                surge_amount: null
                             });
                         }
                     });
 
-                    // Sort alphabetically
-                    watchListState.symbols.sort((a, b) => a.symbol.localeCompare(b.symbol));
+                    // Apply current sort
+                    sortWatchListData(watchListState.sortColumn, watchListState.sortDirection);
 
                     console.log(`Loaded ${watchListState.symbols.length} symbols from watch list (${data.count} from API, ${watchListState.deletedSymbols.size} deleted, ${watchListState.manualSymbols.size} manual)`);
                     renderWatchList();
@@ -3931,40 +3986,69 @@
             if (!watchListState.symbols || watchListState.symbols.length === 0) {
                 tbody.innerHTML = `
                     <tr class="watch-list-empty">
-                        <td colspan="6">No symbols in watch list</td>
+                        <td colspan="8">No symbols in watch list</td>
                     </tr>
                 `;
                 return;
             }
 
-            tbody.innerHTML = watchListState.symbols.map(symbol => `
-                <tr ondblclick="openChartFromWatchList('${symbol.symbol}')">
-                    <td class="symbol-cell">${symbol.symbol}</td>
-                    <td class="source-cell">
-                        <span class="source-indicator ${symbol.oracle ? 'on' : 'off'}"
-                              title="${symbol.oracle ? 'Oracle: Yes' : 'Oracle: No'}"></span>
-                    </td>
-                    <td class="source-cell">
-                        <span class="source-indicator ${symbol.manual ? 'on' : 'off'}"
-                              title="${symbol.manual ? 'Manual: Yes' : 'Manual: No'}"></span>
-                    </td>
-                    <td class="source-cell">
-                        <span class="source-indicator ${symbol.top_gainers ? 'on' : 'off'}"
-                              title="${symbol.top_gainers ? 'Premarket Top Gainers: Yes' : 'Premarket Top Gainers: No'}"></span>
-                    </td>
-                    <td class="source-cell">
-                        <span class="source-indicator ${symbol.surge ? 'on' : 'off'}"
-                              title="${symbol.surge ? 'Volume Surge: Yes' : 'Volume Surge: No'}"></span>
-                    </td>
-                    <td class="del-cell">
-                        <button class="delete-btn"
-                                onclick="event.stopPropagation(); deleteSymbolFromWatchList('${symbol.symbol}')"
-                                title="Delete ${symbol.symbol}">
-                            🗑️
-                        </button>
-                    </td>
-                </tr>
-            `).join('');
+            // Update sort indicators
+            const headers = document.querySelectorAll('.watch-list-table th');
+            headers.forEach(th => {
+                const column = th.getAttribute('onclick')?.match(/sortWatchList\('(.+?)'\)/)?.[1];
+                const indicator = th.querySelector('.sort-indicator');
+
+                if (indicator) {
+                    if (column === watchListState.sortColumn) {
+                        th.className = th.className.replace(/sorted-(asc|desc)/, '');
+                        th.classList.add(watchListState.sortDirection === 'asc' ? 'sorted-asc' : 'sorted-desc');
+                        indicator.textContent = watchListState.sortDirection === 'asc' ? '▲' : '▼';
+                    } else {
+                        th.className = th.className.replace(/sorted-(asc|desc)/, '');
+                        indicator.textContent = '';
+                    }
+                }
+            });
+
+            tbody.innerHTML = watchListState.symbols.map(symbol => {
+                // Format surge amount
+                const surgeStr = (symbol.surge_amount != null && symbol.surge_amount > 0)
+                    ? `${symbol.surge_amount.toFixed(1)}x`
+                    : '-';
+
+                // Format gain with + sign for positive values
+                const gainStr = (symbol.gain_percent != null)
+                    ? (symbol.gain_percent >= 0 ? `+${symbol.gain_percent.toFixed(2)}%` : `${symbol.gain_percent.toFixed(2)}%`)
+                    : '-';
+                const gainClass = (symbol.gain_percent != null && symbol.gain_percent >= 0) ? 'positive' : 'negative';
+
+                return `
+                    <tr ondblclick="openChartFromWatchList('${symbol.symbol}')">
+                        <td class="symbol-cell">${symbol.symbol}</td>
+                        <td class="source-cell">
+                            <span class="source-indicator ${symbol.oracle ? 'on' : 'off'}"
+                                  title="${symbol.oracle ? 'Oracle: Yes' : 'Oracle: No'}"></span>
+                        </td>
+                        <td class="source-cell">
+                            <span class="source-indicator ${symbol.manual ? 'on' : 'off'}"
+                                  title="${symbol.manual ? 'Manual: Yes' : 'Manual: No'}"></span>
+                        </td>
+                        <td class="source-cell">
+                            <span class="source-indicator ${symbol.top_gainers ? 'on' : 'off'}"
+                                  title="${symbol.top_gainers ? 'Premarket Top Gainers: Yes' : 'Premarket Top Gainers: No'}"></span>
+                        </td>
+                        <td class="surge-cell">${surgeStr}</td>
+                        <td class="gain-cell ${gainClass}">${gainStr}</td>
+                        <td class="del-cell">
+                            <button class="delete-btn"
+                                    onclick="event.stopPropagation(); deleteSymbolFromWatchList('${symbol.symbol}')"
+                                    title="Delete ${symbol.symbol}">
+                                🗑️
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
         }
 
         // Show watch list error
@@ -3972,9 +4056,50 @@
             const tbody = document.getElementById('watchListBody');
             tbody.innerHTML = `
                 <tr class="watch-list-empty">
-                    <td colspan="6" style="color: var(--accent-red);">${message}</td>
+                    <td colspan="8" style="color: var(--accent-red);">${message}</td>
                 </tr>
             `;
+        }
+
+        // Sort watch list table
+        function sortWatchList(column) {
+            if (watchListState.sortColumn === column) {
+                // Toggle direction
+                watchListState.sortDirection = watchListState.sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                // New column, default to descending for numeric columns, ascending for text
+                watchListState.sortColumn = column;
+                watchListState.sortDirection = column === 'symbol' ? 'asc' : 'desc';
+            }
+
+            sortWatchListData(column, watchListState.sortDirection);
+            renderWatchList();
+        }
+
+        // Sort watch list data
+        function sortWatchListData(column, direction) {
+            watchListState.symbols.sort((a, b) => {
+                let valA = a[column];
+                let valB = b[column];
+
+                // Handle null/undefined values - push them to the end
+                if (valA == null && valB == null) return 0;
+                if (valA == null) return 1;
+                if (valB == null) return -1;
+
+                // Handle numeric vs string comparison
+                if (typeof valA === 'number' && typeof valB === 'number') {
+                    return direction === 'asc' ? valA - valB : valB - valA;
+                } else {
+                    valA = String(valA).toLowerCase();
+                    valB = String(valB).toLowerCase();
+                    if (direction === 'asc') {
+                        return valA < valB ? -1 : valA > valB ? 1 : 0;
+                    } else {
+                        return valA > valB ? -1 : valA < valB ? 1 : 0;
+                    }
+                }
+            });
         }
 
         // Open chart from watch list (double-click)
@@ -4062,14 +4187,16 @@
                 oracle: false,
                 manual: true,
                 top_gainers: false,
-                surge: false
+                surge: false,
+                gain_percent: null,
+                surge_amount: null
             };
 
             watchListState.symbols.push(newSymbol);
             watchListState.manualSymbols.add(symbol);
 
             // Re-sort symbols
-            watchListState.symbols.sort((a, b) => a.symbol.localeCompare(b.symbol));
+            sortWatchListData(watchListState.sortColumn, watchListState.sortDirection);
 
             // Render and clear input
             renderWatchList();
