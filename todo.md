@@ -214,17 +214,22 @@ Real time charts. Add a bar for the ratio of selling versus buying. Buying to th
 Use alpaca-py to get the latest stock quote with ask_price, bid_size, and ask_size.
 Looking at your code in atoms/api/get_latest_quote.py:5 and atoms/display/print_quote.py:20-21, the current implementation only displays bid_price and ask_price, but the quote object also contains bid_size and ask_size that you can access.
 
+## HOD
 
+- [ ] Update cgi-bin/molecules/alpaca_molecules/market_data.py
+- [ ] Update cgi-bin/molecules/alpaca_molecules/squeeze_alerts.py to include HOD light icon
 
-How many time is Surge ran.  I want it more than once.
+## Surge More than Once
 
+- [X] How many time is Surge ran.  I want it more than once.
 
-Are manually added watch list items being sent to momentum_alerts.py?
+## Momo
 
+- [X]Are manually added watch list items being sent to momentum_alerts.py?
 
+## Company Names
 
-Add company names to index.html
-
+- [X] Add company names to index.html
 
 ## Web Socket
 

@@ -56,7 +56,7 @@ class SqueezeAlertsMonitor:
         websocket_url: str = "ws://localhost:8766",
         test_duration: int = None,
         use_existing: bool = False,
-        squeeze_percent: float = 1.5
+        squeeze_percent: float = 1.75
     ):
         """
         Initialize Squeeze Alerts Monitor.
@@ -69,7 +69,7 @@ class SqueezeAlertsMonitor:
             websocket_url: WebSocket server URL
             test_duration: Run for N seconds then stop and print summary (test mode)
             use_existing: Auto-subscribe to existing symbols from other clients
-            squeeze_percent: Percent price increase in 10 seconds to trigger squeeze alert (default: 1.5%)
+            squeeze_percent: Percent price increase in 10 seconds to trigger squeeze alert (default: 1.75%)
         """
         self.symbols_to_monitor: List[str] = []
         self.max_symbols = max_symbols
@@ -264,6 +264,63 @@ class SqueezeAlertsMonitor:
             self.logger.error(f"❌ Error querying existing symbols: {e}")
             sys.exit(1)
 
+    async def _refresh_existing_symbols(self, ws):
+        """
+        Re-query backend for existing symbol subscriptions during refresh cycle.
+
+        This is called periodically (every 60 seconds) to pick up new symbols
+        that other clients (like momentum_alerts) may have subscribed to.
+        """
+        self.logger.debug("🔄 Refreshing existing symbol subscriptions from backend...")
+
+        # Send health check to get active symbols
+        health_msg = json.dumps({"action": "health"})
+        await ws.send(health_msg)
+
+        try:
+            # Wait for health response - may need to consume trade messages first
+            max_attempts = 50  # Limit attempts to avoid infinite loop
+            for attempt in range(max_attempts):
+                response = await asyncio.wait_for(ws.recv(), timeout=2.0)
+                data = json.loads(response)
+
+                if data['type'] == 'health':
+                    active_symbols = data.get('active_symbols', [])
+
+                    # Get previously monitored symbols
+                    old_symbols = set(self.symbols_to_monitor)
+                    new_symbol_set = set(active_symbols)
+
+                    # Find newly added symbols
+                    added_symbols = new_symbol_set - old_symbols
+                    removed_symbols = old_symbols - new_symbol_set
+
+                    if added_symbols:
+                        self.logger.info(f"🆕 Found {len(added_symbols)} new symbols from backend: {', '.join(sorted(added_symbols))}")
+
+                    if removed_symbols:
+                        self.logger.info(f"📉 {len(removed_symbols)} symbols no longer active: {', '.join(sorted(removed_symbols))}")
+
+                    # Update monitored symbols
+                    self.symbols_to_monitor = active_symbols
+
+                    if not active_symbols:
+                        self.logger.debug("🔄 No active subscriptions found during refresh")
+
+                    # Successfully received health response
+                    break
+                elif data['type'] == 'trade':
+                    # Skip trade messages and continue waiting for health response
+                    continue
+                else:
+                    self.logger.warning(f"⚠️  Unexpected response type during refresh: {data['type']}")
+                    continue
+
+        except asyncio.TimeoutError:
+            self.logger.warning("⚠️  Timeout waiting for health response during refresh (will retry next cycle)")
+        except Exception as e:
+            self.logger.warning(f"⚠️  Error refreshing existing symbols: {e} (will retry next cycle)")
+
     async def _subscribe_all_symbols(self, ws, refresh: bool = False):
         """
         Subscribe to all symbols in the monitor list.
@@ -419,6 +476,9 @@ class SqueezeAlertsMonitor:
                 if self.last_subscription_time:
                     time_since_last_subscription = (datetime.now() - self.last_subscription_time).total_seconds()
                     if time_since_last_subscription >= 60:
+                        # If in use_existing mode, re-query backend for new symbols
+                        if self.use_existing:
+                            await self._refresh_existing_symbols(ws)
                         await self._subscribe_all_symbols(ws, refresh=True)
 
                 try:
