@@ -345,6 +345,8 @@ class SqueezeAlertsMonitor:
 
         if not all_symbols:
             self.logger.warning("⚠️  No symbols to subscribe to")
+            # Still update last subscription time so refresh cycle can trigger
+            self.last_subscription_time = datetime.now()
             return
 
         # Determine which symbols need subscription
@@ -353,6 +355,8 @@ class SqueezeAlertsMonitor:
             symbols_to_subscribe = [s for s in all_symbols if s not in self.active_subscriptions]
             if not symbols_to_subscribe:
                 self.logger.debug("🔄 All symbols already subscribed")
+                # Still update last subscription time to maintain refresh cycle
+                self.last_subscription_time = datetime.now()
                 return
             self.logger.info(f"🔄 Subscribing to {len(symbols_to_subscribe)} new symbols (refresh)...")
         else:
