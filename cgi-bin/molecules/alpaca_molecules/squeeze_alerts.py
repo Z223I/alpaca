@@ -553,9 +553,17 @@ class SqueezeAlertsMonitor:
         exchange = data.get('exchange', 'N/A')
         timestamp_str = data['timestamp']
 
-        # Parse timestamp
+        # Parse timestamp and convert to ET
         from dateutil import parser as date_parser
         timestamp = date_parser.parse(timestamp_str)
+
+        # Convert to ET timezone if not already
+        if timestamp.tzinfo is None:
+            # If naive, assume UTC
+            timestamp = pytz.UTC.localize(timestamp).astimezone(self.et_tz)
+        else:
+            # If timezone-aware, convert to ET
+            timestamp = timestamp.astimezone(self.et_tz)
 
         # Log trade (suppress in test mode unless verbose)
         if not self.test_mode or self.verbose:
