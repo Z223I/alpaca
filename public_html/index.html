@@ -2249,7 +2249,7 @@
                         </div>
                         <div class="time-sales-list" id="trades-${symbol}">
                             <div style="text-align: center; color: var(--text-secondary); padding: 20px;">
-                                Loading trades...
+                                Waiting for real-time trades...
                             </div>
                         </div>
                     </div>
@@ -2320,10 +2320,7 @@
             const updateInterval = setInterval(() => loadChartData(symbol), refreshInterval);
             state.updateIntervals.set(symbol, updateInterval);
 
-            // Load initial historical trades (one-time load for initial display)
-            loadTimeSales(symbol);
-
-            // Subscribe to real-time trades via WebSocket (replaces batch polling)
+            // Subscribe to real-time trades via WebSocket only (no historical load)
             subscribeToSymbol(symbol);
         }
 
@@ -3375,65 +3372,6 @@
             }, 500);
         }
 
-        // Load time and sales data
-        async function loadTimeSales(symbol) {
-            const container = document.getElementById(`trades-${symbol}`);
-            if (!container) {
-                console.error(`Time & sales container not found for ${symbol}`);
-                return;
-            }
-
-            // Only show loading state on initial load (when container is empty or has placeholder)
-            // Don't show loading if "No recent trades" is already displayed
-            const isInitialLoad = container.children.length === 0 ||
-                                  container.textContent.includes('Loading');
-
-            if (isInitialLoad) {
-                container.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 20px;">
-                    Loading trades...
-                </div>`;
-            }
-
-            try {
-                const apiUrl = `./cgi-bin/api/market_data_api.py?action=trades&symbol=${symbol}&limit=250`;
-                console.log('Loading trades from:', apiUrl);
-
-                const response = await fetch(apiUrl);
-
-                // Check if response is ok
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const result = await response.json();
-
-                console.log('Trades response for', symbol, ':', result);
-
-                if (!result.success) {
-                    console.error('Error loading trades for', symbol, ':', result.error);
-                    container.innerHTML = `<div style="text-align: center; color: var(--accent-red); padding: 20px;">
-                        Error: ${result.error || 'Failed to load trades'}
-                    </div>`;
-                    return;
-                }
-
-                if (!result.data || !result.data.trades || result.data.trades.length === 0) {
-                    console.warn('No trades available for', symbol);
-                    container.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 20px;">
-                        No recent trades available for ${symbol}
-                    </div>`;
-                    return;
-                }
-
-                console.log(`Got ${result.data.trades.length} trades for ${symbol}`);
-                renderTimeSales(symbol, result.data.trades);
-            } catch (error) {
-                console.error('Error loading time & sales for', symbol, ':', error);
-                container.innerHTML = `<div style="text-align: center; color: var(--accent-red); padding: 20px;">
-                    Failed to load trades: ${error.message}
-                </div>`;
-            }
-        }
 
         // Render time and sales
         function renderTimeSales(symbol, trades) {
