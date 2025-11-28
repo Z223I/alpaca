@@ -426,6 +426,119 @@ class AlpacaMarketData:
                 'bars': []
             }
 
+    def get_day_highs(self, symbol: str, trading_date: Optional[datetime] = None) -> Dict[str, Any]:
+        """
+        Calculate Premarket High and Regular Hours HOD for a symbol.
+
+        Args:
+            symbol: Stock symbol
+            trading_date: Trading date to calculate for (default: today in ET timezone)
+
+        Returns:
+            Dictionary containing:
+                - symbol: str
+                - date: str (YYYY-MM-DD)
+                - premarket_high: float or None (4:00 AM - 9:30 AM ET)
+                - premarket_high_time: str or None (ISO format timestamp)
+                - regular_hours_hod: float or None (9:30 AM - 4:00 PM ET)
+                - regular_hours_hod_time: str or None (ISO format timestamp)
+                - error: str (if any error occurred)
+        """
+        try:
+            # Use today in ET timezone if no date provided
+            if trading_date is None:
+                trading_date = datetime.now(self.et_tz)
+
+            # Ensure trading_date is timezone-aware in ET
+            if trading_date.tzinfo is None:
+                trading_date = self.et_tz.localize(trading_date)
+            else:
+                trading_date = trading_date.astimezone(self.et_tz)
+
+            # Get the date string
+            date_str = trading_date.strftime('%Y-%m-%d')
+
+            # Define time ranges
+            # Premarket: 4:00 AM - 9:30 AM ET
+            premarket_start = self.et_tz.localize(
+                datetime.combine(trading_date.date(), datetime.min.time())
+            ).replace(hour=4, minute=0, second=0, microsecond=0)
+
+            premarket_end = self.et_tz.localize(
+                datetime.combine(trading_date.date(), datetime.min.time())
+            ).replace(hour=9, minute=30, second=0, microsecond=0)
+
+            # Regular hours: 9:30 AM - 4:00 PM ET
+            regular_start = premarket_end
+            regular_end = self.et_tz.localize(
+                datetime.combine(trading_date.date(), datetime.min.time())
+            ).replace(hour=16, minute=0, second=0, microsecond=0)
+
+            # Get 1-minute bars for the entire day (4:00 AM - 4:00 PM)
+            # This captures both premarket and regular hours
+            df = self.get_bar_data(symbol, '1m', premarket_start, regular_end)
+
+            if df.empty:
+                return {
+                    'symbol': symbol,
+                    'date': date_str,
+                    'premarket_high': None,
+                    'premarket_high_time': None,
+                    'regular_hours_hod': None,
+                    'regular_hours_hod_time': None,
+                    'error': 'No data available for this date'
+                }
+
+            # Ensure timestamp column is timezone-aware
+            if df['timestamp'].dt.tz is None:
+                df['timestamp'] = df['timestamp'].dt.tz_localize(self.et_tz)
+            else:
+                df['timestamp'] = df['timestamp'].dt.tz_convert(self.et_tz)
+
+            # Filter for premarket hours (4:00 AM - 9:30 AM)
+            premarket_df = df[(df['timestamp'] >= premarket_start) & (df['timestamp'] < premarket_end)]
+
+            # Filter for regular hours (9:30 AM - 4:00 PM)
+            regular_df = df[(df['timestamp'] >= regular_start) & (df['timestamp'] <= regular_end)]
+
+            # Calculate premarket high
+            premarket_high = None
+            premarket_high_time = None
+            if not premarket_df.empty:
+                max_idx = premarket_df['high'].idxmax()
+                premarket_high = float(premarket_df.loc[max_idx, 'high'])
+                premarket_high_time = premarket_df.loc[max_idx, 'timestamp'].isoformat()
+
+            # Calculate regular hours HOD
+            regular_hours_hod = None
+            regular_hours_hod_time = None
+            if not regular_df.empty:
+                max_idx = regular_df['high'].idxmax()
+                regular_hours_hod = float(regular_df.loc[max_idx, 'high'])
+                regular_hours_hod_time = regular_df.loc[max_idx, 'timestamp'].isoformat()
+
+            return {
+                'symbol': symbol,
+                'date': date_str,
+                'premarket_high': premarket_high,
+                'premarket_high_time': premarket_high_time,
+                'regular_hours_hod': regular_hours_hod,
+                'regular_hours_hod_time': regular_hours_hod_time,
+                'premarket_bars': len(premarket_df),
+                'regular_hours_bars': len(regular_df)
+            }
+
+        except Exception as e:
+            return {
+                'symbol': symbol,
+                'date': date_str if 'date_str' in locals() else None,
+                'premarket_high': None,
+                'premarket_high_time': None,
+                'regular_hours_hod': None,
+                'regular_hours_hod_time': None,
+                'error': str(e)
+            }
+
     def get_time_and_sales(self, symbol: str, start_date: Optional[datetime] = None,
                            limit: int = 100) -> List[Dict[str, Any]]:
         """
@@ -553,6 +666,13 @@ if __name__ == "__main__":
         print(f"Retrieved {len(trades)} trades")
         if trades:
             print(f"Latest trade: {json.dumps(trades[-1], indent=2)}")
+
+        # Test 4: Get day highs (Premarket High and Regular Hours HOD)
+        print(f"\n{'='*60}")
+        print(f"Test 4: Getting Premarket High and Regular Hours HOD for {symbol}")
+        print(f"{'='*60}")
+        day_highs = client.get_day_highs(symbol)
+        print(json.dumps(day_highs, indent=2))
 
         print(f"\n{'='*60}")
         print("All tests completed!")

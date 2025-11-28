@@ -43,6 +43,14 @@ sys.path.insert(0, project_root)
 from atoms.telegram.telegram_post import TelegramPoster
 from atoms.telegram.user_manager import UserManager
 
+# Import market data - use relative import since we're in the same directory
+import importlib.util
+market_data_path = os.path.join(script_dir, 'market_data.py')
+spec = importlib.util.spec_from_file_location("market_data", market_data_path)
+market_data_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(market_data_module)
+AlpacaMarketData = market_data_module.AlpacaMarketData
+
 
 class SqueezeAlertsMonitor:
     """Real-time trade monitoring system for squeeze detection."""
@@ -98,6 +106,9 @@ class SqueezeAlertsMonitor:
         # Telegram integration
         self.telegram_poster = TelegramPoster()
         self.user_manager = UserManager()
+
+        # Market data client for HOD/premarket high
+        self.market_data = AlpacaMarketData()
 
         # Setup directories for saving squeeze alerts
         self.et_tz = pytz.timezone('US/Eastern')
@@ -604,6 +615,32 @@ class SqueezeAlertsMonitor:
                         self._last_squeeze_time = {}
                     self._last_squeeze_time[symbol] = timestamp
 
+    def _get_price_status(self, current_price: float, reference_high: float) -> tuple:
+        """
+        Determine the status color and icon based on how close current price is to a reference high.
+
+        Args:
+            current_price: Current trade price
+            reference_high: Reference high price (HOD or premarket high)
+
+        Returns:
+            Tuple of (icon, color_name, percent_off)
+            - Green if within 1.5% of high
+            - Red if 5% or more below high
+            - Yellow otherwise
+        """
+        if reference_high is None or reference_high == 0:
+            return ("⚪", "white", None)
+
+        percent_off = ((reference_high - current_price) / reference_high) * 100
+
+        if percent_off <= 1.5:
+            return ("🟢", "green", percent_off)
+        elif percent_off >= 5.0:
+            return ("🔴", "red", percent_off)
+        else:
+            return ("🟡", "yellow", percent_off)
+
     def _report_squeeze(self, symbol: str, low_price: float, high_price: float,
                        percent_change: float, timestamp: datetime, size: int):
         """
@@ -620,6 +657,17 @@ class SqueezeAlertsMonitor:
         self.squeeze_count += 1
         self.squeezes_by_symbol[symbol] = self.squeezes_by_symbol.get(symbol, 0) + 1
 
+        # Get HOD and premarket high data
+        day_highs = self.market_data.get_day_highs(symbol, timestamp)
+        premarket_high = day_highs.get('premarket_high')
+        regular_hod = day_highs.get('regular_hours_hod')
+
+        # Determine status for premarket high
+        pm_icon, pm_color, pm_percent_off = self._get_price_status(high_price, premarket_high)
+
+        # Determine status for regular hours HOD
+        hod_icon, hod_color, hod_percent_off = self._get_price_status(high_price, regular_hod)
+
         # Print to stdout (not logger, so it's always visible)
         print(f"\n{'='*70}")
         print(f"🚀 SQUEEZE DETECTED - {symbol}")
@@ -627,8 +675,20 @@ class SqueezeAlertsMonitor:
         print(f"Time:           {timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"Price Range:    ${low_price:.2f} → ${high_price:.2f}")
         print(f"Change:         +{percent_change:.2f}% in 10 seconds")
-        print(f"Current Size:   {size:,} shares")
         print(f"Window Trades:  {len(self.price_history[symbol])} trades")
+
+        # Display premarket high status
+        if premarket_high:
+            print(f"Premarket High: {pm_icon} ${premarket_high:.2f} ({pm_percent_off:.1f}% off)")
+        else:
+            print(f"Premarket High: {pm_icon} N/A")
+
+        # Display regular hours HOD status
+        if regular_hod:
+            print(f"Regular HOD:    {hod_icon} ${regular_hod:.2f} ({hod_percent_off:.1f}% off)")
+        else:
+            print(f"Regular HOD:    {hod_icon} N/A")
+
         print(f"Total Squeezes: {self.squeeze_count} ({self.squeezes_by_symbol[symbol]} for {symbol})")
         print(f"{'='*70}\n")
 
@@ -636,13 +696,23 @@ class SqueezeAlertsMonitor:
         self.logger.info(f"🚀 SQUEEZE: {symbol} +{percent_change:.2f}% (${low_price:.2f} → ${high_price:.2f})")
 
         # Send Telegram alert to users with squeeze_alerts=true
-        sent_users = self._send_telegram_alert(symbol, low_price, high_price, percent_change, timestamp, size)
+        sent_users = self._send_telegram_alert(
+            symbol, low_price, high_price, percent_change, timestamp, size,
+            premarket_high, pm_icon, pm_percent_off,
+            regular_hod, hod_icon, hod_percent_off
+        )
 
         # Save squeeze alert to JSON file for scanner display
-        self._save_squeeze_alert_sent(symbol, low_price, high_price, percent_change, timestamp, size, sent_users)
+        self._save_squeeze_alert_sent(
+            symbol, low_price, high_price, percent_change, timestamp, size, sent_users,
+            premarket_high, pm_icon, pm_color, pm_percent_off,
+            regular_hod, hod_icon, hod_color, hod_percent_off
+        )
 
     def _send_telegram_alert(self, symbol: str, low_price: float, high_price: float,
-                            percent_change: float, timestamp: datetime, size: int):
+                            percent_change: float, timestamp: datetime, size: int,
+                            premarket_high: float, pm_icon: str, pm_percent_off: float,
+                            regular_hod: float, hod_icon: str, hod_percent_off: float):
         """
         Send Telegram alert to users with squeeze_alerts=true.
 
@@ -653,6 +723,12 @@ class SqueezeAlertsMonitor:
             percent_change: Percent increase
             timestamp: Current timestamp
             size: Current trade size
+            premarket_high: Premarket high price
+            pm_icon: Premarket high status icon
+            pm_percent_off: Percent off premarket high
+            regular_hod: Regular hours HOD
+            hod_icon: Regular hours HOD status icon
+            hod_percent_off: Percent off regular hours HOD
         """
         try:
             # Get users with squeeze_alerts=true
@@ -662,13 +738,26 @@ class SqueezeAlertsMonitor:
                 self.logger.debug("No users with squeeze_alerts=true found")
                 return
 
+            # Build premarket high line
+            if premarket_high:
+                pm_line = f"📊 PM High: {pm_icon} ${premarket_high:.2f} ({pm_percent_off:.1f}% off)\n"
+            else:
+                pm_line = f"📊 PM High: {pm_icon} N/A\n"
+
+            # Build regular hours HOD line
+            if regular_hod:
+                hod_line = f"📊 HOD: {hod_icon} ${regular_hod:.2f} ({hod_percent_off:.1f}% off)\n"
+            else:
+                hod_line = f"📊 HOD: {hod_icon} N/A\n"
+
             # Format Telegram message
             message = (
                 f"🚀 <b>SQUEEZE ALERT - {symbol}</b>\n\n"
                 f"⏰ Time: {timestamp.strftime('%H:%M:%S ET')}\n"
                 f"📈 Price: ${low_price:.2f} → ${high_price:.2f}\n"
                 f"📊 Change: <b>+{percent_change:.2f}%</b> in 10 seconds\n"
-                f"💰 Size: {size:,} shares\n"
+                f"{pm_line}"
+                f"{hod_line}"
                 f"📉 Trades: {len(self.price_history[symbol])} in window\n\n"
                 f"#Squeeze #{symbol}"
             )
@@ -700,7 +789,9 @@ class SqueezeAlertsMonitor:
 
     def _save_squeeze_alert_sent(self, symbol: str, low_price: float, high_price: float,
                                   percent_change: float, timestamp: datetime, size: int,
-                                  sent_to_users: List[str]) -> None:
+                                  sent_to_users: List[str],
+                                  premarket_high: float, pm_icon: str, pm_color: str, pm_percent_off: float,
+                                  regular_hod: float, hod_icon: str, hod_color: str, hod_percent_off: float) -> None:
         """
         Save sent squeeze alert to JSON file for scanner display.
 
@@ -712,6 +803,14 @@ class SqueezeAlertsMonitor:
             timestamp: Current timestamp
             size: Current trade size
             sent_to_users: List of usernames who received the alert
+            premarket_high: Premarket high price
+            pm_icon: Premarket high status icon
+            pm_color: Premarket high status color
+            pm_percent_off: Percent off premarket high
+            regular_hod: Regular hours HOD
+            hod_icon: Regular hours HOD status icon
+            hod_color: Regular hours HOD status color
+            hod_percent_off: Percent off regular hours HOD
         """
         try:
             # Create filename with timestamp
@@ -735,7 +834,19 @@ class SqueezeAlertsMonitor:
                 'window_trades': len(self.price_history.get(symbol, [])),
                 'squeeze_threshold': float(self.squeeze_percent),
                 'sent_to_users': sent_to_users,
-                'sent_count': len(sent_to_users)
+                'sent_count': len(sent_to_users),
+                'premarket_high': float(premarket_high) if premarket_high else None,
+                'premarket_high_status': {
+                    'icon': pm_icon,
+                    'color': pm_color,
+                    'percent_off': float(pm_percent_off) if pm_percent_off is not None else None
+                },
+                'regular_hours_hod': float(regular_hod) if regular_hod else None,
+                'regular_hours_hod_status': {
+                    'icon': hod_icon,
+                    'color': hod_color,
+                    'percent_off': float(hod_percent_off) if hod_percent_off is not None else None
+                }
             }
 
             # Save to JSON file

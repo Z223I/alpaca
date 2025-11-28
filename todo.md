@@ -216,10 +216,16 @@ Looking at your code in atoms/api/get_latest_quote.py:5 and atoms/display/print_
 
 ## Why public_html/cgi-bin
 
+- [X] Because it is a symbolic link.
+
+
+
 ## HOD
 
-- [ ] Update cgi-bin/molecules/alpaca_molecules/market_data.py
-- [ ] Update cgi-bin/molecules/alpaca_molecules/squeeze_alerts.py to include HOD light icon
+- [X] Update cgi-bin/molecules/alpaca_molecules/squeeze_alerts.py: Eliminate the line in the squeeze alert that list number of shares traded.
+- [X] Review cgi-bin/molecules/alpaca_molecules/market_data.py: Does it ever see or calculate HOD, high of day? [no]
+- [X] Update cgi-bin/molecules/alpaca_molecules/market_data.py: To have a function that takes a symbol to calculate Premarket High and Regular hours HOD.
+- [X] Update cgi-bin/molecules/alpaca_molecules/squeeze_alerts.py: Update the squeeze alert to include HOD and premarket high light icon. Use cgi-bin/molecules/alpaca_molecules/market_data.py to collect the values.  Use green if price within 1.5% of either value. Red if 5% or more lower.  Otherwise yellow.
 
 ## Surge More than Once
 
