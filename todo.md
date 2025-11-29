@@ -220,6 +220,12 @@ Looking at your code in atoms/api/get_latest_quote.py:5 and atoms/display/print_
 
 
 
+Do you want to add top gainers to squeeze alerts (indirectly)?
+
+## Green Background for Squeeze Alerts
+
+- [X] Update public_html/index.html: When adding squeeze alerts to the scanner panel, if the HOD icon is green make the background green. That has highest precendence. If not, if premarket high is green, make the background lime.
+
 ## HOD
 
 - [X] Update cgi-bin/molecules/alpaca_molecules/squeeze_alerts.py: Eliminate the line in the squeeze alert that list number of shares traded.
