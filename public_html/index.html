@@ -4381,8 +4381,16 @@
                 const sourceClass = alert.source === 'Squeeze' ? 'squeeze-source' : '';
                 const sourceDisplay = alert.source === 'Squeeze' ? '🚀 Squeeze' : '📈 Momentum';
 
+                // Determine background color based on HOD and premarket high indicators
+                let bgColor = '';
+                if (alert.regular_hours_hod_status && alert.regular_hours_hod_status.color === 'green') {
+                    bgColor = 'background-color: green;';
+                } else if (alert.premarket_high_status && alert.premarket_high_status.color === 'green') {
+                    bgColor = 'background-color: lime;';
+                }
+
                 return `
-                    <tr ondblclick="openChartFromScanner('${alert.symbol}')">
+                    <tr ondblclick="openChartFromScanner('${alert.symbol}')" style="${bgColor}">
                         <td class="symbol-cell">${alert.symbol}</td>
                         <td class="source-cell ${sourceClass}">${sourceDisplay}</td>
                         <td class="time-cell">${alert.time}</td>
