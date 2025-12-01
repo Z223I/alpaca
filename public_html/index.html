@@ -2324,6 +2324,54 @@
             subscribeToSymbol(symbol);
         }
 
+        // Calculate float rotation based on current date's volume
+        function calculateFloatRotation(symbol, floatShares) {
+            const chartData = state.charts.get(symbol);
+            if (!chartData || !chartData.volumeData) {
+                console.log(`No volume data available for ${symbol} to calculate float rotation`);
+                return null;
+            }
+
+            // Get today's date in ET timezone
+            const today = new Date();
+            const todayET = today.toLocaleDateString('en-US', {
+                timeZone: 'America/New_York',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            });
+
+            // Sum volume for all bars from current date
+            let totalVolume = 0;
+            const volumeData = chartData.volumeData;
+            if (volumeData && volumeData.length > 0) {
+                volumeData.forEach(bar => {
+                    // Convert bar timestamp to ET date
+                    const barDate = new Date(bar.time * 1000);
+                    const barDateET = barDate.toLocaleDateString('en-US', {
+                        timeZone: 'America/New_York',
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit'
+                    });
+
+                    // If bar is from today, add its volume
+                    if (barDateET === todayET) {
+                        totalVolume += bar.value;
+                    }
+                });
+            }
+
+            console.log(`Float rotation calculation for ${symbol}: totalVolume=${totalVolume}, floatShares=${floatShares}`);
+
+            if (totalVolume === 0 || !floatShares || floatShares === 0) {
+                return null;
+            }
+
+            const floatRotation = totalVolume / floatShares;
+            return floatRotation;
+        }
+
         // Load fundamentals for chart legend
         async function loadLegendFundamentals(symbol) {
             const floatElement = document.getElementById(`legend-float-${symbol}`);
@@ -2339,9 +2387,25 @@
 
                 if (data.success) {
                     floatElement.textContent = data.float_shares_formatted || 'N/A';
-                    floatRotationElement.textContent = data.float_rotation_formatted || 'N/A';
                     sectorElement.textContent = data.sector || 'N/A';
                     industryElement.textContent = data.industry || 'N/A';
+
+                    // Calculate float rotation from volume data
+                    const floatShares = data.float_shares || 0;
+                    const chartData = state.charts.get(symbol);
+
+                    // Store float shares for later recalculation
+                    if (chartData) {
+                        chartData.floatShares = floatShares;
+                    }
+
+                    // Calculate and display float rotation
+                    const floatRotation = calculateFloatRotation(symbol, floatShares);
+                    if (floatRotation !== null) {
+                        floatRotationElement.textContent = `${floatRotation.toFixed(2)}x`;
+                    } else {
+                        floatRotationElement.textContent = 'N/A';
+                    }
                 } else {
                     console.error(`Failed to load fundamentals for ${symbol}:`, data.error);
                     floatElement.textContent = 'N/A';
@@ -2355,6 +2419,22 @@
                 floatRotationElement.textContent = 'N/A';
                 sectorElement.textContent = 'N/A';
                 industryElement.textContent = 'N/A';
+            }
+        }
+
+        // Update float rotation in legend (call after chart data updates)
+        function updateLegendFloatRotation(symbol) {
+            const chartData = state.charts.get(symbol);
+            if (!chartData || !chartData.floatShares) {
+                return;
+            }
+
+            const floatRotationElement = document.getElementById(`legend-float-rotation-${symbol}`);
+            if (!floatRotationElement) return;
+
+            const floatRotation = calculateFloatRotation(symbol, chartData.floatShares);
+            if (floatRotation !== null) {
+                floatRotationElement.textContent = `${floatRotation.toFixed(2)}x`;
             }
         }
 
@@ -2934,7 +3014,11 @@
                 // Update volume chart
                 if (chartData.indicatorSeries.volume && data.volume) {
                     chartData.indicatorSeries.volume.setData(data.volume);
+                    chartData.volumeData = data.volume;  // Store volume data for float rotation calculation
                 }
+
+                // Update float rotation in legend after volume data updates
+                updateLegendFloatRotation(symbol);
 
                 console.log('Chart data updated without recreation');
                 return;
@@ -3248,6 +3332,8 @@
 
                     // Store volume chart reference
                     chartData.volumeChart = volumeChart;
+                    chartData.volumeSeries = volumeSeries;
+                    chartData.volumeData = data.volume;  // Store volume data for float rotation calculation
                     chartData.indicatorSeries.volume = volumeSeries;
 
                     // Sync time scales between main chart and volume chart
@@ -3370,6 +3456,9 @@
                     }
                 }
             }, 500);
+
+            // Update float rotation in legend after chart is fully rendered
+            updateLegendFloatRotation(symbol);
         }
 
 
