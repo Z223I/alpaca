@@ -288,7 +288,7 @@ class AlpacaMarketData:
                 data = []
                 for bar in symbol_bars:
                     # alpaca-py uses full attribute names (not single letters like alpaca-trade-api)
-                    data.append({
+                    bar_dict = {
                         'timestamp': bar.timestamp,
                         'open': float(bar.open),
                         'high': float(bar.high),
@@ -296,7 +296,11 @@ class AlpacaMarketData:
                         'close': float(bar.close),
                         'volume': int(bar.volume),
                         'symbol': symbol
-                    })
+                    }
+                    # Add VWAP if available
+                    if hasattr(bar, 'vwap') and bar.vwap is not None:
+                        bar_dict['vwap'] = float(bar.vwap)
+                    data.append(bar_dict)
 
                 df = pd.DataFrame(data)
 
@@ -424,6 +428,61 @@ class AlpacaMarketData:
                 'start_date': None,
                 'end_date': None,
                 'bars': []
+            }
+
+    def get_latest_candlestick(self, symbol: str, timeframe: str = '1m') -> Dict[str, Any]:
+        """
+        Get the latest candlestick for a symbol with VWAP data.
+
+        Args:
+            symbol: Stock symbol
+            timeframe: Candlestick timeframe (default: '1m')
+
+        Returns:
+            Dictionary containing:
+                - symbol: str
+                - timestamp: str (ISO format)
+                - open: float
+                - high: float
+                - low: float
+                - close: float
+                - volume: int
+                - vwap: float or None
+                - error: str (if any error occurred)
+        """
+        try:
+            # Get the most recent bar (last 5 minutes to ensure we get data)
+            end_date = datetime.now(self.et_tz)
+            start_date = end_date - timedelta(minutes=5)
+
+            df = self.get_bar_data(symbol, timeframe, start_date, end_date)
+
+            if df.empty:
+                return {
+                    'symbol': symbol,
+                    'error': 'No candlestick data available'
+                }
+
+            # Get the latest bar (last row)
+            latest_bar = df.iloc[-1]
+
+            result = {
+                'symbol': symbol,
+                'timestamp': latest_bar['timestamp'].isoformat() if isinstance(latest_bar['timestamp'], pd.Timestamp) else str(latest_bar['timestamp']),
+                'open': float(latest_bar['open']),
+                'high': float(latest_bar['high']),
+                'low': float(latest_bar['low']),
+                'close': float(latest_bar['close']),
+                'volume': int(latest_bar['volume']),
+                'vwap': float(latest_bar['vwap']) if 'vwap' in latest_bar and pd.notna(latest_bar['vwap']) else None
+            }
+
+            return result
+
+        except Exception as e:
+            return {
+                'symbol': symbol,
+                'error': str(e)
             }
 
     def get_day_highs(self, symbol: str, trading_date: Optional[datetime] = None) -> Dict[str, Any]:

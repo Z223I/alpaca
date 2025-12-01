@@ -674,11 +674,34 @@ class SqueezeAlertsMonitor:
         premarket_high = day_highs.get('premarket_high')
         regular_hod = day_highs.get('regular_hours_hod')
 
+        # Get latest candlestick with VWAP data
+        candlestick = self.market_data.get_latest_candlestick(symbol)
+        vwap = candlestick.get('vwap')
+
+        # Verify VWAP is in the data and log if missing
+        if vwap is None:
+            if 'error' in candlestick:
+                self.logger.warning(f"⚠️  Could not get VWAP for {symbol}: {candlestick['error']}")
+            else:
+                self.logger.warning(f"⚠️  VWAP not available in candlestick data for {symbol}")
+
         # Determine status for premarket high
         pm_icon, pm_color, pm_percent_off = self._get_price_status(high_price, premarket_high)
 
         # Determine status for regular hours HOD
         hod_icon, hod_color, hod_percent_off = self._get_price_status(high_price, regular_hod)
+
+        # Determine VWAP status: green if price > VWAP, red otherwise
+        if vwap is not None:
+            if high_price > vwap:
+                vwap_icon = "🟢"
+                vwap_color = "green"
+            else:
+                vwap_icon = "🔴"
+                vwap_color = "red"
+        else:
+            vwap_icon = "⚪"
+            vwap_color = "white"
 
         # Print to stdout (not logger, so it's always visible)
         print(f"\n{'='*70}")
@@ -688,6 +711,12 @@ class SqueezeAlertsMonitor:
         print(f"Price Range:    ${low_price:.2f} → ${high_price:.2f}")
         print(f"Change:         +{percent_change:.2f}% in 10 seconds")
         print(f"Window Trades:  {len(self.price_history[symbol])} trades")
+
+        # Display VWAP status
+        if vwap:
+            print(f"VWAP:           {vwap_icon} ${vwap:.2f}")
+        else:
+            print(f"VWAP:           {vwap_icon} N/A")
 
         # Display premarket high status
         if premarket_high:
@@ -711,20 +740,23 @@ class SqueezeAlertsMonitor:
         sent_users = self._send_telegram_alert(
             symbol, low_price, high_price, percent_change, timestamp, size,
             premarket_high, pm_icon, pm_percent_off,
-            regular_hod, hod_icon, hod_percent_off
+            regular_hod, hod_icon, hod_percent_off,
+            vwap, vwap_icon
         )
 
         # Save squeeze alert to JSON file for scanner display
         self._save_squeeze_alert_sent(
             symbol, low_price, high_price, percent_change, timestamp, size, sent_users,
             premarket_high, pm_icon, pm_color, pm_percent_off,
-            regular_hod, hod_icon, hod_color, hod_percent_off
+            regular_hod, hod_icon, hod_color, hod_percent_off,
+            vwap, vwap_icon, vwap_color
         )
 
     def _send_telegram_alert(self, symbol: str, low_price: float, high_price: float,
                             percent_change: float, timestamp: datetime, size: int,
                             premarket_high: float, pm_icon: str, pm_percent_off: float,
-                            regular_hod: float, hod_icon: str, hod_percent_off: float):
+                            regular_hod: float, hod_icon: str, hod_percent_off: float,
+                            vwap: float, vwap_icon: str):
         """
         Send Telegram alert to users with squeeze_alerts=true.
 
@@ -741,6 +773,8 @@ class SqueezeAlertsMonitor:
             regular_hod: Regular hours HOD
             hod_icon: Regular hours HOD status icon
             hod_percent_off: Percent off regular hours HOD
+            vwap: VWAP price
+            vwap_icon: VWAP status icon
         """
         try:
             # Get users with squeeze_alerts=true
@@ -749,6 +783,12 @@ class SqueezeAlertsMonitor:
             if not squeeze_users:
                 self.logger.debug("No users with squeeze_alerts=true found")
                 return
+
+            # Build VWAP line
+            if vwap:
+                vwap_line = f"📊 VWAP: {vwap_icon} ${vwap:.2f}\n"
+            else:
+                vwap_line = f"📊 VWAP: {vwap_icon} N/A\n"
 
             # Build premarket high line
             if premarket_high:
@@ -768,6 +808,7 @@ class SqueezeAlertsMonitor:
                 f"⏰ Time: {timestamp.strftime('%H:%M:%S ET')}\n"
                 f"📈 Price: ${low_price:.2f} → ${high_price:.2f}\n"
                 f"📊 Change: <b>+{percent_change:.2f}%</b> in 10 seconds\n"
+                f"{vwap_line}"
                 f"{pm_line}"
                 f"{hod_line}"
                 f"📉 Trades: {len(self.price_history[symbol])} in window\n\n"
@@ -803,7 +844,8 @@ class SqueezeAlertsMonitor:
                                   percent_change: float, timestamp: datetime, size: int,
                                   sent_to_users: List[str],
                                   premarket_high: float, pm_icon: str, pm_color: str, pm_percent_off: float,
-                                  regular_hod: float, hod_icon: str, hod_color: str, hod_percent_off: float) -> None:
+                                  regular_hod: float, hod_icon: str, hod_color: str, hod_percent_off: float,
+                                  vwap: float, vwap_icon: str, vwap_color: str) -> None:
         """
         Save sent squeeze alert to JSON file for scanner display.
 
@@ -823,6 +865,9 @@ class SqueezeAlertsMonitor:
             hod_icon: Regular hours HOD status icon
             hod_color: Regular hours HOD status color
             hod_percent_off: Percent off regular hours HOD
+            vwap: VWAP price
+            vwap_icon: VWAP status icon
+            vwap_color: VWAP status color
         """
         try:
             # Create filename with timestamp
@@ -847,6 +892,11 @@ class SqueezeAlertsMonitor:
                 'squeeze_threshold': float(self.squeeze_percent),
                 'sent_to_users': sent_to_users,
                 'sent_count': len(sent_to_users),
+                'vwap': float(vwap) if vwap else None,
+                'vwap_status': {
+                    'icon': vwap_icon,
+                    'color': vwap_color
+                },
                 'premarket_high': float(premarket_high) if premarket_high else None,
                 'premarket_high_status': {
                     'icon': pm_icon,
