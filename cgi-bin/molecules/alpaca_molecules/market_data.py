@@ -432,7 +432,11 @@ class AlpacaMarketData:
 
     def get_latest_candlestick(self, symbol: str, timeframe: str = '1m') -> Dict[str, Any]:
         """
-        Get the latest candlestick for a symbol with VWAP data.
+        Get the latest candlestick for a symbol with VWAP data calculated from 4:00 AM ET.
+
+        IMPORTANT: VWAP is calculated over the entire time period of the request.
+        To get accurate intraday VWAP, we fetch all bars since 4:00 AM ET and use
+        the VWAP from the latest candlestick.
 
         Args:
             symbol: Stock symbol
@@ -447,14 +451,22 @@ class AlpacaMarketData:
                 - low: float
                 - close: float
                 - volume: int
-                - vwap: float or None
+                - vwap: float or None (VWAP calculated from 4:00 AM ET to latest bar)
                 - error: str (if any error occurred)
         """
         try:
-            # Get the most recent bar (last 5 minutes to ensure we get data)
-            end_date = datetime.now(self.et_tz)
-            start_date = end_date - timedelta(minutes=5)
+            # Get current time in ET
+            now_et = datetime.now(self.et_tz)
 
+            # Start from 4:00 AM ET today
+            start_date = self.et_tz.localize(
+                datetime.combine(now_et.date(), datetime.min.time())
+            ).replace(hour=4, minute=0, second=0, microsecond=0)
+
+            # End at current time
+            end_date = now_et
+
+            # Fetch all bars since 4:00 AM ET
             df = self.get_bar_data(symbol, timeframe, start_date, end_date)
 
             if df.empty:
@@ -463,7 +475,7 @@ class AlpacaMarketData:
                     'error': 'No candlestick data available'
                 }
 
-            # Get the latest bar (last row)
+            # Get the latest bar (last row) - this has VWAP calculated from 4:00 AM to now
             latest_bar = df.iloc[-1]
 
             result = {
@@ -474,7 +486,8 @@ class AlpacaMarketData:
                 'low': float(latest_bar['low']),
                 'close': float(latest_bar['close']),
                 'volume': int(latest_bar['volume']),
-                'vwap': float(latest_bar['vwap']) if 'vwap' in latest_bar and pd.notna(latest_bar['vwap']) else None
+                'vwap': float(latest_bar['vwap']) if 'vwap' in latest_bar and pd.notna(latest_bar['vwap']) else None,
+                'bars_fetched': len(df)
             }
 
             return result
