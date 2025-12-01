@@ -222,6 +222,10 @@ Looking at your code in atoms/api/get_latest_quote.py:5 and atoms/display/print_
 
 Do you want to add top gainers to squeeze alerts (indirectly)?
 
+## Missing Top Gainers
+
+- [ ] THINK HARD.  Review public_html/index.html: Why hasn't AHMA and QTTB not shown up in the gain column in the Watchlist panel?  Question only.
+
 ## Green Background for Squeeze Alerts
 
 - [X] Update public_html/index.html: When adding squeeze alerts to the scanner panel, if the HOD icon is green make the background green. That has highest precendence. If not, if premarket high is green, make the background lime.

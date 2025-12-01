@@ -4031,6 +4031,81 @@
             watchListState.refreshInterval = setInterval(loadWatchList, 120000);
         });
 
+        // Load symbols from data/ directory CSV files
+        async function loadDataDirSymbols() {
+            try {
+                // Get today's date in YYYYMMDD format (ET timezone)
+                const today = new Date().toLocaleDateString('en-US', {
+                    timeZone: 'America/New_York',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                }).split('/');
+                const dateStr = `${today[2]}${today[0]}${today[1]}`; // YYYYMMDD format
+
+                const csvPath = `data/${dateStr}.csv`;
+                console.log('Loading data directory CSV from:', csvPath);
+
+                const response = await fetch(csvPath);
+                if (!response.ok) {
+                    console.log(`No data directory CSV found for today (${csvPath})`);
+                    return [];
+                }
+
+                const csvText = await response.text();
+                const lines = csvText.trim().split('\n');
+
+                if (lines.length <= 1) {
+                    console.log('Data directory CSV is empty');
+                    return [];
+                }
+
+                // Parse CSV - expecting format: Symbol,Signal,Long Delta,Resistance,Max,Last,%Chg,Volume,Float,Mkt.Cap.
+                // CSV column indices
+                const SYMBOL_COL = 0;
+                const GAIN_PERCENT_COL = 5;
+
+                const symbols = [];
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+
+                    const values = line.split(',');
+                    if (values.length > 0) {
+                        const symbol = values[SYMBOL_COL].trim();
+                        if (symbol) {
+                            // Extract %Chg if available
+                            let gainPercent = null;
+                            if (values.length > GAIN_PERCENT_COL && values[GAIN_PERCENT_COL]) {
+                                const chgStr = values[GAIN_PERCENT_COL].trim().replace('%', '');
+                                const parsed = parseFloat(chgStr);
+                                if (!isNaN(parsed)) {
+                                    gainPercent = parsed;
+                                }
+                            }
+
+                            symbols.push({
+                                symbol: symbol,
+                                oracle: false,
+                                manual: false,
+                                top_gainers: true, // Mark as coming from data directory
+                                surge: false,
+                                gain_percent: gainPercent,
+                                surge_amount: null,
+                                source: 'data_dir'
+                            });
+                        }
+                    }
+                }
+
+                console.log(`Loaded ${symbols.length} symbols from data directory CSV`);
+                return symbols;
+            } catch (error) {
+                console.error('Error loading data directory symbols:', error);
+                return [];
+            }
+        }
+
         // Load watch list from API
         async function loadWatchList() {
             try {
@@ -4076,10 +4151,20 @@
                         }
                     });
 
+                    // Load and merge symbols from data directory
+                    const dataDirSymbols = await loadDataDirSymbols();
+                    const existingSymbols = new Set(watchListState.symbols.map(s => s.symbol));
+
+                    dataDirSymbols.forEach(symbol => {
+                        if (!existingSymbols.has(symbol.symbol) && !watchListState.deletedSymbols.has(symbol.symbol)) {
+                            watchListState.symbols.push(symbol);
+                        }
+                    });
+
                     // Apply current sort
                     sortWatchListData(watchListState.sortColumn, watchListState.sortDirection);
 
-                    console.log(`Loaded ${watchListState.symbols.length} symbols from watch list (${data.count} from API, ${watchListState.deletedSymbols.size} deleted, ${watchListState.manualSymbols.size} manual)`);
+                    console.log(`Loaded ${watchListState.symbols.length} symbols from watch list (${data.count} from API, ${dataDirSymbols.length} from data dir, ${watchListState.deletedSymbols.size} deleted, ${watchListState.manualSymbols.size} manual)`);
                     renderWatchList();
                 } else {
                     console.error('Failed to load watch list:', data.error);
