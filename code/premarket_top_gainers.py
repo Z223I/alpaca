@@ -311,27 +311,22 @@ class PremarketTopGainersScanner:
             if target_date_bars.empty:
                 continue
 
-            # Find the bar closest to 4:00 PM ET
-            time_diffs = abs(target_date_bars.index - target_close_time)
-            min_diff_idx = time_diffs.argmin()
-            closest_idx = target_date_bars.index[min_diff_idx]
-            closest_bar = target_date_bars.loc[closest_idx]
-            closest_time = closest_idx
+            # Use the LAST bar on the target date as the close price
+            # This handles thinly-traded stocks that may not have bars near 4:00 PM
+            last_bar = target_date_bars.iloc[-1]
+            last_time = target_date_bars.index[-1]
 
-            # Verify it's reasonably close to market close (within 10 minutes)
-            time_diff_minutes = abs((closest_time - target_close_time).total_seconds()) / 60
+            close_bars_dict[symbol] = {
+                'close_price': float(last_bar['close']),
+                'close_time': last_time,
+                'bar_data': last_bar
+            }
+            found_any_close = True
 
-            if time_diff_minutes <= 10:  # Within 10 minutes of 4:00 PM ET
-                close_bars_dict[symbol] = {
-                    'close_price': float(closest_bar['close']),
-                    'close_time': closest_time,
-                    'bar_data': closest_bar
-                }
-                found_any_close = True
-
-                if self.verbose and symbol == sample_symbol:
-                    print(f"Found market close bar for {symbol}: {closest_time.strftime('%Y-%m-%d %H:%M:%S %Z')} "
-                          f"(${closest_bar['close']:.2f})")
+            if self.verbose and symbol == sample_symbol:
+                time_diff_minutes = abs((last_time - target_close_time).total_seconds()) / 60
+                print(f"Found market close bar for {symbol}: {last_time.strftime('%Y-%m-%d %H:%M:%S %Z')} "
+                      f"(${last_bar['close']:.2f}, {time_diff_minutes:.0f} min from 4PM)")
 
         if found_any_close:
             return {
@@ -417,6 +412,9 @@ class PremarketTopGainersScanner:
                     except Exception as symbol_error:
                         if self.verbose:
                             print(f"Error fetching data for {symbol}: {symbol_error}")
+                        # Log specific symbols we're tracking
+                        if symbol in ['AHMA', 'QTTB']:
+                            print(f"!!! TRACKED SYMBOL {symbol} - Error during data fetch: {symbol_error}")
                         continue
 
             except Exception as e:
@@ -426,6 +424,13 @@ class PremarketTopGainersScanner:
 
         if self.verbose:
             print(f"Successfully collected raw data for {len(all_bars_data)} symbols")
+
+        # Check if tracked symbols made it through data collection
+        for tracked in ['AHMA', 'QTTB']:
+            if tracked in all_bars_data:
+                print(f"!!! TRACKED SYMBOL {tracked} - Successfully collected {len(all_bars_data[tracked])} bars")
+            else:
+                print(f"!!! TRACKED SYMBOL {tracked} - NOT in all_bars_data (not collected or error)")
 
         # Find the actual last market close data
         market_close_data = self.find_last_market_close_data(all_bars_data)
@@ -459,12 +464,14 @@ class PremarketTopGainersScanner:
             }
 
             for symbol, bars_df in all_bars_data.items():
-                fallback_close_bars = bars_df[bars_df.index <= fallback_close_time]
-                if not fallback_close_bars.empty:
-                    last_bar = fallback_close_bars.iloc[-1]
+                # Filter to the target date only (not just before fallback_close_time)
+                # This ensures we get the last bar on the target date for thinly-traded stocks
+                target_date_bars = bars_df[bars_df.index.date == target_date]
+                if not target_date_bars.empty:
+                    last_bar = target_date_bars.iloc[-1]
                     market_close_data['close_bars_dict'][symbol] = {
                         'close_price': float(last_bar['close']),
-                        'close_time': fallback_close_bars.index[-1],
+                        'close_time': target_date_bars.index[-1],
                         'bar_data': last_bar
                     }
 
@@ -474,8 +481,13 @@ class PremarketTopGainersScanner:
         # Filter data to only include bars since market close
         premarket_data = {}
         for symbol, bars_df in all_bars_data.items():
+            # Track specific symbols
+            is_tracked = symbol in ['AHMA', 'QTTB']
+
             # Skip symbols without close data
             if symbol not in close_bars_dict:
+                if is_tracked:
+                    print(f"!!! TRACKED SYMBOL {symbol} - NOT in close_bars_dict (no previous close price found)")
                 continue
 
             # Filter for bars after market close timestamp
@@ -489,6 +501,11 @@ class PremarketTopGainersScanner:
                     'previous_close_time': close_info['close_time'],
                     'last_market_close_ref': close_timestamp
                 }
+                if is_tracked:
+                    print(f"!!! TRACKED SYMBOL {symbol} - Added to premarket_data: {len(premarket_bars)} bars after {close_timestamp}")
+            else:
+                if is_tracked:
+                    print(f"!!! TRACKED SYMBOL {symbol} - No bars after close_timestamp {close_timestamp}")
 
         if self.verbose:
             print(f"Filtered to {len(premarket_data)} symbols with premarket activity")
@@ -511,6 +528,13 @@ class PremarketTopGainersScanner:
         if self.verbose:
             print(f"Calculating gains for {len(premarket_data)} symbols...")
 
+        # Check if tracked symbols made it to calculation stage
+        for tracked in ['AHMA', 'QTTB']:
+            if tracked in premarket_data:
+                print(f"!!! TRACKED SYMBOL {tracked} - IN premarket_data, proceeding to calculate gains")
+            else:
+                print(f"!!! TRACKED SYMBOL {tracked} - NOT in premarket_data (no premarket bars after close)")
+
         results = []
 
         for symbol, data in premarket_data.items():
@@ -519,7 +543,12 @@ class PremarketTopGainersScanner:
                 previous_close = data['previous_close']
                 previous_close_time = data['previous_close_time']
 
+                # Track specific symbols
+                is_tracked = symbol in ['AHMA', 'QTTB']
+
                 if premarket_bars.empty:
+                    if is_tracked:
+                        print(f"!!! TRACKED SYMBOL {symbol} - FILTERED: premarket_bars is empty")
                     continue
 
                 # Get current premarket metrics
@@ -532,12 +561,18 @@ class PremarketTopGainersScanner:
 
                 # Apply filters
                 if criteria.min_gain_percent and gain_percent < criteria.min_gain_percent:
+                    if is_tracked:
+                        print(f"!!! TRACKED SYMBOL {symbol} - FILTERED: gain {gain_percent:.2f}% < min {criteria.min_gain_percent}%")
                     continue
 
                 if criteria.min_price and current_price < criteria.min_price:
+                    if is_tracked:
+                        print(f"!!! TRACKED SYMBOL {symbol} - FILTERED: price ${current_price:.2f} < min ${criteria.min_price}")
                     continue
 
                 if criteria.max_price and current_price > criteria.max_price:
+                    if is_tracked:
+                        print(f"!!! TRACKED SYMBOL {symbol} - FILTERED: price ${current_price:.2f} > max ${criteria.max_price}")
                     continue
 
                 # Calculate premarket aggregated metrics
@@ -546,7 +581,13 @@ class PremarketTopGainersScanner:
                 premarket_low = float(premarket_bars['low'].min())
 
                 if criteria.min_volume and premarket_volume < criteria.min_volume:
+                    if is_tracked:
+                        print(f"!!! TRACKED SYMBOL {symbol} - FILTERED: volume {premarket_volume:,} < min {criteria.min_volume:,}")
                     continue
+
+                # Log success for tracked symbols
+                if is_tracked:
+                    print(f"!!! TRACKED SYMBOL {symbol} - PASSED ALL FILTERS: gain={gain_percent:.2f}%, price=${current_price:.2f}, volume={premarket_volume:,}")
 
                 # Create result
                 result = PremarketResult(
@@ -568,6 +609,10 @@ class PremarketTopGainersScanner:
             except Exception as e:
                 if self.verbose:
                     print(f"Error calculating gains for {symbol}: {e}")
+                if symbol in ['AHMA', 'QTTB']:
+                    print(f"!!! TRACKED SYMBOL {symbol} - EXCEPTION during calculation: {e}")
+                    import traceback
+                    traceback.print_exc()
                 continue
 
         # Sort by gain percentage (highest first)

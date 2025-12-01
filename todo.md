@@ -222,6 +222,8 @@ Looking at your code in atoms/api/get_latest_quote.py:5 and atoms/display/print_
 
 Do you want to add top gainers to squeeze alerts (indirectly)?
 
+Install TraderVue
+
 ## Missing Top Gainers
 
 - [ ] THINK HARD.  Review public_html/index.html: Why hasn't AHMA and QTTB not shown up in the gain column in the Watchlist panel?  Question only.
