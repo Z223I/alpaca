@@ -224,9 +224,13 @@ Do you want to add top gainers to squeeze alerts (indirectly)?
 
 Install TraderVue
 
+## Is VWAP Correct
+
+- [ ] Hit session limit during update to display VWAP on squeeze alerts.  It may be necessary to manual calculate it.  Manully do it and compare the two.
+
 ## Missing Top Gainers
 
-- [ ] THINK HARD.  Review public_html/index.html: Why hasn't AHMA and QTTB not shown up in the gain column in the Watchlist panel?  Question only.
+- [X] THINK HARD.  Review public_html/index.html: Why hasn't AHMA and QTTB not shown up in the gain column in the Watchlist panel?  Question only.
 
 ## Green Background for Squeeze Alerts
 
