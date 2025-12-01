@@ -31,6 +31,9 @@ repo_root = os.path.dirname(cgi_bin_dir)  # Repository root
 sys.path.insert(0, molecules_dir)
 sys.path.insert(0, repo_root)
 
+# Import VWAP calculator
+from vwap_calculator import calculate_vwap_by_day
+
 
 def send_response(data, status=200, error=None):
     """
@@ -221,50 +224,12 @@ def calculate_ema(df, period):
 
 
 def calculate_vwap(df):
-    """Calculate Volume Weighted Average Price (resets daily)."""
-    import pandas as pd
-    import numpy as np
-    from datetime import datetime
-    import pytz
+    """
+    Calculate Volume Weighted Average Price (resets daily).
 
-    if 'volume' not in df.columns or len(df) == 0:
-        return []
-
-    # Convert timestamps to datetime for grouping by day
-    df = df.copy()
-
-    # Ensure proper datetime conversion - timestamps may be strings or datetime objects
-    if not pd.api.types.is_datetime64_any_dtype(df['timestamp']):
-        # If not datetime, convert (may be ISO strings)
-        df['datetime'] = pd.to_datetime(df['timestamp'], utc=True)
-    else:
-        # Already datetime, just copy
-        df['datetime'] = df['timestamp']
-
-    df['date'] = df['datetime'].dt.date
-
-    result = []
-
-    # Calculate VWAP separately for each trading day
-    for date, day_df in df.groupby('date'):
-        typical_price = (day_df['high'] + day_df['low'] + day_df['close']) / 3
-
-        # Calculate cumulative VWAP for this day
-        cumulative_tp_volume = (typical_price * day_df['volume']).cumsum()
-        cumulative_volume = day_df['volume'].cumsum()
-
-        # Avoid division by zero
-        vwap = cumulative_tp_volume / cumulative_volume.replace(0, np.nan)
-
-        for timestamp, value, vol in zip(day_df['timestamp'], vwap, day_df['volume']):
-            # Only include valid values with actual volume
-            if not pd.isna(value) and vol > 0 and not np.isinf(value):
-                result.append({
-                    'time': timestamp,
-                    'value': float(value)
-                })
-
-    return result
+    This is a wrapper around the shared vwap_calculator module.
+    """
+    return calculate_vwap_by_day(df)
 
 
 def calculate_macd(df):

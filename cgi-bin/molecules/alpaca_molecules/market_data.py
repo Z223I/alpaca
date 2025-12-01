@@ -22,6 +22,9 @@ from datetime import datetime, timedelta
 import pytz
 import pandas as pd
 
+# Import VWAP calculator
+from vwap_calculator import get_latest_vwap
+
 # Add paths for importing from main codebase atoms
 # Use realpath to resolve symlinks properly
 script_real_path = os.path.realpath(__file__)
@@ -478,6 +481,16 @@ class AlpacaMarketData:
             # Get the latest bar (last row) - this has VWAP calculated from 4:00 AM to now
             latest_bar = df.iloc[-1]
 
+            # Get VWAP from Alpaca bar data, or calculate it as fallback
+            vwap = None
+            if 'vwap' in latest_bar and pd.notna(latest_bar['vwap']):
+                # Use VWAP from Alpaca API
+                vwap = float(latest_bar['vwap'])
+            else:
+                # Fallback: Calculate VWAP using vwap_calculator module
+                bars_list = df.to_dict('records')
+                vwap = get_latest_vwap(bars_list)
+
             result = {
                 'symbol': symbol,
                 'timestamp': latest_bar['timestamp'].isoformat() if isinstance(latest_bar['timestamp'], pd.Timestamp) else str(latest_bar['timestamp']),
@@ -486,7 +499,7 @@ class AlpacaMarketData:
                 'low': float(latest_bar['low']),
                 'close': float(latest_bar['close']),
                 'volume': int(latest_bar['volume']),
-                'vwap': float(latest_bar['vwap']) if 'vwap' in latest_bar and pd.notna(latest_bar['vwap']) else None,
+                'vwap': vwap,
                 'bars_fetched': len(df)
             }
 
