@@ -222,6 +222,10 @@ Looking at your code in atoms/api/get_latest_quote.py:5 and atoms/display/print_
 
 Do you want to add top gainers to squeeze alerts (indirectly)?
 
+## Wycoff
+
+- [ ] LSKDFJS Update lskdjf: Build volume profile
+
 Install TraderVue
 
 ## Is VWAP Correct

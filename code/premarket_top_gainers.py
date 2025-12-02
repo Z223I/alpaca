@@ -96,7 +96,7 @@ class PremarketTopGainersScanner:
     """Main premarket top gainers scanner class."""
 
     # Symbols to track for detailed debugging
-    TRACKED_SYMBOLS = ['TAOP']
+    TRACKED_SYMBOLS = ['FTEL']
 
     def __init__(self, provider: str = "alpaca", account: str = "Bruce", environment: str = "paper",
                  verbose: bool = False):
@@ -240,7 +240,6 @@ class PremarketTopGainersScanner:
 
             for asset in assets:
                 if (asset.exchange.upper() in exchanges_upper and
-                    asset.tradable and
                     asset.status == 'active'):
 
                     filtered_symbols.append(asset.symbol)
@@ -248,7 +247,7 @@ class PremarketTopGainersScanner:
                         break
 
             if self.verbose:
-                print(f"Found {len(filtered_symbols)} tradable symbols from exchanges")
+                print(f"Found {len(filtered_symbols)} symbols from exchanges")
 
             return filtered_symbols
 
@@ -384,6 +383,7 @@ class PremarketTopGainersScanner:
             print(f"Data range: {start_time.strftime('%Y-%m-%d %H:%M')} to {end_time.strftime('%Y-%m-%d %H:%M')} ET")
 
         all_bars_data = {}
+        failed_symbols = []  # Track symbols that failed to fetch
         batch_size = 50  # Process symbols in batches to avoid API limits
 
         for i in range(0, len(symbols), batch_size):
@@ -391,8 +391,6 @@ class PremarketTopGainersScanner:
 
             if self.verbose:
                 print(f"Processing batch {i//batch_size + 1}/{(len(symbols)-1)//batch_size + 1}")
-
-            self._rate_limit_check()
 
             try:
                 # Get 5-minute bars for each symbol individually
@@ -430,10 +428,19 @@ class PremarketTopGainersScanner:
                                 df.index = df.index.tz_convert(self.et_tz)
 
                                 all_bars_data[symbol] = df
+                        else:
+                            # No bars returned - might be inactive symbol
+                            if symbol not in failed_symbols:
+                                failed_symbols.append(symbol)
 
                     except Exception as symbol_error:
                         if self.verbose:
                             print(f"Error fetching data for {symbol}: {symbol_error}")
+
+                        # Track failed symbols for retry
+                        if symbol not in failed_symbols:
+                            failed_symbols.append(symbol)
+
                         # Log specific symbols we're tracking
                         if symbol in self.TRACKED_SYMBOLS:
                             print(f"!!! TRACKED SYMBOL {symbol} - Error during data fetch: {symbol_error}")
@@ -446,6 +453,83 @@ class PremarketTopGainersScanner:
 
         if self.verbose:
             print(f"Successfully collected raw data for {len(all_bars_data)} symbols")
+            if failed_symbols:
+                print(f"Failed to collect data for {len(failed_symbols)} symbols")
+
+        # Retry failed symbols (up to 2 retries)
+        if failed_symbols:
+            max_retries = 2
+            for retry_attempt in range(max_retries):
+                if not failed_symbols:
+                    break
+
+                if self.verbose:
+                    print(f"\nRetry attempt {retry_attempt + 1}/{max_retries} for {len(failed_symbols)} failed symbols...")
+
+                retry_failed = []
+                for symbol in failed_symbols:
+                    try:
+                        bars = self.client.get_bars(
+                            symbol,
+                            tradeapi.TimeFrame(5, tradeapi.TimeFrameUnit.Minute),
+                            start=start_time.strftime('%Y-%m-%d'),
+                            end=end_time.strftime('%Y-%m-%d'),
+                            limit=5000,
+                            feed=criteria.feed
+                        )
+
+                        if bars and len(bars) > 0:
+                            bar_data = []
+                            for bar in bars:
+                                bar_dict = {
+                                    'open': float(bar.o),
+                                    'high': float(bar.h),
+                                    'low': float(bar.l),
+                                    'close': float(bar.c),
+                                    'volume': int(bar.v),
+                                    'timestamp': bar.t
+                                }
+                                bar_data.append(bar_dict)
+
+                            if bar_data:
+                                df = pd.DataFrame(bar_data)
+                                df.set_index('timestamp', inplace=True)
+                                if df.index.tz is None:
+                                    df.index = df.index.tz_localize('UTC')
+                                df.index = df.index.tz_convert(self.et_tz)
+
+                                all_bars_data[symbol] = df
+                                if self.verbose:
+                                    print(f"✓ Retry success for {symbol}")
+                        else:
+                            # Still no bars - symbol likely inactive
+                            retry_failed.append(symbol)
+
+                    except Exception as retry_error:
+                        if self.verbose:
+                            print(f"Retry failed for {symbol}: {retry_error}")
+                        retry_failed.append(symbol)
+
+                        if symbol in self.TRACKED_SYMBOLS:
+                            print(f"!!! TRACKED SYMBOL {symbol} - Retry {retry_attempt + 1} failed: {retry_error}")
+                        continue
+
+                failed_symbols = retry_failed
+
+                if failed_symbols and retry_attempt < max_retries - 1:
+                    if self.verbose:
+                        print(f"Waiting 10 seconds before next retry...")
+                    time.sleep(10)
+
+            if self.verbose and failed_symbols:
+                print(f"\nFinal: {len(failed_symbols)} symbols still failed after retries")
+                if self.TRACKED_SYMBOLS:
+                    tracked_failed = [s for s in failed_symbols if s in self.TRACKED_SYMBOLS]
+                    if tracked_failed:
+                        print(f"!!! TRACKED SYMBOLS that failed: {', '.join(tracked_failed)}")
+
+        if self.verbose:
+            print(f"Final total: Successfully collected raw data for {len(all_bars_data)} symbols")
 
         # Check if tracked symbols made it through data collection
         for tracked in self.TRACKED_SYMBOLS:
