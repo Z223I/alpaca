@@ -314,10 +314,22 @@ class PremarketTopGainersScanner:
             if target_date_bars.empty:
                 continue
 
-            # Use the LAST bar on the target date as the close price
-            # This handles thinly-traded stocks that may not have bars near 4:00 PM
-            last_bar = target_date_bars.iloc[-1]
-            last_time = target_date_bars.index[-1]
+            # Find the bar closest to 4:00 PM ET (market close)
+            # Only use bars at or before 4:00 PM to avoid after-hours prices
+            market_close_time = self.et_tz.localize(
+                datetime.combine(target_date, self.market_close)  # 4:00 PM ET
+            )
+
+            # Filter to bars at or before 4:00 PM (regular market hours)
+            regular_hours_bars = target_date_bars[target_date_bars.index <= market_close_time]
+
+            if regular_hours_bars.empty:
+                # Skip symbols without bars at or before 4:00 PM
+                continue
+
+            # Use the LAST bar at or before 4:00 PM
+            last_bar = regular_hours_bars.iloc[-1]
+            last_time = regular_hours_bars.index[-1]
 
             close_bars_dict[symbol] = {
                 'close_price': float(last_bar['close']),
@@ -326,10 +338,17 @@ class PremarketTopGainersScanner:
             }
             found_any_close = True
 
-            if self.verbose and symbol == sample_symbol:
+            # Debug logging for tracked symbols
+            is_tracked = symbol in self.TRACKED_SYMBOLS
+            if (self.verbose and symbol == sample_symbol) or is_tracked:
                 time_diff_minutes = abs((last_time - target_close_time).total_seconds()) / 60
                 print(f"Found market close bar for {symbol}: {last_time.strftime('%Y-%m-%d %H:%M:%S %Z')} "
                       f"(${last_bar['close']:.2f}, {time_diff_minutes:.0f} min from 4PM)")
+                if is_tracked:
+                    print(f"!!! TRACKED SYMBOL {symbol} - Previous close bar details:")
+                    print(f"    All bars on {target_date}: {len(target_date_bars)} bars")
+                    print(f"    First bar: {target_date_bars.index[0]} @ ${target_date_bars.iloc[0]['close']:.4f}")
+                    print(f"    Last bar: {target_date_bars.index[-1]} @ ${target_date_bars.iloc[-1]['close']:.4f}")
 
         if found_any_close:
             return {
@@ -467,16 +486,24 @@ class PremarketTopGainersScanner:
             }
 
             for symbol, bars_df in all_bars_data.items():
-                # Filter to the target date only (not just before fallback_close_time)
-                # This ensures we get the last bar on the target date for thinly-traded stocks
+                # Filter to the target date only
                 target_date_bars = bars_df[bars_df.index.date == target_date]
-                if not target_date_bars.empty:
-                    last_bar = target_date_bars.iloc[-1]
-                    market_close_data['close_bars_dict'][symbol] = {
-                        'close_price': float(last_bar['close']),
-                        'close_time': target_date_bars.index[-1],
-                        'bar_data': last_bar
-                    }
+                if target_date_bars.empty:
+                    continue
+
+                # Only use bars at or before 4:00 PM to avoid after-hours prices
+                regular_hours_bars = target_date_bars[target_date_bars.index <= fallback_close_time]
+
+                if regular_hours_bars.empty:
+                    # Skip symbols without bars at or before 4:00 PM
+                    continue
+
+                last_bar = regular_hours_bars.iloc[-1]
+                market_close_data['close_bars_dict'][symbol] = {
+                    'close_price': float(last_bar['close']),
+                    'close_time': regular_hours_bars.index[-1],
+                    'bar_data': last_bar
+                }
 
         close_timestamp = market_close_data['close_timestamp']
         close_bars_dict = market_close_data['close_bars_dict']
@@ -559,8 +586,22 @@ class PremarketTopGainersScanner:
                 current_price = float(current_bar['close'])
                 current_timestamp = premarket_bars.index[-1]
 
+                # Debug logging for tracked symbols
+                if is_tracked:
+                    print(f"!!! TRACKED SYMBOL {symbol} - DEBUG DATA:")
+                    print(f"    Previous close: ${previous_close:.4f} at {previous_close_time}")
+                    print(f"    Current price: ${current_price:.4f} at {current_timestamp}")
+                    print(f"    Total premarket bars: {len(premarket_bars)}")
+                    print(f"    First premarket bar: {premarket_bars.index[0]} @ ${premarket_bars.iloc[0]['close']:.4f}")
+                    print(f"    Last premarket bar: {premarket_bars.index[-1]} @ ${premarket_bars.iloc[-1]['close']:.4f}")
+                    print(f"    Premarket high: ${premarket_bars['high'].max():.4f}")
+                    print(f"    Premarket low: ${premarket_bars['low'].min():.4f}")
+
                 # Calculate gain percentage
                 gain_percent = ((current_price - previous_close) / previous_close) * 100
+
+                if is_tracked:
+                    print(f"    Calculated gain: {gain_percent:.2f}%")
 
                 # Apply filters
                 if criteria.min_gain_percent and gain_percent < criteria.min_gain_percent:
