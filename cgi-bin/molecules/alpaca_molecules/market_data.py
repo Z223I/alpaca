@@ -23,7 +23,10 @@ import pytz
 import pandas as pd
 
 # Import VWAP calculator
-from vwap_calculator import get_latest_vwap
+try:
+    from vwap_calculator import get_latest_vwap
+except ModuleNotFoundError:
+    from alpaca_molecules.vwap_calculator import get_latest_vwap
 
 # Add paths for importing from main codebase atoms
 # Use realpath to resolve symlinks properly

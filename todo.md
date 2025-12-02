@@ -228,6 +228,12 @@ Install TraderVue
 
 - [ ] Hit session limit during update to display VWAP on squeeze alerts.  It may be necessary to manual calculate it.  Manully do it and compare the two.
 
+
+Update the script with debugging statements because I am getting '!!! TRACKED SYMBOL TAOP - FILTERED: gain -19.62% < min 10.0%' but my Webull brokage account shows the gain above 40%.
+  To speed up testing, run code/premarket_top_gainers.py  --symbols TAOP --verbose
+
+
+  
 ## Missing Top Gainers
 
 - [X] THINK HARD.  Review public_html/index.html: Why hasn't AHMA and QTTB not shown up in the gain column in the Watchlist panel?  Question only.

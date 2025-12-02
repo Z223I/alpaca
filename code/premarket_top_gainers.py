@@ -95,6 +95,9 @@ class PremarketResult:
 class PremarketTopGainersScanner:
     """Main premarket top gainers scanner class."""
 
+    # Symbols to track for detailed debugging
+    TRACKED_SYMBOLS = ['TAOP']
+
     def __init__(self, provider: str = "alpaca", account: str = "Bruce", environment: str = "paper",
                  verbose: bool = False):
         """
@@ -413,7 +416,7 @@ class PremarketTopGainersScanner:
                         if self.verbose:
                             print(f"Error fetching data for {symbol}: {symbol_error}")
                         # Log specific symbols we're tracking
-                        if symbol in ['AHMA', 'QTTB']:
+                        if symbol in self.TRACKED_SYMBOLS:
                             print(f"!!! TRACKED SYMBOL {symbol} - Error during data fetch: {symbol_error}")
                         continue
 
@@ -426,7 +429,7 @@ class PremarketTopGainersScanner:
             print(f"Successfully collected raw data for {len(all_bars_data)} symbols")
 
         # Check if tracked symbols made it through data collection
-        for tracked in ['AHMA', 'QTTB']:
+        for tracked in self.TRACKED_SYMBOLS:
             if tracked in all_bars_data:
                 print(f"!!! TRACKED SYMBOL {tracked} - Successfully collected {len(all_bars_data[tracked])} bars")
             else:
@@ -482,7 +485,7 @@ class PremarketTopGainersScanner:
         premarket_data = {}
         for symbol, bars_df in all_bars_data.items():
             # Track specific symbols
-            is_tracked = symbol in ['AHMA', 'QTTB']
+            is_tracked = symbol in self.TRACKED_SYMBOLS
 
             # Skip symbols without close data
             if symbol not in close_bars_dict:
@@ -529,7 +532,7 @@ class PremarketTopGainersScanner:
             print(f"Calculating gains for {len(premarket_data)} symbols...")
 
         # Check if tracked symbols made it to calculation stage
-        for tracked in ['AHMA', 'QTTB']:
+        for tracked in self.TRACKED_SYMBOLS:
             if tracked in premarket_data:
                 print(f"!!! TRACKED SYMBOL {tracked} - IN premarket_data, proceeding to calculate gains")
             else:
@@ -544,7 +547,7 @@ class PremarketTopGainersScanner:
                 previous_close_time = data['previous_close_time']
 
                 # Track specific symbols
-                is_tracked = symbol in ['AHMA', 'QTTB']
+                is_tracked = symbol in self.TRACKED_SYMBOLS
 
                 if premarket_bars.empty:
                     if is_tracked:
@@ -609,7 +612,7 @@ class PremarketTopGainersScanner:
             except Exception as e:
                 if self.verbose:
                     print(f"Error calculating gains for {symbol}: {e}")
-                if symbol in ['AHMA', 'QTTB']:
+                if symbol in self.TRACKED_SYMBOLS:
                     print(f"!!! TRACKED SYMBOL {symbol} - EXCEPTION during calculation: {e}")
                     import traceback
                     traceback.print_exc()

@@ -100,8 +100,7 @@ def calculate_vwap_by_day(df: pd.DataFrame, timestamp_col: str = 'timestamp') ->
             # Only include valid values with actual volume
             if (not pd.isna(vwap_value) and
                 volume > 0 and
-                not np.isinf(vwap_value) and
-                vwap_value > 0):
+                not np.isinf(vwap_value)):
                 result.append({
                     'time': timestamp,
                     'value': float(vwap_value)
