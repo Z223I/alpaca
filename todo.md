@@ -222,9 +222,14 @@ Looking at your code in atoms/api/get_latest_quote.py:5 and atoms/display/print_
 
 Do you want to add top gainers to squeeze alerts (indirectly)?
 
+## Ask - Bid
+
+- [ ] LSKDJF Update LKDSJFSDLKJ add a panel for the spread
+
 ## Wycoff
 
-- [ ] LSKDFJS Update lskdjf: Build volume profile
+- [ ] It is light volume during consolidation and then a burst of volume on the uptrend.  See https://youtu.be/woxIjeeS0yw?si=zmevajT60W3y36cZ&t=1276
+- [ ] LSKDFJS Update lskdjf: Build volume profile. One second volume candles?
 
 Install TraderVue
 
