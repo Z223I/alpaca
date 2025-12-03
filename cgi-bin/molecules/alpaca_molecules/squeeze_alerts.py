@@ -816,6 +816,8 @@ class SqueezeAlertsMonitor:
         """
         Report a detected squeeze to stdout and Telegram.
 
+        Only reports squeezes for symbols with ≥10% day gain (yellow or green icons).
+
         Args:
             symbol: Stock symbol
             low_price: Lowest price in 10-second window
@@ -824,6 +826,22 @@ class SqueezeAlertsMonitor:
             timestamp: Current timestamp
             size: Current trade size
         """
+        # Check gain data first - only report squeezes for yellow/green gains (≥10%)
+        gain_data = self.gains_per_symbol.get(symbol)
+        gain_data_error = None
+
+        if gain_data:
+            gain_percent = gain_data.get('gain_percent')
+            if gain_percent is not None and gain_percent < 10.0:
+                # Skip reporting this squeeze - gain is below 10% (red icon)
+                if self.verbose:
+                    self.logger.debug(f"⏭️  Skipping squeeze for {symbol}: gain {gain_percent:.2f}% < 10%")
+                return
+        else:
+            # No gain data available - log error but still send alert
+            gain_data_error = f"No gain data available for {symbol}"
+            self.logger.error(f"⚠️  {gain_data_error} during squeeze detection")
+
         self.squeeze_count += 1
         self.squeezes_by_symbol[symbol] = self.squeezes_by_symbol.get(symbol, 0) + 1
 
@@ -892,7 +910,7 @@ class SqueezeAlertsMonitor:
 
         # Display gain from previous close
         if gain_percent is not None:
-            print(f"Day Gain:       {gain_icon} {gain_percent:+.2f}% from previous close")
+            print(f"Day Gain:       {gain_icon} {gain_percent:+.2f}%")
         else:
             print(f"Day Gain:       {gain_icon} N/A")
 
@@ -926,7 +944,7 @@ class SqueezeAlertsMonitor:
             premarket_high, pm_icon, pm_percent_off,
             regular_hod, hod_icon, hod_percent_off,
             vwap, vwap_icon,
-            gain_percent, gain_icon
+            gain_percent, gain_icon, gain_data_error
         )
 
         # Save squeeze alert to JSON file for scanner display
@@ -935,7 +953,7 @@ class SqueezeAlertsMonitor:
             premarket_high, pm_icon, pm_color, pm_percent_off,
             regular_hod, hod_icon, hod_color, hod_percent_off,
             vwap, vwap_icon, vwap_color,
-            gain_percent, gain_icon, gain_color
+            gain_percent, gain_icon, gain_color, gain_data_error
         )
 
     def _send_telegram_alert(self, symbol: str, low_price: float, high_price: float,
@@ -943,7 +961,7 @@ class SqueezeAlertsMonitor:
                             premarket_high: float, pm_icon: str, pm_percent_off: float,
                             regular_hod: float, hod_icon: str, hod_percent_off: float,
                             vwap: float, vwap_icon: str,
-                            gain_percent: float, gain_icon: str):
+                            gain_percent: float, gain_icon: str, gain_data_error: str):
         """
         Send Telegram alert to users with squeeze_alerts=true.
 
@@ -964,6 +982,7 @@ class SqueezeAlertsMonitor:
             vwap_icon: VWAP status icon
             gain_percent: Day gain percentage from previous close
             gain_icon: Day gain status icon
+            gain_data_error: Error message if gain data is unavailable
         """
         try:
             # Get users with squeeze_alerts=true
@@ -993,9 +1012,14 @@ class SqueezeAlertsMonitor:
 
             # Build day gain line
             if gain_percent is not None:
-                gain_line = f"📊 Day Gain: {gain_icon} <b>{gain_percent:+.2f}%</b> from previous close\n"
+                gain_line = f"📊 Day Gain: {gain_icon} <b>{gain_percent:+.2f}%</b>\n"
             else:
                 gain_line = f"📊 Day Gain: {gain_icon} N/A\n"
+
+            # Add error line if gain data is missing
+            error_line = ""
+            if gain_data_error:
+                error_line = f"⚠️ <i>{gain_data_error}</i>\n"
 
             # Format Telegram message
             message = (
@@ -1004,6 +1028,7 @@ class SqueezeAlertsMonitor:
                 f"📈 Price: ${low_price:.2f} → ${high_price:.2f}\n"
                 f"📊 Change: <b>+{percent_change:.2f}%</b> in 10 seconds\n"
                 f"{gain_line}"
+                f"{error_line}"
                 f"{vwap_line}"
                 f"{pm_line}"
                 f"{hod_line}"
@@ -1042,7 +1067,7 @@ class SqueezeAlertsMonitor:
                                   premarket_high: float, pm_icon: str, pm_color: str, pm_percent_off: float,
                                   regular_hod: float, hod_icon: str, hod_color: str, hod_percent_off: float,
                                   vwap: float, vwap_icon: str, vwap_color: str,
-                                  gain_percent: float, gain_icon: str, gain_color: str) -> None:
+                                  gain_percent: float, gain_icon: str, gain_color: str, gain_data_error: str) -> None:
         """
         Save sent squeeze alert to JSON file for scanner display.
 
@@ -1068,6 +1093,7 @@ class SqueezeAlertsMonitor:
             gain_percent: Day gain percentage from previous close
             gain_icon: Day gain status icon
             gain_color: Day gain status color
+            gain_data_error: Error message if gain data is unavailable
         """
         try:
             # Create filename with timestamp
@@ -1115,6 +1141,10 @@ class SqueezeAlertsMonitor:
                     'percent_off': float(hod_percent_off) if hod_percent_off is not None else None
                 }
             }
+
+            # Add error field if present
+            if gain_data_error:
+                alert_json['error'] = gain_data_error
 
             # Save to JSON file
             with open(filepath, 'w') as f:
