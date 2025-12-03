@@ -99,7 +99,7 @@ class PremarketTopGainersScanner:
     """Main premarket top gainers scanner class."""
 
     # Symbols to track for detailed debugging
-    TRACKED_SYMBOLS = ['KXIN']
+    TRACKED_SYMBOLS = ['CAPR']
 
     def __init__(self, provider: str = "alpaca", account: str = "Bruce", environment: str = "paper",
                  verbose: bool = False):
