@@ -237,11 +237,13 @@ Install TraderVue
 
 - [ ] Hit session limit during update to display VWAP on squeeze alerts.  It may be necessary to manual calculate it.  Manully do it and compare the two.
 
+## Volume Profile
+
+- [ ] Create subplot or side plot for volume profile for the last five minutes.
+
 ## Gain Calculation
 
-- [ ] Update the script with debugging statements because I am getting '!!! TRACKED SYMBOL TAOP - FILTERED: gain -19.62% < min 10.0%' but my Webull brokage account shows the gain above 40%. To speed up testing, run code/premarket_top_gainers.py  --symbols TAOP --verbose.  Fix it.
-
-
+- [X] Update the script with debugging statements because I am getting '!!! TRACKED SYMBOL TAOP - FILTERED: gain -19.62% < min 10.0%' but my Webull brokage account shows the gain above 40%. To speed up testing, run code/premarket_top_gainers.py  --symbols TAOP --verbose.  Fix it.
 
 ## Missing Top Gainers
 
