@@ -26,7 +26,7 @@ import json
 import logging
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, time as dt_time
 from pathlib import Path
 from typing import List, Set, Dict, Deque
 from collections import deque
@@ -42,6 +42,8 @@ sys.path.insert(0, project_root)
 
 from atoms.telegram.telegram_post import TelegramPoster
 from atoms.telegram.user_manager import UserManager
+from atoms.api.init_alpaca_client import init_alpaca_client
+from atoms.api.collect_premarket_data import collect_premarket_data
 
 # Import market data - use relative import since we're in the same directory
 import importlib.util
@@ -50,6 +52,12 @@ spec = importlib.util.spec_from_file_location("market_data", market_data_path)
 market_data_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(market_data_module)
 AlpacaMarketData = market_data_module.AlpacaMarketData
+
+# Extended trading hours constants (ET)
+EXTENDED_HOURS_START = dt_time(4, 0)   # 4:00 AM ET - Premarket start
+EXTENDED_HOURS_END = dt_time(20, 0)    # 8:00 PM ET - After-hours end
+MARKET_OPEN = dt_time(9, 30)           # 9:30 AM ET - Regular market open
+MARKET_CLOSE = dt_time(16, 0)          # 4:00 PM ET - Regular market close
 
 
 class SqueezeAlertsMonitor:
@@ -119,6 +127,11 @@ class SqueezeAlertsMonitor:
         # Manual symbols file monitoring
         self.manual_symbols_file = Path(project_root) / "data" / "manual_symbols.json"
         self.last_subscription_time = None
+
+        # Gains tracking (stores premarket gains per symbol)
+        self.gains_per_symbol: Dict[str, Dict] = {}
+        self.last_gains_update = None
+        self.alpaca_client = None  # Will be initialized when first needed
 
         # Load symbols
         if use_existing:
@@ -231,8 +244,20 @@ class SqueezeAlertsMonitor:
                 # Subscribe to all symbols
                 await self._subscribe_all_symbols(ws)
 
-                # Start monitoring loop
-                await self._monitor_trades(ws)
+                # Start gains collection background task
+                gains_task = asyncio.create_task(self._gains_collection_task())
+                self.logger.info("✅ Started gains collection background task")
+
+                try:
+                    # Start monitoring loop
+                    await self._monitor_trades(ws)
+                finally:
+                    # Cancel background task when monitoring stops
+                    gains_task.cancel()
+                    try:
+                        await gains_task
+                    except asyncio.CancelledError:
+                        pass
 
         except ConnectionRefusedError:
             self.logger.error(f"❌ Connection refused to {self.websocket_url}")
@@ -461,6 +486,139 @@ class SqueezeAlertsMonitor:
 
         except Exception as e:
             self.logger.error(f"❌ Error updating directory paths: {e}")
+
+    def _is_gains_collection_window(self) -> bool:
+        """
+        Check if current time is within the extended trading hours (0400-2000 ET).
+
+        Returns:
+            True if within the collection window, False otherwise
+        """
+        current_et = datetime.now(self.et_tz)
+        current_time = current_et.time()
+        current_weekday = current_et.weekday()  # Monday = 0, Sunday = 6
+
+        # Only Monday-Friday
+        if current_weekday >= 5:
+            return False
+
+        # Check if between extended hours (04:00 AM - 08:00 PM ET)
+        return EXTENDED_HOURS_START <= current_time <= EXTENDED_HOURS_END
+
+    def _initialize_alpaca_client(self):
+        """Initialize Alpaca client if not already initialized."""
+        if self.alpaca_client is None:
+            try:
+                self.alpaca_client = init_alpaca_client("alpaca", "Bruce", "paper")
+                self.logger.debug("✅ Initialized Alpaca client for gains collection")
+            except Exception as e:
+                self.logger.error(f"❌ Error initializing Alpaca client: {e}")
+                raise
+
+    async def _collect_gains_data(self):
+        """
+        Collect premarket gains data for all subscribed symbols.
+
+        This method runs every 30 seconds and calls collect_premarket_data
+        to get gains for each subscribed symbol.
+        """
+        try:
+            # Get current subscribed symbols
+            if not self.active_subscriptions:
+                self.logger.debug("No active subscriptions, skipping gains collection")
+                return
+
+            symbols_list = list(self.active_subscriptions)
+
+            if not symbols_list:
+                return
+
+            self.logger.debug(f"🔄 Collecting gains data for {len(symbols_list)} symbols")
+
+            # Initialize client if needed
+            if self.alpaca_client is None:
+                self._initialize_alpaca_client()
+
+            # Create a simple criteria object
+            class PremarketCriteria:
+                def __init__(self):
+                    self.feed = "sip"
+                    self.lookback_days = 7
+                    self.min_price = None
+                    self.max_price = None
+                    self.min_volume = None
+                    self.min_gain_percent = None
+
+            criteria = PremarketCriteria()
+
+            # Call collect_premarket_data
+            premarket_data = collect_premarket_data(
+                client=self.alpaca_client,
+                symbols=symbols_list,
+                criteria=criteria,
+                et_tz=self.et_tz,
+                market_close=MARKET_CLOSE,
+                verbose=self.verbose,
+                tracked_symbols=[]
+            )
+
+            # Process and store gains
+            for symbol, data in premarket_data.items():
+                if 'premarket_bars' in data and not data['premarket_bars'].empty:
+                    # Calculate gain percentage
+                    previous_close = data['previous_close']
+                    current_bar = data['premarket_bars'].iloc[-1]
+                    current_price = float(current_bar['close'])
+                    gain_percent = ((current_price - previous_close) / previous_close) * 100
+
+                    # Store in class variable
+                    self.gains_per_symbol[symbol] = {
+                        'current_price': current_price,
+                        'previous_close': previous_close,
+                        'gain_percent': gain_percent,
+                        'previous_close_time': data['previous_close_time'],
+                        'last_updated': datetime.now(self.et_tz)
+                    }
+
+            self.last_gains_update = datetime.now(self.et_tz)
+            self.logger.info(f"✅ Updated gains for {len(self.gains_per_symbol)} symbols")
+
+        except Exception as e:
+            self.logger.error(f"❌ Error collecting gains data: {e}")
+            import traceback
+            traceback.print_exc()
+
+    async def _gains_collection_task(self):
+        """
+        Background task that collects gains data every 30 seconds.
+
+        Runs from 0400 to 2000 ET.
+        """
+        self.logger.info("🔄 Starting gains collection background task")
+
+        while True:
+            try:
+                # Wait 30 seconds
+                await asyncio.sleep(30)
+
+                # Check if we're in the collection window
+                if not self._is_gains_collection_window():
+                    if self.verbose:
+                        self.logger.debug("Outside gains collection window (0400-2000 ET)")
+                    continue
+
+                # Collect gains data
+                await self._collect_gains_data()
+
+            except asyncio.CancelledError:
+                self.logger.info("⚠️  Gains collection task cancelled")
+                break
+            except Exception as e:
+                self.logger.error(f"❌ Error in gains collection task: {e}")
+                import traceback
+                traceback.print_exc()
+                # Continue running even if there's an error
+                await asyncio.sleep(30)
 
     async def _monitor_trades(self, ws):
         """Monitor and log incoming trades (Phase 1: Eavesdropping)."""
@@ -703,6 +861,26 @@ class SqueezeAlertsMonitor:
             vwap_icon = "⚪"
             vwap_color = "white"
 
+        # Get gain data for this symbol
+        gain_data = self.gains_per_symbol.get(symbol)
+        gain_percent = None
+        gain_icon = "⚪"
+        gain_color = "white"
+
+        if gain_data:
+            gain_percent = gain_data.get('gain_percent')
+            if gain_percent is not None:
+                if gain_percent >= 30.0:
+                    gain_icon = "🟢"
+                    gain_color = "green"
+                elif gain_percent >= 10.0:
+                    gain_icon = "🟡"
+                    gain_color = "yellow"
+                else:
+                    # Anything below 10% is red
+                    gain_icon = "🔴"
+                    gain_color = "red"
+
         # Print to stdout (not logger, so it's always visible)
         print(f"\n{'='*70}")
         print(f"🚀 SQUEEZE DETECTED - {symbol}")
@@ -711,6 +889,12 @@ class SqueezeAlertsMonitor:
         print(f"Price Range:    ${low_price:.2f} → ${high_price:.2f}")
         print(f"Change:         +{percent_change:.2f}% in 10 seconds")
         print(f"Window Trades:  {len(self.price_history[symbol])} trades")
+
+        # Display gain from previous close
+        if gain_percent is not None:
+            print(f"Day Gain:       {gain_icon} {gain_percent:+.2f}% from previous close")
+        else:
+            print(f"Day Gain:       {gain_icon} N/A")
 
         # Display VWAP status
         if vwap:
@@ -741,7 +925,8 @@ class SqueezeAlertsMonitor:
             symbol, low_price, high_price, percent_change, timestamp, size,
             premarket_high, pm_icon, pm_percent_off,
             regular_hod, hod_icon, hod_percent_off,
-            vwap, vwap_icon
+            vwap, vwap_icon,
+            gain_percent, gain_icon
         )
 
         # Save squeeze alert to JSON file for scanner display
@@ -749,14 +934,16 @@ class SqueezeAlertsMonitor:
             symbol, low_price, high_price, percent_change, timestamp, size, sent_users,
             premarket_high, pm_icon, pm_color, pm_percent_off,
             regular_hod, hod_icon, hod_color, hod_percent_off,
-            vwap, vwap_icon, vwap_color
+            vwap, vwap_icon, vwap_color,
+            gain_percent, gain_icon, gain_color
         )
 
     def _send_telegram_alert(self, symbol: str, low_price: float, high_price: float,
                             percent_change: float, timestamp: datetime, size: int,
                             premarket_high: float, pm_icon: str, pm_percent_off: float,
                             regular_hod: float, hod_icon: str, hod_percent_off: float,
-                            vwap: float, vwap_icon: str):
+                            vwap: float, vwap_icon: str,
+                            gain_percent: float, gain_icon: str):
         """
         Send Telegram alert to users with squeeze_alerts=true.
 
@@ -775,6 +962,8 @@ class SqueezeAlertsMonitor:
             hod_percent_off: Percent off regular hours HOD
             vwap: VWAP price
             vwap_icon: VWAP status icon
+            gain_percent: Day gain percentage from previous close
+            gain_icon: Day gain status icon
         """
         try:
             # Get users with squeeze_alerts=true
@@ -802,12 +991,19 @@ class SqueezeAlertsMonitor:
             else:
                 hod_line = f"📊 HOD: {hod_icon} N/A\n"
 
+            # Build day gain line
+            if gain_percent is not None:
+                gain_line = f"📊 Day Gain: {gain_icon} <b>{gain_percent:+.2f}%</b> from previous close\n"
+            else:
+                gain_line = f"📊 Day Gain: {gain_icon} N/A\n"
+
             # Format Telegram message
             message = (
                 f"🚀 <b>SQUEEZE ALERT - {symbol}</b>\n\n"
                 f"⏰ Time: {timestamp.strftime('%H:%M:%S ET')}\n"
                 f"📈 Price: ${low_price:.2f} → ${high_price:.2f}\n"
                 f"📊 Change: <b>+{percent_change:.2f}%</b> in 10 seconds\n"
+                f"{gain_line}"
                 f"{vwap_line}"
                 f"{pm_line}"
                 f"{hod_line}"
@@ -845,7 +1041,8 @@ class SqueezeAlertsMonitor:
                                   sent_to_users: List[str],
                                   premarket_high: float, pm_icon: str, pm_color: str, pm_percent_off: float,
                                   regular_hod: float, hod_icon: str, hod_color: str, hod_percent_off: float,
-                                  vwap: float, vwap_icon: str, vwap_color: str) -> None:
+                                  vwap: float, vwap_icon: str, vwap_color: str,
+                                  gain_percent: float, gain_icon: str, gain_color: str) -> None:
         """
         Save sent squeeze alert to JSON file for scanner display.
 
@@ -868,6 +1065,9 @@ class SqueezeAlertsMonitor:
             vwap: VWAP price
             vwap_icon: VWAP status icon
             vwap_color: VWAP status color
+            gain_percent: Day gain percentage from previous close
+            gain_icon: Day gain status icon
+            gain_color: Day gain status color
         """
         try:
             # Create filename with timestamp
@@ -892,6 +1092,11 @@ class SqueezeAlertsMonitor:
                 'squeeze_threshold': float(self.squeeze_percent),
                 'sent_to_users': sent_to_users,
                 'sent_count': len(sent_to_users),
+                'day_gain': float(gain_percent) if gain_percent is not None else None,
+                'day_gain_status': {
+                    'icon': gain_icon,
+                    'color': gain_color
+                },
                 'vwap': float(vwap) if vwap else None,
                 'vwap_status': {
                     'icon': vwap_icon,
