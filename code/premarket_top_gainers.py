@@ -39,11 +39,13 @@ import pandas as pd
 import pytz
 import alpaca_trade_api as tradeapi
 
-# Add the atoms directory to the path for imports
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'atoms'))
-sys.path.append(os.path.join(os.path.dirname(__file__)))
+# Set PYTHONPATH to include the project root directory
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 from atoms.api.init_alpaca_client import init_alpaca_client
+from atoms.alpaca_api.find_last_market_close_data import find_last_market_close_data
 
 
 @dataclass
@@ -96,7 +98,7 @@ class PremarketTopGainersScanner:
     """Main premarket top gainers scanner class."""
 
     # Symbols to track for detailed debugging
-    TRACKED_SYMBOLS = ['FTEL']
+    TRACKED_SYMBOLS = ['KXIN']
 
     def __init__(self, provider: str = "alpaca", account: str = "Bruce", environment: str = "paper",
                  verbose: bool = False):
@@ -260,105 +262,21 @@ class PremarketTopGainersScanner:
         """
         Find the actual last market close bar (4:00 PM ET) from the collected data.
 
+        This is a wrapper method that delegates to the atoms module function.
+
         Args:
             bars_data: Dictionary of symbol -> DataFrame of 5-minute bars
 
         Returns:
             Dictionary with close_timestamp and close_bars_dict, or None if not found
         """
-        if not bars_data:
-            return None
-
-        # Get a representative symbol's data to find market close times
-        sample_symbol = next(iter(bars_data.keys()))
-        sample_bars = bars_data[sample_symbol]
-
-        if sample_bars.empty:
-            return None
-
-        current_et = datetime.now(self.et_tz)
-        current_time = current_et.time()
-        current_date = current_et.date()
-
-        # Find the most recent completed trading day
-        target_date = current_date
-
-        # If market hasn't closed yet today, use yesterday
-        if current_et.weekday() < 5 and current_time < self.market_close:
-            target_date = current_date - timedelta(days=1)
-
-        # Skip back to most recent weekday
-        while target_date.weekday() >= 5:  # Skip weekends
-            target_date -= timedelta(days=1)
-
-        if self.verbose:
-            print(f"Looking for market close on: {target_date}")
-
-        # Look for the 4:00 PM ET bar on the target date across all symbols
-        target_close_time = self.et_tz.localize(
-            datetime.combine(target_date, self.market_close)
+        return find_last_market_close_data(
+            bars_data=bars_data,
+            et_tz=self.et_tz,
+            market_close=self.market_close,
+            verbose=self.verbose,
+            tracked_symbols=self.TRACKED_SYMBOLS
         )
-
-        # Find bars closest to 4:00 PM ET (within 10 minutes)
-        close_bars_dict = {}
-        found_any_close = False
-
-        for symbol, bars_df in bars_data.items():
-            if bars_df.empty:
-                continue
-
-            # Filter to target date
-            target_date_bars = bars_df[bars_df.index.date == target_date]
-
-            if target_date_bars.empty:
-                continue
-
-            # Find the bar closest to 4:00 PM ET (market close)
-            # Only use bars at or before 4:00 PM to avoid after-hours prices
-            market_close_time = self.et_tz.localize(
-                datetime.combine(target_date, self.market_close)  # 4:00 PM ET
-            )
-
-            # Filter to bars at or before 4:00 PM (regular market hours)
-            regular_hours_bars = target_date_bars[target_date_bars.index <= market_close_time]
-
-            if regular_hours_bars.empty:
-                # Skip symbols without bars at or before 4:00 PM
-                continue
-
-            # Use the LAST bar at or before 4:00 PM
-            last_bar = regular_hours_bars.iloc[-1]
-            last_time = regular_hours_bars.index[-1]
-
-            close_bars_dict[symbol] = {
-                'close_price': float(last_bar['close']),
-                'close_time': last_time,
-                'bar_data': last_bar
-            }
-            found_any_close = True
-
-            # Debug logging for tracked symbols
-            is_tracked = symbol in self.TRACKED_SYMBOLS
-            if (self.verbose and symbol == sample_symbol) or is_tracked:
-                time_diff_minutes = abs((last_time - target_close_time).total_seconds()) / 60
-                print(f"Found market close bar for {symbol}: {last_time.strftime('%Y-%m-%d %H:%M:%S %Z')} "
-                      f"(${last_bar['close']:.2f}, {time_diff_minutes:.0f} min from 4PM)")
-                if is_tracked:
-                    print(f"!!! TRACKED SYMBOL {symbol} - Previous close bar details:")
-                    print(f"    All bars on {target_date}: {len(target_date_bars)} bars")
-                    print(f"    First bar: {target_date_bars.index[0]} @ ${target_date_bars.iloc[0]['close']:.4f}")
-                    print(f"    Last bar: {target_date_bars.index[-1]} @ ${target_date_bars.iloc[-1]['close']:.4f}")
-
-        if found_any_close:
-            return {
-                'close_timestamp': target_close_time,
-                'close_bars_dict': close_bars_dict,
-                'target_date': target_date
-            }
-
-        if self.verbose:
-            print("Could not find market close bars in data")
-        return None
 
     def collect_premarket_data(self, symbols: List[str], criteria: PremarketCriteria) -> Dict[str, Dict]:
         """
