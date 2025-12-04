@@ -762,7 +762,7 @@
 
         /* Left Sidebar Container */
         .left-sidebar {
-            width: 700px;
+            width: 595px;
             min-width: 500px;
             max-width: 900px;
             display: flex;
@@ -1263,11 +1263,6 @@
             width: 70px;
         }
 
-        .scanner-table th.volume-col {
-            text-align: right;
-            width: 90px;
-        }
-
         .scanner-table tbody tr {
             border-bottom: 1px solid var(--border-color);
             cursor: pointer;
@@ -1320,12 +1315,6 @@
 
         .scanner-table td.gain-cell.negative {
             color: var(--accent-red);
-        }
-
-        .scanner-table td.volume-cell {
-            text-align: right;
-            color: var(--text-primary);
-            font-size: 13px;
         }
 
         .scanner-table td.text-cell {
@@ -1500,14 +1489,13 @@
                             <th class="time-col">Time<div class="resize-handle"></div></th>
                             <th class="price-col">Price<div class="resize-handle"></div></th>
                             <th class="gain-col">Gain<div class="resize-handle"></div></th>
-                            <th class="volume-col">Volume<div class="resize-handle"></div></th>
                             <th>Text<div class="resize-handle"></div></th>
                         </tr>
                     </thead>
                     <tbody id="scannerBody">
                         <!-- Alerts will be populated here -->
                         <tr class="scanner-empty">
-                            <td colspan="7">Loading scanner...</td>
+                            <td colspan="6">Loading scanner...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -4545,9 +4533,6 @@
                     : 'N/A';
                 const gainClass = (alert.gain != null && alert.gain >= 0) ? 'positive' : 'negative';
 
-                // Format volume with commas
-                const volumeStr = alert.volume.toLocaleString();
-
                 // Format price with 2 decimal places
                 const priceStr = alert.price ? `$${alert.price.toFixed(2)}` : 'N/A';
 
@@ -4570,7 +4555,6 @@
                         <td class="time-cell">${alert.time}</td>
                         <td class="price-cell">${priceStr}</td>
                         <td class="gain-cell ${gainClass}">${gainStr}</td>
-                        <td class="volume-cell">${volumeStr}</td>
                         <td class="text-cell">${alert.text}</td>
                     </tr>
                 `;
@@ -4582,7 +4566,7 @@
             const tbody = document.getElementById('scannerBody');
             tbody.innerHTML = `
                 <tr class="scanner-empty">
-                    <td colspan="7" style="color: var(--accent-red);">${message}</td>
+                    <td colspan="6" style="color: var(--accent-red);">${message}</td>
                 </tr>
             `;
         }

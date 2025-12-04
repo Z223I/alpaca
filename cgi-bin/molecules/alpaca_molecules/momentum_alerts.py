@@ -494,7 +494,8 @@ class MomentumAlertsSystem:
             os.path.expanduser("~/miniconda3/envs/alpaca/bin/python"),
             str(script_path),
             "--account", "live",  # Use live account with SIP feed access
-            "--symbols-file", "data_master/master.csv",
+            "--exchanges", "NASDAQ", "AMEX",
+            "--max-symbols", "7000",
             "--min-price", "0.75",
             "--max-price", "40.00",
             "--min-volume", "250000",
