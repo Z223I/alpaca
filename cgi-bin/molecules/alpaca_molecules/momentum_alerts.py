@@ -438,7 +438,7 @@ class MomentumAlertsSystem:
             "--max-symbols", "7000",
             "--min-price", "0.75",
             "--max-price", "100.00",
-            "--min-volume", "250000",
+            "--min-volume", "2500",
             "--top-gainers", "40",
             "--export-csv", "gainers_nasdaq_amex.csv",
             "--verbose"
@@ -495,10 +495,10 @@ class MomentumAlertsSystem:
             str(script_path),
             "--account", "live",  # Use live account with SIP feed access
             "--exchanges", "NASDAQ", "AMEX",
-            "--max-symbols", "7000",
+            "--max-symbols", "9000",
             "--min-price", "0.75",
             "--max-price", "40.00",
-            "--min-volume", "250000",
+            "--min-volume", "2500",
             "--top-gainers", "40",
             "--export-csv", "top_gainers_nasdaq_amex.csv",
             "--verbose"
