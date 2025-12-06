@@ -12,23 +12,29 @@ Process:
    - Generates top_gainers_nasdaq_amex.csv in ./historical_data/{YYYY-MM-DD}/premarket/
    - Monitors premarket top gainers continuously
    - Runs on weekdays only (Monday-Friday)
-2. Market Open Scanning: Run market_open_top_gainers.py starting at 9:40 ET, every 20 minutes
+2. Top Gainers (Alpaca API): Run alpaca.py --top-gainers from 04:00 to 20:00 ET every 10 minutes
+   - Runs on separate CPU core (core 2) using taskset
+   - Generates top_gainers_alpaca.csv in ./historical_data/{YYYY-MM-DD}/market/
+   - Uses Alpaca screener API for real-time top gainers
+   - Runs on weekdays only (Monday-Friday)
+3. Market Open Scanning: Run market_open_top_gainers.py starting at 9:40 ET, every 20 minutes
    - Generates gainers_nasdaq_amex.csv
    - Runs every day including weekends for continuous data collection
    - Automatically reschedules after each run
-3. Volume Surge: Run volume surge scanner hourly at :45 from 06:45 to 12:45 ET on weekdays only
+4. Volume Surge: Run volume surge scanner hourly at :45 from 06:45 to 12:45 ET on weekdays only
    - Runs at: 06:45, 07:45, 08:45, 09:45, 10:45, 11:45, 12:45 ET (7 runs per weekday)
    - Generates relative_volume_nasdaq_amex.csv
    - Automatically reschedules after each run
-4. Data Integration: Load symbols from all sources (premarket, market open, volume surge, Oracle)
-   - Track source with boolean fields: from_premarket, from_gainers, from_volume_surge, oracle
+5. Data Integration: Load symbols from all sources (premarket, market open, volume surge, Oracle, top gainers)
+   - Track source with boolean fields: from_premarket, from_gainers, from_volume_surge, oracle, from_top_gainers
    - Merge and deduplicate symbols across all sources
-5. Stock Monitoring: Every minute, collect 30 minutes of 1-minute candlesticks for each stock
-6. Momentum Alerts: Check stocks above VWAP, above EMA9, and pass urgency filter
-7. Integration: Send alerts to all users with momentum_alerts=true via Telegram
+6. Stock Monitoring: Every minute, collect 30 minutes of 1-minute candlesticks for each stock
+7. Momentum Alerts: Check stocks above VWAP, above EMA9, and pass urgency filter
+8. Integration: Send alerts to all users with momentum_alerts=true via Telegram
 
 CSV Files Generated:
 - ./historical_data/{YYYY-MM-DD}/premarket/top_gainers_nasdaq_amex.csv (premarket)
+- ./historical_data/{YYYY-MM-DD}/market/top_gainers_alpaca.csv (top gainers from Alpaca API)
 - ./historical_data/{YYYY-MM-DD}/market/gainers_nasdaq_amex.csv (market open)
 - ./historical_data/{YYYY-MM-DD}/volume_surge/relative_volume_nasdaq_amex.csv
 - ./historical_data/{YYYY-MM-DD}/scanner/symbol_list.csv
@@ -170,10 +176,15 @@ class MomentumAlertsSystem:
         self.premarket_schedule = []  # List of scheduled premarket times
         self.premarket_runs_completed = 0
 
+        # Top Gainers data (Alpaca screener API)
+        self.top_gainers_schedule = []  # List of scheduled top gainers times
+        self.top_gainers_runs_completed = 0
+
         # State
         self.running = False
         self.startup_processes = {}  # Track running startup scripts
         self.premarket_processes = {}  # Track running premarket scripts
+        self.top_gainers_processes = {}  # Track running top gainers scripts
 
         # Debug mode - send random alerts for testing
         self.debug_mode = False  # Set to False to disable debug alerts
@@ -332,6 +343,62 @@ class MomentumAlertsSystem:
         self.premarket_schedule = [next_run]
 
         self.logger.info(f"🌅 Next premarket script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
+        self.logger.info(f"⏰ Runs every 10 minutes from 04:00 to 20:00 ET on weekdays only")
+
+    def _schedule_top_gainers_runs(self):
+        """
+        Schedule the top gainers script to run from 04:00 to 20:00 ET, every 10 minutes.
+
+        Runs on weekdays only (Monday-Friday) during market hours.
+        Same schedule as premarket scanner.
+        """
+        current_time = datetime.now(self.et_tz)
+
+        # Calculate next run time from 04:00 to 20:00 ET, every 10 minutes
+        # Base time is 04:00 ET (hour=4, minute=0)
+
+        # Get minutes since midnight
+        current_minutes_since_midnight = current_time.hour * 60 + current_time.minute
+
+        # First run at 04:00 ET = 240 minutes since midnight
+        first_run_minutes = 4 * 60  # 240 minutes
+
+        # Last run at 20:00 ET = 1200 minutes since midnight
+        last_run_minutes = 20 * 60  # 1200 minutes
+
+        # If before 04:00 today, schedule for 04:00 today
+        if current_minutes_since_midnight < first_run_minutes:
+            next_run = current_time.replace(hour=4, minute=0, second=0, microsecond=0)
+        elif current_minutes_since_midnight >= last_run_minutes:
+            # After 20:00 today, schedule for 04:00 tomorrow
+            next_run = (current_time + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
+        else:
+            # Between 04:00 and 20:00 - calculate how many 10-minute intervals have passed since 04:00 today
+            minutes_since_0400 = current_minutes_since_midnight - first_run_minutes
+            intervals_passed = minutes_since_0400 // 10
+
+            # Next run is the next 10-minute interval
+            next_interval_minutes = first_run_minutes + ((intervals_passed + 1) * 10)
+
+            # If we've gone past 20:00, schedule for 04:00 tomorrow
+            if next_interval_minutes >= last_run_minutes:
+                next_run = (current_time + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
+            else:
+                next_run_hour = next_interval_minutes // 60
+                next_run_minute = next_interval_minutes % 60
+                next_run = current_time.replace(hour=next_run_hour, minute=next_run_minute, second=0, microsecond=0)
+
+        # If next_run is on a weekend, find next Monday at 04:00
+        if next_run.weekday() >= 5:  # Saturday=5, Sunday=6
+            days_until_monday = (7 - next_run.weekday()) % 7
+            if days_until_monday == 0:
+                days_until_monday = 7
+            next_run = (next_run + timedelta(days=days_until_monday)).replace(hour=4, minute=0, second=0, microsecond=0)
+
+        # Store the next scheduled run
+        self.top_gainers_schedule = [next_run]
+
+        self.logger.info(f"📈 Next top gainers script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
         self.logger.info(f"⏰ Runs every 10 minutes from 04:00 to 20:00 ET on weekdays only")
 
     def _schedule_volume_surge_runs(self):
@@ -536,6 +603,58 @@ class MomentumAlertsSystem:
             self.logger.error(f"❌ Failed to start premarket script: {e}")
             return False
 
+    async def _run_top_gainers_script(self) -> bool:
+        """
+        Run the alpaca.py --top-gainers script on a separate CPU core.
+
+        Returns:
+            True if script ran successfully, False otherwise
+        """
+        self.logger.info("📈 Running top gainers script: alpaca.py --top-gainers")
+
+        script_path = Path("code") / "alpaca.py"
+        python_path = os.path.expanduser("~/miniconda3/envs/alpaca/bin/python")
+
+        cmd = [
+            "taskset", "-c", "2",  # Run on CPU core 2 (separate from main process and premarket)
+            python_path,
+            str(script_path),
+            "--top-gainers",
+            "--limit", "40"
+        ]
+
+        try:
+            # Create environment with PYTHONPATH set to project root
+            env = os.environ.copy()
+            env['PYTHONPATH'] = project_root
+
+            # Create process with logging
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                cwd=str(Path.cwd()),
+                env=env
+            )
+
+            # Store process for monitoring
+            process_id = f"top_gainers_{self.top_gainers_runs_completed + 1}"
+            self.top_gainers_processes[process_id] = {
+                'process': process,
+                'start_time': datetime.now(self.et_tz),
+                'cmd': ' '.join(cmd)
+            }
+
+            self.logger.info(f"📈 Started top gainers script on CPU core 2 (PID: {process.pid})")
+            self.logger.info("🕒 Expected completion: < 1 minute")
+
+            return True
+
+        except Exception as e:
+            self.logger.error(f"❌ Failed to start top gainers script: {e}")
+            return False
+
     def _check_startup_schedule(self):
         """
         Check if it's time to run a startup script.
@@ -641,6 +760,62 @@ class MomentumAlertsSystem:
 
             self.premarket_schedule = [next_run]
             self.logger.info(f"🌅 Next premarket script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
+
+    def _check_top_gainers_schedule(self):
+        """
+        Check if it's time to run a top gainers script.
+
+        After each run, automatically schedule the next one (every 10 minutes).
+        Only runs between 04:00 and 20:00 ET on weekdays (Monday-Friday).
+        Same schedule as premarket scanner.
+        """
+        current_time = datetime.now(self.et_tz)
+
+        # Check if we have a scheduled run and it's time to execute
+        if self.top_gainers_schedule and current_time >= self.top_gainers_schedule[0]:
+            # Check if today is a weekday before running
+            if current_time.weekday() < 5:  # Monday=0, Friday=4
+                # Run the script
+                asyncio.create_task(self._run_top_gainers_script())
+                self.top_gainers_runs_completed += 1
+
+            # Immediately schedule the next run (10 minutes from now)
+            next_run = current_time + timedelta(minutes=10)
+            # Align to the next 10-minute boundary based on 04:00 start
+            # Round to nearest 10-minute mark: 04:00, 04:10, 04:20, 04:30, etc.
+            minutes_since_midnight = next_run.hour * 60 + next_run.minute
+            first_run_minutes = 4 * 60  # 240 minutes (04:00)
+            last_run_minutes = 20 * 60  # 1200 minutes (20:00)
+
+            if minutes_since_midnight < first_run_minutes:
+                # Before 04:00, schedule for 04:00
+                next_run = next_run.replace(hour=4, minute=0, second=0, microsecond=0)
+            elif minutes_since_midnight >= last_run_minutes:
+                # After 20:00, schedule for 04:00 tomorrow
+                next_run = (next_run + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
+            else:
+                # Between 04:00 and 20:00, round to next 10-minute interval from 04:00
+                minutes_since_0400 = minutes_since_midnight - first_run_minutes
+                intervals_from_0400 = (minutes_since_0400 // 10) + 1
+                next_interval_minutes = first_run_minutes + (intervals_from_0400 * 10)
+
+                if next_interval_minutes >= last_run_minutes:
+                    # Past 20:00, schedule for 04:00 tomorrow
+                    next_run = (next_run + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
+                else:
+                    next_run_hour = next_interval_minutes // 60
+                    next_run_minute = next_interval_minutes % 60
+                    next_run = next_run.replace(hour=next_run_hour, minute=next_run_minute, second=0, microsecond=0)
+
+            # If next_run is on a weekend, find next Monday at 04:00
+            if next_run.weekday() >= 5:  # Saturday=5, Sunday=6
+                days_until_monday = (7 - next_run.weekday()) % 7
+                if days_until_monday == 0:
+                    days_until_monday = 7
+                next_run = (next_run + timedelta(days=days_until_monday)).replace(hour=4, minute=0, second=0, microsecond=0)
+
+            self.top_gainers_schedule = [next_run]
+            self.logger.info(f"📈 Next top gainers script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
 
     def _check_volume_surge_schedule(self):
         """
@@ -2535,8 +2710,11 @@ class MomentumAlertsSystem:
             # Schedule next startup script runs (will start scheduling from next 20-min interval)
             self._schedule_startup_runs()
 
-            # Schedule premarket script runs (04:00-20:00 ET, every 20 minutes)
+            # Schedule premarket script runs (04:00-20:00 ET, every 10 minutes)
             self._schedule_premarket_runs()
+
+            # Schedule top gainers script runs (04:00-20:00 ET, every 10 minutes)
+            self._schedule_top_gainers_runs()
 
             # Schedule volume surge scanner runs (hourly at :45 from 06:45-12:45 ET, weekdays only)
             self._schedule_volume_surge_runs()
@@ -2555,6 +2733,9 @@ class MomentumAlertsSystem:
 
                     # Check premarket schedule
                     self._check_premarket_schedule()
+
+                    # Check top gainers schedule
+                    self._check_top_gainers_schedule()
 
                     # Check volume surge schedule
                     self._check_volume_surge_schedule()

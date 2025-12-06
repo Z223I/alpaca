@@ -4,8 +4,10 @@ import math
 import time
 import subprocess
 import logging
+import csv
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date, time as dt_time
+from pathlib import Path
 import pytz
 import pandas as pd
 import json
@@ -20,6 +22,7 @@ from atoms.api.get_cash import get_cash
 from atoms.api.get_positions import get_positions
 from atoms.api.get_latest_quote import get_latest_quote
 from atoms.api.get_latest_quote_avg import get_latest_quote_avg
+from atoms.api.get_top_movers import get_top_movers
 from atoms.api.init_alpaca_client import init_alpaca_client
 from atoms.api.config import TradingConfig
 from atoms.api.pnl import AlpacaDailyPnL
@@ -153,6 +156,53 @@ class AlpacaPrivate:
                 self.logger.error(message)
             else:
                 self.logger.info(message)
+
+    def _export_top_gainers_to_csv(self, gainers_data: List[Dict], filename: str = "top_gainers_alpaca.csv") -> bool:
+        """
+        Export top gainers data to CSV file.
+
+        Args:
+            gainers_data: List of dictionaries containing gainer information
+            filename: Output CSV filename (default: top_gainers_alpaca.csv)
+
+        Returns:
+            True if export successful, False otherwise
+        """
+        if not gainers_data:
+            print("No top gainers data to export")
+            return False
+
+        try:
+            # Create directory structure: ./historical_data/{YYYY-MM-DD}/market/
+            et_tz = pytz.timezone('US/Eastern')
+            today = datetime.now(et_tz).strftime('%Y-%m-%d')
+            directory = Path("historical_data") / today / "market"
+            directory.mkdir(parents=True, exist_ok=True)
+
+            # Full path to CSV file
+            csv_path = directory / filename
+
+            # Write to CSV
+            with open(csv_path, 'w', newline='') as csvfile:
+                fieldnames = ['symbol', 'price', 'change', 'percent_change']
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+                writer.writeheader()
+                for gainer in gainers_data:
+                    row = {
+                        'symbol': gainer.get('symbol', 'N/A'),
+                        'price': gainer.get('price', 0),
+                        'change': gainer.get('change', 0),
+                        'percent_change': gainer.get('percent_change', 0)
+                    }
+                    writer.writerow(row)
+
+            print(f"✓ Top gainers exported to {csv_path}")
+            return True
+
+        except Exception as e:
+            print(f"✗ Error exporting top gainers to CSV: {e}")
+            return False
 
     def _calculateQuantity(self, price: float, method_name: str = "method") -> int:
         """
@@ -2635,9 +2685,15 @@ No further position monitoring will occur until restarted."""
                 print_active_orders(self.api)
             if self.args.top_gainers:
                 top = self.args.limit if self.args.limit else 10
+                # Display top gainers
                 success = print_top_movers(self.api, 'stocks', top, self.account_name, self.account)
                 if not success:
                     return 1
+
+                # Export top gainers to CSV
+                movers_data = get_top_movers(self.api, 'stocks', top, self.account_name, self.account)
+                if movers_data and 'gainers' in movers_data:
+                    self._export_top_gainers_to_csv(movers_data['gainers'], "top_gainers_alpaca.csv")
             return 0  # Exit early for display-only operations
 
         # Default behavior: show all information for other operations

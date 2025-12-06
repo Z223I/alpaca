@@ -57,9 +57,10 @@ def get_watch_list_symbols() -> List[Dict]:
     Load watch list symbols from CSV files and return with source indicators.
 
     Reads from:
-    1. historical_data/{YYYY-MM-DD}/top_gainers_nasdaq_amex.csv (premarket top gainers)
-    2. historical_data/{YYYY-MM-DD}/volume_surge/relative_volume_nasdaq_amex.csv (surge)
-    3. data/{YYYYMMDD}.csv (oracle) - falls back to latest CSV if today's not found
+    1. historical_data/{YYYY-MM-DD}/premarket/top_gainers_nasdaq_amex.csv (premarket top gainers)
+    2. historical_data/{YYYY-MM-DD}/market/top_gainers_alpaca.csv (Alpaca API top gainers)
+    3. historical_data/{YYYY-MM-DD}/volume_surge/relative_volume_nasdaq_amex.csv (surge)
+    4. data/{YYYYMMDD}.csv (oracle) - falls back to latest CSV if today's not found
 
     Returns:
         List of dictionaries with fields:
@@ -67,6 +68,7 @@ def get_watch_list_symbols() -> List[Dict]:
         - oracle: Boolean - from Oracle data source
         - manual: Boolean - manually added (always False for now)
         - top_gainers: Boolean - from premarket top gainers list
+        - alpaca_top_gainers: Boolean - from Alpaca API top gainers list
         - surge: Boolean - from volume surge list
         - gain_percent: Float or None - percentage gain from top_gainers or volume_surge
         - surge_amount: Float or None - volume surge ratio from volume_surge
@@ -77,6 +79,7 @@ def get_watch_list_symbols() -> List[Dict]:
 
     # File paths
     gainers_csv = Path(project_root) / "historical_data" / today / "premarket" / "top_gainers_nasdaq_amex.csv"
+    alpaca_gainers_csv = Path(project_root) / "historical_data" / today / "market" / "top_gainers_alpaca.csv"
     volume_surge_csv = Path(project_root) / "historical_data" / today / "volume_surge" / "relative_volume_nasdaq_amex.csv"
     oracle_csv = Path(project_root) / "data" / f"{compact_date}.csv"
 
@@ -112,6 +115,7 @@ def get_watch_list_symbols() -> List[Dict]:
                                 'oracle': False,
                                 'manual': False,
                                 'top_gainers': True,
+                                'alpaca_top_gainers': False,
                                 'surge': False,
                                 'gain_percent': gain_percent,
                                 'surge_amount': None
@@ -121,6 +125,46 @@ def get_watch_list_symbols() -> List[Dict]:
                             break  # Stop after first 40
         except Exception as e:
             print(f"Error loading premarket top gainers CSV: {e}", file=sys.stderr)
+
+    # Load from Alpaca top gainers CSV file - keep first 40 symbols that don't end in 'W'
+    if alpaca_gainers_csv.exists():
+        try:
+            alpaca_gainers_count = 0
+            with open(alpaca_gainers_csv, 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    symbol = row.get('symbol', '').strip().upper()
+                    # Filter: must have symbol and not end in 'W'
+                    if symbol and not symbol.endswith('W'):
+                        # Get percent_change from the CSV
+                        percent_change = None
+                        if 'percent_change' in row:
+                            try:
+                                percent_change = float(row['percent_change'])
+                            except (ValueError, TypeError):
+                                pass
+
+                        if symbol in symbols_dict:
+                            # Symbol already exists - update alpaca_top_gainers flag
+                            symbols_dict[symbol]['alpaca_top_gainers'] = True
+                            # Don't override gain_percent if it's already set from premarket
+                            if symbols_dict[symbol]['gain_percent'] is None and percent_change is not None:
+                                symbols_dict[symbol]['gain_percent'] = percent_change
+                        elif alpaca_gainers_count < 40:  # Only add first 40 new symbols
+                            symbols_dict[symbol] = {
+                                'oracle': False,
+                                'manual': False,
+                                'top_gainers': False,
+                                'alpaca_top_gainers': True,
+                                'surge': False,
+                                'gain_percent': percent_change,
+                                'surge_amount': None
+                            }
+                            alpaca_gainers_count += 1
+                        else:
+                            continue  # Skip additional symbols beyond first 40 new ones
+        except Exception as e:
+            print(f"Error loading Alpaca top gainers CSV: {e}", file=sys.stderr)
 
     # Load from volume surge CSV file - keep first 40 symbols that don't end in 'W'
     if volume_surge_csv.exists():
@@ -154,6 +198,7 @@ def get_watch_list_symbols() -> List[Dict]:
                                 'oracle': False,
                                 'manual': False,
                                 'top_gainers': False,
+                                'alpaca_top_gainers': False,
                                 'surge': True,
                                 'gain_percent': None,  # Only top_gainers provides gain_percent
                                 'surge_amount': surge_amount
@@ -183,6 +228,7 @@ def get_watch_list_symbols() -> List[Dict]:
                                 'oracle': True,
                                 'manual': False,
                                 'top_gainers': False,
+                                'alpaca_top_gainers': False,
                                 'surge': False,
                                 'gain_percent': None,
                                 'surge_amount': None

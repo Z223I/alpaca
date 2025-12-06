@@ -1458,6 +1458,7 @@
                             <th class="source-col" title="Oracle">🔮</th>
                             <th class="source-col" title="Manual">✏️</th>
                             <th class="source-col" title="Premarket Top Gainers">🌅</th>
+                            <th class="source-col" title="Alpaca Top Gainers">📈</th>
                             <th class="surge-col" onclick="sortWatchList('surge_amount')" title="Volume Surge Ratio">Surge <span class="sort-indicator"></span></th>
                             <th class="gain-col" onclick="sortWatchList('gain_percent')" title="Percent Gain">Gain <span class="sort-indicator"></span></th>
                             <th class="del-col">Del</th>
@@ -1466,7 +1467,7 @@
                     <tbody id="watchListBody">
                         <!-- Symbols will be populated here -->
                         <tr class="watch-list-empty">
-                            <td colspan="8">Loading watch list...</td>
+                            <td colspan="9">Loading watch list...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -4077,6 +4078,7 @@
                                 oracle: false,
                                 manual: false,
                                 top_gainers: true, // Mark as coming from data directory
+                                alpaca_top_gainers: false,
                                 surge: false,
                                 gain_percent: gainPercent,
                                 surge_amount: null,
@@ -4132,6 +4134,7 @@
                                 oracle: false,
                                 manual: true,
                                 top_gainers: false,
+                                alpaca_top_gainers: false,
                                 surge: false,
                                 gain_percent: null,
                                 surge_amount: null
@@ -4171,7 +4174,7 @@
             if (!watchListState.symbols || watchListState.symbols.length === 0) {
                 tbody.innerHTML = `
                     <tr class="watch-list-empty">
-                        <td colspan="8">No symbols in watch list</td>
+                        <td colspan="9">No symbols in watch list</td>
                     </tr>
                 `;
                 return;
@@ -4222,6 +4225,10 @@
                             <span class="source-indicator ${symbol.top_gainers ? 'on' : 'off'}"
                                   title="${symbol.top_gainers ? 'Premarket Top Gainers: Yes' : 'Premarket Top Gainers: No'}"></span>
                         </td>
+                        <td class="source-cell">
+                            <span class="source-indicator ${symbol.alpaca_top_gainers ? 'on' : 'off'}"
+                                  title="${symbol.alpaca_top_gainers ? 'Alpaca Top Gainers: Yes' : 'Alpaca Top Gainers: No'}"></span>
+                        </td>
                         <td class="surge-cell">${surgeStr}</td>
                         <td class="gain-cell ${gainClass}">${gainStr}</td>
                         <td class="del-cell">
@@ -4241,7 +4248,7 @@
             const tbody = document.getElementById('watchListBody');
             tbody.innerHTML = `
                 <tr class="watch-list-empty">
-                    <td colspan="8" style="color: var(--accent-red);">${message}</td>
+                    <td colspan="9" style="color: var(--accent-red);">${message}</td>
                 </tr>
             `;
         }
@@ -4372,6 +4379,7 @@
                 oracle: false,
                 manual: true,
                 top_gainers: false,
+                alpaca_top_gainers: false,
                 surge: false,
                 gain_percent: null,
                 surge_amount: null
