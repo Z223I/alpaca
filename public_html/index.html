@@ -1455,10 +1455,10 @@
                     <thead>
                         <tr>
                             <th onclick="sortWatchList('symbol')">Symbol <span class="sort-indicator"></span></th>
-                            <th class="source-col" title="Oracle">🔮</th>
-                            <th class="source-col" title="Manual">✏️</th>
-                            <th class="source-col" title="Premarket Top Gainers">🌅</th>
-                            <th class="source-col" title="Alpaca Top Gainers">📈</th>
+                            <th class="source-col" onclick="sortWatchList('oracle')" title="Oracle">🔮 <span class="sort-indicator"></span></th>
+                            <th class="source-col" onclick="sortWatchList('manual')" title="Manual">✏️ <span class="sort-indicator"></span></th>
+                            <th class="source-col" onclick="sortWatchList('top_gainers')" title="Premarket Top Gainers">🌅 <span class="sort-indicator"></span></th>
+                            <th class="source-col" onclick="sortWatchList('alpaca_top_gainers')" title="Alpaca Top Gainers">📈 <span class="sort-indicator"></span></th>
                             <th class="surge-col" onclick="sortWatchList('surge_amount')" title="Volume Surge Ratio">Surge <span class="sort-indicator"></span></th>
                             <th class="gain-col" onclick="sortWatchList('gain_percent')" title="Percent Gain">Gain <span class="sort-indicator"></span></th>
                             <th class="del-col">Del</th>
@@ -4270,7 +4270,30 @@
 
         // Sort watch list data
         function sortWatchListData(column, direction) {
+            const booleanColumns = ['oracle', 'manual', 'top_gainers', 'alpaca_top_gainers'];
+
             watchListState.symbols.sort((a, b) => {
+                // Special handling for boolean source columns
+                if (booleanColumns.includes(column)) {
+                    const valA = a[column];
+                    const valB = b[column];
+
+                    // Sort by boolean value first
+                    if (valA === valB) {
+                        // If same boolean value, sort by symbol alphabetically
+                        return a.symbol.toLowerCase() < b.symbol.toLowerCase() ? -1 :
+                               a.symbol.toLowerCase() > b.symbol.toLowerCase() ? 1 : 0;
+                    }
+
+                    // Different boolean values - true comes first for desc, last for asc
+                    if (direction === 'desc') {
+                        return valA ? -1 : 1;  // true (-1) comes before false (1)
+                    } else {
+                        return valA ? 1 : -1;  // false (-1) comes before true (1)
+                    }
+                }
+
+                // Original sorting logic for other columns
                 let valA = a[column];
                 let valB = b[column];
 
