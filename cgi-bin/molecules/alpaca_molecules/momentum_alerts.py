@@ -21,8 +21,8 @@ Process:
    - Generates gainers_nasdaq_amex.csv
    - Runs every day including weekends for continuous data collection
    - Automatically reschedules after each run
-4. Volume Surge: Run volume surge scanner hourly at :45 from 06:45 to 12:45 ET on weekdays only
-   - Runs at: 06:45, 07:45, 08:45, 09:45, 10:45, 11:45, 12:45 ET (7 runs per weekday)
+4. Volume Surge: Run volume surge scanner every 30 minutes from 06:45 to 14:45 ET on weekdays only
+   - Runs at: 06:45, 07:15, 07:45, 08:15, 08:45, 09:15, 09:45, 10:15, 10:45, 11:15, 11:45, 12:15, 12:45, 13:15, 13:45, 14:15, 14:45 ET (17 runs per weekday)
    - Generates relative_volume_nasdaq_amex.csv
    - Automatically reschedules after each run
 5. Data Integration: Load symbols from all sources (premarket, market open, volume surge, Oracle, top gainers)
@@ -403,31 +403,41 @@ class MomentumAlertsSystem:
 
     def _schedule_volume_surge_runs(self):
         """
-        Schedule the volume surge scanner to run hourly at :45 from 06:45 to 12:45 ET on weekdays only.
+        Schedule the volume surge scanner to run every 30 minutes from 06:45 to 14:45 ET on weekdays only.
 
-        Runs: 06:45, 07:45, 08:45, 09:45, 10:45, 11:45, 12:45 ET (7 runs per weekday)
+        Runs: 06:45, 07:15, 07:45, 08:15, 08:45, 09:15, 09:45, 10:15, 10:45, 11:15, 11:45, 12:15, 12:45, 13:15, 13:45, 14:15, 14:45 ET (17 runs per weekday)
         """
         current_time = datetime.now(self.et_tz)
 
         # Check if today is a weekday (Monday=0, Sunday=6)
         is_weekday = current_time.weekday() < 5
 
-        # Volume surge runs at :45 of each hour from 06:45 to 12:45 ET
+        # Volume surge runs every 30 minutes from 06:45 to 14:45 ET
         # First run at 06:45 ET = 405 minutes since midnight (6*60 + 45)
-        # Last run at 12:45 ET = 765 minutes since midnight (12*60 + 45)
+        # Last run at 14:45 ET = 885 minutes since midnight (14*60 + 45)
 
         # Get minutes since midnight
         current_minutes_since_midnight = current_time.hour * 60 + current_time.minute
 
-        # Define run times (in minutes since midnight)
+        # Define run times (in minutes since midnight) - every 30 minutes
         run_times = [
             6 * 60 + 45,   # 06:45 (405)
+            7 * 60 + 15,   # 07:15 (435)
             7 * 60 + 45,   # 07:45 (465)
+            8 * 60 + 15,   # 08:15 (495)
             8 * 60 + 45,   # 08:45 (525)
+            9 * 60 + 15,   # 09:15 (555)
             9 * 60 + 45,   # 09:45 (585)
+            10 * 60 + 15,  # 10:15 (615)
             10 * 60 + 45,  # 10:45 (645)
+            11 * 60 + 15,  # 11:15 (675)
             11 * 60 + 45,  # 11:45 (705)
-            12 * 60 + 45   # 12:45 (765)
+            12 * 60 + 15,  # 12:15 (735)
+            12 * 60 + 45,  # 12:45 (765)
+            13 * 60 + 15,  # 13:15 (795)
+            13 * 60 + 45,  # 13:45 (825)
+            14 * 60 + 15,  # 14:15 (855)
+            14 * 60 + 45   # 14:45 (885)
         ]
 
         if not is_weekday:
@@ -443,7 +453,7 @@ class MomentumAlertsSystem:
             # Before 06:45 today, schedule for 06:45 today
             next_run = current_time.replace(hour=6, minute=45, second=0, microsecond=0)
         elif current_minutes_since_midnight >= run_times[-1]:
-            # After 12:45 today, schedule for 06:45 tomorrow (if tomorrow is weekday)
+            # After 14:45 today, schedule for 06:45 tomorrow (if tomorrow is weekday)
             tomorrow = current_time + timedelta(days=1)
             if tomorrow.weekday() < 5:  # Tomorrow is weekday
                 next_run = tomorrow.replace(hour=6, minute=45, second=0, microsecond=0)
@@ -456,7 +466,7 @@ class MomentumAlertsSystem:
                     hour=6, minute=45, second=0, microsecond=0
                 )
         else:
-            # Between 06:45 and 12:45 - find next scheduled time
+            # Between 06:45 and 14:45 - find next scheduled time
             next_run_minutes = None
             for run_minute in run_times:
                 if current_minutes_since_midnight < run_minute:
@@ -486,7 +496,7 @@ class MomentumAlertsSystem:
         self.volume_surge_schedule = [next_run]
 
         self.logger.info(f"📈 Next volume surge scanner run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
-        self.logger.info(f"⏰ Runs hourly at :45 from 06:45 to 12:45 ET on weekdays only")
+        self.logger.info(f"⏰ Runs every 30 minutes from 06:45 to 14:45 ET on weekdays only")
 
     async def _run_startup_script(self) -> bool:
         """
@@ -821,8 +831,8 @@ class MomentumAlertsSystem:
         """
         Check if it's time to run a volume surge scanner.
 
-        After each run, automatically schedule the next one (hourly at :45).
-        Only runs from 06:45 to 12:45 ET on weekdays.
+        After each run, automatically schedule the next one (every 30 minutes).
+        Only runs from 06:45 to 14:45 ET on weekdays.
         """
         current_time = datetime.now(self.et_tz)
 
@@ -832,16 +842,26 @@ class MomentumAlertsSystem:
             asyncio.create_task(self._run_volume_surge_scanner())
             self.volume_surge_runs_completed += 1
 
-            # Schedule the next run (next hourly :45 time slot)
-            # Run times: 06:45, 07:45, 08:45, 09:45, 10:45, 11:45, 12:45 ET
+            # Schedule the next run (every 30 minutes)
+            # Run times: 06:45, 07:15, 07:45, 08:15, 08:45, 09:15, 09:45, 10:15, 10:45, 11:15, 11:45, 12:15, 12:45, 13:15, 13:45, 14:15, 14:45 ET
             run_times = [
                 6 * 60 + 45,   # 06:45 (405)
+                7 * 60 + 15,   # 07:15 (435)
                 7 * 60 + 45,   # 07:45 (465)
+                8 * 60 + 15,   # 08:15 (495)
                 8 * 60 + 45,   # 08:45 (525)
+                9 * 60 + 15,   # 09:15 (555)
                 9 * 60 + 45,   # 09:45 (585)
+                10 * 60 + 15,  # 10:15 (615)
                 10 * 60 + 45,  # 10:45 (645)
+                11 * 60 + 15,  # 11:15 (675)
                 11 * 60 + 45,  # 11:45 (705)
-                12 * 60 + 45   # 12:45 (765)
+                12 * 60 + 15,  # 12:15 (735)
+                12 * 60 + 45,  # 12:45 (765)
+                13 * 60 + 15,  # 13:15 (795)
+                13 * 60 + 45,  # 13:45 (825)
+                14 * 60 + 15,  # 14:15 (855)
+                14 * 60 + 45   # 14:45 (885)
             ]
 
             # Find the next run time
