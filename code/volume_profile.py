@@ -561,43 +561,55 @@ class VolumeProfile:
             latest_profile = self.get_latest_profile()
             if latest_profile and latest_profile['volume_at_price']:
                 volume_data = latest_profile['volume_at_price']
-                prices = list(volume_data.keys())
-                volumes_at_price = list(volume_data.values())
+                prices = sorted(volume_data.keys())
+                volumes_at_price = [volume_data[p] for p in prices]
 
                 # Create volume profile bars on the right side of chart
                 max_volume = max(volumes_at_price) if volumes_at_price else 1
                 price_range = (max(prices) - min(prices)
                               if len(prices) > 1 else 1)
-                # Scale bars to 60% of price range (4x wider)
-                bar_width_factor = price_range * 0.60
 
-                # Get chart x-axis limits for positioning volume bars
+                # Calculate actual price increment between levels
+                if len(prices) > 1:
+                    price_increments = [prices[i+1] - prices[i] for i in range(len(prices)-1)]
+                    avg_price_increment = np.mean(price_increments)
+                    bar_height = float(avg_price_increment * 0.95)  # 95% of spacing to avoid overlap
+                else:
+                    bar_height = float(price_range * 0.01)
+
+                # Scale bars to 15% of time range for visibility
                 xlims = ax1.get_xlim()
-                # 7% from right edge
-                x_position = xlims[1] - (xlims[1] - xlims[0]) * 0.07
+                time_range = xlims[1] - xlims[0]
+                bar_width_factor = time_range * 0.15
+
+                # Position bars 2% from right edge
+                x_position = xlims[1] - (time_range * 0.02)
 
                 for price, volume in volume_data.items():
                     if volume > 0:
                         bar_width = (volume / max_volume) * bar_width_factor
 
-                        # Color coding for volume bars
+                        # Color coding for volume bars with better contrast
                         if price == latest_profile['point_of_control']:
                             color = 'blue'  # POC in blue
-                            alpha = 0.8
+                            alpha = 0.9
+                            linewidth = 0.5
                         elif (latest_profile['value_area_low'] <= price <=
                                 latest_profile['value_area_high']):
                             color = 'orange'  # Value area in orange
-                            alpha = 0.6
+                            alpha = 0.7
+                            linewidth = 0.3
                         else:
-                            color = 'gray'  # Other areas in gray
-                            alpha = 0.4
+                            color = 'lightgray'  # Other areas in light gray
+                            alpha = 0.5
+                            linewidth = 0.2
 
-                        # Draw horizontal volume bar
+                        # Draw horizontal volume bar (extending left from right edge)
                         bar_rect = Rectangle(
-                            (x_position, price - 0.01),
-                            bar_width, 0.02,
+                            (x_position - bar_width, price - bar_height/2),
+                            bar_width, bar_height,
                             facecolor=color, alpha=alpha,
-                            edgecolor='black', linewidth=0.3)
+                            edgecolor='darkgray', linewidth=linewidth)
                         ax1.add_patch(bar_rect)
 
                 # Plot POC line
