@@ -19,8 +19,7 @@ Key Features:
 
 """
 Usage:
-python code/volume_profile.py --symbol BBAI --days 1 --timeframe 5Min \
-    --time-per-profile DAY --chart
+python code/volume_profile.py --symbol TWG --days 1 --timeframe 5Min --time-per-profile DAY --chart
 """
 
 import os
@@ -766,8 +765,12 @@ def main():
         description='Volume Profile Analysis - ToS Script Conversion')
     parser.add_argument('--symbol', type=str, required=True,
                        help='Stock symbol to analyze')
-    parser.add_argument('--days', type=int, default=5,
-                       help='Number of days of data to analyze')
+    parser.add_argument('--days', type=int, default=None,
+                       help='Number of days of data to analyze (default: 5 if '
+                            '--minutes not specified)')
+    parser.add_argument('--minutes', type=int, default=None,
+                       help='Number of minutes of data to analyze (overrides '
+                            '--days if specified)')
     parser.add_argument('--timeframe', type=str, default='1Min',
                        choices=['1Min', '5Min', '15Min', '1Hour', '1Day'],
                        help='Data timeframe')
@@ -794,7 +797,15 @@ def main():
 
     # Calculate date range
     end_date = datetime.now(pytz.timezone('America/New_York'))
-    start_date = end_date - timedelta(days=args.days)
+
+    # Use minutes if specified, otherwise use days (default 5)
+    if args.minutes is not None:
+        start_date = end_date - timedelta(minutes=args.minutes)
+        time_period_desc = f"{args.minutes} minutes"
+    else:
+        days = args.days if args.days is not None else 5
+        start_date = end_date - timedelta(days=days)
+        time_period_desc = f"{days} days"
 
     # Map timeframe for alpaca_trade_api
     timeframe_map = {
@@ -815,7 +826,7 @@ def main():
     )
 
     try:
-        print(f"Loading {args.days} days of {args.timeframe} data for "
+        print(f"Loading {time_period_desc} of {args.timeframe} data for "
               f"{args.symbol}...")
         vp.load_data_from_alpaca(
             symbol=args.symbol,
