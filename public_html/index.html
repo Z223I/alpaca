@@ -650,6 +650,14 @@
             background-color: var(--bg-tertiary);
         }
 
+        .trade-item.up {
+            background-color: rgba(78, 204, 163, 0.15);
+        }
+
+        .trade-item.down {
+            background-color: rgba(255, 107, 107, 0.15);
+        }
+
         .trade-time {
             color: var(--text-secondary);
             font-size: 11px;
@@ -1821,7 +1829,7 @@
 
             // Create trade item element
             const tradeItem = document.createElement('div');
-            tradeItem.className = 'trade-item';
+            tradeItem.className = `trade-item ${priceClass}`;
             tradeItem.innerHTML = `
                 <div>
                     <div class="trade-time">${tradeTime} ET</div>
@@ -1830,12 +1838,6 @@
                 </div>
                 <div class="trade-size">${tradeData.size.toLocaleString()}</div>
             `;
-
-            // Add flash animation
-            tradeItem.style.backgroundColor = 'rgba(78, 204, 163, 0.3)';
-            setTimeout(() => {
-                tradeItem.style.backgroundColor = '';
-            }, 1000);
 
             // Check if user is scrolled to top (within 50px threshold)
             const isScrolledToTop = container.scrollTop < 50;
@@ -3497,7 +3499,7 @@
                 const symbolDisplay = trade.symbol || 'UNK';
 
                 return `
-                    <div class="trade-item">
+                    <div class="trade-item ${priceClass}">
                         <div>
                             <div class="trade-time">${tradeTime} ET</div>
                             <div class="trade-price ${priceClass}">$${trade.price.toFixed(2)}</div>

@@ -20,6 +20,7 @@ Key Features:
 """
 Usage:
 python code/volume_profile.py --symbol TWG --days 1 --timeframe 5Min --time-per-profile DAY --chart
+python code/volume_profile.py --symbol TWG --minutes 90 --timeframe 1Min --time-per-profile CHART --chart
 """
 
 import os
@@ -637,10 +638,32 @@ class VolumeProfile:
             ax1.grid(True, alpha=0.3)
             ax1.legend(loc='upper left')
 
+            # Calculate dynamic timestamp interval for 5-10 timestamps
+            time_span = (timestamps.max() - timestamps.min()).total_seconds() / 60  # in minutes
+            if time_span <= 60:  # Less than 1 hour
+                # Show every 10 minutes
+                locator = mdates.MinuteLocator(interval=10)
+                formatter = mdates.DateFormatter('%H:%M', tz=et_tz)
+            elif time_span <= 180:  # 1-3 hours
+                # Show every 30 minutes
+                locator = mdates.MinuteLocator(interval=30)
+                formatter = mdates.DateFormatter('%H:%M', tz=et_tz)
+            elif time_span <= 480:  # 3-8 hours
+                # Show every hour
+                locator = mdates.HourLocator(interval=1)
+                formatter = mdates.DateFormatter('%H:%M', tz=et_tz)
+            elif time_span <= 1440:  # 8-24 hours
+                # Show every 2 hours
+                locator = mdates.HourLocator(interval=2)
+                formatter = mdates.DateFormatter('%m/%d %H:%M', tz=et_tz)
+            else:  # More than 24 hours
+                # Show every 4 hours
+                locator = mdates.HourLocator(interval=4)
+                formatter = mdates.DateFormatter('%m/%d %H:%M', tz=et_tz)
+
             # Format x-axis for timestamps with dates in ET timezone
-            ax1.xaxis.set_major_formatter(
-                mdates.DateFormatter('%m/%d %H:%M', tz=et_tz))
-            ax1.xaxis.set_major_locator(mdates.HourLocator(interval=2))
+            ax1.xaxis.set_major_formatter(formatter)
+            ax1.xaxis.set_major_locator(locator)
             plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45)
 
             # Plot volume bars on bottom subplot
@@ -657,11 +680,10 @@ class VolumeProfile:
                 lambda x, p: (f'{x/1e6:.1f}M' if x >= 1e6
                              else f'{x/1e3:.0f}K')))
 
-            # Sync x-axes
+            # Sync x-axes and use same timestamp formatting
             ax2.set_xlim(ax1.get_xlim())
-            ax2.xaxis.set_major_formatter(
-                mdates.DateFormatter('%m/%d %H:%M', tz=et_tz))
-            ax2.xaxis.set_major_locator(mdates.HourLocator(interval=2))
+            ax2.xaxis.set_major_formatter(formatter)
+            ax2.xaxis.set_major_locator(locator)
             plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45)
 
             # Adjust layout and save
