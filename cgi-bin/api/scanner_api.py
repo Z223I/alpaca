@@ -87,20 +87,20 @@ def get_squeeze_alerts() -> List[Dict]:
 
             # Extract data
             symbol = alert_data.get('symbol', 'N/A')
-            low_price = alert_data.get('low_price', 0)
-            high_price = alert_data.get('high_price', 0)
+            first_price = alert_data.get('first_price', 0)
+            last_price = alert_data.get('last_price', 0)
             percent_change = alert_data.get('percent_change', 0)
             size = alert_data.get('size', 0)
             window_trades = alert_data.get('window_trades', 0)
 
             # Build text field
-            text = f"🚀 +{percent_change:.2f}% squeeze | ${low_price:.2f} → ${high_price:.2f} | {window_trades} trades"
+            text = f"🚀 +{percent_change:.2f}% squeeze | ${first_price:.2f} → ${last_price:.2f} | {window_trades} trades"
 
             alert_obj = {
                 'symbol': symbol,
                 'source': 'Squeeze',
                 'time': time_str,
-                'price': high_price,  # Show high price
+                'price': last_price,  # Show last price
                 'gain': percent_change,  # Show percent change as "gain"
                 'volume': size,  # Show trade size as "volume"
                 'text': text,
