@@ -801,11 +801,11 @@ class SqueezeAlertsMonitor:
         if reference_high is None or reference_high == 0:
             return ("⚪", "white", None)
 
-        percent_off = ((reference_high - current_price) / reference_high) * 100
+        percent_off = ((reference_high - current_price) / reference_high) * 100 * -1
 
-        if percent_off <= 1.5:
+        if percent_off >= -1.5:
             return ("🟢", "green", percent_off)
-        elif percent_off >= 5.0:
+        elif percent_off <= -5.0:
             return ("🔴", "red", percent_off)
         else:
             return ("🟡", "yellow", percent_off)
