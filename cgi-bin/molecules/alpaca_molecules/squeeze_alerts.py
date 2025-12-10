@@ -44,6 +44,7 @@ from atoms.telegram.telegram_post import TelegramPoster
 from atoms.telegram.user_manager import UserManager
 from atoms.api.init_alpaca_client import init_alpaca_client
 from atoms.api.collect_premarket_data import collect_premarket_data
+from atoms.api.fundamental_data import FundamentalDataFetcher
 
 # Import market data - use relative import since we're in the same directory
 import importlib.util
@@ -133,6 +134,14 @@ class SqueezeAlertsMonitor:
         self.last_gains_update = None
         self.alpaca_client = None  # Will be initialized when first needed
 
+        # Volume surge and fundamental data tracking
+        self.volume_surge_data: Dict[str, Dict] = {}  # Stores volume surge ratio per symbol
+        self.fundamental_data: Dict[str, Dict] = {}  # Stores float shares, market cap per symbol
+        self.fundamental_fetcher = FundamentalDataFetcher(verbose=verbose)
+        self.scanner_dir = Path(project_root) / "historical_data" / self.today / "scanner"
+        self.symbol_list_csv_path = self.scanner_dir / "symbol_list.csv"
+        self.hourly_volume_data: Dict[str, int] = {}  # Stores total volume since 04:00 ET per symbol
+
         # Load symbols
         if use_existing:
             # Will query existing symbols from backend after connection
@@ -202,6 +211,239 @@ class SqueezeAlertsMonitor:
 
         return manual_symbols
 
+    def _load_symbol_volume_data(self) -> Dict[str, Dict]:
+        """
+        Load volume surge data from symbol_list.csv.
+
+        Returns:
+            Dictionary mapping symbols to volume surge data
+        """
+        volume_data = {}
+
+        if not self.symbol_list_csv_path.exists():
+            self.logger.debug(f"⚠️ Symbol list CSV not found: {self.symbol_list_csv_path}")
+            return volume_data
+
+        try:
+            with open(self.symbol_list_csv_path, 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    symbol = row.get('symbol', '').strip().upper()
+                    if symbol:
+                        volume_surge_detected = row.get('volume_surge_detected', 'False').strip()
+                        volume_surge_ratio = row.get('volume_surge_ratio', '')
+
+                        # Convert volume_surge_detected to boolean
+                        detected = volume_surge_detected.lower() in ('true', '1', 'yes')
+
+                        # Convert volume_surge_ratio to float if available
+                        ratio = None
+                        if volume_surge_ratio and volume_surge_ratio.strip():
+                            try:
+                                ratio = float(volume_surge_ratio)
+                            except ValueError:
+                                pass
+
+                        volume_data[symbol] = {
+                            'volume_surge_detected': detected,
+                            'volume_surge_ratio': ratio
+                        }
+
+            self.logger.info(f"📊 Loaded volume surge data for {len(volume_data)} symbols from {self.symbol_list_csv_path}")
+
+        except Exception as e:
+            self.logger.error(f"❌ Error loading symbol volume data: {e}")
+
+        return volume_data
+
+    def _fetch_fundamental_data(self, symbols: List[str]) -> Dict[str, Dict]:
+        """
+        Fetch fundamental data for symbols.
+
+        Returns:
+            Dictionary mapping symbols to fundamental data
+        """
+        fundamental_data = {}
+
+        if not symbols:
+            return fundamental_data
+
+        self.logger.info(f"📊 Fetching fundamental data for {len(symbols)} symbols...")
+
+        for symbol in symbols:
+            try:
+                data = self.fundamental_fetcher.get_fundamental_data(symbol)
+
+                # Only store if we got valid data
+                if data and data.get('source') != 'none':
+                    fundamental_data[symbol] = data
+
+                    if self.verbose:
+                        shares_str = f"{data['shares_outstanding']:,}" if data['shares_outstanding'] else "N/A"
+                        float_str = f"{data['float_shares']:,}" if data['float_shares'] else "N/A"
+                        cap_str = f"${data['market_cap']:,}" if data['market_cap'] else "N/A"
+                        self.logger.debug(
+                            f"  {symbol}: Shares: {shares_str} | Float: {float_str} | "
+                            f"Cap: {cap_str} | Source: {data['source']}")
+
+            except Exception as e:
+                self.logger.debug(f"  {symbol}: Could not fetch fundamental data: {e}")
+
+        self.logger.info(f"✅ Fetched fundamental data for {len(fundamental_data)}/{len(symbols)} symbols")
+
+        return fundamental_data
+
+    async def _collect_hourly_volume_data(self, symbols: List[str]) -> Dict[str, int]:
+        """
+        Collect 1-hour candlesticks from 04:00 ET to now and sum volume for float rotation.
+
+        Args:
+            symbols: List of symbols to collect hourly volume for
+
+        Returns:
+            Dictionary mapping symbols to their total volume since 04:00 ET
+        """
+        if not symbols or not self.alpaca_client:
+            return {}
+
+        try:
+            import alpaca_trade_api as tradeapi
+            from datetime import timedelta
+
+            volume_dict = {}
+
+            # Calculate time range (04:00 ET today to now)
+            current_et = datetime.now(self.et_tz)
+
+            # Start at 04:00 ET today
+            start_time = current_et.replace(hour=4, minute=0, second=0, microsecond=0)
+
+            # If current time is before 04:00 ET, use yesterday's 04:00 ET
+            if current_et.hour < 4:
+                start_time = start_time - timedelta(days=1)
+
+            end_time = current_et
+
+            self.logger.debug(f"📊 Fetching hourly volume from {start_time.strftime('%H:%M ET')} to {end_time.strftime('%H:%M ET')}")
+
+            # Collect hourly data for each symbol
+            for symbol in symbols:
+                try:
+                    # Fetch 1-hour bars
+                    bars = self.alpaca_client.get_bars(
+                        symbol,
+                        tradeapi.TimeFrame(1, tradeapi.TimeFrameUnit.Hour),  # 1-hour bars
+                        start=start_time.astimezone(pytz.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                        end=end_time.astimezone(pytz.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                        limit=100,  # Up to 100 hours
+                        feed='sip'
+                    )
+
+                    if bars and len(bars) > 0:
+                        # Sum volume from all hourly bars
+                        total_volume = 0
+                        bar_count = 0
+
+                        for bar in bars:
+                            total_volume += int(bar.v)
+                            bar_count += 1
+
+                        volume_dict[symbol] = total_volume
+
+                        self.logger.debug(
+                            f"📊 {symbol}: Summed {bar_count} hourly bars "
+                            f"(04:00 ET to now) = {total_volume:,} volume")
+
+                except Exception as symbol_error:
+                    self.logger.debug(f"⚠️ Error collecting hourly volume for {symbol}: {symbol_error}")
+                    continue
+
+            if volume_dict:
+                self.logger.info(f"📊 Collected hourly volume for {len(volume_dict)} symbols")
+
+            return volume_dict
+
+        except Exception as e:
+            self.logger.error(f"❌ Error collecting hourly volume data: {e}")
+            return {}
+
+    async def _collect_volume_and_fundamental_data(self):
+        """
+        Collect volume surge and fundamental data for all subscribed symbols.
+
+        This method runs periodically to update surge ratios and float shares.
+        """
+        try:
+            # Load volume surge data from CSV
+            volume_data = self._load_symbol_volume_data()
+            if volume_data:
+                self.volume_surge_data = volume_data
+
+            # Get current subscribed symbols
+            if not self.active_subscriptions:
+                self.logger.debug("No active subscriptions, skipping fundamental data collection")
+                return
+
+            symbols_list = list(self.active_subscriptions)
+
+            if not symbols_list:
+                return
+
+            # Initialize Alpaca client if needed
+            if self.alpaca_client is None:
+                self._initialize_alpaca_client()
+
+            # Fetch fundamental data for subscribed symbols
+            fundamental_data = self._fetch_fundamental_data(symbols_list)
+            if fundamental_data:
+                # Merge with existing data
+                self.fundamental_data.update(fundamental_data)
+
+            # Collect hourly volume data for float rotation calculation
+            hourly_volume = await self._collect_hourly_volume_data(symbols_list)
+            if hourly_volume:
+                self.hourly_volume_data.update(hourly_volume)
+
+            self.logger.info(
+                f"✅ Updated volume surge data ({len(self.volume_surge_data)} symbols), "
+                f"fundamental data ({len(self.fundamental_data)} symbols), and "
+                f"hourly volume data ({len(self.hourly_volume_data)} symbols)"
+            )
+
+        except Exception as e:
+            self.logger.error(f"❌ Error collecting volume and fundamental data: {e}")
+            import traceback
+            traceback.print_exc()
+
+    async def _volume_fundamental_collection_task(self):
+        """
+        Background task that collects volume surge and fundamental data every 5 minutes.
+
+        Runs continuously while the monitor is active.
+        """
+        self.logger.info("🔄 Starting volume/fundamental data collection background task")
+
+        # Initial collection
+        await self._collect_volume_and_fundamental_data()
+
+        while True:
+            try:
+                # Wait 5 minutes (300 seconds)
+                await asyncio.sleep(300)
+
+                # Collect data
+                await self._collect_volume_and_fundamental_data()
+
+            except asyncio.CancelledError:
+                self.logger.info("⚠️  Volume/fundamental data collection task cancelled")
+                break
+            except Exception as e:
+                self.logger.error(f"❌ Error in volume/fundamental data collection task: {e}")
+                import traceback
+                traceback.print_exc()
+                # Continue running even if there's an error
+                await asyncio.sleep(300)
+
     def _get_all_symbols_to_monitor(self) -> List[str]:
         """
         Get all symbols to monitor from all sources (manual symbols + existing list).
@@ -248,14 +490,23 @@ class SqueezeAlertsMonitor:
                 gains_task = asyncio.create_task(self._gains_collection_task())
                 self.logger.info("✅ Started gains collection background task")
 
+                # Start volume/fundamental data collection background task
+                volume_fund_task = asyncio.create_task(self._volume_fundamental_collection_task())
+                self.logger.info("✅ Started volume/fundamental data collection background task")
+
                 try:
                     # Start monitoring loop
                     await self._monitor_trades(ws)
                 finally:
-                    # Cancel background task when monitoring stops
+                    # Cancel background tasks when monitoring stops
                     gains_task.cancel()
+                    volume_fund_task.cancel()
                     try:
                         await gains_task
+                    except asyncio.CancelledError:
+                        pass
+                    try:
+                        await volume_fund_task
                     except asyncio.CancelledError:
                         pass
 
@@ -898,6 +1149,31 @@ class SqueezeAlertsMonitor:
                     gain_icon = "🔴"
                     gain_color = "red"
 
+        # Get volume surge data for this symbol
+        volume_surge_data = self.volume_surge_data.get(symbol, {})
+        volume_surge_ratio = volume_surge_data.get('volume_surge_ratio')
+
+        # Get fundamental data for this symbol
+        fundamental_data = self.fundamental_data.get(symbol, {})
+        float_shares = fundamental_data.get('float_shares')
+
+        # Calculate float rotation using hourly volume data (04:00 ET to now)
+        # Float Rotation = Total Volume (hourly bars from 04:00 ET) / Float Shares
+        total_volume_since_0400 = self.hourly_volume_data.get(symbol)
+        float_rotation = None
+        float_rotation_percent = None
+
+        if float_shares and float_shares > 0 and total_volume_since_0400 is not None:
+            # Calculate float rotation as a ratio
+            float_rotation = total_volume_since_0400 / float_shares
+            float_rotation_percent = float_rotation * 100
+
+            if self.verbose:
+                self.logger.debug(
+                    f"📊 {symbol}: Volume since 04:00 ET: {total_volume_since_0400:,} | "
+                    f"Float: {float_shares:,} | "
+                    f"Float Rotation: {float_rotation:.4f}x ({float_rotation_percent:.2f}%)")
+
         # Print to stdout (not logger, so it's always visible)
         print(f"\n{'='*70}")
         print(f"🚀 SQUEEZE DETECTED - {symbol}")
@@ -931,6 +1207,46 @@ class SqueezeAlertsMonitor:
         else:
             print(f"Regular HOD:    {hod_icon} N/A")
 
+        # Display volume surge ratio
+        if volume_surge_ratio is not None:
+            # Green if > 5x, red otherwise
+            surge_icon = "🟢" if volume_surge_ratio > 5 else "🔴"
+            print(f"Surge Ratio:    {surge_icon} {volume_surge_ratio:.2f}x")
+        else:
+            print(f"Surge Ratio:    ⚪ N/A")
+
+        # Display float shares
+        if float_shares is not None:
+            if float_shares >= 1_000_000_000:
+                float_str = f"{float_shares / 1_000_000_000:.2f}B"
+            elif float_shares >= 1_000_000:
+                float_str = f"{float_shares / 1_000_000:.2f}M"
+            else:
+                float_str = f"{float_shares:,.0f}"
+            # Green if < 20M, yellow if < 50M, red otherwise
+            if float_shares < 20_000_000:
+                float_icon = "🟢"
+            elif float_shares < 50_000_000:
+                float_icon = "🟡"
+            else:
+                float_icon = "🔴"
+            print(f"Float Shares:   {float_icon} {float_str}")
+        else:
+            print(f"Float Shares:   ⚪ N/A")
+
+        # Display float rotation
+        if float_rotation is not None:
+            # Determine emoji based on float rotation value
+            if float_rotation > 1:
+                rotation_emoji = "🟢"  # Green if > 1
+            elif float_rotation < 0.8:
+                rotation_emoji = "🔴"  # Red if < 0.8
+            else:
+                rotation_emoji = "🟡"  # Yellow otherwise
+            print(f"Float Rotation: {rotation_emoji} {float_rotation:.2f}x")
+        else:
+            print(f"Float Rotation: ⚪ N/A")
+
         print(f"Total Squeezes: {self.squeeze_count} ({self.squeezes_by_symbol[symbol]} for {symbol})")
         print(f"{'='*70}\n")
 
@@ -943,7 +1259,8 @@ class SqueezeAlertsMonitor:
             premarket_high, pm_icon, pm_percent_off,
             regular_hod, hod_icon, hod_percent_off,
             vwap, vwap_icon,
-            gain_percent, gain_icon, gain_data_error
+            gain_percent, gain_icon, gain_data_error,
+            volume_surge_ratio, float_shares, float_rotation
         )
 
         # Save squeeze alert to JSON file for scanner display
@@ -952,7 +1269,8 @@ class SqueezeAlertsMonitor:
             premarket_high, pm_icon, pm_color, pm_percent_off,
             regular_hod, hod_icon, hod_color, hod_percent_off,
             vwap, vwap_icon, vwap_color,
-            gain_percent, gain_icon, gain_color, gain_data_error
+            gain_percent, gain_icon, gain_color, gain_data_error,
+            volume_surge_ratio, float_shares, float_rotation, float_rotation_percent
         )
 
     def _send_telegram_alert(self, symbol: str, first_price: float, last_price: float,
@@ -960,7 +1278,8 @@ class SqueezeAlertsMonitor:
                             premarket_high: float, pm_icon: str, pm_percent_off: float,
                             regular_hod: float, hod_icon: str, hod_percent_off: float,
                             vwap: float, vwap_icon: str,
-                            gain_percent: float, gain_icon: str, gain_data_error: str):
+                            gain_percent: float, gain_icon: str, gain_data_error: str,
+                            volume_surge_ratio: float, float_shares: float, float_rotation: float):
         """
         Send Telegram alert to users with squeeze_alerts=true.
 
@@ -982,6 +1301,9 @@ class SqueezeAlertsMonitor:
             gain_percent: Day gain percentage from previous close
             gain_icon: Day gain status icon
             gain_data_error: Error message if gain data is unavailable
+            volume_surge_ratio: Volume surge ratio (multiplier)
+            float_shares: Float shares outstanding
+            float_rotation: Float rotation (total volume / float shares)
         """
         try:
             # Get users with squeeze_alerts=true
@@ -1020,6 +1342,46 @@ class SqueezeAlertsMonitor:
             if gain_data_error:
                 error_line = f"⚠️ <i>{gain_data_error}</i>\n"
 
+            # Build volume surge ratio line
+            if volume_surge_ratio is not None:
+                # Green if > 5x, red otherwise
+                surge_icon = "🟢" if volume_surge_ratio > 5 else "🔴"
+                surge_line = f"📊 Surge Ratio: {surge_icon} {volume_surge_ratio:.2f}x\n"
+            else:
+                surge_line = f"📊 Surge Ratio: ⚪ N/A\n"
+
+            # Build float shares line
+            if float_shares is not None:
+                if float_shares >= 1_000_000_000:
+                    float_str = f"{float_shares / 1_000_000_000:.2f}B"
+                elif float_shares >= 1_000_000:
+                    float_str = f"{float_shares / 1_000_000:.2f}M"
+                else:
+                    float_str = f"{float_shares:,.0f}"
+                # Green if < 20M, yellow if < 50M, red otherwise
+                if float_shares < 20_000_000:
+                    float_icon = "🟢"
+                elif float_shares < 50_000_000:
+                    float_icon = "🟡"
+                else:
+                    float_icon = "🔴"
+                float_shares_line = f"📊 Float Shares: {float_icon} {float_str}\n"
+            else:
+                float_shares_line = f"📊 Float Shares: ⚪ N/A\n"
+
+            # Build float rotation line
+            if float_rotation is not None:
+                # Determine emoji based on float rotation value
+                if float_rotation > 1:
+                    rotation_emoji = "🟢"  # Green if > 1
+                elif float_rotation < 0.8:
+                    rotation_emoji = "🔴"  # Red if < 0.8
+                else:
+                    rotation_emoji = "🟡"  # Yellow otherwise
+                float_rotation_line = f"📊 Float Rotation: {rotation_emoji} {float_rotation:.2f}x\n"
+            else:
+                float_rotation_line = f"📊 Float Rotation: ⚪ N/A\n"
+
             # Format Telegram message
             message = (
                 f"🚀 <b>SQUEEZE ALERT - {symbol}</b>\n\n"
@@ -1031,6 +1393,9 @@ class SqueezeAlertsMonitor:
                 f"{vwap_line}"
                 f"{pm_line}"
                 f"{hod_line}"
+                f"{surge_line}"
+                f"{float_shares_line}"
+                f"{float_rotation_line}"
                 f"📉 Trades: {len(self.price_history[symbol])} in window\n\n"
                 f"#Squeeze #{symbol}"
             )
@@ -1066,7 +1431,9 @@ class SqueezeAlertsMonitor:
                                   premarket_high: float, pm_icon: str, pm_color: str, pm_percent_off: float,
                                   regular_hod: float, hod_icon: str, hod_color: str, hod_percent_off: float,
                                   vwap: float, vwap_icon: str, vwap_color: str,
-                                  gain_percent: float, gain_icon: str, gain_color: str, gain_data_error: str) -> None:
+                                  gain_percent: float, gain_icon: str, gain_color: str, gain_data_error: str,
+                                  volume_surge_ratio: float, float_shares: float, float_rotation: float,
+                                  float_rotation_percent: float) -> None:
         """
         Save sent squeeze alert to JSON file for scanner display.
 
@@ -1093,6 +1460,10 @@ class SqueezeAlertsMonitor:
             gain_icon: Day gain status icon
             gain_color: Day gain status color
             gain_data_error: Error message if gain data is unavailable
+            volume_surge_ratio: Volume surge ratio (multiplier)
+            float_shares: Float shares outstanding
+            float_rotation: Float rotation (total volume / float shares)
+            float_rotation_percent: Float rotation as percentage
         """
         try:
             # Create filename with timestamp
@@ -1138,7 +1509,11 @@ class SqueezeAlertsMonitor:
                     'icon': hod_icon,
                     'color': hod_color,
                     'percent_off': float(hod_percent_off) if hod_percent_off is not None else None
-                }
+                },
+                'volume_surge_ratio': float(volume_surge_ratio) if volume_surge_ratio is not None else None,
+                'float_shares': float(float_shares) if float_shares is not None else None,
+                'float_rotation': float(float_rotation) if float_rotation is not None else None,
+                'float_rotation_percent': float(float_rotation_percent) if float_rotation_percent is not None else None
             }
 
             # Add error field if present
