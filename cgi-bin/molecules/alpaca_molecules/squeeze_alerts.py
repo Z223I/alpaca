@@ -763,22 +763,21 @@ class SqueezeAlertsMonitor:
         if len(self.price_history[symbol]) < 2:
             return
 
-        # Get lowest and highest prices in the window
-        prices = [p for _, p in self.price_history[symbol]]
-        low_price = min(prices)
-        high_price = max(prices)
+        # Get first and last prices in the window (chronologically)
+        first_price = self.price_history[symbol][0][1]  # Oldest trade in window
+        last_price = self.price_history[symbol][-1][1]  # Newest trade in window
 
-        # Calculate percent change from low to high
-        if low_price > 0:
-            percent_change = ((high_price - low_price) / low_price) * 100
+        # Calculate percent change from first to last
+        if first_price > 0:
+            percent_change = ((last_price - first_price) / first_price) * 100
 
-            # Check if we have a squeeze
+            # Check if we have a squeeze (only upward movement)
             if percent_change >= self.squeeze_percent:
                 # Check if we already reported this squeeze recently
                 # Only report once per symbol per 30-second window to avoid spam
                 last_squeeze_time = getattr(self, '_last_squeeze_time', {})
                 if symbol not in last_squeeze_time or (timestamp - last_squeeze_time[symbol]).total_seconds() > 30:
-                    self._report_squeeze(symbol, low_price, high_price, percent_change, timestamp, size)
+                    self._report_squeeze(symbol, first_price, last_price, percent_change, timestamp, size)
 
                     # Track last squeeze time
                     if not hasattr(self, '_last_squeeze_time'):
@@ -811,7 +810,7 @@ class SqueezeAlertsMonitor:
         else:
             return ("🟡", "yellow", percent_off)
 
-    def _report_squeeze(self, symbol: str, low_price: float, high_price: float,
+    def _report_squeeze(self, symbol: str, first_price: float, last_price: float,
                        percent_change: float, timestamp: datetime, size: int):
         """
         Report a detected squeeze to stdout and Telegram.
@@ -820,9 +819,9 @@ class SqueezeAlertsMonitor:
 
         Args:
             symbol: Stock symbol
-            low_price: Lowest price in 10-second window
-            high_price: Highest price in 10-second window
-            percent_change: Percent increase
+            first_price: First price in 10-second window (oldest trade)
+            last_price: Last price in 10-second window (newest trade)
+            percent_change: Percent increase from first to last
             timestamp: Current timestamp
             size: Current trade size
         """
@@ -862,14 +861,14 @@ class SqueezeAlertsMonitor:
                 self.logger.warning(f"⚠️  VWAP not available in candlestick data for {symbol}")
 
         # Determine status for premarket high
-        pm_icon, pm_color, pm_percent_off = self._get_price_status(high_price, premarket_high)
+        pm_icon, pm_color, pm_percent_off = self._get_price_status(last_price, premarket_high)
 
         # Determine status for regular hours HOD
-        hod_icon, hod_color, hod_percent_off = self._get_price_status(high_price, regular_hod)
+        hod_icon, hod_color, hod_percent_off = self._get_price_status(last_price, regular_hod)
 
         # Determine VWAP status: green if price > VWAP, red otherwise
         if vwap is not None:
-            if high_price > vwap:
+            if last_price > vwap:
                 vwap_icon = "🟢"
                 vwap_color = "green"
             else:
@@ -904,7 +903,7 @@ class SqueezeAlertsMonitor:
         print(f"🚀 SQUEEZE DETECTED - {symbol}")
         print(f"{'='*70}")
         print(f"Time:           {timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"Price Range:    ${low_price:.2f} → ${high_price:.2f}")
+        print(f"Price Range:    ${first_price:.2f} → ${last_price:.2f}")
         print(f"Change:         +{percent_change:.2f}% in 10 seconds")
         print(f"Window Trades:  {len(self.price_history[symbol])} trades")
 
@@ -936,11 +935,11 @@ class SqueezeAlertsMonitor:
         print(f"{'='*70}\n")
 
         # Also log it
-        self.logger.info(f"🚀 SQUEEZE: {symbol} +{percent_change:.2f}% (${low_price:.2f} → ${high_price:.2f})")
+        self.logger.info(f"🚀 SQUEEZE: {symbol} +{percent_change:.2f}% (${first_price:.2f} → ${last_price:.2f})")
 
         # Send Telegram alert to users with squeeze_alerts=true
         sent_users = self._send_telegram_alert(
-            symbol, low_price, high_price, percent_change, timestamp, size,
+            symbol, first_price, last_price, percent_change, timestamp, size,
             premarket_high, pm_icon, pm_percent_off,
             regular_hod, hod_icon, hod_percent_off,
             vwap, vwap_icon,
@@ -949,14 +948,14 @@ class SqueezeAlertsMonitor:
 
         # Save squeeze alert to JSON file for scanner display
         self._save_squeeze_alert_sent(
-            symbol, low_price, high_price, percent_change, timestamp, size, sent_users,
+            symbol, first_price, last_price, percent_change, timestamp, size, sent_users,
             premarket_high, pm_icon, pm_color, pm_percent_off,
             regular_hod, hod_icon, hod_color, hod_percent_off,
             vwap, vwap_icon, vwap_color,
             gain_percent, gain_icon, gain_color, gain_data_error
         )
 
-    def _send_telegram_alert(self, symbol: str, low_price: float, high_price: float,
+    def _send_telegram_alert(self, symbol: str, first_price: float, last_price: float,
                             percent_change: float, timestamp: datetime, size: int,
                             premarket_high: float, pm_icon: str, pm_percent_off: float,
                             regular_hod: float, hod_icon: str, hod_percent_off: float,
@@ -967,9 +966,9 @@ class SqueezeAlertsMonitor:
 
         Args:
             symbol: Stock symbol
-            low_price: Lowest price in 10-second window
-            high_price: Highest price in 10-second window
-            percent_change: Percent increase
+            first_price: First price in 10-second window (oldest trade)
+            last_price: Last price in 10-second window (newest trade)
+            percent_change: Percent increase from first to last
             timestamp: Current timestamp
             size: Current trade size
             premarket_high: Premarket high price
@@ -1025,7 +1024,7 @@ class SqueezeAlertsMonitor:
             message = (
                 f"🚀 <b>SQUEEZE ALERT - {symbol}</b>\n\n"
                 f"⏰ Time: {timestamp.strftime('%H:%M:%S ET')}\n"
-                f"📈 Price: ${low_price:.2f} → ${high_price:.2f}\n"
+                f"📈 Price: ${first_price:.2f} → ${last_price:.2f}\n"
                 f"📊 Change: <b>+{percent_change:.2f}%</b> in 10 seconds\n"
                 f"{gain_line}"
                 f"{error_line}"
@@ -1061,7 +1060,7 @@ class SqueezeAlertsMonitor:
             traceback.print_exc()
             return []
 
-    def _save_squeeze_alert_sent(self, symbol: str, low_price: float, high_price: float,
+    def _save_squeeze_alert_sent(self, symbol: str, first_price: float, last_price: float,
                                   percent_change: float, timestamp: datetime, size: int,
                                   sent_to_users: List[str],
                                   premarket_high: float, pm_icon: str, pm_color: str, pm_percent_off: float,
@@ -1073,9 +1072,9 @@ class SqueezeAlertsMonitor:
 
         Args:
             symbol: Stock symbol
-            low_price: Lowest price in 10-second window
-            high_price: Highest price in 10-second window
-            percent_change: Percent increase
+            first_price: First price in 10-second window (oldest trade)
+            last_price: Last price in 10-second window (newest trade)
+            percent_change: Percent increase from first to last
             timestamp: Current timestamp
             size: Current trade size
             sent_to_users: List of usernames who received the alert
@@ -1110,8 +1109,8 @@ class SqueezeAlertsMonitor:
             alert_json = {
                 'symbol': symbol,
                 'timestamp': timestamp.isoformat(),
-                'low_price': float(low_price),
-                'high_price': float(high_price),
+                'first_price': float(first_price),
+                'last_price': float(last_price),
                 'percent_change': float(percent_change),
                 'size': int(size),
                 'window_trades': len(self.price_history.get(symbol, [])),
