@@ -72,7 +72,7 @@ class SqueezeAlertsMonitor:
         websocket_url: str = "ws://localhost:8766",
         test_duration: int = None,
         use_existing: bool = False,
-        squeeze_percent: float = 1.75
+        squeeze_percent: float = 2.0
     ):
         """
         Initialize Squeeze Alerts Monitor.
@@ -85,7 +85,7 @@ class SqueezeAlertsMonitor:
             websocket_url: WebSocket server URL
             test_duration: Run for N seconds then stop and print summary (test mode)
             use_existing: Auto-subscribe to existing symbols from other clients
-            squeeze_percent: Percent price increase in 10 seconds to trigger squeeze alert (default: 1.75%)
+            squeeze_percent: Percent price increase in 10 seconds to trigger squeeze alert (default: 2.0%)
         """
         self.symbols_to_monitor: List[str] = []
         self.max_symbols = max_symbols

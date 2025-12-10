@@ -22,6 +22,7 @@ from atoms.api.get_cash import get_cash
 from atoms.api.get_positions import get_positions
 from atoms.api.get_latest_quote import get_latest_quote
 from atoms.api.get_latest_quote_avg import get_latest_quote_avg
+from atoms.api.get_latest_trade import get_latest_trade
 from atoms.api.get_top_movers import get_top_movers
 from atoms.api.init_alpaca_client import init_alpaca_client
 from atoms.api.config import TradingConfig
@@ -31,6 +32,7 @@ from atoms.display.print_cash import print_cash
 from atoms.display.print_orders import print_active_orders
 from atoms.display.print_positions import print_positions
 from atoms.display.print_quote import print_quote
+from atoms.display.print_trade import print_trade
 from atoms.display.print_top_movers import print_top_movers
 from atoms.display.generate_chart_from_df import generate_chart_from_dataframe
 from atoms.utils.macd_alert_scorer import score_alerts_with_macd, MACDAlertScorer

@@ -23,6 +23,7 @@ import statistics
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from pathlib import Path
+import numpy as np
 
 
 class Trade:
@@ -453,6 +454,7 @@ def generate_plots(analyzer: TradeAnalyzer, timeframe: str, output_dir: str = '.
         plot_period_pnl_comparison(analyzer, full_output_dir, timeframe, timestamp)
         plot_period_winrate_comparison(analyzer, full_output_dir, timeframe, timestamp)
         plot_period_metrics_comparison(analyzer, full_output_dir, timeframe, timestamp)
+        plot_period_avg_winloss_comparison(analyzer, full_output_dir, timeframe, timestamp)
 
     # Standard plots (always generate)
     # 1. Cumulative P&L over time
@@ -585,6 +587,50 @@ def plot_period_metrics_comparison(analyzer: TradeAnalyzer, output_dir: str, tim
     plt.suptitle(f'Performance Metrics by {timeframe.capitalize()}', fontsize=14, fontweight='bold', y=0.995)
     plt.tight_layout()
     plt.savefig(f'{output_dir}/period_metrics_comparison_{timeframe}_{timestamp}.png', dpi=300, bbox_inches='tight')
+    plt.close()
+
+
+def plot_period_avg_winloss_comparison(analyzer: TradeAnalyzer, output_dir: str, timeframe: str, timestamp: str):
+    """Plot average win/loss comparison across periods."""
+    periods = [ps.period_name for ps in analyzer.period_stats]
+    avg_wins = [ps.stats['avg_win'] for ps in analyzer.period_stats]
+    avg_losses = [ps.stats['avg_loss'] for ps in analyzer.period_stats]
+
+    x = np.arange(len(periods))
+    width = 0.35
+
+    fig, ax = plt.subplots(figsize=(14, 6))
+
+    # Create grouped bars
+    bars1 = ax.bar(x - width/2, avg_wins, width, label='Avg Win',
+                   color='green', alpha=0.7, edgecolor='black')
+    bars2 = ax.bar(x + width/2, avg_losses, width, label='Avg Loss',
+                   color='red', alpha=0.7, edgecolor='black')
+
+    ax.set_title(f'Average Win/Loss by {timeframe.capitalize()}', fontsize=14, fontweight='bold')
+    ax.set_xlabel(f'{timeframe.capitalize()}', fontsize=12)
+    ax.set_ylabel('Amount ($)', fontsize=12)
+    ax.set_xticks(x)
+    ax.set_xticklabels(periods, rotation=45, ha='right')
+    ax.axhline(y=0, color='black', linestyle='-', linewidth=0.8)
+    ax.grid(True, alpha=0.3, axis='y')
+    ax.legend()
+
+    # Add value labels on bars
+    for bar, value in zip(bars1, avg_wins):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2., height,
+                f'${value:.2f}',
+                ha='center', va='bottom', fontsize=8)
+
+    for bar, value in zip(bars2, avg_losses):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2., height,
+                f'${value:.2f}',
+                ha='center', va='bottom', fontsize=8)
+
+    plt.tight_layout()
+    plt.savefig(f'{output_dir}/period_avg_winloss_comparison_{timeframe}_{timestamp}.png', dpi=300, bbox_inches='tight')
     plt.close()
 
 
