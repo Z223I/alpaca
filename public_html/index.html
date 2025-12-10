@@ -4100,6 +4100,10 @@
 
         // Load watch list from API
         async function loadWatchList() {
+            // Auto-subscribe thresholds
+            const AUTO_SUBSCRIBE_GAIN_THRESHOLD = 30;  // Gain percent threshold (30%)
+            const AUTO_SUBSCRIBE_SURGE_THRESHOLD = 5;  // Surge multiplier threshold (5x)
+
             try {
                 console.log('Loading watch list from API...');
                 const response = await fetch('cgi-bin/api/watch_list_api.py');
@@ -4156,6 +4160,15 @@
 
                     // Apply current sort
                     sortWatchListData(watchListState.sortColumn, watchListState.sortDirection);
+
+                    // Auto-subscribe to symbols meeting gain and surge thresholds
+                    watchListState.symbols.forEach(symbol => {
+                        if (symbol.gain_percent != null && symbol.gain_percent > AUTO_SUBSCRIBE_GAIN_THRESHOLD &&
+                            symbol.surge_amount != null && symbol.surge_amount >= AUTO_SUBSCRIBE_SURGE_THRESHOLD) {
+                            console.log(`Auto-subscribing to ${symbol.symbol} (Gain: ${symbol.gain_percent.toFixed(2)}%, Surge: ${symbol.surge_amount.toFixed(1)}x)`);
+                            subscribeToSymbol(symbol.symbol);
+                        }
+                    });
 
                     console.log(`Loaded ${watchListState.symbols.length} symbols from watch list (${data.count} from API, ${dataDirSymbols.length} from data dir, ${watchListState.deletedSymbols.size} deleted, ${watchListState.manualSymbols.size} manual)`);
                     renderWatchList();
