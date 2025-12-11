@@ -258,15 +258,13 @@ class TradeStreamServer:
             self.subscriptions[symbol].discard(websocket)
             logger.info(f"🔴 [UNSUBSCRIBE] Removed websocket from {symbol} subscription set")
 
-            # If no more subscribers, clean up but KEEP Alpaca subscription active
-            # This prevents Alpaca stream from closing and restarting on reconnect
+            # If no more subscribers, clean up and unsubscribe from Alpaca
             if not self.subscriptions[symbol]:
                 del self.subscriptions[symbol]
-                # FIXED: Don't unsubscribe from Alpaca to keep stream alive for fast reconnection
-                logger.info(f"🔴 [UNSUBSCRIBE] No more clients for {symbol}, but keeping Alpaca subscription active for fast reconnection")
+                logger.info(f"🔴 [UNSUBSCRIBE] No more clients for {symbol}, unsubscribing from Alpaca")
+                # Unsubscribe from Alpaca to stop receiving unwanted data
+                await self._unsubscribe_alpaca_symbol(symbol)
                 logger.info(f"🔴 [UNSUBSCRIBE] Remaining subscriptions: {list(self.subscriptions.keys())}")
-                # NOTE: We keep the symbol in alpaca_subscribed set and don't call _unsubscribe_alpaca_symbol
-                # This wastes minimal resources but ensures instant reconnection without 5-second auth delay
 
             # Send confirmation (only if connection still open)
             try:

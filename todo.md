@@ -241,19 +241,27 @@ Install TraderVue
 
 
 
+## Reverse Splits
 
+- [ ] Keep reverse splits out of Watchlist.
+
+## News
 
 Add news column to CSV. Manually update it. Pass it through the alerts system.
 
 Add news column to signals. Also, volume surge if possible.
 
-## Surge Schedule
+## Sanity Check
 
-- [ ] lskdfj
+- [ ] Ensure data_master/master.csv is not being used to limit stock symbol selection.
+
+## Float Rotation Scanner
+
+- [ ] Create a float rotation scanner.  Can something be extended?
 
 ## Surge all stocks
 
-- [ ] Update cgi-bin/molecules/alpaca_molecules/momentum_alerts.py: "--symbols-file", "data_master/master.csv", -> "--exchanges", "NASDAQ", "AMEX",
+- [X] Update cgi-bin/molecules/alpaca_molecules/momentum_alerts.py: "--symbols-file", "data_master/master.csv", -> "--exchanges", "NASDAQ", "AMEX",
             "--max-symbols", "7000",
 
 ```python
