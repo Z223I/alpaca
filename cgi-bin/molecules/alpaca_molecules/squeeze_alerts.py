@@ -28,7 +28,7 @@ import os
 import sys
 from datetime import datetime, time as dt_time
 from pathlib import Path
-from typing import List, Set, Dict, Deque
+from typing import List, Set, Dict, Deque, Any
 from collections import deque
 import websockets
 import pytz
@@ -107,7 +107,7 @@ class SqueezeAlertsMonitor:
         self.test_mode = test_duration is not None
 
         # Squeeze detection: rolling 10-second window of trades per symbol
-        # Each symbol stores: deque of (timestamp, price) tuples
+        # Each symbol stores: deque of (timestamp, price, size) tuples
         self.price_history: Dict[str, Deque[tuple]] = {}
         self.squeeze_count = 0
         self.squeezes_by_symbol: Dict[str, int] = {}
@@ -124,6 +124,9 @@ class SqueezeAlertsMonitor:
         self.today = datetime.now(self.et_tz).strftime('%Y-%m-%d')
         self.squeeze_alerts_sent_dir = Path(project_root) / "historical_data" / self.today / "squeeze_alerts_sent"
         self.squeeze_alerts_sent_dir.mkdir(parents=True, exist_ok=True)
+
+        # Load squeeze counts from existing alert files (survives restarts, resets daily)
+        self._load_squeeze_counts()
 
         # Manual symbols file monitoring
         self.manual_symbols_file = Path(project_root) / "data" / "manual_symbols.json"
@@ -447,6 +450,7 @@ class SqueezeAlertsMonitor:
     def _get_all_symbols_to_monitor(self) -> List[str]:
         """
         Get all symbols to monitor from all sources (manual symbols + existing list).
+        Always includes SPY for market context analysis.
 
         Returns:
             Combined list of unique symbols
@@ -459,6 +463,9 @@ class SqueezeAlertsMonitor:
         # Add manual symbols
         manual_symbols = self._load_manual_symbols()
         all_symbols.update(manual_symbols)
+
+        # Always include SPY for market context (Phase 1 enhancement)
+        all_symbols.add('SPY')
 
         # Convert to sorted list
         return sorted(list(all_symbols))
@@ -699,6 +706,42 @@ class SqueezeAlertsMonitor:
         # Update last subscription time
         self.last_subscription_time = datetime.now()
 
+    def _load_squeeze_counts(self):
+        """
+        Load squeeze counts by counting existing alert files for today.
+
+        This is the source of truth - counts actual alert files created today.
+        Cannot become corrupted and self-heals on restart.
+        """
+        try:
+            # Count alert files for each symbol: alert_{SYMBOL}_{DATE}_*.json
+            counts = {}
+
+            if self.squeeze_alerts_sent_dir.exists():
+                # Get all alert files for today
+                alert_files = list(self.squeeze_alerts_sent_dir.glob('alert_*_*.json'))
+
+                # Count files per symbol
+                for alert_file in alert_files:
+                    # Filename format: alert_SYMBOL_YYYY-MM-DD_HHMMSS.json
+                    parts = alert_file.stem.split('_')
+                    if len(parts) >= 2:
+                        symbol = parts[1]  # Second part is symbol
+                        counts[symbol] = counts.get(symbol, 0) + 1
+
+                self.squeezes_by_symbol = counts
+                total = sum(counts.values())
+                self.logger.info(f"✅ Counted {total} squeezes across {len(counts)} symbols from alert files for {self.today}")
+            else:
+                self.squeezes_by_symbol = {}
+                self.logger.info(f"📝 No alert directory for {self.today}, starting fresh")
+
+        except Exception as e:
+            self.logger.error(f"❌ Error counting squeeze alerts: {e}")
+            import traceback
+            traceback.print_exc()
+            self.squeezes_by_symbol = {}
+
     def _check_date_change(self):
         """
         Check if the date has changed and update directories if needed.
@@ -716,12 +759,17 @@ class SqueezeAlertsMonitor:
     def _update_date_directories(self, new_date: str):
         """
         Update all date-dependent directory paths to use the new date.
+        Also resets squeeze counts for the new day.
 
         Args:
             new_date: New date string in YYYY-MM-DD format
         """
         try:
             self.logger.info(f"🔄 Updating directory paths for new date: {new_date}")
+
+            # Archive old squeeze counts before resetting
+            old_count = len(self.squeezes_by_symbol)
+            old_total = sum(self.squeezes_by_symbol.values())
 
             # Update the date
             self.today = new_date
@@ -731,6 +779,10 @@ class SqueezeAlertsMonitor:
 
             # Create new directory
             self.squeeze_alerts_sent_dir.mkdir(parents=True, exist_ok=True)
+
+            # Reset squeeze counts for new day (will be recounted from alert files)
+            self.logger.info(f"📊 Archived {old_total} squeezes across {old_count} symbols from previous day")
+            self.squeezes_by_symbol = {}
 
             self.logger.info(f"✅ Directory paths updated successfully for {new_date}")
             self.logger.info(f"📁 Squeeze alerts dir: {self.squeeze_alerts_sent_dir}")
@@ -1000,8 +1052,8 @@ class SqueezeAlertsMonitor:
         if symbol not in self.price_history:
             self.price_history[symbol] = deque()
 
-        # Add current trade to history
-        self.price_history[symbol].append((timestamp, price))
+        # Add current trade to history (timestamp, price, size)
+        self.price_history[symbol].append((timestamp, price, size))
 
         # Remove trades older than 10 seconds
         from datetime import timedelta
@@ -1015,8 +1067,8 @@ class SqueezeAlertsMonitor:
             return
 
         # Get first and last prices in the window (chronologically)
-        first_price = self.price_history[symbol][0][1]  # Oldest trade in window
-        last_price = self.price_history[symbol][-1][1]  # Newest trade in window
+        first_price = self.price_history[symbol][0][1]  # Oldest trade in window - (timestamp, price, size)
+        last_price = self.price_history[symbol][-1][1]  # Newest trade in window - (timestamp, price, size)
 
         # Calculate percent change from first to last
         if first_price > 0:
@@ -1034,6 +1086,150 @@ class SqueezeAlertsMonitor:
                     if not hasattr(self, '_last_squeeze_time'):
                         self._last_squeeze_time = {}
                     self._last_squeeze_time[symbol] = timestamp
+
+    def _calculate_phase1_metrics(self, symbol: str, timestamp: datetime, last_price: float) -> Dict[str, Any]:
+        """
+        Calculate Phase 1 enhancement metrics for squeeze alerts.
+
+        Args:
+            symbol: Stock symbol
+            timestamp: Current timestamp
+            last_price: Current price
+
+        Returns:
+            Dictionary containing Phase 1 metrics
+        """
+        metrics = {}
+
+        # ===== 1. TIMING METRICS =====
+        # Calculate time since market open (9:30 AM ET)
+        market_open = timestamp.replace(hour=9, minute=30, second=0, microsecond=0)
+        time_since_open = (timestamp - market_open).total_seconds() / 60  # in minutes
+        metrics['time_since_market_open_minutes'] = int(time_since_open)
+
+        # Hour of day
+        metrics['hour_of_day'] = timestamp.hour
+
+        # Market session
+        hour = timestamp.hour
+        minute = timestamp.minute
+        time_value = hour + minute / 60.0
+
+        if 9.5 <= time_value < 11:
+            metrics['market_session'] = 'early'
+        elif 11 <= time_value < 14:
+            metrics['market_session'] = 'mid_day'
+        elif 14 <= time_value < 15:
+            metrics['market_session'] = 'power_hour'
+        elif 15 <= time_value <= 16:
+            metrics['market_session'] = 'close'
+        else:
+            metrics['market_session'] = 'extended'
+
+        # Squeeze number today for this symbol
+        # Note: squeezes_by_symbol is already incremented in _report_squeeze before this is called
+        metrics['squeeze_number_today'] = self.squeezes_by_symbol.get(symbol, 0)
+
+        # Minutes since last squeeze
+        if hasattr(self, '_last_squeeze_time') and symbol in self._last_squeeze_time:
+            last_squeeze = self._last_squeeze_time[symbol]
+            minutes_since = (timestamp - last_squeeze).total_seconds() / 60
+            metrics['minutes_since_last_squeeze'] = round(minutes_since, 2)
+        else:
+            metrics['minutes_since_last_squeeze'] = None
+
+        # ===== 2. VOLUME INTELLIGENCE =====
+        # Calculate window volume from price_history
+        if symbol in self.price_history:
+            window_volume = sum(trade[2] for trade in self.price_history[symbol])  # trade[2] is size
+            metrics['window_volume'] = int(window_volume)
+
+            # Calculate volume vs recent averages (placeholder - would need historical tracking)
+            # For now, set to None - would require tracking 1min and 5min volume history
+            metrics['window_volume_vs_1min_avg'] = None
+            metrics['window_volume_vs_5min_avg'] = None
+            metrics['volume_trend'] = None
+        else:
+            metrics['window_volume'] = None
+            metrics['window_volume_vs_1min_avg'] = None
+            metrics['window_volume_vs_5min_avg'] = None
+            metrics['volume_trend'] = None
+
+        # ===== 3. PRICE LEVEL CONTEXT =====
+        # Get gain data for previous close
+        gain_data = self.gains_per_symbol.get(symbol)
+
+        if gain_data:
+            prev_close = gain_data.get('previous_close')
+            if prev_close and prev_close > 0:
+                metrics['distance_from_prev_close_percent'] = round(
+                    ((last_price - prev_close) / prev_close) * 100, 2)
+            else:
+                metrics['distance_from_prev_close_percent'] = None
+        else:
+            metrics['distance_from_prev_close_percent'] = None
+
+        # Distance from VWAP
+        candlestick = self.market_data.get_latest_candlestick(symbol)
+        vwap = candlestick.get('vwap')
+
+        if vwap and vwap > 0:
+            metrics['distance_from_vwap_percent'] = round(
+                ((last_price - vwap) / vwap) * 100, 2)
+        else:
+            metrics['distance_from_vwap_percent'] = None
+
+        # Distance from day low (would need to track or fetch)
+        # Placeholder for now - would require fetching day's low
+        metrics['distance_from_day_low_percent'] = None
+
+        # Distance from open (would need to track)
+        # Placeholder for now
+        metrics['distance_from_open_percent'] = None
+
+        # ===== 4. RISK/REWARD METRICS =====
+        # Get day highs for target calculation
+        day_highs = self.market_data.get_day_highs(symbol, timestamp)
+        regular_hod = day_highs.get('regular_hours_hod')
+
+        # Estimated stop loss (7.5% below current price as default)
+        stop_loss_percent = 7.5
+        estimated_stop = last_price * (1 - stop_loss_percent / 100)
+        metrics['estimated_stop_loss_price'] = round(estimated_stop, 4)
+        metrics['stop_loss_distance_percent'] = stop_loss_percent
+
+        # Potential target (assume HOD if available, otherwise 10% above current)
+        if regular_hod and regular_hod > last_price:
+            potential_target = regular_hod
+        else:
+            potential_target = last_price * 1.10  # 10% above current
+
+        metrics['potential_target_price'] = round(potential_target, 4)
+
+        # Risk/reward ratio
+        potential_gain = potential_target - last_price
+        potential_loss = last_price - estimated_stop
+
+        if potential_loss > 0:
+            metrics['risk_reward_ratio'] = round(potential_gain / potential_loss, 2)
+        else:
+            metrics['risk_reward_ratio'] = None
+
+        # ===== 5. MARKET CONTEXT (SPY) =====
+        # Get SPY gain data
+        spy_data = self.gains_per_symbol.get('SPY')
+
+        if spy_data:
+            spy_gain = spy_data.get('gain_percent')
+            metrics['spy_percent_change_day'] = round(spy_gain, 2) if spy_gain is not None else None
+        else:
+            metrics['spy_percent_change_day'] = None
+
+        # SPY concurrent change (would require tracking SPY price during same window)
+        # Placeholder for now
+        metrics['spy_percent_change_concurrent'] = None
+
+        return metrics
 
     def _get_price_status(self, current_price: float, reference_high: float) -> tuple:
         """
@@ -1094,6 +1290,9 @@ class SqueezeAlertsMonitor:
 
         self.squeeze_count += 1
         self.squeezes_by_symbol[symbol] = self.squeezes_by_symbol.get(symbol, 0) + 1
+
+        # Note: Counts are persisted via alert files themselves, loaded on restart
+        # No need for separate file writes - alert files are the source of truth
 
         # Get HOD and premarket high data
         day_highs = self.market_data.get_day_highs(symbol, timestamp)
@@ -1287,6 +1486,9 @@ class SqueezeAlertsMonitor:
         # Also log it
         self.logger.info(f"🚀 SQUEEZE: {symbol} +{percent_change:.2f}% (${first_price:.2f} → ${last_price:.2f})")
 
+        # Calculate Phase 1 enhancement metrics for data analysis
+        phase1_metrics = self._calculate_phase1_metrics(symbol, timestamp, last_price)
+
         # Send Telegram alert to users with squeeze_alerts=true
         sent_users = self._send_telegram_alert(
             symbol, first_price, last_price, percent_change, timestamp, size,
@@ -1298,7 +1500,7 @@ class SqueezeAlertsMonitor:
             spread, spread_percent
         )
 
-        # Save squeeze alert to JSON file for scanner display
+        # Save squeeze alert to JSON file for scanner display (includes Phase 1 metrics)
         self._save_squeeze_alert_sent(
             symbol, first_price, last_price, percent_change, timestamp, size, sent_users,
             premarket_high, pm_icon, pm_color, pm_percent_off,
@@ -1306,7 +1508,8 @@ class SqueezeAlertsMonitor:
             vwap, vwap_icon, vwap_color,
             gain_percent, gain_icon, gain_color, gain_data_error,
             volume_surge_ratio, float_shares, float_rotation, float_rotation_percent,
-            spread, spread_percent
+            spread, spread_percent,
+            phase1_metrics
         )
 
     def _send_telegram_alert(self, symbol: str, first_price: float, last_price: float,
@@ -1495,7 +1698,8 @@ class SqueezeAlertsMonitor:
                                   gain_percent: float, gain_icon: str, gain_color: str, gain_data_error: str,
                                   volume_surge_ratio: float, float_shares: float, float_rotation: float,
                                   float_rotation_percent: float,
-                                  spread: float, spread_percent: float) -> None:
+                                  spread: float, spread_percent: float,
+                                  phase1_metrics: Dict[str, Any]) -> None:
         """
         Save sent squeeze alert to JSON file for scanner display.
 
@@ -1528,6 +1732,7 @@ class SqueezeAlertsMonitor:
             float_rotation_percent: Float rotation as percentage
             spread: Bid-ask spread (ask_price - bid_price)
             spread_percent: Spread as percentage of latest price
+            phase1_metrics: Dictionary containing Phase 1 enhancement metrics
         """
         try:
             # Create filename with timestamp
@@ -1585,6 +1790,10 @@ class SqueezeAlertsMonitor:
             # Add error field if present
             if gain_data_error:
                 alert_json['error'] = gain_data_error
+
+            # Add Phase 1 enhancement metrics for data analysis
+            if phase1_metrics:
+                alert_json['phase1_analysis'] = phase1_metrics
 
             # Save to JSON file
             with open(filepath, 'w') as f:

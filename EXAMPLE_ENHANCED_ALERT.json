@@ -1,0 +1,63 @@
+{
+  "symbol": "ATPC",
+  "timestamp": "2025-12-11T15:20:38.869008-05:00",
+  "first_price": 0.1401,
+  "last_price": 0.143,
+  "percent_change": 2.069950035688784,
+  "size": 479,
+  "window_trades": 157,
+  "squeeze_threshold": 2.0,
+  "sent_to_users": [
+    "Bruce"
+  ],
+  "sent_count": 1,
+  "day_gain": 99.8567335243553,
+  "day_gain_status": {
+    "icon": "🟢",
+    "color": "green"
+  },
+  "vwap": 0.139347,
+  "vwap_status": {
+    "icon": "🟢",
+    "color": "green"
+  },
+  "premarket_high": 0.2041,
+  "premarket_high_status": {
+    "icon": "🔴",
+    "color": "red",
+    "percent_off": -29.93630573248408
+  },
+  "regular_hours_hod": 0.1707,
+  "regular_hours_hod_status": {
+    "icon": "🔴",
+    "color": "red",
+    "percent_off": -16.227299355594614
+  },
+  "volume_surge_ratio": 134.69977311361419,
+  "float_shares": 21685704.0,
+  "float_rotation": 30.523056341634103,
+  "float_rotation_percent": 3052.30563416341,
+  "spread": 0.0007999999999999952,
+  "spread_percent": 0.5594405594405562,
+  "phase1_analysis": {
+    "time_since_market_open_minutes": 350,
+    "hour_of_day": 15,
+    "market_session": "power_hour",
+    "squeeze_number_today": 3,
+    "minutes_since_last_squeeze": 45.5,
+    "window_volume": 6621844,
+    "window_volume_vs_1min_avg": null,
+    "window_volume_vs_5min_avg": null,
+    "volume_trend": null,
+    "distance_from_prev_close_percent": 99.86,
+    "distance_from_vwap_percent": 2.63,
+    "distance_from_day_low_percent": null,
+    "distance_from_open_percent": null,
+    "estimated_stop_loss_price": 0.1323,
+    "stop_loss_distance_percent": 7.5,
+    "potential_target_price": 0.1707,
+    "risk_reward_ratio": 2.58,
+    "spy_percent_change_day": 0.45,
+    "spy_percent_change_concurrent": null
+  }
+}
