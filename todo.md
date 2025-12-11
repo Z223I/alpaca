@@ -259,6 +259,18 @@ Add news column to signals. Also, volume surge if possible.
 
 - [ ] Create a float rotation scanner.  Can something be extended?
 
+## BRB Alert
+
+- [ ] Write script to review historical data.  Need to perfom analysis to find what works. Use usual suspects price > 9 EMA > 21 EMA; MACD open.
+- [ ] Create BRB alerts. Trigger the watching based on an all green squeeze alert minus PM High. Stop monitoring after 10 minutes unless it is going well.
+
+## Spread
+
+Do this for data collection for data analysis.
+High volume and short candlestick body is sign of a reversal.
+
+- [ ] Update lksjdf: Use code/alpaca.py to retrieve the bid and ask.  Add the spread (ask - bid) to the squeeze alert.  Add spread percentage as (ask - bid) / latest price in squeeze alert.
+
 ## Surge all stocks
 
 - [X] Update cgi-bin/molecules/alpaca_molecules/momentum_alerts.py: "--symbols-file", "data_master/master.csv", -> "--exchanges", "NASDAQ", "AMEX",

@@ -1111,6 +1111,19 @@ class SqueezeAlertsMonitor:
             else:
                 self.logger.warning(f"⚠️  VWAP not available in candlestick data for {symbol}")
 
+        # Get latest quote data for bid/ask spread
+        quote_data = self.market_data.get_latest_quote_data(symbol)
+        bid_price = quote_data.get('bid_price')
+        ask_price = quote_data.get('ask_price')
+
+        # Calculate spread and spread percentage
+        spread = None
+        spread_percent = None
+        if bid_price is not None and ask_price is not None and bid_price > 0 and ask_price > 0:
+            spread = ask_price - bid_price
+            if last_price > 0:
+                spread_percent = (spread / last_price) * 100
+
         # Determine status for premarket high
         pm_icon, pm_color, pm_percent_off = self._get_price_status(last_price, premarket_high)
 
@@ -1255,6 +1268,19 @@ class SqueezeAlertsMonitor:
         else:
             print(f"Float Rotation: ⚪ N/A")
 
+        # Display spread and spread percentage
+        if spread is not None and spread_percent is not None:
+            # Red if spread < 0.5%, yellow if < 1.5%, green otherwise
+            if spread_percent < 0.5:
+                spread_icon = "🔴"
+            elif spread_percent < 1.5:
+                spread_icon = "🟡"
+            else:
+                spread_icon = "🟢"
+            print(f"Spread:         {spread_icon} ${spread:.4f} ({spread_percent:.2f}%)")
+        else:
+            print(f"Spread:         ⚪ N/A")
+
         print(f"Total Squeezes: {self.squeeze_count} ({self.squeezes_by_symbol[symbol]} for {symbol})")
         print(f"{'='*70}\n")
 
@@ -1268,7 +1294,8 @@ class SqueezeAlertsMonitor:
             regular_hod, hod_icon, hod_percent_off,
             vwap, vwap_icon,
             gain_percent, gain_icon, gain_data_error,
-            volume_surge_ratio, float_shares, float_rotation
+            volume_surge_ratio, float_shares, float_rotation,
+            spread, spread_percent
         )
 
         # Save squeeze alert to JSON file for scanner display
@@ -1278,7 +1305,8 @@ class SqueezeAlertsMonitor:
             regular_hod, hod_icon, hod_color, hod_percent_off,
             vwap, vwap_icon, vwap_color,
             gain_percent, gain_icon, gain_color, gain_data_error,
-            volume_surge_ratio, float_shares, float_rotation, float_rotation_percent
+            volume_surge_ratio, float_shares, float_rotation, float_rotation_percent,
+            spread, spread_percent
         )
 
     def _send_telegram_alert(self, symbol: str, first_price: float, last_price: float,
@@ -1287,7 +1315,8 @@ class SqueezeAlertsMonitor:
                             regular_hod: float, hod_icon: str, hod_percent_off: float,
                             vwap: float, vwap_icon: str,
                             gain_percent: float, gain_icon: str, gain_data_error: str,
-                            volume_surge_ratio: float, float_shares: float, float_rotation: float):
+                            volume_surge_ratio: float, float_shares: float, float_rotation: float,
+                            spread: float, spread_percent: float):
         """
         Send Telegram alert to users with squeeze_alerts=true.
 
@@ -1312,6 +1341,8 @@ class SqueezeAlertsMonitor:
             volume_surge_ratio: Volume surge ratio (multiplier)
             float_shares: Float shares outstanding
             float_rotation: Float rotation (total volume / float shares)
+            spread: Bid-ask spread (ask_price - bid_price)
+            spread_percent: Spread as percentage of latest price
         """
         try:
             # Get users with squeeze_alerts=true
@@ -1398,6 +1429,19 @@ class SqueezeAlertsMonitor:
             else:
                 float_rotation_line = f"📊 Float Rotation: ⚪ N/A\n"
 
+            # Build spread line
+            if spread is not None and spread_percent is not None:
+                # Red if spread < 0.5%, yellow if < 1.5%, green otherwise
+                if spread_percent < 0.5:
+                    spread_icon = "🔴"
+                elif spread_percent < 1.5:
+                    spread_icon = "🟡"
+                else:
+                    spread_icon = "🟢"
+                spread_line = f"📊 Spread: {spread_icon} ${spread:.4f} ({spread_percent:.2f}%)\n"
+            else:
+                spread_line = f"📊 Spread: ⚪ N/A\n"
+
             # Format Telegram message
             message = (
                 f"🚀 <b>SQUEEZE ALERT - {symbol}</b>\n\n"
@@ -1412,6 +1456,7 @@ class SqueezeAlertsMonitor:
                 f"{surge_line}"
                 f"{float_shares_line}"
                 f"{float_rotation_line}"
+                f"{spread_line}"
                 f"📉 Trades: {len(self.price_history[symbol])} in window\n\n"
                 f"#Squeeze #{symbol}"
             )
@@ -1449,7 +1494,8 @@ class SqueezeAlertsMonitor:
                                   vwap: float, vwap_icon: str, vwap_color: str,
                                   gain_percent: float, gain_icon: str, gain_color: str, gain_data_error: str,
                                   volume_surge_ratio: float, float_shares: float, float_rotation: float,
-                                  float_rotation_percent: float) -> None:
+                                  float_rotation_percent: float,
+                                  spread: float, spread_percent: float) -> None:
         """
         Save sent squeeze alert to JSON file for scanner display.
 
@@ -1480,6 +1526,8 @@ class SqueezeAlertsMonitor:
             float_shares: Float shares outstanding
             float_rotation: Float rotation (total volume / float shares)
             float_rotation_percent: Float rotation as percentage
+            spread: Bid-ask spread (ask_price - bid_price)
+            spread_percent: Spread as percentage of latest price
         """
         try:
             # Create filename with timestamp
@@ -1529,7 +1577,9 @@ class SqueezeAlertsMonitor:
                 'volume_surge_ratio': float(volume_surge_ratio) if volume_surge_ratio is not None else None,
                 'float_shares': float(float_shares) if float_shares is not None else None,
                 'float_rotation': float(float_rotation) if float_rotation is not None else None,
-                'float_rotation_percent': float(float_rotation_percent) if float_rotation_percent is not None else None
+                'float_rotation_percent': float(float_rotation_percent) if float_rotation_percent is not None else None,
+                'spread': float(spread) if spread is not None else None,
+                'spread_percent': float(spread_percent) if spread_percent is not None else None
             }
 
             # Add error field if present
