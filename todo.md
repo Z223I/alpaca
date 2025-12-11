@@ -125,15 +125,12 @@ Stop limit buy to purchase when the stop limit is hit
 
 Check a penetration of 100% is required
 
-Add news column to CSV. Manually update it. Pass it through the alerts system.
-
-Add news column to signals. Also, volume surge if possible.
-
 Create a program code/percentage_bin.Py. Have it go through all historical data and bin percentage gains by minute.
 
 Can the data from volume surge be saved, and then used for top gainers? Or, can they be combined and written to two different databases?
 
 Create program and connect to telegram polling to give a list of stocks that have any type of alert. Sort by alert type give the time stamp.
+
 
 ## Major Resistance
 
@@ -240,6 +237,39 @@ Install TraderVue
 ## Volume Profile
 
 - [ ] Create subplot or side plot for volume profile for the last five minutes.
+
+
+
+
+
+
+Add news column to CSV. Manually update it. Pass it through the alerts system.
+
+Add news column to signals. Also, volume surge if possible.
+
+## Surge Schedule
+
+- [ ] lskdfj
+
+## Surge all stocks
+
+- [ ] Update cgi-bin/molecules/alpaca_molecules/momentum_alerts.py: "--symbols-file", "data_master/master.csv", -> "--exchanges", "NASDAQ", "AMEX",
+            "--max-symbols", "7000",
+
+```python
+        script_path = Path("code") / "alpaca_screener.py"
+        cmd = [
+            "~/miniconda3/envs/alpaca/bin/python",
+            str(script_path),
+            "--symbols-file", "data_master/master.csv",
+            "--min-volume", "250000",
+            "--min-percent-change", "5.0",
+            "--surge-days", "50",
+            "--volume-surge", "5.0",
+            "--export-csv", "relative_volume_nasdaq_amex.csv",
+            "--verbose"
+        ]
+```
 
 ## Gain Calculation
 

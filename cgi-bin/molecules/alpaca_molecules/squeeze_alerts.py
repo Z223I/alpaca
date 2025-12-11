@@ -1174,12 +1174,20 @@ class SqueezeAlertsMonitor:
                     f"Float: {float_shares:,} | "
                     f"Float Rotation: {float_rotation:.4f}x ({float_rotation_percent:.2f}%)")
 
+        # Determine price icon based on last_price
+        if 2 <= last_price <= 20:
+            price_icon = "🟢"  # Green: $2-$20 (sweet spot)
+        elif (20 < last_price < 30) or (1 <= last_price < 2):
+            price_icon = "🟡"  # Yellow: $20-$30 or $1-$2
+        else:
+            price_icon = "🔴"  # Red: <$1 or >=$30
+
         # Print to stdout (not logger, so it's always visible)
         print(f"\n{'='*70}")
         print(f"🚀 SQUEEZE DETECTED - {symbol}")
         print(f"{'='*70}")
         print(f"Time:           {timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"Price Range:    ${first_price:.2f} → ${last_price:.2f}")
+        print(f"Price Range:    ${first_price:.2f} → {price_icon} ${last_price:.2f}")
         print(f"Change:         +{percent_change:.2f}% in 10 seconds")
         print(f"Window Trades:  {len(self.price_history[symbol])} trades")
 
@@ -1313,6 +1321,14 @@ class SqueezeAlertsMonitor:
                 self.logger.debug("No users with squeeze_alerts=true found")
                 return
 
+            # Determine price icon based on last_price
+            if 2 <= last_price <= 20:
+                price_icon = "🟢"  # Green: $2-$20 (sweet spot)
+            elif (20 < last_price < 30) or (1 <= last_price < 2):
+                price_icon = "🟡"  # Yellow: $20-$30 or $1-$2
+            else:
+                price_icon = "🔴"  # Red: <$1 or >=$30
+
             # Build VWAP line
             if vwap:
                 vwap_line = f"📊 VWAP: {vwap_icon} ${vwap:.2f}\n"
@@ -1386,7 +1402,7 @@ class SqueezeAlertsMonitor:
             message = (
                 f"🚀 <b>SQUEEZE ALERT - {symbol}</b>\n\n"
                 f"⏰ Time: {timestamp.strftime('%H:%M:%S ET')}\n"
-                f"📈 Price: ${first_price:.2f} → ${last_price:.2f}\n"
+                f"📈 Price: ${first_price:.2f} → {price_icon} ${last_price:.2f}\n"
                 f"📊 Change: <b>+{percent_change:.2f}%</b> in 10 seconds\n"
                 f"{gain_line}"
                 f"{error_line}"

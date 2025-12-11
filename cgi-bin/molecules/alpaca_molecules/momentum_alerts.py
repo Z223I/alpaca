@@ -1022,7 +1022,8 @@ class MomentumAlertsSystem:
         cmd = [
             "~/miniconda3/envs/alpaca/bin/python",
             str(script_path),
-            "--symbols-file", "data_master/master.csv",
+            "--exchanges", "NASDAQ", "AMEX",
+            "--max-symbols", "7000",
             "--min-volume", "250000",
             "--min-percent-change", "5.0",
             "--surge-days", "50",
