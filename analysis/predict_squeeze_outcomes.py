@@ -670,8 +670,8 @@ class SqueezeOutcomePredictor:
                         # Price went UP first, then DOWN
                         # Check if we hit target before stop loss
                         if high_gain >= gain_threshold:
-                            # WIN: Hit target before stop loss
-                            return (min(high_gain, 10.0), f'target_hit_at_{interval_sec_str}s')
+                            # WIN: Hit target before stop loss (exact limit order)
+                            return (gain_threshold, f'target_hit_at_{interval_sec_str}s')
 
                         # Check if stop loss was hit
                         if low_gain <= -stop_loss_pct:
@@ -687,17 +687,17 @@ class SqueezeOutcomePredictor:
 
                         # Check if target was hit
                         if high_gain >= gain_threshold:
-                            # WIN: Hit target after stop loss
-                            return (min(high_gain, 10.0), f'target_hit_at_{interval_sec_str}s')
+                            # WIN: Hit target (exact limit order)
+                            return (gain_threshold, f'target_hit_at_{interval_sec_str}s')
 
                 else:
                     # FALLBACK: Use snapshot price if no range data
                     if 'gain_percent' in interval_data:
                         gain = interval_data['gain_percent']
 
-                        # Check if hit target
+                        # Check if hit target (exact limit order)
                         if gain >= gain_threshold:
-                            return (min(gain, 10.0), f'snapshot_target_at_{interval_sec_str}s')
+                            return (gain_threshold, f'snapshot_target_at_{interval_sec_str}s')
 
                         # Check if hit stop loss
                         if gain <= -stop_loss_pct:
@@ -707,7 +707,7 @@ class SqueezeOutcomePredictor:
             # Use the final outcome
             final_gain = outcome.get('final_gain_percent', 0)
             if final_gain >= gain_threshold:
-                return (min(final_gain, 10.0), 'final_target')
+                return (gain_threshold, 'final_target')
             elif final_gain <= -stop_loss_pct:
                 return (-stop_loss_pct, 'final_stop_loss')
             else:
@@ -718,7 +718,7 @@ class SqueezeOutcomePredictor:
         max_gain = outcome.get('max_gain_percent', 0)
 
         if max_gain >= gain_threshold:
-            return (min(max_gain, 10.0), 'legacy_target_hit')
+            return (gain_threshold, 'legacy_target_hit')
         elif max_gain <= -stop_loss_pct:
             return (-stop_loss_pct, 'legacy_stop_loss')
         else:
