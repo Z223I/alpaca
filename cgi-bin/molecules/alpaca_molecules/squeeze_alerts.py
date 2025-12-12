@@ -112,6 +112,19 @@ class SqueezeAlertsMonitor:
         self.squeeze_count = 0
         self.squeezes_by_symbol: Dict[str, int] = {}
 
+        # Volume history tracking for Phase 1 metrics
+        # Each symbol stores: deque of (timestamp, volume) tuples for 5-minute rolling window
+        self.volume_history: Dict[str, Deque[tuple]] = {}
+
+        # Day open and low prices per symbol (for distance calculations)
+        self.day_open_prices: Dict[str, float] = {}
+        self.day_low_prices: Dict[str, float] = {}
+
+        # SPY price tracking for concurrent change calculation
+        self.spy_squeeze_start_price: Dict[str, float] = {}  # symbol -> SPY price at squeeze start
+        self.latest_spy_price: float = None  # Latest SPY price seen
+        self.latest_spy_timestamp: datetime = None  # When SPY price was last updated
+
         # Telegram integration
         self.telegram_poster = TelegramPoster()
         self.user_manager = UserManager()
@@ -1026,6 +1039,17 @@ class SqueezeAlertsMonitor:
             # If timezone-aware, convert to ET
             timestamp = timestamp.astimezone(self.et_tz)
 
+        # Track volume history for Phase 1 metrics (5-minute rolling window)
+        self._track_volume_history(symbol, timestamp, size)
+
+        # Track day open and low prices for Phase 1 metrics
+        self._track_day_prices(symbol, price, timestamp)
+
+        # Track SPY price for concurrent change calculation (store latest SPY price)
+        if symbol == 'SPY':
+            self.latest_spy_price = price
+            self.latest_spy_timestamp = timestamp
+
         # Log trade (suppress in test mode unless verbose)
         if not self.test_mode or self.verbose:
             self.logger.info(
@@ -1035,6 +1059,52 @@ class SqueezeAlertsMonitor:
 
         # Squeeze detection: Track prices in 10-second rolling window
         await self._detect_squeeze(symbol, timestamp, price, size)
+
+    def _track_volume_history(self, symbol: str, timestamp: datetime, volume: int):
+        """
+        Track volume history for 1min and 5min rolling averages.
+
+        Maintains a 5-minute rolling window of (timestamp, volume) tuples per symbol.
+        """
+        # Initialize volume history for this symbol if needed
+        if symbol not in self.volume_history:
+            self.volume_history[symbol] = deque()
+
+        # Add current trade volume to history
+        self.volume_history[symbol].append((timestamp, volume))
+
+        # Remove volumes older than 5 minutes
+        from datetime import timedelta
+        cutoff_time = timestamp - timedelta(minutes=5)
+
+        while (self.volume_history[symbol] and
+               self.volume_history[symbol][0][0] < cutoff_time):
+            self.volume_history[symbol].popleft()
+
+    def _track_day_prices(self, symbol: str, price: float, timestamp: datetime):
+        """
+        Track day's open and low prices for distance calculations.
+
+        Args:
+            symbol: Stock symbol
+            price: Current price
+            timestamp: Trade timestamp
+        """
+        # Track day's open price (first trade at or after 9:30 AM ET)
+        if symbol not in self.day_open_prices:
+            # Check if this is during regular hours (9:30 AM - 4:00 PM ET)
+            hour = timestamp.hour
+            minute = timestamp.minute
+
+            if (hour == 9 and minute >= 30) or (10 <= hour < 16):
+                # This is the first trade we're seeing during regular hours
+                self.day_open_prices[symbol] = price
+
+        # Track day's low price (minimum price seen today)
+        if symbol not in self.day_low_prices:
+            self.day_low_prices[symbol] = price
+        else:
+            self.day_low_prices[symbol] = min(self.day_low_prices[symbol], price)
 
     async def _detect_squeeze(self, symbol: str, timestamp: datetime, price: float, size: int):
         """
@@ -1052,8 +1122,15 @@ class SqueezeAlertsMonitor:
         if symbol not in self.price_history:
             self.price_history[symbol] = deque()
 
+        # Store SPY price at window start (for concurrent change calculation)
+        was_empty = len(self.price_history[symbol]) == 0
+
         # Add current trade to history (timestamp, price, size)
         self.price_history[symbol].append((timestamp, price, size))
+
+        # If this is the first trade in a new window, store SPY price
+        if was_empty and symbol != 'SPY' and self.latest_spy_price is not None:
+            self.spy_squeeze_start_price[symbol] = self.latest_spy_price
 
         # Remove trades older than 10 seconds
         from datetime import timedelta
@@ -1144,11 +1221,50 @@ class SqueezeAlertsMonitor:
             window_volume = sum(trade[2] for trade in self.price_history[symbol])  # trade[2] is size
             metrics['window_volume'] = int(window_volume)
 
-            # Calculate volume vs recent averages (placeholder - would need historical tracking)
-            # For now, set to None - would require tracking 1min and 5min volume history
-            metrics['window_volume_vs_1min_avg'] = None
-            metrics['window_volume_vs_5min_avg'] = None
-            metrics['volume_trend'] = None
+            # Calculate volume vs recent averages from volume_history
+            if symbol in self.volume_history and len(self.volume_history[symbol]) > 0:
+                from datetime import timedelta
+
+                # Calculate 1-minute average volume
+                one_min_ago = timestamp - timedelta(minutes=1)
+                one_min_volumes = [v for t, v in self.volume_history[symbol] if t >= one_min_ago]
+
+                if len(one_min_volumes) > 0:
+                    one_min_avg = sum(one_min_volumes) / len(one_min_volumes)
+                    metrics['window_volume_vs_1min_avg'] = round(window_volume / one_min_avg, 2) if one_min_avg > 0 else None
+                else:
+                    metrics['window_volume_vs_1min_avg'] = None
+
+                # Calculate 5-minute average volume
+                five_min_volumes = [v for t, v in self.volume_history[symbol]]
+
+                if len(five_min_volumes) > 0:
+                    five_min_avg = sum(five_min_volumes) / len(five_min_volumes)
+                    metrics['window_volume_vs_5min_avg'] = round(window_volume / five_min_avg, 2) if five_min_avg > 0 else None
+                else:
+                    metrics['window_volume_vs_5min_avg'] = None
+
+                # Determine volume trend (compare recent 2min vs previous 3min)
+                two_min_ago = timestamp - timedelta(minutes=2)
+                recent_volumes = [v for t, v in self.volume_history[symbol] if t >= two_min_ago]
+                older_volumes = [v for t, v in self.volume_history[symbol] if t < two_min_ago]
+
+                if len(recent_volumes) > 0 and len(older_volumes) > 0:
+                    recent_avg = sum(recent_volumes) / len(recent_volumes)
+                    older_avg = sum(older_volumes) / len(older_volumes)
+
+                    if recent_avg > older_avg * 1.2:  # 20% increase
+                        metrics['volume_trend'] = 'increasing'
+                    elif recent_avg < older_avg * 0.8:  # 20% decrease
+                        metrics['volume_trend'] = 'decreasing'
+                    else:
+                        metrics['volume_trend'] = 'stable'
+                else:
+                    metrics['volume_trend'] = None
+            else:
+                metrics['window_volume_vs_1min_avg'] = None
+                metrics['window_volume_vs_5min_avg'] = None
+                metrics['volume_trend'] = None
         else:
             metrics['window_volume'] = None
             metrics['window_volume_vs_1min_avg'] = None
@@ -1179,13 +1295,19 @@ class SqueezeAlertsMonitor:
         else:
             metrics['distance_from_vwap_percent'] = None
 
-        # Distance from day low (would need to track or fetch)
-        # Placeholder for now - would require fetching day's low
-        metrics['distance_from_day_low_percent'] = None
+        # Distance from day low (using tracked day_low_prices)
+        if symbol in self.day_low_prices and self.day_low_prices[symbol] > 0:
+            metrics['distance_from_day_low_percent'] = round(
+                ((last_price - self.day_low_prices[symbol]) / self.day_low_prices[symbol]) * 100, 2)
+        else:
+            metrics['distance_from_day_low_percent'] = None
 
-        # Distance from open (would need to track)
-        # Placeholder for now
-        metrics['distance_from_open_percent'] = None
+        # Distance from day open (using tracked day_open_prices)
+        if symbol in self.day_open_prices and self.day_open_prices[symbol] > 0:
+            metrics['distance_from_open_percent'] = round(
+                ((last_price - self.day_open_prices[symbol]) / self.day_open_prices[symbol]) * 100, 2)
+        else:
+            metrics['distance_from_open_percent'] = None
 
         # ===== 4. RISK/REWARD METRICS =====
         # Get day highs for target calculation
@@ -1225,9 +1347,17 @@ class SqueezeAlertsMonitor:
         else:
             metrics['spy_percent_change_day'] = None
 
-        # SPY concurrent change (would require tracking SPY price during same window)
-        # Placeholder for now
-        metrics['spy_percent_change_concurrent'] = None
+        # SPY concurrent change (SPY movement during the same squeeze window)
+        if (symbol in self.spy_squeeze_start_price and
+            self.latest_spy_price is not None and
+            self.spy_squeeze_start_price[symbol] > 0):
+
+            spy_start = self.spy_squeeze_start_price[symbol]
+            spy_end = self.latest_spy_price
+            spy_change = ((spy_end - spy_start) / spy_start) * 100
+            metrics['spy_percent_change_concurrent'] = round(spy_change, 2)
+        else:
+            metrics['spy_percent_change_concurrent'] = None
 
         return metrics
 
