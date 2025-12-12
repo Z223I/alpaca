@@ -1205,6 +1205,162 @@ class SqueezeAlertsMonitor:
                         self._last_squeeze_time = {}
                     self._last_squeeze_time[symbol] = timestamp
 
+    def _calculate_ema_values(self, symbol: str, timestamp: datetime) -> Dict[str, Any]:
+        """
+        Calculate EMA 9 and EMA 21 from 1-minute candlesticks.
+
+        Args:
+            symbol: Stock symbol
+            timestamp: Current timestamp
+
+        Returns:
+            Dictionary containing EMA 9 and EMA 21 values, or None if calculation fails
+        """
+        try:
+            import alpaca_trade_api as tradeapi
+            import pandas as pd
+            from atoms.utils.calculate_ema import calculate_ema
+
+            if not self.alpaca_client:
+                return {'ema_9': None, 'ema_21': None, 'error': 'Alpaca client not available'}
+
+            # Calculate time range - fetch enough bars for EMA 21 calculation
+            # Need at least 21 bars, but fetch 30 to have sufficient data
+            end_time = timestamp
+            start_time = timestamp - timedelta(minutes=35)
+
+            # Fetch 1-minute bars
+            bars = self.alpaca_client.get_bars(
+                symbol,
+                tradeapi.TimeFrame(1, tradeapi.TimeFrameUnit.Minute),
+                start=start_time.astimezone(pytz.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                end=end_time.astimezone(pytz.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                limit=35,
+                feed='sip'
+            )
+
+            if not bars or len(bars) < 21:
+                return {'ema_9': None, 'ema_21': None, 'error': f'Insufficient bars: {len(bars) if bars else 0}'}
+
+            # Convert bars to DataFrame
+            bar_data = []
+            for bar in bars:
+                bar_dict = {
+                    'high': float(bar.h),
+                    'low': float(bar.l),
+                    'close': float(bar.c),
+                    'timestamp': bar.t
+                }
+                bar_data.append(bar_dict)
+
+            df = pd.DataFrame(bar_data)
+            df.set_index('timestamp', inplace=True)
+
+            # Calculate EMA 9
+            success_9, ema_9_series = calculate_ema(df, period=9)
+
+            # Calculate EMA 21
+            success_21, ema_21_series = calculate_ema(df, period=21)
+
+            if success_9 and success_21:
+                # Get the latest (most recent) EMA values
+                ema_9_value = ema_9_series.iloc[-1] if len(ema_9_series) > 0 else None
+                ema_21_value = ema_21_series.iloc[-1] if len(ema_21_series) > 0 else None
+
+                # Only return valid values (not zero)
+                if ema_9_value and ema_9_value > 0 and ema_21_value and ema_21_value > 0:
+                    return {
+                        'ema_9': round(ema_9_value, 2),
+                        'ema_21': round(ema_21_value, 2),
+                        'error': None
+                    }
+                else:
+                    return {'ema_9': None, 'ema_21': None, 'error': 'EMA values are zero or invalid'}
+            else:
+                return {'ema_9': None, 'ema_21': None, 'error': 'EMA calculation failed'}
+
+        except Exception as e:
+            self.logger.error(f"Error calculating EMAs for {symbol}: {e}")
+            return {'ema_9': None, 'ema_21': None, 'error': str(e)}
+
+    def _calculate_macd_values(self, symbol: str, timestamp: datetime) -> Dict[str, Any]:
+        """
+        Calculate MACD (Moving Average Convergence Divergence) from 1-minute candlesticks.
+
+        Args:
+            symbol: Stock symbol
+            timestamp: Current timestamp
+
+        Returns:
+            Dictionary containing MACD, Signal, and Histogram values, or None if calculation fails
+        """
+        try:
+            import alpaca_trade_api as tradeapi
+            import pandas as pd
+            from atoms.utils.calculate_macd import calculate_macd
+
+            if not self.alpaca_client:
+                return {'macd': None, 'signal': None, 'histogram': None, 'error': 'Alpaca client not available'}
+
+            # Calculate time range - fetch enough bars for MACD calculation
+            # Need at least 26 bars (slow EMA length), but fetch 35 to have sufficient data
+            end_time = timestamp
+            start_time = timestamp - timedelta(minutes=35)
+
+            # Fetch 1-minute bars
+            bars = self.alpaca_client.get_bars(
+                symbol,
+                tradeapi.TimeFrame(1, tradeapi.TimeFrameUnit.Minute),
+                start=start_time.astimezone(pytz.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                end=end_time.astimezone(pytz.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                limit=35,
+                feed='sip'
+            )
+
+            if not bars or len(bars) < 26:
+                return {'macd': None, 'signal': None, 'histogram': None, 'error': f'Insufficient bars: {len(bars) if bars else 0}'}
+
+            # Convert bars to DataFrame
+            bar_data = []
+            for bar in bars:
+                bar_dict = {
+                    'high': float(bar.h),
+                    'low': float(bar.l),
+                    'close': float(bar.c),
+                    'timestamp': bar.t
+                }
+                bar_data.append(bar_dict)
+
+            df = pd.DataFrame(bar_data)
+            df.set_index('timestamp', inplace=True)
+
+            # Calculate MACD with default parameters (12, 26, 9)
+            success, macd_result = calculate_macd(df, fast_length=12, slow_length=26,
+                                                 signal_length=9, source='close')
+
+            if success:
+                # Get the latest (most recent) MACD values
+                macd_value = macd_result['macd'].iloc[-1] if len(macd_result['macd']) > 0 else None
+                signal_value = macd_result['signal'].iloc[-1] if len(macd_result['signal']) > 0 else None
+                histogram_value = macd_result['histogram'].iloc[-1] if len(macd_result['histogram']) > 0 else None
+
+                # Return values (MACD can be negative, so don't check > 0)
+                if macd_value is not None and signal_value is not None and histogram_value is not None:
+                    return {
+                        'macd': round(macd_value, 4),
+                        'signal': round(signal_value, 4),
+                        'histogram': round(histogram_value, 4),
+                        'error': None
+                    }
+                else:
+                    return {'macd': None, 'signal': None, 'histogram': None, 'error': 'MACD values are invalid'}
+            else:
+                return {'macd': None, 'signal': None, 'histogram': None, 'error': 'MACD calculation failed'}
+
+        except Exception as e:
+            self.logger.error(f"Error calculating MACD for {symbol}: {e}")
+            return {'macd': None, 'signal': None, 'histogram': None, 'error': str(e)}
+
     def _calculate_phase1_metrics(self, symbol: str, timestamp: datetime, last_price: float) -> Dict[str, Any]:
         """
         Calculate Phase 1 enhancement metrics for squeeze alerts.
@@ -2103,6 +2259,25 @@ class SqueezeAlertsMonitor:
                     f"Float: {float_shares:,} | "
                     f"Float Rotation: {float_rotation:.4f}x ({float_rotation_percent:.2f}%)")
 
+        # Calculate EMA 9 and EMA 21 from 1-minute candlesticks
+        ema_data = self._calculate_ema_values(symbol, timestamp)
+        ema_9 = ema_data.get('ema_9')
+        ema_21 = ema_data.get('ema_21')
+        ema_error = ema_data.get('error')
+
+        if ema_error and self.verbose:
+            self.logger.debug(f"⚠️  EMA calculation for {symbol}: {ema_error}")
+
+        # Calculate MACD from 1-minute candlesticks
+        macd_data = self._calculate_macd_values(symbol, timestamp)
+        macd = macd_data.get('macd')
+        macd_signal = macd_data.get('signal')
+        macd_histogram = macd_data.get('histogram')
+        macd_error = macd_data.get('error')
+
+        if macd_error and self.verbose:
+            self.logger.debug(f"⚠️  MACD calculation for {symbol}: {macd_error}")
+
         # Determine price icon based on last_price
         if 2 <= last_price <= 20:
             price_icon = "🟢"  # Green: $2-$20 (sweet spot)
@@ -2197,6 +2372,28 @@ class SqueezeAlertsMonitor:
         else:
             print(f"Spread:         ⚪ N/A")
 
+        # Display EMA 9 and EMA 21
+        if ema_9 is not None and ema_21 is not None:
+            # Determine EMA icon based on EMA 9 vs EMA 21
+            if ema_9 > ema_21:
+                ema_icon = "🟢"  # Green if EMA 9 > EMA 21 (bullish)
+            else:
+                ema_icon = "🔴"  # Red if EMA 9 < EMA 21 (bearish)
+            print(f"EMA 9/21:       {ema_icon} ${ema_9:.2f} / ${ema_21:.2f}")
+        else:
+            print(f"EMA 9/21:       ⚪ N/A")
+
+        # Display MACD
+        if macd is not None and macd_signal is not None and macd_histogram is not None:
+            # Determine MACD icon based on histogram (MACD - Signal)
+            if macd_histogram > 0:
+                macd_icon = "🟢"  # Green if histogram > 0 (bullish)
+            else:
+                macd_icon = "🔴"  # Red if histogram <= 0 (bearish)
+            print(f"MACD:           {macd_icon} {macd:.4f} / {macd_signal:.4f} / {macd_histogram:.4f}")
+        else:
+            print(f"MACD:           ⚪ N/A")
+
         print(f"Total Squeezes: {self.squeeze_count} ({self.squeezes_by_symbol[symbol]} for {symbol})")
         print(f"{'='*70}\n")
 
@@ -2214,7 +2411,9 @@ class SqueezeAlertsMonitor:
             vwap, vwap_icon,
             gain_percent, gain_icon, gain_data_error,
             volume_surge_ratio, float_shares, float_rotation,
-            spread, spread_percent
+            spread, spread_percent,
+            ema_9, ema_21,
+            macd, macd_signal, macd_histogram
         )
 
         # Save squeeze alert to JSON file for scanner display (includes Phase 1 metrics)
@@ -2226,6 +2425,8 @@ class SqueezeAlertsMonitor:
             gain_percent, gain_icon, gain_color, gain_data_error,
             volume_surge_ratio, float_shares, float_rotation, float_rotation_percent,
             spread, spread_percent,
+            ema_9, ema_21,
+            macd, macd_signal, macd_histogram,
             phase1_metrics
         )
 
@@ -2245,7 +2446,9 @@ class SqueezeAlertsMonitor:
                             vwap: float, vwap_icon: str,
                             gain_percent: float, gain_icon: str, gain_data_error: str,
                             volume_surge_ratio: float, float_shares: float, float_rotation: float,
-                            spread: float, spread_percent: float):
+                            spread: float, spread_percent: float,
+                            ema_9: float, ema_21: float,
+                            macd: float, macd_signal: float, macd_histogram: float):
         """
         Send Telegram alert to users with squeeze_alerts=true.
 
@@ -2272,6 +2475,11 @@ class SqueezeAlertsMonitor:
             float_rotation: Float rotation (total volume / float shares)
             spread: Bid-ask spread (ask_price - bid_price)
             spread_percent: Spread as percentage of latest price
+            ema_9: EMA 9 value from 1-minute candlesticks
+            ema_21: EMA 21 value from 1-minute candlesticks
+            macd: MACD line value from 1-minute candlesticks
+            macd_signal: MACD signal line value from 1-minute candlesticks
+            macd_histogram: MACD histogram value from 1-minute candlesticks
         """
         try:
             # Get users with squeeze_alerts=true
@@ -2371,6 +2579,28 @@ class SqueezeAlertsMonitor:
             else:
                 spread_line = f"📊 Spread: ⚪ N/A\n"
 
+            # Build EMA line
+            if ema_9 is not None and ema_21 is not None:
+                # Determine EMA icon based on EMA 9 vs EMA 21
+                if ema_9 > ema_21:
+                    ema_icon = "🟢"  # Green if EMA 9 > EMA 21 (bullish)
+                else:
+                    ema_icon = "🔴"  # Red if EMA 9 < EMA 21 (bearish)
+                ema_line = f"📊 EMA 9/21: {ema_icon} ${ema_9:.2f} / ${ema_21:.2f}\n"
+            else:
+                ema_line = f"📊 EMA 9/21: ⚪ N/A\n"
+
+            # Build MACD line
+            if macd is not None and macd_signal is not None and macd_histogram is not None:
+                # Determine MACD icon based on histogram
+                if macd_histogram > 0:
+                    macd_icon = "🟢"  # Green if histogram > 0 (bullish)
+                else:
+                    macd_icon = "🔴"  # Red if histogram <= 0 (bearish)
+                macd_line = f"📊 MACD: {macd_icon} {macd:.4f} / {macd_signal:.4f} / {macd_histogram:.4f}\n"
+            else:
+                macd_line = f"📊 MACD: ⚪ N/A\n"
+
             # Format Telegram message
             message = (
                 f"🚀 <b>SQUEEZE ALERT - {symbol}</b>\n\n"
@@ -2382,6 +2612,8 @@ class SqueezeAlertsMonitor:
                 f"{vwap_line}"
                 f"{pm_line}"
                 f"{hod_line}"
+                f"{ema_line}"
+                f"{macd_line}"
                 f"{surge_line}"
                 f"{float_shares_line}"
                 f"{float_rotation_line}"
@@ -2425,6 +2657,8 @@ class SqueezeAlertsMonitor:
                                   volume_surge_ratio: float, float_shares: float, float_rotation: float,
                                   float_rotation_percent: float,
                                   spread: float, spread_percent: float,
+                                  ema_9: float, ema_21: float,
+                                  macd: float, macd_signal: float, macd_histogram: float,
                                   phase1_metrics: Dict[str, Any]) -> str:
         """
         Save sent squeeze alert to JSON file for scanner display.
@@ -2458,6 +2692,11 @@ class SqueezeAlertsMonitor:
             float_rotation_percent: Float rotation as percentage
             spread: Bid-ask spread (ask_price - bid_price)
             spread_percent: Spread as percentage of latest price
+            ema_9: EMA 9 value from 1-minute candlesticks
+            ema_21: EMA 21 value from 1-minute candlesticks
+            macd: MACD line value from 1-minute candlesticks
+            macd_signal: MACD signal line value from 1-minute candlesticks
+            macd_histogram: MACD histogram value from 1-minute candlesticks
             phase1_metrics: Dictionary containing Phase 1 enhancement metrics
         """
         try:
@@ -2510,7 +2749,12 @@ class SqueezeAlertsMonitor:
                 'float_rotation': float(float_rotation) if float_rotation is not None else None,
                 'float_rotation_percent': float(float_rotation_percent) if float_rotation_percent is not None else None,
                 'spread': float(spread) if spread is not None else None,
-                'spread_percent': float(spread_percent) if spread_percent is not None else None
+                'spread_percent': float(spread_percent) if spread_percent is not None else None,
+                'ema_9': float(ema_9) if ema_9 is not None else None,
+                'ema_21': float(ema_21) if ema_21 is not None else None,
+                'macd': float(macd) if macd is not None else None,
+                'macd_signal': float(macd_signal) if macd_signal is not None else None,
+                'macd_histogram': float(macd_histogram) if macd_histogram is not None else None
             }
 
             # Add error field if present

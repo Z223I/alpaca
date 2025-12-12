@@ -272,6 +272,7 @@ High volume and short candlestick body is sign of a reversal.
 - [ ] Update lksjdf: Use code/alpaca.py to retrieve the bid and ask.  Add the spread (ask - bid) to the squeeze alert.  Add spread percentage as (ask - bid) / latest price in squeeze alert.
 - [ ] Is the data statistically independent?
 - [ ] Is data after the squeeze alert saved to all performance analysis?
+- [ ] Add 9/21 EMA, MACD (MACD, Signal, or histogram)
 
 ## Surge all stocks
 
