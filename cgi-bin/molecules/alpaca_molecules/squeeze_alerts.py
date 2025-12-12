@@ -1659,6 +1659,16 @@ class SqueezeAlertsMonitor:
             # Profitability snapshots
             'profitable_snapshots': profitable_snapshots,
 
+            # Per-interval price range tracking (for each recorded interval)
+            'interval_price_ranges': {},  # Keyed by interval_seconds
+
+            # Current interval tracking (running low/high until next interval snapshot)
+            'current_interval_low': squeeze_price,
+            'current_interval_low_time': squeeze_timestamp,
+            'current_interval_high': squeeze_price,
+            'current_interval_high_time': squeeze_timestamp,
+            'current_interval_start_time': squeeze_timestamp,
+
             # Last seen price (for handling gaps)
             'last_seen_price': squeeze_price,
             'last_seen_timestamp': squeeze_timestamp
@@ -1802,6 +1812,15 @@ class SqueezeAlertsMonitor:
         elapsed = (timestamp - followup['start_time']).total_seconds() / 60
         elapsed_minute = int(elapsed) + 1  # Convert to 1-indexed minute
 
+        # Update current interval's low and high (for per-interval tracking)
+        if price < followup['current_interval_low']:
+            followup['current_interval_low'] = price
+            followup['current_interval_low_time'] = timestamp
+
+        if price > followup['current_interval_high']:
+            followup['current_interval_high'] = price
+            followup['current_interval_high_time'] = timestamp
+
         # Update maximum price and gain
         if price > followup['max_price_seen']:
             followup['max_price_seen'] = price
@@ -1865,6 +1884,16 @@ class SqueezeAlertsMonitor:
         Called when a trade occurs at (or near) an interval time.
         Stores the price, volume, and other metrics at this point in time.
 
+        NEW: Also captures interval price range (low/high with timestamps)
+        This tracks the lowest and highest prices that occurred DURING this interval period,
+        providing insight into intra-interval volatility and optimal entry/exit points.
+
+        For example, the 30s interval captures:
+        - Price at the 30s mark (snapshot)
+        - Low price between 20s-30s (with timestamp when it occurred)
+        - High price between 20s-30s (with timestamp when it occurred)
+        - Price range statistics
+
         Args:
             key: Followup key
             interval_seconds: Interval time in seconds (e.g., 10, 20, 30, 60, 120, etc.)
@@ -1879,17 +1908,50 @@ class SqueezeAlertsMonitor:
         # Calculate gain from entry
         gain_percent = ((price - squeeze_price) / squeeze_price) * 100
 
-        # Record interval data (keyed by seconds)
+        # Calculate gains for interval low/high
+        interval_low = followup['current_interval_low']
+        interval_high = followup['current_interval_high']
+        interval_low_gain = ((interval_low - squeeze_price) / squeeze_price) * 100
+        interval_high_gain = ((interval_high - squeeze_price) / squeeze_price) * 100
+
+        # Record interval data (keyed by seconds) including price range
         followup['interval_data'][interval_seconds] = {
             'timestamp': timestamp.isoformat(),
             'price': float(price),
             'volume_since_squeeze': int(volume),
             'trades_since_squeeze': int(trades),
-            'gain_percent': round(gain_percent, 2)
+            'gain_percent': round(gain_percent, 2),
+
+            # Interval price range (low and high during this interval period)
+            'interval_low': float(interval_low),
+            'interval_low_timestamp': followup['current_interval_low_time'].isoformat(),
+            'interval_low_gain_percent': round(interval_low_gain, 2),
+            'interval_high': float(interval_high),
+            'interval_high_timestamp': followup['current_interval_high_time'].isoformat(),
+            'interval_high_gain_percent': round(interval_high_gain, 2)
+        }
+
+        # Store interval price range for easy access
+        followup['interval_price_ranges'][interval_seconds] = {
+            'low': float(interval_low),
+            'low_timestamp': followup['current_interval_low_time'].isoformat(),
+            'low_gain_percent': round(interval_low_gain, 2),
+            'high': float(interval_high),
+            'high_timestamp': followup['current_interval_high_time'].isoformat(),
+            'high_gain_percent': round(interval_high_gain, 2),
+            'range': float(interval_high - interval_low),
+            'range_percent': round(((interval_high - interval_low) / interval_low) * 100, 2) if interval_low > 0 else 0
         }
 
         # Mark this interval as recorded
         followup['intervals_recorded'].append(interval_seconds)
+
+        # Reset current interval tracking for next period
+        followup['current_interval_low'] = price
+        followup['current_interval_low_time'] = timestamp
+        followup['current_interval_high'] = price
+        followup['current_interval_high_time'] = timestamp
+        followup['current_interval_start_time'] = timestamp
 
         # Record profitability snapshot
         followup['profitable_snapshots'][interval_seconds] = (price > squeeze_price)

@@ -1,0 +1,77 @@
+{
+  "timestamp": "2025-12-12T11:02:01.955082",
+  "data_directory": "/home/wilsonb/dl/github.com/Z223I/alpaca/historical_data/2025-12-12/squeeze_alerts_sent",
+  "total_alerts": 465,
+  "features": {
+    "ema_spread": {
+      "count": 321,
+      "mean": -0.13018691588785056,
+      "std": 0.6650563622380221,
+      "min": -2.8299999999999983,
+      "max": 1.7700000000000031
+    },
+    "macd_histogram": {
+      "count": 89,
+      "mean": -0.07269887640449438,
+      "std": 0.17211503189224536,
+      "min": -0.6061,
+      "max": 0.1691
+    },
+    "squeeze_number_today": {
+      "count": 465,
+      "mean": 28.718279569892474,
+      "std": 23.105086702206936,
+      "min": 1.0,
+      "max": 91.0
+    },
+    "minutes_since_last_squeeze": {
+      "count": 437,
+      "mean": 2.121899313501144,
+      "std": 3.2911786194971713,
+      "min": 0.5,
+      "max": 35.12
+    },
+    "window_volume_vs_1min_avg": {
+      "count": 465,
+      "mean": 253.05870967741936,
+      "std": 282.10008653014313,
+      "min": 0.36,
+      "max": 1972.54
+    },
+    "distance_from_vwap_percent": {
+      "count": 465,
+      "mean": 1.5310537634408603,
+      "std": 3.5769703346715787,
+      "min": -15.19,
+      "max": 18.28
+    },
+    "distance_from_day_low_percent": {
+      "count": 465,
+      "mean": 11.861354838709676,
+      "std": 8.368263405731051,
+      "min": 2.01,
+      "max": 52.14
+    },
+    "day_gain": {
+      "count": 464,
+      "mean": 84.04382607298912,
+      "std": 62.840771529371075,
+      "min": 10.434782608695663,
+      "max": 289.937106918239
+    },
+    "spy_percent_change_concurrent": {
+      "count": 465,
+      "mean": -0.208,
+      "std": 0.24608853887476606,
+      "min": -0.9,
+      "max": 0.26
+    },
+    "spread_percent": {
+      "count": 465,
+      "mean": 1.586492098439299,
+      "std": 1.5115897613795592,
+      "min": -0.5952380952380958,
+      "max": 11.584158415841587
+    }
+  }
+}

@@ -264,6 +264,30 @@ Add news column to signals. Also, volume surge if possible.
 - [ ] Write script to review historical data.  Need to perfom analysis to find what works. Use usual suspects price > 9 EMA > 21 EMA; MACD open.
 - [ ] Create BRB alerts. Trigger the watching based on an all green squeeze alert minus PM High. Stop monitoring after 10 minutes unless it is going well.
 
+## Analysis
+
+Test 2, 3, 4, 5 percent with a 2% stop loss.
+
+Why 2% Wins:
+
+  1. Higher Win Rate: 75% (vs 68% for 5%)
+    - More consistent returns
+    - Builds trading confidence
+    - Better risk management
+  2. Catches More Opportunities: 79% recall
+    - Captures 79% of all 2%+ moves
+    - Only misses 21% of winners
+    - vs 5% target misses 35% of winners
+  3. Better Calibrated Model
+    - 71% of squeezes achieve 2% (easier target)
+    - 50% of squeezes achieve 5% (harder target)
+    - Less noise in classification
+  4. Faster Exits
+    - Median time to 2%: 45 seconds
+    - Median time to 5%: 2.5 minutes
+    - Reduces exposure time
+
+
 ## Spread
 
 Do this for data collection for data analysis.
