@@ -4295,7 +4295,14 @@
 
                     // Sort by boolean value first
                     if (valA === valB) {
-                        // If same boolean value, sort by symbol alphabetically
+                        // Special case: for top_gainers, sort by gain_percent as secondary sort
+                        if (column === 'top_gainers') {
+                            const gainA = a.gain_percent ?? -Infinity;
+                            const gainB = b.gain_percent ?? -Infinity;
+                            return gainB - gainA;  // Descending order (higher gains first)
+                        }
+
+                        // For other boolean columns, sort by symbol alphabetically
                         return a.symbol.toLowerCase() < b.symbol.toLowerCase() ? -1 :
                                a.symbol.toLowerCase() > b.symbol.toLowerCase() ? 1 : 0;
                     }
