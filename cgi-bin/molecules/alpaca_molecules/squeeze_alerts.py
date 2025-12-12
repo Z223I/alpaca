@@ -26,9 +26,9 @@ import json
 import logging
 import os
 import sys
-from datetime import datetime, time as dt_time
+from datetime import datetime, time as dt_time, timedelta
 from pathlib import Path
-from typing import List, Set, Dict, Deque, Any
+from typing import List, Set, Dict, Deque, Any, Optional
 from collections import deque
 import websockets
 import pytz
@@ -63,6 +63,33 @@ MARKET_CLOSE = dt_time(16, 0)          # 4:00 PM ET - Regular market close
 
 class SqueezeAlertsMonitor:
     """Real-time trade monitoring system for squeeze detection."""
+
+    # ===== OUTCOME TRACKING CONFIGURATION =====
+    # Enable/disable outcome tracking globally
+    OUTCOME_TRACKING_ENABLED = True
+
+    # Duration to track outcomes after squeeze detection (minutes)
+    OUTCOME_TRACKING_DURATION_MINUTES = 10
+
+    # Specific intervals for recording price snapshots (in seconds)
+    # Combines sub-minute intervals (10s, 20s, 30s, 40s, 50s, 90s, 150s)
+    # with minute intervals (60s=1min through 600s=10min)
+    OUTCOME_TRACKING_INTERVALS_SECONDS = [
+        10, 20, 30, 40, 50, 90, 150,           # Sub-minute intervals
+        60, 120, 180, 240, 300, 360, 420, 480, 540, 600  # 1-10 minute intervals
+    ]
+
+    # Time tolerance for interval recording (seconds)
+    OUTCOME_INTERVAL_TOLERANCE_SECONDS = 5  # Reduced from 30s for tighter sub-minute tracking
+
+    # Maximum concurrent followups to track (memory/performance limit)
+    OUTCOME_MAX_CONCURRENT_FOLLOWUPS = 100
+
+    # Stop loss threshold (percentage below entry price)
+    OUTCOME_STOP_LOSS_PERCENT = 7.5
+
+    # Target gain thresholds to track achievement (percentages above entry)
+    OUTCOME_TARGET_THRESHOLDS = [5.0, 10.0, 15.0]
 
     def __init__(
         self,
@@ -124,6 +151,17 @@ class SqueezeAlertsMonitor:
         self.spy_squeeze_start_price: Dict[str, float] = {}  # symbol -> SPY price at squeeze start
         self.latest_spy_price: float = None  # Latest SPY price seen
         self.latest_spy_timestamp: datetime = None  # When SPY price was last updated
+
+        # ===== OUTCOME TRACKING DATA STRUCTURES =====
+        # Active followups: tracks outcomes for squeezes in progress
+        # Key format: "AAPL_2025-12-12_152045" (symbol_date_time)
+        self.active_followups: Dict[str, Dict[str, Any]] = {}
+
+        # Cumulative volume since squeeze start (for each followup)
+        self.followup_volume_tracking: Dict[str, int] = {}
+
+        # Cumulative trades since squeeze start (for each followup)
+        self.followup_trades_tracking: Dict[str, int] = {}
 
         # Telegram integration
         self.telegram_poster = TelegramPoster()
@@ -1050,6 +1088,9 @@ class SqueezeAlertsMonitor:
             self.latest_spy_price = price
             self.latest_spy_timestamp = timestamp
 
+        # Check outcome tracking intervals for this symbol
+        self._check_outcome_intervals(symbol, timestamp, price, size)
+
         # Log trade (suppress in test mode unless verbose)
         if not self.test_mode or self.verbose:
             self.logger.info(
@@ -1361,6 +1402,552 @@ class SqueezeAlertsMonitor:
 
         return metrics
 
+    # ===== OUTCOME TRACKING METHODS =====
+
+    def _start_outcome_tracking(self, symbol: str, squeeze_timestamp: datetime,
+                                squeeze_price: float, alert_filename: str) -> None:
+        """
+        Initialize outcome tracking for a squeeze alert.
+
+        Called from _report_squeeze() after saving the alert JSON file.
+
+        Args:
+            symbol: Stock symbol (e.g., 'AAPL')
+            squeeze_timestamp: Datetime when squeeze was detected
+            squeeze_price: Price at squeeze detection (entry price for tracking)
+            alert_filename: Name of the alert JSON file (to update later with outcomes)
+        """
+        if not self.OUTCOME_TRACKING_ENABLED:
+            return
+
+        # Check concurrent tracking limit
+        if len(self.active_followups) >= self.OUTCOME_MAX_CONCURRENT_FOLLOWUPS:
+            self.logger.warning(
+                f"⚠️  Outcome tracking limit reached ({self.OUTCOME_MAX_CONCURRENT_FOLLOWUPS}). "
+                f"Skipping tracking for {symbol}"
+            )
+            return
+
+        # Create unique key for this followup: symbol_timestamp
+        # Format: "AAPL_2025-12-12_152045"
+        key = f"{symbol}_{squeeze_timestamp.strftime('%Y-%m-%d_%H%M%S')}"
+
+        # Check if already tracking (shouldn't happen, but defensive)
+        if key in self.active_followups:
+            self.logger.warning(
+                f"⚠️  Already tracking outcomes for {key}, skipping duplicate"
+            )
+            return
+
+        # Calculate tracking window end time
+        end_time = squeeze_timestamp + timedelta(
+            minutes=self.OUTCOME_TRACKING_DURATION_MINUTES
+        )
+
+        # Calculate first interval time (first interval in seconds list)
+        first_interval_seconds = self.OUTCOME_TRACKING_INTERVALS_SECONDS[0]
+        first_interval_time = squeeze_timestamp + timedelta(seconds=first_interval_seconds)
+
+        # Initialize target threshold tracking
+        reached_targets = {}
+        for threshold in self.OUTCOME_TARGET_THRESHOLDS:
+            reached_targets[threshold] = {
+                'reached': False,
+                'minute': None,
+                'price': None,
+                'timestamp': None
+            }
+
+        # Initialize profitable snapshots for each interval (keyed by seconds)
+        profitable_snapshots = {
+            interval_sec: None for interval_sec in self.OUTCOME_TRACKING_INTERVALS_SECONDS
+        }
+
+        # Create followup data structure
+        self.active_followups[key] = {
+            # Identification
+            'symbol': symbol,
+            'squeeze_timestamp': squeeze_timestamp,
+            'squeeze_price': squeeze_price,
+            'alert_filename': alert_filename,
+
+            # Tracking window
+            'start_time': squeeze_timestamp,
+            'end_time': end_time,
+
+            # Interval tracking state (using index into OUTCOME_TRACKING_INTERVALS_SECONDS)
+            'next_interval_index': 0,
+            'next_interval_time': first_interval_time,
+            'intervals_recorded': [],  # Will store interval times in seconds
+            'interval_data': {},  # Keyed by seconds (e.g., 10, 20, 30, 60, etc.)
+
+            # Running statistics (updated on every trade)
+            'max_price_seen': squeeze_price,
+            'min_price_seen': squeeze_price,
+            'max_gain_percent': 0.0,
+            'max_gain_minute': 0,
+            'max_gain_timestamp': squeeze_timestamp,
+            'max_drawdown_percent': 0.0,
+            'max_drawdown_minute': 0,
+            'max_drawdown_timestamp': squeeze_timestamp,
+
+            # Stop loss tracking
+            'reached_stop_loss': False,
+            'stop_loss_minute': None,
+            'stop_loss_price': None,
+            'stop_loss_timestamp': None,
+
+            # Target threshold tracking
+            'reached_targets': reached_targets,
+
+            # Profitability snapshots
+            'profitable_snapshots': profitable_snapshots,
+
+            # Last seen price (for handling gaps)
+            'last_seen_price': squeeze_price,
+            'last_seen_timestamp': squeeze_timestamp
+        }
+
+        # Initialize cumulative counters
+        self.followup_volume_tracking[key] = 0
+        self.followup_trades_tracking[key] = 0
+
+        self.logger.info(
+            f"📊 Started outcome tracking for {symbol} "
+            f"(entry: ${squeeze_price:.4f}, duration: {self.OUTCOME_TRACKING_DURATION_MINUTES}min, "
+            f"key: {key})"
+        )
+
+    def _check_outcome_intervals(self, symbol: str, timestamp: datetime,
+                                  price: float, size: int) -> None:
+        """
+        Check if any outcome intervals are due for recording.
+
+        Called from _handle_trade() on EVERY trade for symbols with active followups.
+        Updates running statistics and records interval data when interval times are reached.
+
+        Args:
+            symbol: Stock symbol
+            timestamp: Current trade timestamp
+            price: Current trade price
+            size: Current trade size
+        """
+        if not self.OUTCOME_TRACKING_ENABLED:
+            return
+
+        # Find all active followups for this symbol
+        # Multiple squeezes for same symbol can be tracked concurrently
+        keys_to_check = [k for k in self.active_followups.keys()
+                        if k.startswith(f"{symbol}_")]
+
+        if not keys_to_check:
+            return  # No active tracking for this symbol
+
+        keys_to_finalize = []
+
+        for key in keys_to_check:
+            followup = self.active_followups[key]
+
+            # Update cumulative volume and trades
+            self.followup_volume_tracking[key] += size
+            self.followup_trades_tracking[key] += 1
+
+            # Update last seen price (for gap handling)
+            followup['last_seen_price'] = price
+            followup['last_seen_timestamp'] = timestamp
+
+            # Update running statistics (max/min, stop loss, targets)
+            self._update_followup_statistics(key, price, timestamp)
+
+            # Check if tracking period has ended
+            if timestamp >= followup['end_time']:
+                keys_to_finalize.append(key)
+                continue
+
+            # Check if market has closed (don't track into extended hours)
+            if timestamp.time() >= datetime.strptime("16:00:00", "%H:%M:%S").time():
+                self.logger.info(
+                    f"🔔 Market closed, finalizing outcome tracking for {symbol} "
+                    f"at {timestamp.strftime('%H:%M:%S')}"
+                )
+                keys_to_finalize.append(key)
+                continue
+
+            # Check if next interval is due
+            next_interval_index = followup['next_interval_index']
+
+            # Check if we have more intervals to track
+            if next_interval_index >= len(self.OUTCOME_TRACKING_INTERVALS_SECONDS):
+                # All intervals recorded, finalize
+                keys_to_finalize.append(key)
+                continue
+
+            next_interval_time = followup['next_interval_time']
+            interval_seconds = self.OUTCOME_TRACKING_INTERVALS_SECONDS[next_interval_index]
+
+            # Define tolerance window
+            tolerance = timedelta(seconds=self.OUTCOME_INTERVAL_TOLERANCE_SECONDS)
+
+            # Check if current trade is within tolerance of next interval time
+            if timestamp >= (next_interval_time - tolerance):
+                # Record this interval
+                self._record_outcome_interval(
+                    key=key,
+                    interval_seconds=interval_seconds,
+                    timestamp=timestamp,
+                    price=price,
+                    volume=self.followup_volume_tracking[key],
+                    trades=self.followup_trades_tracking[key]
+                )
+
+                # Advance to next interval
+                next_interval_index += 1
+
+                if next_interval_index < len(self.OUTCOME_TRACKING_INTERVALS_SECONDS):
+                    # More intervals to track
+                    followup['next_interval_index'] = next_interval_index
+                    next_interval_seconds = self.OUTCOME_TRACKING_INTERVALS_SECONDS[next_interval_index]
+                    followup['next_interval_time'] = followup['start_time'] + timedelta(
+                        seconds=next_interval_seconds
+                    )
+                else:
+                    # All intervals recorded, finalize
+                    keys_to_finalize.append(key)
+
+        # Finalize completed followups
+        for key in keys_to_finalize:
+            self._finalize_outcome_tracking(key)
+
+    def _update_followup_statistics(self, key: str, price: float,
+                                    timestamp: datetime) -> None:
+        """
+        Update running statistics for an active followup.
+
+        Called on EVERY trade during the tracking period to capture:
+        - Maximum price and gain (and when they occurred)
+        - Minimum price and drawdown (and when they occurred)
+        - Stop loss hits
+        - Target threshold achievements
+
+        This ensures we capture rapid moves that happen between interval snapshots.
+
+        Args:
+            key: Followup key (symbol_timestamp format)
+            price: Current trade price
+            timestamp: Current trade timestamp
+        """
+        followup = self.active_followups[key]
+        squeeze_price = followup['squeeze_price']
+
+        # Calculate gain/loss from squeeze entry price
+        gain_percent = ((price - squeeze_price) / squeeze_price) * 100
+
+        # Calculate elapsed time in minutes
+        elapsed = (timestamp - followup['start_time']).total_seconds() / 60
+        elapsed_minute = int(elapsed) + 1  # Convert to 1-indexed minute
+
+        # Update maximum price and gain
+        if price > followup['max_price_seen']:
+            followup['max_price_seen'] = price
+            followup['max_gain_percent'] = gain_percent
+            followup['max_gain_minute'] = elapsed_minute
+            followup['max_gain_timestamp'] = timestamp
+
+            if self.verbose:
+                self.logger.debug(
+                    f"📈 {followup['symbol']} new high: ${price:.4f} "
+                    f"({gain_percent:+.2f}%) at T+{elapsed_minute}min"
+                )
+
+        # Update minimum price and drawdown
+        if price < followup['min_price_seen']:
+            followup['min_price_seen'] = price
+            followup['max_drawdown_percent'] = gain_percent
+            followup['max_drawdown_minute'] = elapsed_minute
+            followup['max_drawdown_timestamp'] = timestamp
+
+            if self.verbose:
+                self.logger.debug(
+                    f"📉 {followup['symbol']} new low: ${price:.4f} "
+                    f"({gain_percent:+.2f}%) at T+{elapsed_minute}min"
+                )
+
+        # Check stop loss threshold
+        stop_loss_threshold = -self.OUTCOME_STOP_LOSS_PERCENT
+        if not followup['reached_stop_loss'] and gain_percent <= stop_loss_threshold:
+            followup['reached_stop_loss'] = True
+            followup['stop_loss_price'] = price
+            followup['stop_loss_minute'] = elapsed_minute
+            followup['stop_loss_timestamp'] = timestamp
+
+            self.logger.warning(
+                f"🛑 {followup['symbol']} hit stop loss: ${price:.4f} "
+                f"({gain_percent:.2f}%) at T+{elapsed_minute}min"
+            )
+
+        # Check target thresholds
+        for threshold in self.OUTCOME_TARGET_THRESHOLDS:
+            target_info = followup['reached_targets'][threshold]
+
+            if not target_info['reached'] and gain_percent >= threshold:
+                target_info['reached'] = True
+                target_info['price'] = price
+                target_info['minute'] = elapsed_minute
+                target_info['timestamp'] = timestamp
+
+                self.logger.info(
+                    f"🎯 {followup['symbol']} hit +{threshold}% target: ${price:.4f} "
+                    f"at T+{elapsed_minute}min"
+                )
+
+    def _record_outcome_interval(self, key: str, interval_seconds: int,
+                                  timestamp: datetime, price: float,
+                                  volume: int, trades: int) -> None:
+        """
+        Record data snapshot for a specific outcome interval.
+
+        Called when a trade occurs at (or near) an interval time.
+        Stores the price, volume, and other metrics at this point in time.
+
+        Args:
+            key: Followup key
+            interval_seconds: Interval time in seconds (e.g., 10, 20, 30, 60, 120, etc.)
+            timestamp: Trade timestamp (actual time, may differ slightly from target)
+            price: Trade price at this interval
+            volume: Cumulative volume since squeeze start
+            trades: Cumulative number of trades since squeeze start
+        """
+        followup = self.active_followups[key]
+        squeeze_price = followup['squeeze_price']
+
+        # Calculate gain from entry
+        gain_percent = ((price - squeeze_price) / squeeze_price) * 100
+
+        # Record interval data (keyed by seconds)
+        followup['interval_data'][interval_seconds] = {
+            'timestamp': timestamp.isoformat(),
+            'price': float(price),
+            'volume_since_squeeze': int(volume),
+            'trades_since_squeeze': int(trades),
+            'gain_percent': round(gain_percent, 2)
+        }
+
+        # Mark this interval as recorded
+        followup['intervals_recorded'].append(interval_seconds)
+
+        # Record profitability snapshot
+        followup['profitable_snapshots'][interval_seconds] = (price > squeeze_price)
+
+        # Format interval display (show seconds for <60s, otherwise minutes)
+        if interval_seconds < 60:
+            interval_display = f"{interval_seconds}s"
+        else:
+            interval_display = f"{interval_seconds // 60}min"
+
+        if self.verbose:
+            self.logger.debug(
+                f"📊 {followup['symbol']} T+{interval_display}: "
+                f"${price:.4f} ({gain_percent:+.2f}%) "
+                f"[{len(followup['intervals_recorded'])}/{len(self.OUTCOME_TRACKING_INTERVALS_SECONDS)} intervals]"
+            )
+
+    def _build_outcome_summary(self, followup: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Build summary statistics from followup data.
+
+        Called when outcome tracking is complete to calculate final metrics
+        and aggregate statistics for analysis.
+
+        Args:
+            followup: Followup data dictionary
+
+        Returns:
+            Dictionary containing summary statistics
+        """
+        # Get final interval data (T+600s=10min or last recorded interval)
+        final_interval_seconds = 600  # 10 minutes in seconds
+
+        if final_interval_seconds in followup['interval_data']:
+            final_data = followup['interval_data'][final_interval_seconds]
+            final_price = final_data['price']
+            final_gain = final_data['gain_percent']
+        elif followup['intervals_recorded']:
+            # Use last recorded interval if T+10min not reached
+            last_interval = max(followup['intervals_recorded'])
+            final_data = followup['interval_data'][last_interval]
+            final_price = final_data['price']
+            final_gain = final_data['gain_percent']
+        else:
+            # No intervals recorded (shouldn't happen, but defensive)
+            final_price = followup['squeeze_price']
+            final_gain = 0.0
+
+        # Build target achievement summary
+        targets_achieved = {}
+        for threshold in self.OUTCOME_TARGET_THRESHOLDS:
+            target_info = followup['reached_targets'][threshold]
+            threshold_int = int(threshold)
+
+            targets_achieved[f'achieved_{threshold_int}pct'] = target_info['reached']
+            targets_achieved[f'time_to_{threshold_int}pct_minutes'] = target_info['minute']
+            targets_achieved[f'price_at_{threshold_int}pct'] = (
+                float(target_info['price']) if target_info['price'] is not None else None
+            )
+
+        # Build profitability summary for key intervals (in seconds)
+        profitable_at = {}
+        key_intervals = [
+            (10, '10s'), (20, '20s'), (30, '30s'),  # Sub-minute snapshots
+            (60, '1min'), (120, '2min'), (300, '5min'), (600, '10min')  # Minute snapshots
+        ]
+        for interval_sec, label in key_intervals:
+            if interval_sec in followup['profitable_snapshots']:
+                profitable_at[f'profitable_at_{label}'] = (
+                    followup['profitable_snapshots'][interval_sec]
+                )
+
+        # Build complete summary
+        summary = {
+            # Max/min statistics
+            'max_price': float(followup['max_price_seen']),
+            'max_gain_percent': round(followup['max_gain_percent'], 2),
+            'max_gain_reached_at_minute': followup['max_gain_minute'],
+
+            'min_price': float(followup['min_price_seen']),
+            'max_drawdown_percent': round(followup['max_drawdown_percent'], 2),
+            'max_drawdown_reached_at_minute': followup['max_drawdown_minute'],
+
+            # Final statistics
+            'price_at_10min': float(final_price),
+            'final_gain_percent': round(final_gain, 2),
+
+            # Stop loss
+            'reached_stop_loss': followup['reached_stop_loss'],
+            'time_to_stop_loss_minutes': followup['stop_loss_minute'],
+            'price_at_stop_loss': (
+                float(followup['stop_loss_price'])
+                if followup['stop_loss_price'] is not None else None
+            ),
+
+            # Profitability snapshots
+            **profitable_at,
+
+            # Target achievements
+            **targets_achieved,
+
+            # Tracking metadata
+            'intervals_recorded': followup['intervals_recorded'],
+            'intervals_recorded_count': len(followup['intervals_recorded']),
+            'tracking_completed': (
+                len(followup['intervals_recorded']) == len(self.OUTCOME_TRACKING_INTERVALS_SECONDS)
+            )
+        }
+
+        return summary
+
+    def _finalize_outcome_tracking(self, key: str) -> None:
+        """
+        Finalize outcome tracking and save results.
+
+        Called when:
+        - All intervals have been recorded (10 minutes elapsed)
+        - Market closes during tracking period
+        - Tracking period end time is reached
+
+        Calculates final summary statistics and updates the alert JSON file.
+
+        Args:
+            key: Followup key to finalize
+        """
+        if key not in self.active_followups:
+            self.logger.warning(f"⚠️  Cannot finalize {key}: not found in active followups")
+            return
+
+        followup = self.active_followups[key]
+
+        # Build outcome summary statistics
+        summary = self._build_outcome_summary(followup)
+
+        # Update alert JSON file with outcome data
+        self._update_alert_with_outcomes(
+            alert_filename=followup['alert_filename'],
+            followup=followup,
+            summary=summary
+        )
+
+        # Clean up tracking data
+        del self.active_followups[key]
+
+        if key in self.followup_volume_tracking:
+            del self.followup_volume_tracking[key]
+
+        if key in self.followup_trades_tracking:
+            del self.followup_trades_tracking[key]
+
+        # Log completion
+        completion_status = "✅ COMPLETE" if summary['tracking_completed'] else "⏸️  PARTIAL"
+        self.logger.info(
+            f"{completion_status} Outcome tracking for {followup['symbol']}: "
+            f"max gain {summary['max_gain_percent']:+.2f}% @ T+{summary['max_gain_reached_at_minute']}min, "
+            f"final {summary['final_gain_percent']:+.2f}% @ T+10min "
+            f"({summary['intervals_recorded_count']}/{len(self.OUTCOME_TRACKING_INTERVALS_SECONDS)} intervals)"
+        )
+
+    def _update_alert_with_outcomes(self, alert_filename: str, followup: Dict[str, Any],
+                                     summary: Dict[str, Any]) -> None:
+        """
+        Update the original alert JSON file with outcome tracking data.
+
+        Reads the existing alert JSON, adds the outcome_tracking section,
+        and writes it back to disk.
+
+        Args:
+            alert_filename: Name of alert JSON file (e.g., "alert_AAPL_2025-12-12_152045.json")
+            followup: Complete followup data dictionary
+            summary: Summary statistics dictionary
+        """
+        try:
+            filepath = self.squeeze_alerts_sent_dir / alert_filename
+
+            # Check if file exists
+            if not filepath.exists():
+                self.logger.error(
+                    f"❌ Cannot update outcomes: alert file not found: {alert_filename}"
+                )
+                return
+
+            # Read existing alert data
+            with open(filepath, 'r') as f:
+                alert_data = json.load(f)
+
+            # Add outcome tracking section
+            alert_data['outcome_tracking'] = {
+                # Configuration
+                'enabled': True,
+                'tracking_start': followup['start_time'].isoformat(),
+                'tracking_end': followup['end_time'].isoformat(),
+                'squeeze_entry_price': float(followup['squeeze_price']),
+                'duration_minutes': self.OUTCOME_TRACKING_DURATION_MINUTES,
+                'interval_seconds': self.OUTCOME_TRACKING_INTERVALS_SECONDS,
+
+                # Interval snapshots (keyed by seconds: 10, 20, 30, 60, 120, etc.)
+                'intervals': followup['interval_data'],
+
+                # Summary statistics
+                'summary': summary
+            }
+
+            # Write updated data back to file
+            with open(filepath, 'w') as f:
+                json.dump(alert_data, f, indent=2)
+
+            self.logger.debug(f"📝 Updated {alert_filename} with outcome data")
+
+        except Exception as e:
+            self.logger.error(f"❌ Error updating alert with outcomes: {e}")
+            import traceback
+            traceback.print_exc()
+
     def _get_price_status(self, current_price: float, reference_high: float) -> tuple:
         """
         Determine the status color and icon based on how close current price is to a reference high.
@@ -1631,7 +2218,7 @@ class SqueezeAlertsMonitor:
         )
 
         # Save squeeze alert to JSON file for scanner display (includes Phase 1 metrics)
-        self._save_squeeze_alert_sent(
+        filename = self._save_squeeze_alert_sent(
             symbol, first_price, last_price, percent_change, timestamp, size, sent_users,
             premarket_high, pm_icon, pm_color, pm_percent_off,
             regular_hod, hod_icon, hod_color, hod_percent_off,
@@ -1641,6 +2228,15 @@ class SqueezeAlertsMonitor:
             spread, spread_percent,
             phase1_metrics
         )
+
+        # Start outcome tracking for this squeeze (if enabled and alert was saved successfully)
+        if filename:
+            self._start_outcome_tracking(
+                symbol=symbol,
+                squeeze_timestamp=timestamp,
+                squeeze_price=last_price,
+                alert_filename=filename
+            )
 
     def _send_telegram_alert(self, symbol: str, first_price: float, last_price: float,
                             percent_change: float, timestamp: datetime, size: int,
@@ -1829,7 +2425,7 @@ class SqueezeAlertsMonitor:
                                   volume_surge_ratio: float, float_shares: float, float_rotation: float,
                                   float_rotation_percent: float,
                                   spread: float, spread_percent: float,
-                                  phase1_metrics: Dict[str, Any]) -> None:
+                                  phase1_metrics: Dict[str, Any]) -> str:
         """
         Save sent squeeze alert to JSON file for scanner display.
 
@@ -1931,10 +2527,13 @@ class SqueezeAlertsMonitor:
 
             self.logger.debug(f"📝 Saved squeeze alert for {symbol} to {filename}")
 
+            return filename
+
         except Exception as e:
             self.logger.error(f"❌ Error saving squeeze alert: {e}")
             import traceback
             traceback.print_exc()
+            return None
 
     def _print_statistics(self):
         """Print monitoring statistics."""
