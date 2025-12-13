@@ -196,6 +196,18 @@ class SqueezeAlertsMonitor:
         self.symbol_list_csv_path = self.scanner_dir / "symbol_list.csv"
         self.hourly_volume_data: Dict[str, int] = {}  # Stores total volume since 04:00 ET per symbol
 
+        # ===== FAKE TRADE TRACKING DATA STRUCTURES =====
+        # Active fake trades: tracks simulated trades in progress
+        # Key format: "AAPL_2025-12-12_152045_001" (symbol_date_time_sequence)
+        self.active_fake_trades: Dict[str, Dict[str, Any]] = {}
+
+        # Fake trades directory for storing results
+        self.fake_trades_dir = Path(project_root) / "historical_data" / self.today / "fake_trades"
+        self.fake_trades_dir.mkdir(parents=True, exist_ok=True)
+
+        # Counter for fake trades (to ensure unique IDs)
+        self.fake_trade_counter = 0
+
         # Load symbols
         if use_existing:
             # Will query existing symbols from backend after connection
@@ -1090,6 +1102,9 @@ class SqueezeAlertsMonitor:
 
         # Check outcome tracking intervals for this symbol
         self._check_outcome_intervals(symbol, timestamp, price, size)
+
+        # Check fake trade conditions for this symbol
+        self._check_fake_trade_conditions(symbol, timestamp, price)
 
         # Log trade (suppress in test mode unless verbose)
         if not self.test_mode or self.verbose:
@@ -2166,6 +2181,190 @@ class SqueezeAlertsMonitor:
             import traceback
             traceback.print_exc()
 
+    # ===== FAKE TRADE TRACKING METHODS =====
+
+    def _start_fake_trade(self, symbol: str, entry_timestamp: datetime, entry_price: float,
+                         quantity: int = 1, trailing_stop_loss: float = 2.0,
+                         take_profit: float = 5.0) -> None:
+        """
+        Start a fake trade to simulate trading after a squeeze alert.
+
+        This method initiates a simulated trade that monitors the price until it hits
+        the take_profit target or the trailing_stop_loss. The trailing stop follows
+        the price up but never down.
+
+        Args:
+            symbol: Stock symbol
+            entry_timestamp: Timestamp when trade is entered
+            entry_price: Entry price for the fake trade
+            quantity: Number of shares (default: 1)
+            trailing_stop_loss: Trailing stop loss percentage (default: 2.0%)
+            take_profit: Take profit percentage (default: 5.0%)
+        """
+        # Generate unique key for this fake trade
+        self.fake_trade_counter += 1
+        trade_id = f"{symbol}_{entry_timestamp.strftime('%Y%m%d_%H%M%S')}_{self.fake_trade_counter:03d}"
+
+        # Calculate initial stop loss price (trailing stop starts at entry price - stop_loss%)
+        initial_stop_price = entry_price * (1 - trailing_stop_loss / 100)
+        take_profit_price = entry_price * (1 + take_profit / 100)
+
+        # Create fake trade tracking entry
+        fake_trade = {
+            'trade_id': trade_id,
+            'symbol': symbol,
+            'entry_timestamp': entry_timestamp.isoformat(),
+            'entry_price': entry_price,
+            'quantity': quantity,
+            'trailing_stop_loss_percent': trailing_stop_loss,
+            'take_profit_percent': take_profit,
+            'take_profit_price': take_profit_price,
+            'current_stop_price': initial_stop_price,
+            'highest_price_seen': entry_price,
+            'current_price': entry_price,
+            'status': 'active',  # active, stopped_out, take_profit_hit
+            'exit_timestamp': None,
+            'exit_price': None,
+            'exit_reason': None,
+            'profit_percent': 0.0,
+            'profit_dollars': 0.0,
+            'price_history': []  # Track significant price points
+        }
+
+        # Store in active fake trades
+        self.active_fake_trades[trade_id] = fake_trade
+
+        # Log fake trade start
+        self.logger.info(
+            f"💰 FAKE TRADE STARTED: {symbol} @ ${entry_price:.4f} x {quantity} shares | "
+            f"Stop: ${initial_stop_price:.4f} ({trailing_stop_loss}%) | "
+            f"Target: ${take_profit_price:.4f} ({take_profit}%)"
+        )
+
+    def _check_fake_trade_conditions(self, symbol: str, timestamp: datetime, price: float) -> None:
+        """
+        Check if any active fake trades for this symbol should be closed.
+
+        This method is called on every trade update. It checks:
+        1. If price hits the take_profit target
+        2. If price hits the trailing_stop_loss
+        3. Updates the trailing stop as price moves up
+
+        Args:
+            symbol: Stock symbol
+            timestamp: Current trade timestamp
+            price: Current trade price
+        """
+        # Find all active fake trades for this symbol
+        trades_to_finalize = []
+
+        for trade_id, trade in self.active_fake_trades.items():
+            if trade['symbol'] != symbol or trade['status'] != 'active':
+                continue
+
+            # Update current price
+            trade['current_price'] = price
+
+            # Check if we hit the take profit target
+            if price >= trade['take_profit_price']:
+                trade['status'] = 'take_profit_hit'
+                trade['exit_timestamp'] = timestamp.isoformat()
+                trade['exit_price'] = price
+                trade['exit_reason'] = f"Take profit hit (+{trade['take_profit_percent']}%)"
+                trades_to_finalize.append(trade_id)
+
+                self.logger.info(
+                    f"🎯 FAKE TRADE TAKE PROFIT: {symbol} @ ${price:.4f} | "
+                    f"Entry: ${trade['entry_price']:.4f} | "
+                    f"Profit: +{trade['take_profit_percent']}%"
+                )
+                continue
+
+            # Update highest price and trailing stop
+            if price > trade['highest_price_seen']:
+                old_highest = trade['highest_price_seen']
+                trade['highest_price_seen'] = price
+
+                # Update trailing stop (it follows price up but never down)
+                new_stop_price = price * (1 - trade['trailing_stop_loss_percent'] / 100)
+                if new_stop_price > trade['current_stop_price']:
+                    old_stop = trade['current_stop_price']
+                    trade['current_stop_price'] = new_stop_price
+
+                    if self.verbose:
+                        self.logger.debug(
+                            f"📈 FAKE TRADE TRAILING STOP UPDATED: {symbol} | "
+                            f"High: ${old_highest:.4f} → ${price:.4f} | "
+                            f"Stop: ${old_stop:.4f} → ${new_stop_price:.4f}"
+                        )
+
+            # Check if we hit the trailing stop loss
+            if price <= trade['current_stop_price']:
+                trade['status'] = 'stopped_out'
+                trade['exit_timestamp'] = timestamp.isoformat()
+                trade['exit_price'] = price
+
+                # Calculate actual loss percentage
+                actual_loss_percent = ((price - trade['entry_price']) / trade['entry_price']) * 100
+                trade['exit_reason'] = f"Trailing stop loss hit ({actual_loss_percent:.2f}%)"
+                trades_to_finalize.append(trade_id)
+
+                self.logger.warning(
+                    f"🛑 FAKE TRADE STOPPED OUT: {symbol} @ ${price:.4f} | "
+                    f"Entry: ${trade['entry_price']:.4f} | "
+                    f"Loss: {actual_loss_percent:.2f}%"
+                )
+                continue
+
+        # Finalize trades that hit exit conditions
+        for trade_id in trades_to_finalize:
+            self._finalize_fake_trade(trade_id)
+
+    def _finalize_fake_trade(self, trade_id: str) -> None:
+        """
+        Finalize a fake trade and save results to JSON.
+
+        Args:
+            trade_id: Trade ID to finalize
+        """
+        if trade_id not in self.active_fake_trades:
+            self.logger.warning(f"⚠️  Cannot finalize fake trade {trade_id}: not found")
+            return
+
+        trade = self.active_fake_trades[trade_id]
+
+        # Calculate profit/loss
+        if trade['exit_price']:
+            trade['profit_percent'] = (
+                (trade['exit_price'] - trade['entry_price']) / trade['entry_price']
+            ) * 100
+            trade['profit_dollars'] = (
+                (trade['exit_price'] - trade['entry_price']) * trade['quantity']
+            )
+
+        # Save to JSON file
+        filename = f"fake_trade_{trade_id}.json"
+        filepath = self.fake_trades_dir / filename
+
+        try:
+            with open(filepath, 'w') as f:
+                json.dump(trade, f, indent=2)
+
+            self.logger.info(
+                f"💾 FAKE TRADE SAVED: {trade['symbol']} | "
+                f"Result: {trade['status']} | "
+                f"P/L: {trade['profit_percent']:+.2f}% (${trade['profit_dollars']:+.2f}) | "
+                f"File: {filename}"
+            )
+
+        except Exception as e:
+            self.logger.error(f"❌ Error saving fake trade {trade_id}: {e}")
+            import traceback
+            traceback.print_exc()
+
+        # Remove from active trades
+        del self.active_fake_trades[trade_id]
+
     def _get_price_status(self, current_price: float, reference_high: float) -> tuple:
         """
         Determine the status color and icon based on how close current price is to a reference high.
@@ -2499,6 +2698,16 @@ class SqueezeAlertsMonitor:
                 squeeze_timestamp=timestamp,
                 squeeze_price=last_price,
                 alert_filename=filename
+            )
+
+            # Start a fake trade to simulate trading this squeeze
+            self._start_fake_trade(
+                symbol=symbol,
+                entry_timestamp=timestamp,
+                entry_price=last_price,
+                quantity=1,  # Default: 1 share
+                trailing_stop_loss=2.0,  # Default: 2% trailing stop
+                take_profit=5.0  # Default: 5% take profit
             )
 
     def _send_telegram_alert(self, symbol: str, first_price: float, last_price: float,

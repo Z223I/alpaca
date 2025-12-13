@@ -115,6 +115,258 @@
             transform: scale(1.1);
         }
 
+        /* Fake Trades Container */
+        .fake-trades-container {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .fake-trade-counter {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background-color: var(--bg-tertiary);
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .fake-trade-count {
+            color: var(--accent-green);
+            font-size: 18px;
+        }
+
+        .fake-trade-icon {
+            cursor: pointer;
+            color: var(--accent-blue);
+            font-size: 24px;
+            transition: all 0.2s ease;
+        }
+
+        .fake-trade-icon:hover {
+            color: var(--accent-green);
+            transform: scale(1.1);
+        }
+
+        /* Fake Trades Popup */
+        .fake-trades-popup {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 2000;
+            overflow: auto;
+        }
+
+        .fake-trades-popup-content {
+            background-color: var(--bg-secondary);
+            margin: 2% auto;
+            padding: 0;
+            width: 95%;
+            max-width: 1400px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .fake-trades-popup-header {
+            background-color: var(--bg-tertiary);
+            padding: 20px;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .fake-trades-popup-header h2 {
+            color: var(--accent-green);
+            font-size: 24px;
+            margin: 0;
+        }
+
+        .fake-trades-close-btn {
+            background: var(--accent-red);
+            border: none;
+            color: white;
+            font-size: 24px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .fake-trades-close-btn:hover {
+            background: #ff5252;
+            transform: scale(1.1);
+        }
+
+        .fake-trades-table-container {
+            overflow-x: auto;
+            overflow-y: auto;
+            flex: 1;
+            padding: 20px;
+        }
+
+        .fake-trades-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .fake-trades-table th {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .fake-trades-table th:hover {
+            background-color: var(--bg-primary);
+        }
+
+        .fake-trades-table th::after {
+            content: ' ⇅';
+            opacity: 0.3;
+        }
+
+        .fake-trades-table th.sort-asc::after {
+            content: ' ↑';
+            opacity: 1;
+        }
+
+        .fake-trades-table th.sort-desc::after {
+            content: ' ↓';
+            opacity: 1;
+        }
+
+        .fake-trades-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .fake-trades-table tr:hover {
+            background-color: rgba(78, 204, 163, 0.1);
+        }
+
+        .profit-positive {
+            color: var(--accent-green);
+            font-weight: 600;
+        }
+
+        .profit-negative {
+            color: var(--accent-red);
+            font-weight: 600;
+        }
+
+        /* Fake Trades Statistics Popup */
+        .fake-stats-popup {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 2000;
+            overflow: auto;
+        }
+
+        .fake-stats-popup-content {
+            background-color: var(--bg-secondary);
+            margin: 5% auto;
+            padding: 0;
+            width: 90%;
+            max-width: 800px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .fake-stats-popup-header {
+            background-color: var(--bg-tertiary);
+            padding: 20px;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .fake-stats-popup-header h2 {
+            color: var(--accent-green);
+            font-size: 24px;
+            margin: 0;
+        }
+
+        .fake-stats-close-btn {
+            background: var(--accent-red);
+            border: none;
+            color: white;
+            font-size: 24px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .fake-stats-close-btn:hover {
+            background: #ff5252;
+            transform: scale(1.1);
+        }
+
+        .fake-stats-body {
+            padding: 30px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background-color: var(--bg-tertiary);
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid var(--accent-blue);
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .stat-value.positive {
+            color: var(--accent-green);
+        }
+
+        .stat-value.negative {
+            color: var(--accent-red);
+        }
+
         /* Fundamentals Popup */
         .fundamentals-popup {
             position: fixed;
@@ -1372,6 +1624,16 @@
         </div>
         <span class="premarket-icon-external" onclick="openPremarketPopup()" title="View Premarket Top Gainers (Ctrl+G)">🌅</span>
         <span class="fundamentals-icon-header" onclick="openFundamentalsPopup()" title="View Stock Fundamentals">📊</span>
+
+        <!-- Fake Trades Section -->
+        <div class="fake-trades-container">
+            <div class="fake-trade-counter">
+                <span>💰 Fake Trades:</span>
+                <span class="fake-trade-count" id="fakeTradeCount">0</span>
+            </div>
+            <span class="fake-trade-icon" onclick="openFakeTradesPopup()" title="View Fake Trades List">📋</span>
+            <span class="fake-trade-icon" onclick="openFakeStatsPopup()" title="View Fake Trades Statistics">📊</span>
+        </div>
     </div>
 
     <!-- Fundamentals Popup -->
@@ -1396,6 +1658,94 @@
 
             <div id="fundamentalsPopupData" style="display: none;" class="fundamentals-popup-data">
                 <!-- Fundamentals data will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Fake Trades List Popup -->
+    <div id="fakeTradesPopup" class="fake-trades-popup" style="display: none;">
+        <div class="fake-trades-popup-content">
+            <div class="fake-trades-popup-header">
+                <h2>💰 Fake Trades - <span id="fakeTradesDate"></span></h2>
+                <button class="fake-trades-close-btn" onclick="closeFakeTradesPopup()">✕</button>
+            </div>
+            <div class="fake-trades-table-container">
+                <table class="fake-trades-table" id="fakeTradesTable">
+                    <thead>
+                        <tr>
+                            <th onclick="sortFakeTrades('symbol')">Symbol</th>
+                            <th onclick="sortFakeTrades('entry_timestamp')">Entry Time</th>
+                            <th onclick="sortFakeTrades('entry_price')">Entry Price</th>
+                            <th onclick="sortFakeTrades('quantity')">Quantity</th>
+                            <th onclick="sortFakeTrades('exit_price')">Exit Price</th>
+                            <th onclick="sortFakeTrades('profit_percent')">Profit %</th>
+                            <th onclick="sortFakeTrades('profit_dollars')">Profit $</th>
+                            <th onclick="sortFakeTrades('time_held')">Time Held</th>
+                            <th onclick="sortFakeTrades('status')">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fakeTradesBody">
+                        <!-- Fake trades will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fake Trades Statistics Popup -->
+    <div id="fakeStatsPopup" class="fake-stats-popup" style="display: none;">
+        <div class="fake-stats-popup-content">
+            <div class="fake-stats-popup-header">
+                <h2>📊 Fake Trades Statistics</h2>
+                <button class="fake-stats-close-btn" onclick="closeFakeStatsPopup()">✕</button>
+            </div>
+            <div class="fake-stats-body">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Total Trades</div>
+                        <div class="stat-value" id="statTotalTrades">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Winning Trades</div>
+                        <div class="stat-value positive" id="statWinningTrades">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Losing Trades</div>
+                        <div class="stat-value negative" id="statLosingTrades">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Win Rate</div>
+                        <div class="stat-value" id="statWinRate">0%</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Total Profit/Loss</div>
+                        <div class="stat-value" id="statTotalPL">$0.00</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Avg Profit %</div>
+                        <div class="stat-value" id="statAvgProfitPct">0%</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Best Trade</div>
+                        <div class="stat-value positive" id="statBestTrade">0%</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Worst Trade</div>
+                        <div class="stat-value negative" id="statWorstTrade">0%</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Avg Time Held</div>
+                        <div class="stat-value" id="statAvgTimeHeld">0m</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Take Profit Hits</div>
+                        <div class="stat-value positive" id="statTakeProfitHits">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Stop Loss Hits</div>
+                        <div class="stat-value negative" id="statStopLossHits">0</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -4695,6 +5045,292 @@
                 }
             });
         }
+
+        // ===== FAKE TRADES FUNCTIONALITY =====
+
+        let fakeTradesData = [];
+        let currentSortColumn = null;
+        let currentSortDirection = 'asc';
+
+        // Load fake trades on page load
+        async function loadFakeTrades() {
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                const response = await fetch(`/cgi-bin/list_fake_trades.cgi?date=${today}`);
+
+                if (!response.ok) {
+                    console.error('Failed to load fake trades');
+                    return;
+                }
+
+                const data = await response.json();
+                fakeTradesData = data.trades || [];
+
+                // Update counter
+                document.getElementById('fakeTradeCount').textContent = fakeTradesData.length;
+
+                console.log(`Loaded ${fakeTradesData.length} fake trades for ${today}`);
+            } catch (error) {
+                console.error('Error loading fake trades:', error);
+                fakeTradesData = [];
+                document.getElementById('fakeTradeCount').textContent = '0';
+            }
+        }
+
+        // Open fake trades list popup
+        function openFakeTradesPopup() {
+            const popup = document.getElementById('fakeTradesPopup');
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('fakeTradesDate').textContent = today;
+
+            displayFakeTrades();
+            popup.style.display = 'block';
+        }
+
+        // Close fake trades list popup
+        function closeFakeTradesPopup() {
+            document.getElementById('fakeTradesPopup').style.display = 'none';
+        }
+
+        // Display fake trades in table
+        function displayFakeTrades() {
+            const tbody = document.getElementById('fakeTradesBody');
+            tbody.innerHTML = '';
+
+            if (fakeTradesData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px; color: var(--text-secondary);">No fake trades for today</td></tr>';
+                return;
+            }
+
+            fakeTradesData.forEach(trade => {
+                const row = document.createElement('tr');
+
+                // Calculate time held
+                const timeHeld = calculateTimeHeld(trade.entry_timestamp, trade.exit_timestamp);
+
+                // Format profit/loss
+                const profitClass = trade.profit_percent >= 0 ? 'profit-positive' : 'profit-negative';
+                const profitSign = trade.profit_percent >= 0 ? '+' : '';
+
+                // Format status
+                let statusDisplay = trade.status;
+                if (trade.status === 'take_profit_hit') statusDisplay = '🎯 Take Profit';
+                else if (trade.status === 'stopped_out') statusDisplay = '🛑 Stopped Out';
+                else if (trade.status === 'active') statusDisplay = '⏳ Active';
+
+                row.innerHTML = `
+                    <td><strong>${trade.symbol}</strong></td>
+                    <td>${formatTimestamp(trade.entry_timestamp)}</td>
+                    <td>$${trade.entry_price.toFixed(4)}</td>
+                    <td>${trade.quantity}</td>
+                    <td>${trade.exit_price ? '$' + trade.exit_price.toFixed(4) : '-'}</td>
+                    <td class="${profitClass}">${profitSign}${trade.profit_percent.toFixed(2)}%</td>
+                    <td class="${profitClass}">${profitSign}$${Math.abs(trade.profit_dollars).toFixed(2)}</td>
+                    <td>${timeHeld}</td>
+                    <td>${statusDisplay}</td>
+                `;
+
+                tbody.appendChild(row);
+            });
+        }
+
+        // Sort fake trades
+        function sortFakeTrades(column) {
+            // Toggle sort direction if clicking same column
+            if (currentSortColumn === column) {
+                currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSortColumn = column;
+                currentSortDirection = 'asc';
+            }
+
+            // Sort the data
+            fakeTradesData.sort((a, b) => {
+                let valA, valB;
+
+                switch (column) {
+                    case 'symbol':
+                        valA = a.symbol;
+                        valB = b.symbol;
+                        break;
+                    case 'entry_timestamp':
+                    case 'exit_timestamp':
+                        valA = new Date(a[column] || 0);
+                        valB = new Date(b[column] || 0);
+                        break;
+                    case 'entry_price':
+                    case 'exit_price':
+                    case 'quantity':
+                    case 'profit_percent':
+                    case 'profit_dollars':
+                        valA = parseFloat(a[column]) || 0;
+                        valB = parseFloat(b[column]) || 0;
+                        break;
+                    case 'time_held':
+                        valA = calculateTimeHeldSeconds(a.entry_timestamp, a.exit_timestamp);
+                        valB = calculateTimeHeldSeconds(b.entry_timestamp, b.exit_timestamp);
+                        break;
+                    case 'status':
+                        valA = a.status;
+                        valB = b.status;
+                        break;
+                    default:
+                        return 0;
+                }
+
+                if (valA < valB) return currentSortDirection === 'asc' ? -1 : 1;
+                if (valA > valB) return currentSortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            // Update table header styles
+            document.querySelectorAll('.fake-trades-table th').forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+            });
+
+            const headerIndex = ['symbol', 'entry_timestamp', 'entry_price', 'quantity', 'exit_price', 'profit_percent', 'profit_dollars', 'time_held', 'status'].indexOf(column);
+            if (headerIndex >= 0) {
+                const headers = document.querySelectorAll('.fake-trades-table th');
+                headers[headerIndex].classList.add(currentSortDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+            }
+
+            // Redisplay
+            displayFakeTrades();
+        }
+
+        // Calculate time held in human-readable format
+        function calculateTimeHeld(entryTime, exitTime) {
+            if (!exitTime) return '-';
+
+            const seconds = calculateTimeHeldSeconds(entryTime, exitTime);
+
+            if (seconds < 60) {
+                return `${seconds}s`;
+            } else if (seconds < 3600) {
+                const minutes = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                return `${minutes}m ${secs}s`;
+            } else {
+                const hours = Math.floor(seconds / 3600);
+                const minutes = Math.floor((seconds % 3600) / 60);
+                return `${hours}h ${minutes}m`;
+            }
+        }
+
+        // Calculate time held in seconds
+        function calculateTimeHeldSeconds(entryTime, exitTime) {
+            if (!exitTime) return 0;
+            return Math.floor((new Date(exitTime) - new Date(entryTime)) / 1000);
+        }
+
+        // Format timestamp for display
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return '-';
+            const date = new Date(timestamp);
+            return date.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+        }
+
+        // Open fake trades statistics popup
+        function openFakeStatsPopup() {
+            calculateAndDisplayStats();
+            document.getElementById('fakeStatsPopup').style.display = 'block';
+        }
+
+        // Close fake trades statistics popup
+        function closeFakeStatsPopup() {
+            document.getElementById('fakeStatsPopup').style.display = 'none';
+        }
+
+        // Calculate and display statistics
+        function calculateAndDisplayStats() {
+            if (fakeTradesData.length === 0) {
+                // Set all stats to zero
+                document.getElementById('statTotalTrades').textContent = '0';
+                document.getElementById('statWinningTrades').textContent = '0';
+                document.getElementById('statLosingTrades').textContent = '0';
+                document.getElementById('statWinRate').textContent = '0%';
+                document.getElementById('statTotalPL').textContent = '$0.00';
+                document.getElementById('statAvgProfitPct').textContent = '0%';
+                document.getElementById('statBestTrade').textContent = '0%';
+                document.getElementById('statWorstTrade').textContent = '0%';
+                document.getElementById('statAvgTimeHeld').textContent = '0m';
+                document.getElementById('statTakeProfitHits').textContent = '0';
+                document.getElementById('statStopLossHits').textContent = '0';
+                return;
+            }
+
+            // Calculate statistics
+            const totalTrades = fakeTradesData.length;
+            const completedTrades = fakeTradesData.filter(t => t.status !== 'active');
+            const winningTrades = completedTrades.filter(t => t.profit_percent > 0);
+            const losingTrades = completedTrades.filter(t => t.profit_percent < 0);
+            const takeProfitHits = fakeTradesData.filter(t => t.status === 'take_profit_hit').length;
+            const stopLossHits = fakeTradesData.filter(t => t.status === 'stopped_out').length;
+
+            const winRate = completedTrades.length > 0 ? (winningTrades.length / completedTrades.length * 100) : 0;
+            const totalPL = fakeTradesData.reduce((sum, t) => sum + (t.profit_dollars || 0), 0);
+            const avgProfitPct = completedTrades.length > 0
+                ? completedTrades.reduce((sum, t) => sum + t.profit_percent, 0) / completedTrades.length
+                : 0;
+
+            const bestTrade = completedTrades.length > 0
+                ? Math.max(...completedTrades.map(t => t.profit_percent))
+                : 0;
+            const worstTrade = completedTrades.length > 0
+                ? Math.min(...completedTrades.map(t => t.profit_percent))
+                : 0;
+
+            // Calculate average time held
+            const totalSeconds = completedTrades.reduce((sum, t) => {
+                return sum + calculateTimeHeldSeconds(t.entry_timestamp, t.exit_timestamp);
+            }, 0);
+            const avgSeconds = completedTrades.length > 0 ? totalSeconds / completedTrades.length : 0;
+            const avgTimeHeld = avgSeconds < 60 ? `${Math.floor(avgSeconds)}s` :
+                                avgSeconds < 3600 ? `${Math.floor(avgSeconds / 60)}m` :
+                                `${Math.floor(avgSeconds / 3600)}h ${Math.floor((avgSeconds % 3600) / 60)}m`;
+
+            // Update the DOM
+            document.getElementById('statTotalTrades').textContent = totalTrades;
+            document.getElementById('statWinningTrades').textContent = winningTrades.length;
+            document.getElementById('statLosingTrades').textContent = losingTrades.length;
+            document.getElementById('statWinRate').textContent = winRate.toFixed(1) + '%';
+
+            const plElement = document.getElementById('statTotalPL');
+            plElement.textContent = (totalPL >= 0 ? '+' : '') + '$' + totalPL.toFixed(2);
+            plElement.className = 'stat-value ' + (totalPL >= 0 ? 'positive' : 'negative');
+
+            const avgElement = document.getElementById('statAvgProfitPct');
+            avgElement.textContent = (avgProfitPct >= 0 ? '+' : '') + avgProfitPct.toFixed(2) + '%';
+            avgElement.className = 'stat-value ' + (avgProfitPct >= 0 ? 'positive' : 'negative');
+
+            document.getElementById('statBestTrade').textContent = '+' + bestTrade.toFixed(2) + '%';
+            document.getElementById('statWorstTrade').textContent = worstTrade.toFixed(2) + '%';
+            document.getElementById('statAvgTimeHeld').textContent = avgTimeHeld;
+            document.getElementById('statTakeProfitHits').textContent = takeProfitHits;
+            document.getElementById('statStopLossHits').textContent = stopLossHits;
+        }
+
+        // Load fake trades when page loads and refresh periodically
+        loadFakeTrades();
+        setInterval(loadFakeTrades, 30000); // Refresh every 30 seconds
+
+        // Close popups when clicking outside
+        window.addEventListener('click', function(event) {
+            const fakeTradesPopup = document.getElementById('fakeTradesPopup');
+            const fakeStatsPopup = document.getElementById('fakeStatsPopup');
+
+            if (event.target === fakeTradesPopup) {
+                closeFakeTradesPopup();
+            }
+            if (event.target === fakeStatsPopup) {
+                closeFakeStatsPopup();
+            }
+        });
 
     </script>
 </body>

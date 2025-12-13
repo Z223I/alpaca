@@ -264,6 +264,12 @@ Add news column to signals. Also, volume surge if possible.
 - [ ] Write script to review historical data.  Need to perfom analysis to find what works. Use usual suspects price > 9 EMA > 21 EMA; MACD open.
 - [ ] Create BRB alerts. Trigger the watching based on an all green squeeze alert minus PM High. Stop monitoring after 10 minutes unless it is going well.
 
+## Fake Trades
+
+- [ ] ULTRATHINK. The squeeze alerts we have created seem to work well.  It is now time to test them using fake trades and using the websocket already running in cgi-bin/molecules/alpaca_molecules/squeeze_alerts.py.  Update cgi-bin/molecules/alpaca_molecules/squeeze_alerts.py: create a fake_trade method: the method receives the args symbol, quantity (1 default), trailing_stop_loss (2% default), and take_profit (5% default); it then monitors the price until it hits the take_profit or the trailing_stop_loss (trailing stops follow the price up but never down); store fake trade data in ./historical_data/YYYYMMDD/fake_trades/*.json; there can be multiple instances of fake_trade. After a squeeze alert gets generated, call the fake_trade method.
+
+- [ ] ULTRATHINK. Update public_html/index.html: In the upper-righthand corner, keep a tally of the fake trades.  Also, have a button that when clicked creates a popup that lists the fake trades for the current date.  The columns shall be symbol, entry timestamp, entry price, quantity, profit_percent, profit_dollars, time held (exit_timestamp - entry_timestamp).  The columns are also to be sortable.  Have a second icon for a popup for fake trade statistics.
+
 ## Analysis
 
 Test 2, 3, 4, 5 percent with a 2% stop loss.
