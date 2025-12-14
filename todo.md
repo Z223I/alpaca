@@ -266,9 +266,28 @@ Add news column to signals. Also, volume surge if possible.
 
 ## Fake Trades
 
-- [ ] ULTRATHINK. The squeeze alerts we have created seem to work well.  It is now time to test them using fake trades and using the websocket already running in cgi-bin/molecules/alpaca_molecules/squeeze_alerts.py.  Update cgi-bin/molecules/alpaca_molecules/squeeze_alerts.py: create a fake_trade method: the method receives the args symbol, quantity (1 default), trailing_stop_loss (2% default), and take_profit (5% default); it then monitors the price until it hits the take_profit or the trailing_stop_loss (trailing stops follow the price up but never down); store fake trade data in ./historical_data/YYYYMMDD/fake_trades/*.json; there can be multiple instances of fake_trade. After a squeeze alert gets generated, call the fake_trade method.
+- [X] ULTRATHINK. The squeeze alerts we have created seem to work well.  It is now time to test them using fake trades and using the websocket already running in cgi-bin/molecules/alpaca_molecules/squeeze_alerts.py.  Update cgi-bin/molecules/alpaca_molecules/squeeze_alerts.py: create a fake_trade method: the method receives the args symbol, quantity (1 default), trailing_stop_loss (2% default), and take_profit (5% default); it then monitors the price until it hits the take_profit or the trailing_stop_loss (trailing stops follow the price up but never down); store fake trade data in ./historical_data/YYYYMMDD/fake_trades/*.json; there can be multiple instances of fake_trade. After a squeeze alert gets generated, call the fake_trade method.
 
-- [ ] ULTRATHINK. Update public_html/index.html: In the upper-righthand corner, keep a tally of the fake trades.  Also, have a button that when clicked creates a popup that lists the fake trades for the current date.  The columns shall be symbol, entry timestamp, entry price, quantity, profit_percent, profit_dollars, time held (exit_timestamp - entry_timestamp).  The columns are also to be sortable.  Have a second icon for a popup for fake trade statistics.
+- [X] ULTRATHINK. Update public_html/index.html: In the upper-righthand corner, keep a tally of the fake trades.  Also, have a button that when clicked creates a popup that lists the fake trades for the current date.  The columns shall be symbol, entry timestamp, entry price, quantity, profit_percent, profit_dollars, time held (exit_timestamp - entry_timestamp).  The columns are also to be sortable.  Have a second icon for a popup for fake trade statistics.
+
+- [X] Review public_html/index.html: what script and socket is it using to subscribe to stock symbol trading data?  Document in docs/README_time_and_sales.md.
+
+- [X] Review cgi-bin/molecules/alpaca_molecules/squeeze_alerts.py: It processes fake trades.  Question: what are the correct words to describe what is being done?  Is it spawn or something else? [simulate, initiate, start, create, or track]
+
+- [X] Review cgi-bin/molecules/alpaca_molecules/squeeze_alerts.py and docs/README_time_and_sales.md.  Would it be better to subscribe the symbol to the websocket every time a fake track is created?
+Key Methods (cgi-bin/molecules/alpaca_molecules/squeeze_alerts.py):
+
+  1. Line 2186-2242: _start_fake_trade() - Creates/initiates a simulated trade
+  2. Line 2244-2321: _check_fake_trade_conditions() - Monitors active trades on each price update
+  3. Line 2323-2366: _finalize_fake_trade() - Closes and saves completed trades
+  4. Line 2703-2711 - Where fake trades are started (when a squeeze alert fires)
+
+- [ ] Review docs/README_time_and_sales.md to understand how to subscribe and unsubscribe to stock symbol trading data. Update cgi-bin/molecules/alpaca_molecules/squeeze_alerts.py: when a fake trade is created, subscribe to the symbol. That way, something else doesn’t unsubscribe and mess things up.
+
+Keep the stock loss at 2% from the high.  Or, what percent from the high if the high is a 3% gain or more.
+
+
+
 
 ## Analysis
 

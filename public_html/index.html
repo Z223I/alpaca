@@ -139,6 +139,23 @@
             font-size: 18px;
         }
 
+        .fake-trade-profit {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .fake-trade-profit.positive {
+            color: var(--accent-green);
+        }
+
+        .fake-trade-profit.negative {
+            color: var(--accent-red);
+        }
+
+        .fake-trade-profit.neutral {
+            color: var(--text-secondary);
+        }
+
         .fake-trade-icon {
             cursor: pointer;
             color: var(--accent-blue);
@@ -1628,8 +1645,11 @@
         <!-- Fake Trades Section -->
         <div class="fake-trades-container">
             <div class="fake-trade-counter">
-                <span>💰 Fake Trades:</span>
+                <span>💰 Trades:</span>
                 <span class="fake-trade-count" id="fakeTradeCount">0</span>
+                <span style="margin: 0 5px;">|</span>
+                <span>P/L:</span>
+                <span class="fake-trade-profit" id="fakeTradeProfit">$0.00</span>
             </div>
             <span class="fake-trade-icon" onclick="openFakeTradesPopup()" title="View Fake Trades List">📋</span>
             <span class="fake-trade-icon" onclick="openFakeStatsPopup()" title="View Fake Trades Statistics">📊</span>
@@ -5069,11 +5089,32 @@
                 // Update counter
                 document.getElementById('fakeTradeCount').textContent = fakeTradesData.length;
 
-                console.log(`Loaded ${fakeTradesData.length} fake trades for ${today}`);
+                // Calculate and update accumulated profit
+                const totalProfit = fakeTradesData.reduce((sum, trade) => {
+                    return sum + (trade.profit_dollars || 0);
+                }, 0);
+
+                const profitElement = document.getElementById('fakeTradeProfit');
+                const profitSign = totalProfit >= 0 ? '+' : '';
+                profitElement.textContent = profitSign + '$' + totalProfit.toFixed(2);
+
+                // Update color class
+                profitElement.className = 'fake-trade-profit';
+                if (totalProfit > 0) {
+                    profitElement.classList.add('positive');
+                } else if (totalProfit < 0) {
+                    profitElement.classList.add('negative');
+                } else {
+                    profitElement.classList.add('neutral');
+                }
+
+                console.log(`Loaded ${fakeTradesData.length} fake trades for ${today} | Total P/L: ${profitSign}$${totalProfit.toFixed(2)}`);
             } catch (error) {
                 console.error('Error loading fake trades:', error);
                 fakeTradesData = [];
                 document.getElementById('fakeTradeCount').textContent = '0';
+                document.getElementById('fakeTradeProfit').textContent = '$0.00';
+                document.getElementById('fakeTradeProfit').className = 'fake-trade-profit neutral';
             }
         }
 

@@ -118,6 +118,7 @@ class SqueezeAlertsMonitor:
         self.symbols_to_monitor: List[str] = []
         self.max_symbols = max_symbols
         self.websocket_url = websocket_url
+        self.ws = None  # WebSocket connection (set when connected)
         self.verbose = verbose
         self.test_duration = test_duration
         self.use_existing = use_existing
@@ -549,6 +550,9 @@ class SqueezeAlertsMonitor:
             async with websockets.connect(self.websocket_url) as ws:
                 self.logger.info("✅ Connected to WebSocket server")
 
+                # Store websocket connection for use by other methods (e.g., fake trade subscriptions)
+                self.ws = ws
+
                 # Query existing symbols if use_existing mode
                 if self.use_existing:
                     await self._query_and_use_existing_symbols(ws)
@@ -579,6 +583,9 @@ class SqueezeAlertsMonitor:
                         await volume_fund_task
                     except asyncio.CancelledError:
                         pass
+
+                    # Clear websocket connection
+                    self.ws = None
 
         except ConnectionRefusedError:
             self.logger.error(f"❌ Connection refused to {self.websocket_url}")
@@ -657,6 +664,29 @@ class SqueezeAlertsMonitor:
 
                     if removed_symbols:
                         self.logger.info(f"📉 {len(removed_symbols)} symbols no longer active: {', '.join(sorted(removed_symbols))}")
+
+                        # Unsubscribe from removed symbols (unless they have active fake trades)
+                        for symbol in removed_symbols:
+                            # Check if there are active fake trades for this symbol
+                            has_active_fake_trades = any(
+                                trade['symbol'] == symbol and trade['status'] == 'active'
+                                for trade in self.active_fake_trades.values()
+                            )
+
+                            if has_active_fake_trades:
+                                # Keep subscription for symbols with active fake trades
+                                self.logger.info(
+                                    f"📌 Keeping {symbol} subscribed (has active fake trades)"
+                                )
+                            elif symbol in self.active_subscriptions:
+                                # Unsubscribe from symbols without active fake trades
+                                try:
+                                    unsubscribe_msg = json.dumps({"action": "unsubscribe", "symbol": symbol})
+                                    await ws.send(unsubscribe_msg)
+                                    self.active_subscriptions.discard(symbol)
+                                    self.logger.info(f"🔕 Unsubscribed from {symbol}")
+                                except Exception as e:
+                                    self.logger.error(f"❌ Failed to unsubscribe from {symbol}: {e}")
 
                     # Update monitored symbols
                     self.symbols_to_monitor = active_symbols
@@ -1213,7 +1243,7 @@ class SqueezeAlertsMonitor:
                 # Only report once per symbol per 30-second window to avoid spam
                 last_squeeze_time = getattr(self, '_last_squeeze_time', {})
                 if symbol not in last_squeeze_time or (timestamp - last_squeeze_time[symbol]).total_seconds() > 30:
-                    self._report_squeeze(symbol, first_price, last_price, percent_change, timestamp, size)
+                    await self._report_squeeze(symbol, first_price, last_price, percent_change, timestamp, size)
 
                     # Track last squeeze time
                     if not hasattr(self, '_last_squeeze_time'):
@@ -2183,7 +2213,7 @@ class SqueezeAlertsMonitor:
 
     # ===== FAKE TRADE TRACKING METHODS =====
 
-    def _start_fake_trade(self, symbol: str, entry_timestamp: datetime, entry_price: float,
+    async def _start_fake_trade(self, symbol: str, entry_timestamp: datetime, entry_price: float,
                          quantity: int = 1, trailing_stop_loss: float = 2.0,
                          take_profit: float = 5.0) -> None:
         """
@@ -2193,6 +2223,9 @@ class SqueezeAlertsMonitor:
         the take_profit target or the trailing_stop_loss. The trailing stop follows
         the price up but never down.
 
+        IMPORTANT: This method ensures the symbol is subscribed to the websocket to
+        guarantee price updates for the fake trade tracking.
+
         Args:
             symbol: Stock symbol
             entry_timestamp: Timestamp when trade is entered
@@ -2201,6 +2234,17 @@ class SqueezeAlertsMonitor:
             trailing_stop_loss: Trailing stop loss percentage (default: 2.0%)
             take_profit: Take profit percentage (default: 5.0%)
         """
+        # Ensure symbol is subscribed to websocket for price updates
+        if self.ws and symbol not in self.active_subscriptions:
+            try:
+                subscribe_msg = json.dumps({"action": "subscribe", "symbol": symbol})
+                await self.ws.send(subscribe_msg)
+                self.active_subscriptions.add(symbol)
+                self.logger.info(f"📡 Auto-subscribed to {symbol} for fake trade tracking")
+            except Exception as e:
+                self.logger.error(f"❌ Failed to subscribe to {symbol} for fake trade: {e}")
+                # Continue anyway - might still get updates if already subscribed at backend
+
         # Generate unique key for this fake trade
         self.fake_trade_counter += 1
         trade_id = f"{symbol}_{entry_timestamp.strftime('%Y%m%d_%H%M%S')}_{self.fake_trade_counter:03d}"
@@ -2391,7 +2435,7 @@ class SqueezeAlertsMonitor:
         else:
             return ("🟡", "yellow", percent_off)
 
-    def _report_squeeze(self, symbol: str, first_price: float, last_price: float,
+    async def _report_squeeze(self, symbol: str, first_price: float, last_price: float,
                        percent_change: float, timestamp: datetime, size: int):
         """
         Report a detected squeeze to stdout and Telegram.
@@ -2701,7 +2745,7 @@ class SqueezeAlertsMonitor:
             )
 
             # Start a fake trade to simulate trading this squeeze
-            self._start_fake_trade(
+            await self._start_fake_trade(
                 symbol=symbol,
                 entry_timestamp=timestamp,
                 entry_price=last_price,
