@@ -100,7 +100,7 @@ class PremarketTopGainersScanner:
     """Main premarket top gainers scanner class."""
 
     # Symbols to track for detailed debugging
-    TRACKED_SYMBOLS = ['GURE']
+    TRACKED_SYMBOLS = []
 
     def __init__(self, provider: str = "alpaca", account: str = "Bruce", environment: str = "paper",
                  verbose: bool = False):
@@ -152,6 +152,19 @@ class PremarketTopGainersScanner:
 
         self.call_times.append(current_time)
 
+    def is_warrant(self, symbol: str) -> bool:
+        """
+        Check if a symbol is a warrant.
+        Warrants are always 5 characters and end in 'W'.
+
+        Args:
+            symbol: Stock ticker symbol
+
+        Returns:
+            True if symbol is a warrant, False otherwise
+        """
+        return len(symbol) == 5 and symbol.endswith('W')
+
     def has_recent_reverse_split(self, symbol: str, days: int = 2) -> bool:
         """
         Check if a symbol has had a reverse split in the last N days using yfinance.
@@ -161,7 +174,7 @@ class PremarketTopGainersScanner:
             days: Number of days to look back (default: 2)
 
         Returns:
-            True if reverse split detected in the last N days, False otherwise
+            True if reverse split detected or if symbol should be filtered out, False otherwise
         """
         try:
             ticker = yf.Ticker(symbol)
@@ -190,9 +203,15 @@ class PremarketTopGainersScanner:
             return False
 
         except Exception as e:
+            error_message = str(e)
+            # Silently filter out symbols with "Period 'max' is invalid" error
+            if "Period 'max' is invalid" in error_message or "Period" in error_message:
+                # Return True to filter out this symbol without printing anything
+                return True
+
+            # For other errors, print if verbose and don't filter
             if self.verbose:
                 print(f"Error checking reverse split for {symbol}: {e}")
-            # On error, don't filter out the symbol (conservative approach)
             return False
 
     def is_premarket_hours(self) -> bool:
@@ -234,10 +253,20 @@ class PremarketTopGainersScanner:
             # Try to get most active stocks
             if hasattr(self.client, 'get_most_actives'):
                 most_actives = self.client.get_most_actives(by='volume', top=min(max_symbols, 1000))
-                symbols = [stock.symbol for stock in most_actives]
+                symbols = []
+                warrants_filtered = 0
+
+                for stock in most_actives:
+                    # Filter out warrants
+                    if self.is_warrant(stock.symbol):
+                        warrants_filtered += 1
+                        continue
+                    symbols.append(stock.symbol)
 
                 if self.verbose:
                     print(f"Found {len(symbols)} active symbols for premarket scanning")
+                    if warrants_filtered > 0:
+                        print(f"Filtered out {warrants_filtered} warrants")
 
                 return symbols
             else:
@@ -284,10 +313,16 @@ class PremarketTopGainersScanner:
 
             assets = self.client.list_assets(status='active', asset_class='us_equity')
             filtered_symbols = []
+            warrants_filtered = 0
 
             for asset in assets:
                 if (asset.exchange.upper() in exchanges_upper and
                     asset.status == 'active'):
+
+                    # Filter out warrants (5 characters ending in 'W')
+                    if self.is_warrant(asset.symbol):
+                        warrants_filtered += 1
+                        continue
 
                     filtered_symbols.append(asset.symbol)
                     if len(filtered_symbols) >= max_symbols:
@@ -295,6 +330,8 @@ class PremarketTopGainersScanner:
 
             if self.verbose:
                 print(f"Found {len(filtered_symbols)} symbols from exchanges")
+                if warrants_filtered > 0:
+                    print(f"Filtered out {warrants_filtered} warrants")
 
             return filtered_symbols
 
@@ -413,11 +450,6 @@ class PremarketTopGainersScanner:
                         print(f"Filtering {symbol}: reverse split detected in last 2 days")
                     continue
 
-                # Log warning if previous close is above $1
-                if previous_close > 1.0:
-                    if self.verbose or is_tracked:
-                        print(f"WARNING: {symbol} PrevClose ${previous_close:.2f} is above $1.00 (current: ${current_price:.2f}, gain: {gain_percent:.2f}%)")
-
                 # Apply filters
                 if criteria.min_gain_percent and gain_percent < criteria.min_gain_percent:
                     if is_tracked:
@@ -511,9 +543,21 @@ class PremarketTopGainersScanner:
 
         # Get symbols to analyze
         if criteria.specific_symbols:
-            symbols = criteria.specific_symbols
+            # Filter out warrants from specific symbols
+            symbols = []
+            warrants_filtered = 0
+            for symbol in criteria.specific_symbols:
+                if self.is_warrant(symbol):
+                    warrants_filtered += 1
+                    if self.verbose:
+                        print(f"Filtering out warrant: {symbol}")
+                    continue
+                symbols.append(symbol)
+
             if self.verbose:
-                print(f"Analyzing specific symbols: {', '.join(symbols)}")
+                print(f"Analyzing {len(symbols)} specific symbols: {', '.join(symbols)}")
+                if warrants_filtered > 0:
+                    print(f"Filtered out {warrants_filtered} warrants from specific symbols")
         else:
             symbols = self.get_active_symbols(criteria.max_symbols, criteria.exchanges)
 
