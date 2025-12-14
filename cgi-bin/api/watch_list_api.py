@@ -29,29 +29,6 @@ sys.path.insert(0, str(project_root))
 import pytz
 
 
-def find_latest_oracle_csv() -> Path:
-    """
-    Find the latest CSV file in the ./data directory.
-
-    Returns:
-        Path to the latest CSV file, or None if no CSV files found
-    """
-    data_dir = Path(project_root) / "data"
-
-    if not data_dir.exists():
-        return None
-
-    # Find all CSV files matching the date pattern YYYYMMDD.csv
-    csv_files = list(data_dir.glob('????????.csv'))
-
-    if not csv_files:
-        return None
-
-    # Sort by filename (which is the date) and return the latest
-    csv_files.sort(reverse=True)
-    return csv_files[0]
-
-
 def get_watch_list_symbols() -> List[Dict]:
     """
     Load watch list symbols from CSV files and return with source indicators.
@@ -60,7 +37,7 @@ def get_watch_list_symbols() -> List[Dict]:
     1. historical_data/{YYYY-MM-DD}/premarket/top_gainers_nasdaq_amex.csv (premarket top gainers)
     2. historical_data/{YYYY-MM-DD}/market/top_gainers_alpaca.csv (Alpaca API top gainers)
     3. historical_data/{YYYY-MM-DD}/volume_surge/relative_volume_nasdaq_amex.csv (surge)
-    4. data/{YYYYMMDD}.csv (oracle) - falls back to latest CSV if today's not found
+    4. data/{YYYYMMDD}.csv (oracle)
 
     Returns:
         List of dictionaries with fields:
@@ -82,13 +59,6 @@ def get_watch_list_symbols() -> List[Dict]:
     alpaca_gainers_csv = Path(project_root) / "historical_data" / today / "market" / "top_gainers_alpaca.csv"
     volume_surge_csv = Path(project_root) / "historical_data" / today / "volume_surge" / "relative_volume_nasdaq_amex.csv"
     oracle_csv = Path(project_root) / "data" / f"{compact_date}.csv"
-
-    # Fallback to latest CSV if today's doesn't exist
-    if not oracle_csv.exists():
-        latest_csv = find_latest_oracle_csv()
-        if latest_csv:
-            oracle_csv = latest_csv
-            print(f"Using fallback Oracle CSV: {oracle_csv.name}", file=sys.stderr)
 
     symbols_dict = {}
 
