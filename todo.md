@@ -264,6 +264,10 @@ Add news column to signals. Also, volume surge if possible.
 - [ ] Write script to review historical data.  Need to perfom analysis to find what works. Use usual suspects price > 9 EMA > 21 EMA; MACD open.
 - [ ] Create BRB alerts. Trigger the watching based on an all green squeeze alert minus PM High. Stop monitoring after 10 minutes unless it is going well.
 
+## Premarket Top Gainers Reverse Splits
+
+- [ ] Update code/premarket_top_gainers.py to eliminate reverse splits using yfinance.
+
 ## Oracle
 
 - [X] Update public_html/index.html: In the Watchlist panel, the Oracle column is populated with the current date's info and fallbacks to the last oracle data if necessary.  The fallback was for testing.  We are now past testing.  Eliminate the fallback info.

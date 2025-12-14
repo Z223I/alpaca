@@ -38,6 +38,7 @@ from typing import Dict, List, Optional
 import pandas as pd
 import pytz
 import alpaca_trade_api as tradeapi
+import yfinance as yf
 
 # Set PYTHONPATH to include the project root directory
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -150,6 +151,49 @@ class PremarketTopGainersScanner:
                 time.sleep(sleep_time)
 
         self.call_times.append(current_time)
+
+    def has_recent_reverse_split(self, symbol: str, days: int = 2) -> bool:
+        """
+        Check if a symbol has had a reverse split in the last N days using yfinance.
+
+        Args:
+            symbol: Stock ticker symbol
+            days: Number of days to look back (default: 2)
+
+        Returns:
+            True if reverse split detected in the last N days, False otherwise
+        """
+        try:
+            ticker = yf.Ticker(symbol)
+            splits = ticker.splits
+
+            if splits is None or len(splits) == 0:
+                return False
+
+            # Get current time in ET
+            current_et = datetime.now(self.et_tz)
+            cutoff_date = current_et - timedelta(days=days)
+
+            # Filter splits to only recent ones
+            recent_splits = splits[splits.index > cutoff_date]
+
+            if len(recent_splits) == 0:
+                return False
+
+            # Check if any recent splits are reverse splits (ratio < 1.0)
+            for split_date, split_ratio in recent_splits.items():
+                if split_ratio < 1.0:
+                    if self.verbose:
+                        print(f"WARNING: {symbol} has reverse split on {split_date.strftime('%Y-%m-%d')}: {split_ratio:.4f}x (1-for-{1/split_ratio:.0f})")
+                    return True
+
+            return False
+
+        except Exception as e:
+            if self.verbose:
+                print(f"Error checking reverse split for {symbol}: {e}")
+            # On error, don't filter out the symbol (conservative approach)
+            return False
 
     def is_premarket_hours(self) -> bool:
         """Check if current time is during premarket hours (4:00 AM - 9:30 AM ET)."""
@@ -360,6 +404,19 @@ class PremarketTopGainersScanner:
 
                 if is_tracked:
                     print(f"    Calculated gain: {gain_percent:.2f}%")
+
+                # Check for reverse splits in the last 2 days
+                if self.has_recent_reverse_split(symbol, days=2):
+                    if is_tracked:
+                        print(f"!!! TRACKED SYMBOL {symbol} - FILTERED: recent reverse split detected")
+                    if self.verbose:
+                        print(f"Filtering {symbol}: reverse split detected in last 2 days")
+                    continue
+
+                # Log warning if previous close is above $1
+                if previous_close > 1.0:
+                    if self.verbose or is_tracked:
+                        print(f"WARNING: {symbol} PrevClose ${previous_close:.2f} is above $1.00 (current: ${current_price:.2f}, gain: {gain_percent:.2f}%)")
 
                 # Apply filters
                 if criteria.min_gain_percent and gain_percent < criteria.min_gain_percent:
