@@ -282,12 +282,7 @@ Key Methods (cgi-bin/molecules/alpaca_molecules/squeeze_alerts.py):
   3. Line 2323-2366: _finalize_fake_trade() - Closes and saves completed trades
   4. Line 2703-2711 - Where fake trades are started (when a squeeze alert fires)
 
-- [ ] Review docs/README_time_and_sales.md to understand how to subscribe and unsubscribe to stock symbol trading data. Update cgi-bin/molecules/alpaca_molecules/squeeze_alerts.py: when a fake trade is created, subscribe to the symbol. That way, something else doesn’t unsubscribe and mess things up.
-
-Keep the stock loss at 2% from the high.  Or, what percent from the high if the high is a 3% gain or more.
-
-
-
+- [X] Review docs/README_time_and_sales.md to understand how to subscribe and unsubscribe to stock symbol trading data. Update cgi-bin/molecules/alpaca_molecules/squeeze_alerts.py: when a fake trade is created, subscribe to the symbol. That way, something else doesn’t unsubscribe and mess things up.
 
 ## Analysis
 
