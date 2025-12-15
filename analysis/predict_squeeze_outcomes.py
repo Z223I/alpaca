@@ -12,8 +12,8 @@ This script:
 5. Generates feature importance analysis
 
 NOTE: Some features have missing data in current dataset:
-- ema_spread: 31% missing (will be 100% available in future with improved data collection)
-- macd_histogram: 81% missing (will be 100% available when switched to daily MACD)
+- ema_spread_pct: ~10% missing (price-normalized EMA spread)
+- macd_histogram: ~15% missing (will be 100% available when switched to daily MACD)
 
 For now, we handle missing data via imputation and indicator variables.
 
@@ -209,9 +209,9 @@ class SqueezeOutcomePredictor:
         Prepare feature matrix and target variable.
 
         Handles:
-        - Missing data in ema_spread (31% missing - will be 100% in future)
-        - Missing data in macd_histogram (81% missing - will be 100% with daily MACD)
-        - Categorical encoding for market_session
+        - Missing data in ema_spread_pct (~10% missing - price-normalized)
+        - Missing data in macd_histogram (~15% missing - will be 100% with daily MACD)
+        - Categorical encoding for market_session and price_category
         - Feature scaling
 
         Args:
@@ -225,29 +225,37 @@ class SqueezeOutcomePredictor:
         print("STEP 3: PREPARING FEATURES AND TARGET")
         print("="*80)
 
-        # Define feature columns (10 independent features)
+        # Define feature columns (11 independent features)
+        # UPDATED: ema_spread_pct (price-normalized), removed distance_from_day_low_percent
         feature_cols = [
-            'ema_spread',
-            'distance_from_vwap_percent',
-            'minutes_since_last_squeeze',
-            'window_volume_vs_1min_avg',
-            'spy_percent_change_concurrent',
-            'spread_percent',
-            'day_gain',
-            'squeeze_number_today',
-            'distance_from_day_low_percent',
-            'market_session'
+            'ema_spread_pct',              # Price-normalized EMA momentum
+            'price_category',              # Stock price bin (categorical)
+            'macd_histogram',              # MACD momentum indicator
+            'market_session',              # Time of day (categorical)
+            'squeeze_number_today',        # Squeeze sequence number
+            'minutes_since_last_squeeze',  # Time since last squeeze
+            'window_volume_vs_1min_avg',   # Volume surge ratio
+            'distance_from_vwap_percent',  # Distance from VWAP
+            'day_gain',                    # Day gain percentage
+            'spy_percent_change_concurrent',  # SPY correlation
+            'spread_percent'               # Bid-ask spread
         ]
 
         # Extract features
         X = df[feature_cols].copy()
 
-        # Handle categorical: market_session
+        # Handle categorical variables
         if 'market_session' in X.columns:
-            le = LabelEncoder()
-            X['market_session_encoded'] = le.fit_transform(X['market_session'].fillna('unknown'))
+            le_session = LabelEncoder()
+            X['market_session_encoded'] = le_session.fit_transform(X['market_session'].fillna('unknown'))
             X = X.drop('market_session', axis=1)
-            print(f"✓ Encoded market_session: {list(le.classes_)}")
+            print(f"✓ Encoded market_session: {list(le_session.classes_)}")
+
+        if 'price_category' in X.columns:
+            le_price = LabelEncoder()
+            X['price_category_encoded'] = le_price.fit_transform(X['price_category'].fillna('unknown'))
+            X = X.drop('price_category', axis=1)
+            print(f"✓ Encoded price_category: {list(le_price.classes_)}")
 
         # Handle missing data
         print(f"\nMissing Data Analysis:")
@@ -255,7 +263,7 @@ class SqueezeOutcomePredictor:
         for col, pct in missing_pct[missing_pct > 0].items():
             print(f"  {col}: {pct:.1f}% missing")
 
-        # NOTE: In future, ema_spread and macd_histogram will be 100% available
+        # NOTE: In future, ema_spread_pct and macd_histogram will be 100% available
         # For now, we impute missing values
 
         # Strategy: Impute with median + create missing indicators
@@ -267,9 +275,9 @@ class SqueezeOutcomePredictor:
         )
 
         # Create indicator variables for features with significant missing data
-        if 'ema_spread' in X.columns and X['ema_spread'].isnull().sum() > 0:
-            X_imputed['ema_spread_missing'] = X['ema_spread'].isnull().astype(int)
-            print(f"✓ Created ema_spread_missing indicator")
+        if 'ema_spread_pct' in X.columns and X['ema_spread_pct'].isnull().sum() > 0:
+            X_imputed['ema_spread_pct_missing'] = X['ema_spread_pct'].isnull().astype(int)
+            print(f"✓ Created ema_spread_pct_missing indicator")
 
         # Exclude macd_histogram if too much missing data (>50%)
         if 'macd_histogram' in X_imputed.columns:
@@ -951,8 +959,8 @@ def main(gain_threshold: float = 5.0):
     print(f"Target: Predict if squeeze reaches {gain_threshold}% gain within 10 minutes")
     print()
     print("NOTE: Some features have missing data in current dataset:")
-    print("  - ema_spread: 31% missing (will be 100% in future)")
-    print("  - macd_histogram: 81% missing (will be 100% with daily MACD)")
+    print("  - ema_spread_pct: ~10% missing (price-normalized EMA spread)")
+    print("  - macd_histogram: ~15% missing (will be 100% with daily MACD)")
     print("  We handle this via imputation for now.")
     print("="*80)
 

@@ -1,23 +1,23 @@
 ================================================================================
 SQUEEZE ALERT OUTCOME PREDICTION - SUMMARY REPORT
 ================================================================================
-Generated: 2025-12-15 10:28:31
+Generated: 2025-12-15 11:45:56
 
 DATASET
 --------------------------------------------------------------------------------
-Total Observations: 214
-Training Set: 171 samples
-Test Set: 43 samples
-Features: 11
+Total Observations: 626
+Training Set: 500 samples
+Test Set: 126 samples
+Features: 12
 Target Variable: achieved_5pct (reached 5% gain in 10 minutes)
 
 MODEL PERFORMANCE
 --------------------------------------------------------------------------------
 Model                  Accuracy  Precision     Recall         F1    ROC-AUC
 --------------------------------------------------------------------------------
-Logistic Regression      0.5581     0.6786     0.6552     0.6667     0.5222
-Random Forest            0.6512     0.7333     0.7586     0.7458     0.7069
-XGBoost                  0.7209     0.8148     0.7586     0.7857     0.7414
+Logistic Regression      0.7302     0.8116     0.7273     0.7671     0.7980
+Random Forest            0.7460     0.7711     0.8312     0.8000     0.8227
+XGBoost                  0.7381     0.7619     0.8312     0.7950     0.8110
 
 INTERPRETATION
 --------------------------------------------------------------------------------
@@ -28,10 +28,10 @@ ROC-AUC:   Overall discrimination ability (0.5=random, 1.0=perfect)
 
 RECOMMENDATION
 --------------------------------------------------------------------------------
-Best Model: XGBoost
-  F1-Score: 0.7857
-  Precision: 0.8148
-  Recall: 0.7586
+Best Model: Random Forest
+  F1-Score: 0.8000
+  Precision: 0.7711
+  Recall: 0.8312
 
 ✓ Model shows good predictive performance (F1 > 0.60)
   Recommended for trade filtering in production

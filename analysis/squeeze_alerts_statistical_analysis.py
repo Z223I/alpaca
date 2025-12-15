@@ -3,13 +3,15 @@
 Statistical Analysis of Squeeze Alerts Data
 
 This script performs limited statistical analysis on squeeze alert data with focus on:
-1. Feature engineering for statistical independence (EMA spread)
+1. Feature engineering for statistical independence:
+   - ema_spread_pct: Price-normalized EMA momentum (%)
+   - price_category: Stock price bins (<$2, $2-5, $5-10, $10-20, $20-40, >$40)
 2. Correlation matrix analysis
 3. Variance Inflation Factor (VIF) calculation
 4. Export of clean, independent feature set
 
 Author: Statistical Analysis Module
-Date: 2025-12-12
+Date: 2025-12-15
 """
 
 import json
@@ -40,15 +42,16 @@ class SqueezeAlertsAnalyzer:
 
         # Define the independent features (excluding high VIF features)
         # REMOVED: spy_percent_change_day (VIF=18.74), percent_change (VIF=10.03)
+        # REMOVED: distance_from_day_low_percent (VIF=18.04, r=0.96 with day_gain)
         self.feature_names = [
-            'ema_spread',              # Derived: ema_9 - ema_21 (VIF=1.45)
+            'ema_spread_pct',          # Derived: (ema_9 - ema_21) / price * 100 (price-independent)
+            'price_category',          # Categorical: <$2, $2-5, $5-10, $10-20, $20-40, >$40
             'macd_histogram',          # MACD momentum indicator (86% missing)
             'market_session',          # Categorical timing
             'squeeze_number_today',    # Squeeze sequence (VIF=5.32)
             'minutes_since_last_squeeze',  # VIF=1.63
             'window_volume_vs_1min_avg',   # VIF=2.39
             'distance_from_vwap_percent',  # VIF=1.45
-            'distance_from_day_low_percent',  # VIF=4.60
             'day_gain',                    # VIF=3.39
             'spy_percent_change_concurrent',  # VIF=3.07 (kept over _day)
             'spread_percent'               # VIF=3.20
@@ -106,24 +109,54 @@ class SqueezeAlertsAnalyzer:
         """
         print("\nEngineering derived features...")
 
-        # 1. Create ema_spread (ema_9 - ema_21)
-        # This captures EMA divergence/convergence independent of absolute price level
-        self.alerts_df['ema_spread'] = None
+        # 1. Create ema_spread_pct (price-independent EMA momentum)
+        # Formula: (ema_9 - ema_21) / price * 100
+        # This captures EMA divergence/convergence as a percentage of price
+        self.alerts_df['ema_spread_pct'] = None
 
         for idx, row in self.alerts_df.iterrows():
             ema_9 = row.get('ema_9')
             ema_21 = row.get('ema_21')
+            last_price = row.get('last_price')
 
-            if ema_9 is not None and ema_21 is not None:
-                self.alerts_df.at[idx, 'ema_spread'] = ema_9 - ema_21
+            if ema_9 is not None and ema_21 is not None and last_price is not None and last_price > 0:
+                self.alerts_df.at[idx, 'ema_spread_pct'] = ((ema_9 - ema_21) / last_price) * 100
 
-        # Convert ema_spread to numeric
-        self.alerts_df['ema_spread'] = pd.to_numeric(self.alerts_df['ema_spread'], errors='coerce')
+        # Convert to numeric
+        self.alerts_df['ema_spread_pct'] = pd.to_numeric(self.alerts_df['ema_spread_pct'], errors='coerce')
 
-        print(f"✓ Created ema_spread (ema_9 - ema_21)")
-        print(f"  - Non-null values: {self.alerts_df['ema_spread'].notna().sum()}")
-        print(f"  - Mean: {self.alerts_df['ema_spread'].mean():.4f}")
-        print(f"  - Std: {self.alerts_df['ema_spread'].std():.4f}")
+        print(f"✓ Created ema_spread_pct ((ema_9 - ema_21) / price * 100)")
+        print(f"  - Non-null values: {self.alerts_df['ema_spread_pct'].notna().sum()}")
+        print(f"  - Mean: {self.alerts_df['ema_spread_pct'].mean():.4f}%")
+        print(f"  - Std: {self.alerts_df['ema_spread_pct'].std():.4f}%")
+
+        # 2. Create price_category (captures price-level effects on squeeze behavior)
+        # Bins: <$2, $2-5, $5-10, $10-20, $20-40, >$40
+        def categorize_price(price):
+            if pd.isna(price) or price is None:
+                return None
+            elif price < 2:
+                return '<$2'
+            elif price < 5:
+                return '$2-5'
+            elif price < 10:
+                return '$5-10'
+            elif price < 20:
+                return '$10-20'
+            elif price < 40:
+                return '$20-40'
+            else:
+                return '>$40'
+
+        self.alerts_df['price_category'] = self.alerts_df['last_price'].apply(categorize_price)
+
+        print(f"✓ Created price_category (bins: <$2, $2-5, $5-10, $10-20, $20-40, >$40)")
+        print(f"  - Non-null values: {self.alerts_df['price_category'].notna().sum()}")
+        if self.alerts_df['price_category'].notna().any():
+            print(f"  - Distribution:")
+            for category, count in self.alerts_df['price_category'].value_counts().sort_index().items():
+                pct = (count / self.alerts_df['price_category'].notna().sum()) * 100
+                print(f"    {category:>8}: {count:4d} ({pct:5.1f}%)")
 
         return self.alerts_df
 
@@ -154,10 +187,15 @@ class SqueezeAlertsAnalyzer:
         # Create subset with only independent features
         self.independent_features = self.alerts_df[available_features].copy()
 
-        # Convert market_session to categorical codes for numerical analysis
+        # Convert categorical variables to numeric codes for numerical analysis
         if 'market_session' in self.independent_features.columns:
             session_mapping = {'extended': 0, 'early': 1, 'mid': 2, 'late': 3}
             self.independent_features['market_session_code'] = self.independent_features['market_session'].map(session_mapping)
+            # Keep both for reference, but use _code for correlations
+
+        if 'price_category' in self.independent_features.columns:
+            price_mapping = {'<$2': 0, '$2-5': 1, '$5-10': 2, '$10-20': 3, '$20-40': 4, '>$40': 5}
+            self.independent_features['price_category_code'] = self.independent_features['price_category'].map(price_mapping)
             # Keep both for reference, but use _code for correlations
 
         return self.independent_features
@@ -498,8 +536,9 @@ def main():
     print("SQUEEZE ALERTS STATISTICAL ANALYSIS")
     print("="*80)
     print(f"Analyzing data with focus on statistical independence")
-    print(f"Target: 10 independent features (VIF < 5) including EMA")
-    print(f"EXCLUDED: spy_percent_change_day (VIF=18.74), percent_change (VIF=10.03)")
+    print(f"Target: 11 independent features (VIF < 5)")
+    print(f"NEW: ema_spread_pct (price-normalized), price_category (6 bins)")
+    print(f"EXCLUDED: spy_percent_change_day, percent_change, distance_from_day_low_percent")
     print("="*80)
 
     # Initialize analyzer
