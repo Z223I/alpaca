@@ -564,7 +564,11 @@ Examples:
         print(f"{'Win Rate':<30} {model_win_rate*100:>18.1f}% {all_win_rate*100:>18.1f}% {(model_win_rate-all_win_rate)*100:>13.1f}%")
         print(f"{'Avg Profit per Trade':<30} {model_avg_profit:>18.2f}% {all_avg_profit:>18.2f}% {model_avg_profit-all_avg_profit:>13.2f}%")
         print(f"{'Total Profit':<30} {model_total_profit:>18.2f}% {all_total_profit:>18.2f}% {model_total_profit-all_total_profit:>13.2f}%")
-        print(f"{'Wins / Losses':<30} {f'{model_wins} / {model_losses}':<20} {f'{(df_backtest['actual_profit'] > 0).sum()} / {(df_backtest['actual_profit'] < 0).sum()}':<20} {'':<15}")
+
+        # Calculate baseline wins/losses separately to avoid f-string nesting
+        baseline_wins = (df_backtest['actual_profit'] > 0).sum()
+        baseline_losses = (df_backtest['actual_profit'] < 0).sum()
+        print(f"{'Wins / Losses':<30} {f'{model_wins} / {model_losses}':<20} {f'{baseline_wins} / {baseline_losses}':<20} {'':<15}")
 
         # Confusion Matrix
         print("\n" + "="*80)
