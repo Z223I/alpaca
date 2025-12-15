@@ -186,6 +186,11 @@ def load_alerts_from_directory(directory: Path,
             with open(json_file, 'r') as f:
                 alert = json.load(f)
 
+            # Flatten phase1_analysis into main alert dict (CRITICAL FIX)
+            if 'phase1_analysis' in alert:
+                phase1 = alert.pop('phase1_analysis')
+                alert.update(phase1)
+
             # Apply price filter
             last_price = alert.get('last_price', 0)
             if min_price is not None and last_price < min_price:
