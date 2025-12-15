@@ -1414,6 +1414,37 @@ def main(gain_threshold: float = 5.0):
         output_path=f'analysis/time_of_day_analysis{threshold_suffix}.png'
     )
 
+    # Step 14: Save XGBoost model for 1.5% target
+    if gain_threshold == 1.5 and 'XGBoost' in predictor.models:
+        print("\n" + "="*80)
+        print("SAVING XGBOOST MODEL FOR 1.5% TARGET")
+        print("="*80)
+
+        model_path = Path('analysis/xgboost_model_1.5pct.json')
+        predictor.models['XGBoost'].save_model(model_path)
+        print(f"✓ Saved XGBoost model to: {model_path}")
+
+        # Also save feature names for later use
+        import json
+        feature_info = {
+            'feature_names': predictor.feature_names,
+            'gain_threshold': gain_threshold,
+            'train_samples': len(predictor.X_train),
+            'test_samples': len(predictor.X_test),
+            'model_performance': {
+                'test_accuracy': predictor.results['XGBoost']['test_accuracy'],
+                'precision': predictor.results['XGBoost']['precision'],
+                'recall': predictor.results['XGBoost']['recall'],
+                'f1_score': predictor.results['XGBoost']['f1_score'],
+                'roc_auc': predictor.results['XGBoost']['roc_auc']
+            }
+        }
+
+        feature_info_path = Path('analysis/xgboost_model_1.5pct_info.json')
+        with open(feature_info_path, 'w') as f:
+            json.dump(feature_info, f, indent=2)
+        print(f"✓ Saved model metadata to: {feature_info_path}")
+
     print("\n" + "="*80)
     print(f"ANALYSIS COMPLETE - {gain_threshold}% GAIN TARGET")
     print("="*80)
@@ -1423,6 +1454,9 @@ def main(gain_threshold: float = 5.0):
     print(f"  - analysis/prediction_summary{threshold_suffix}.txt")
     print(f"  - analysis/price_category_analysis{threshold_suffix}.png")
     print(f"  - analysis/time_of_day_analysis{threshold_suffix}.png")
+    if gain_threshold == 1.5:
+        print(f"  - analysis/xgboost_model_1.5pct.json")
+        print(f"  - analysis/xgboost_model_1.5pct_info.json")
     print("\nNext steps:")
     print("  1. Review model performance (aim for F1 > 0.60)")
     print("  2. Check feature importance (which features drive success?)")
