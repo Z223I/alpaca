@@ -104,3 +104,4 @@ flake8 code/ atoms/                                                # Lint codeba
 - The application supports both paper trading and live trading environments
 - Position sizing logic is currently optimized for 50% risk (see TODO in `code/alpaca.py:97`)
 - Use conda environment alpaca
+- you are not to make commits unless told

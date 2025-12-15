@@ -268,6 +268,10 @@ Add news column to signals. Also, volume surge if possible.
 
 - [ ] Update code/premarket_top_gainers.py to eliminate reverse splits using yfinance.
 
+
+
+Review analysis/squeeze_alerts_statistical_analysis.py: I am guessing that the price of a stock will have an impact on the predictability of squeezes.  What do you think?  If it is used, it needs to be made statistally independent.
+
 ## Oracle
 
 - [X] Update public_html/index.html: In the Watchlist panel, the Oracle column is populated with the current date's info and fallbacks to the last oracle data if necessary.  The fallback was for testing.  We are now past testing.  Eliminate the fallback info.
