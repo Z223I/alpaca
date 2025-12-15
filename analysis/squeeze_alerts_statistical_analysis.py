@@ -492,7 +492,7 @@ def main():
     """Main execution function."""
 
     # Configuration
-    data_dir = "/home/wilsonb/dl/github.com/Z223I/alpaca/historical_data/2025-12-12/squeeze_alerts_sent"
+    data_dir = "/home/wilsonb/dl/github.com/Z223I/alpaca/historical_data/2025-12-15/squeeze_alerts_sent"
 
     print("="*80)
     print("SQUEEZE ALERTS STATISTICAL ANALYSIS")

@@ -24,6 +24,8 @@ Date: 2025-12-12
 import json
 import pandas as pd
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend to avoid threading issues
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
@@ -51,7 +53,7 @@ class SqueezeOutcomePredictor:
         Initialize predictor with data sources.
 
         Args:
-            json_dir: Directory containing squeeze alert JSON files
+            json_dir: Base historical_data directory containing date subdirectories (e.g., 2025-12-12/)
             features_csv: Path to independent features CSV
         """
         self.json_dir = Path(json_dir)
@@ -68,12 +70,13 @@ class SqueezeOutcomePredictor:
         # Set random seed for reproducibility
         np.random.seed(42)
 
-    def extract_outcomes(self, gain_threshold: float = 5.0) -> pd.DataFrame:
+    def extract_outcomes(self, gain_threshold: float = 5.0, start_date: str = "2025-12-12") -> pd.DataFrame:
         """
-        Extract outcome_tracking data from JSON files.
+        Extract outcome_tracking data from JSON files across multiple date directories.
 
         Args:
             gain_threshold: Gain percentage threshold for success classification
+            start_date: Starting date for directory scan (YYYY-MM-DD format)
 
         Returns:
             DataFrame with outcome metrics for each alert
@@ -82,10 +85,27 @@ class SqueezeOutcomePredictor:
         print("STEP 1: EXTRACTING OUTCOME DATA FROM JSON FILES")
         print("="*80)
         print(f"Gain threshold: {gain_threshold}%")
+        print(f"Scanning directories from {start_date} onwards")
 
         outcomes = []
-        json_files = list(self.json_dir.glob('alert_*.json'))
-        print(f"Found {len(json_files)} JSON files")
+
+        # Find all date directories >= start_date
+        date_dirs = []
+        for date_dir in self.json_dir.glob('????-??-??'):
+            if date_dir.is_dir() and date_dir.name >= start_date:
+                squeeze_dir = date_dir / 'squeeze_alerts_sent'
+                if squeeze_dir.exists():
+                    date_dirs.append(squeeze_dir)
+
+        date_dirs.sort()  # Sort chronologically
+        print(f"Found {len(date_dirs)} date directories: {[d.parent.name for d in date_dirs]}")
+
+        # Collect all JSON files from all directories
+        json_files = []
+        for squeeze_dir in date_dirs:
+            json_files.extend(list(squeeze_dir.glob('alert_*.json')))
+
+        print(f"Found {len(json_files)} total JSON files across all directories")
 
         for json_file in json_files:
             try:
@@ -937,14 +957,15 @@ def main(gain_threshold: float = 5.0):
     print("="*80)
 
     # Configuration
-    json_dir = "/home/wilsonb/dl/github.com/Z223I/alpaca/historical_data/2025-12-12/squeeze_alerts_sent"
+    # Use base historical_data directory to scan all date directories from 2025-12-12 onwards
+    json_dir = "/home/wilsonb/dl/github.com/Z223I/alpaca/historical_data"
     features_csv = "analysis/squeeze_alerts_independent_features.csv"
 
     # Initialize predictor
     predictor = SqueezeOutcomePredictor(json_dir, features_csv)
 
-    # Step 1: Extract outcomes
-    outcomes_df = predictor.extract_outcomes(gain_threshold=gain_threshold)
+    # Step 1: Extract outcomes from all directories starting 2025-12-12
+    outcomes_df = predictor.extract_outcomes(gain_threshold=gain_threshold, start_date="2025-12-12")
 
     # Step 2: Merge with features
     df = predictor.merge_with_features(outcomes_df)
@@ -1017,49 +1038,72 @@ if __name__ == "__main__":
         print(f"\nRunning analysis with {threshold}% gain threshold\n")
         main(gain_threshold=threshold)
     else:
-        # Run with 2% threshold (user requested)
-        print(f"\n{'='*80}")
-        print("RUNNING ANALYSIS: 2% GAIN TARGET")
-        print(f"{'='*80}\n")
-        predictor_2pct, results_2pct = main(gain_threshold=2.0)
+        # Run multiple thresholds for comparison
+        thresholds = [1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
+        predictors = {}
+        results_all = {}
 
+        for threshold in thresholds:
+            print(f"\n{'='*80}")
+            # Format threshold properly (1.5 -> "1.5%", 2.0 -> "2%")
+            threshold_str = f"{threshold:.1f}".rstrip('0').rstrip('.') if threshold % 1 else str(int(threshold))
+            print(f"RUNNING ANALYSIS: {threshold_str}% GAIN TARGET")
+            print(f"{'='*80}\n")
+            predictor, results = main(gain_threshold=threshold)
+            predictors[threshold] = predictor
+            results_all[threshold] = results
+
+        # Print comprehensive comparison
         print(f"\n\n{'='*80}")
-        print("COMPARISON: 2% vs 5% GAIN TARGETS")
+        print("FINAL COMPARISON: ALL GAIN TARGETS")
         print(f"{'='*80}\n")
 
-        # Also run with 5% for comparison
-        print(f"\n{'='*80}")
-        print("RUNNING ANALYSIS: 5% GAIN TARGET")
-        print(f"{'='*80}\n")
-        predictor_5pct, results_5pct = main(gain_threshold=5.0)
-
-        # Print comparison
-        print(f"\n\n{'='*80}")
-        print("FINAL COMPARISON: 2% vs 5% TARGETS")
-        print(f"{'='*80}\n")
-
-        print(f"{'Metric':<25} {'2% Target':>15} {'5% Target':>15} {'Difference':>15}")
+        # Header - format thresholds properly
+        header_cols = []
+        for t in thresholds:
+            t_str = f"{t:.1f}".rstrip('0').rstrip('.') if t % 1 else str(int(t))
+            header_cols.append(f"{t_str}% Target")
+        print(f"{'Metric':<20} " + "".join([f"{col:>15}" for col in header_cols]))
         print("-"*80)
 
-        # Random Forest comparison
-        rf_2 = results_2pct['Random Forest']
-        rf_5 = results_5pct['Random Forest']
+        # Metrics comparison (Random Forest)
+        metrics = ['test_accuracy', 'precision', 'recall', 'f1_score', 'roc_auc']
+        metric_names = ['Test Accuracy', 'Precision', 'Recall', 'F1-Score', 'ROC-AUC']
 
-        print(f"{'Test Accuracy':<25} {rf_2['test_accuracy']:>14.4f} {rf_5['test_accuracy']:>15.4f} {rf_2['test_accuracy']-rf_5['test_accuracy']:>+15.4f}")
-        print(f"{'Precision':<25} {rf_2['precision']:>14.4f} {rf_5['precision']:>15.4f} {rf_2['precision']-rf_5['precision']:>+15.4f}")
-        print(f"{'Recall':<25} {rf_2['recall']:>14.4f} {rf_5['recall']:>15.4f} {rf_2['recall']-rf_5['recall']:>+15.4f}")
-        print(f"{'F1-Score':<25} {rf_2['f1_score']:>14.4f} {rf_5['f1_score']:>15.4f} {rf_2['f1_score']-rf_5['f1_score']:>+15.4f}")
-        print(f"{'ROC-AUC':<25} {rf_2['roc_auc']:>14.4f} {rf_5['roc_auc']:>15.4f} {rf_2['roc_auc']-rf_5['roc_auc']:>+15.4f}")
+        for metric, metric_name in zip(metrics, metric_names):
+            print(f"{metric_name:<20} ", end="")
+            for threshold in thresholds:
+                rf_result = results_all[threshold]['Random Forest']
+                value = rf_result[metric]
+                if value is not None:
+                    print(f"{value:>14.4f} ", end="")
+                else:
+                    print(f"{'N/A':>14} ", end="")
+            print()
 
+        # Find best model based on F1-score
         print("\n" + "="*80)
         print("RECOMMENDATION")
         print("="*80)
 
-        if rf_2['f1_score'] > rf_5['f1_score']:
-            print(f"✓ 2% target performs better (F1: {rf_2['f1_score']:.4f} vs {rf_5['f1_score']:.4f})")
-            print("  Use 2% target for higher win rate with smaller but more consistent gains")
-        else:
-            print(f"✓ 5% target performs better (F1: {rf_5['f1_score']:.4f} vs {rf_2['f1_score']:.4f})")
-            print("  Use 5% target for larger gains despite lower win rate")
+        best_threshold = thresholds[0]  # Initialize with first threshold
+        best_f1 = results_all[thresholds[0]]['Random Forest']['f1_score']
+        for threshold in thresholds[1:]:
+            rf_result = results_all[threshold]['Random Forest']
+            if rf_result['f1_score'] > best_f1:
+                best_f1 = rf_result['f1_score']
+                best_threshold = threshold
 
-        print("="*80)
+        # Format best threshold
+        best_t_str = f"{best_threshold:.1f}".rstrip('0').rstrip('.') if best_threshold % 1 else str(int(best_threshold))
+        print(f"✓ Best performing target: {best_t_str}% (F1-Score: {best_f1:.4f})")
+        print(f"\nF1-Score ranking:")
+        sorted_by_f1 = sorted(thresholds,
+                              key=lambda t: results_all[t]['Random Forest']['f1_score'],
+                              reverse=True)
+        for i, threshold in enumerate(sorted_by_f1, 1):
+            f1 = results_all[threshold]['Random Forest']['f1_score']
+            t_str = f"{threshold:.1f}".rstrip('0').rstrip('.') if threshold % 1 else str(int(threshold))
+            print(f"  {i}. {t_str}% target: F1 = {f1:.4f}")
+
+        print("\n" + "="*80)
