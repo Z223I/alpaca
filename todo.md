@@ -269,8 +269,20 @@ Add news column to signals. Also, volume surge if possible.
 - [ ] Update code/premarket_top_gainers.py to eliminate reverse splits using yfinance.
 
 
+## Bin Prices
 
-Review analysis/squeeze_alerts_statistical_analysis.py: I am guessing that the price of a stock will have an impact on the predictability of squeezes.  What do you think?  If it is used, it needs to be made statistally independent.
+- [X] Review analysis/squeeze_alerts_statistical_analysis.py: I am guessing that the price of a stock will have an impact on the predictability of squeezes.  What do you think?  If it is used, it needs to be made statistally independent.
+
+```text
+Key Takeaways:
+
+  - Trade $5-10 stocks - Nearly 60% win rate, best profitability
+  - Avoid $20-40 stocks - Low win rate, worst avg outcome
+  - $10-20 has highest volume but also highest stop loss rate (44%)
+  - Penny stocks (<$2) underperform despite high volatility
+
+  This validates that price level DOES matter for squeeze predictability!
+```
 
 ## Oracle
 

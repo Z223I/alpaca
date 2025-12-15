@@ -943,6 +943,175 @@ class SqueezeOutcomePredictor:
 
         print(f"✓ Saved summary report to: {output_file}")
 
+    def analyze_by_price_category(self, gain_threshold: float = 5.0,
+                                   output_path: str = 'analysis/price_category_analysis_5pct.png') -> pd.DataFrame:
+        """
+        Analyze squeeze outcomes by price category to identify best performing bins.
+
+        Args:
+            gain_threshold: Gain percentage threshold for success
+            output_path: Where to save visualization
+
+        Returns:
+            DataFrame with performance metrics by price category
+        """
+        print("\n" + "="*80)
+        print(f"PRICE CATEGORY ANALYSIS - {gain_threshold}% TARGET")
+        print("="*80)
+
+        # Check if price_category exists in dataframe
+        if 'price_category' not in self.df.columns:
+            print("⚠️  price_category not found in dataset")
+            return None
+
+        # Create target column name
+        target_col = f'achieved_{int(gain_threshold)}pct'
+
+        # Group by price_category and calculate metrics
+        grouped = self.df.groupby('price_category').agg({
+            'symbol': 'count',
+            target_col: 'mean',
+            'achieved_10pct': 'mean',
+            'reached_stop_loss': 'mean',
+            'max_gain_percent': 'mean',
+            'final_gain_percent': 'mean'
+        }).round(4)
+
+        grouped.columns = ['Count', f'Win_Rate_{int(gain_threshold)}pct', 'Win_Rate_10pct',
+                          'Stop_Loss_Rate', 'Avg_Max_Gain', 'Avg_Final_Gain']
+
+        # Calculate profitability score (win rate - stop loss rate)
+        grouped['Profitability_Score'] = grouped[f'Win_Rate_{int(gain_threshold)}pct'] - grouped['Stop_Loss_Rate']
+
+        # Sort by win rate descending
+        grouped = grouped.sort_values(f'Win_Rate_{int(gain_threshold)}pct', ascending=False)
+
+        # Print table
+        print(f"\nPerformance by Price Category (sorted by {gain_threshold}% win rate):")
+        print("="*95)
+        print(f"{'Price':<10} {'Count':>7} {f'{int(gain_threshold)}% Win':>10} {'10% Win':>10} "
+              f"{'Stop Loss':>11} {'Avg Max':>10} {'Avg Final':>11} {'Profit Score':>13}")
+        print("-"*95)
+
+        for price_cat, row in grouped.iterrows():
+            print(f"{price_cat:<10} {int(row['Count']):7d} "
+                  f"{row[f'Win_Rate_{int(gain_threshold)}pct']*100:9.1f}% "
+                  f"{row['Win_Rate_10pct']*100:9.1f}% "
+                  f"{row['Stop_Loss_Rate']*100:10.1f}% "
+                  f"{row['Avg_Max_Gain']:9.2f}% "
+                  f"{row['Avg_Final_Gain']:10.2f}% "
+                  f"{row['Profitability_Score']*100:12.1f}%")
+
+        print("="*95)
+
+        # Find best bin
+        best_bin = grouped['Profitability_Score'].idxmax()
+        print(f"\n🏆 Best Performing Bin: {best_bin}")
+        print(f"   {int(gain_threshold)}% Win Rate: {grouped.loc[best_bin, f'Win_Rate_{int(gain_threshold)}pct']*100:.1f}%")
+        print(f"   Stop Loss Rate: {grouped.loc[best_bin, 'Stop_Loss_Rate']*100:.1f}%")
+        print(f"   Profitability Score: {grouped.loc[best_bin, 'Profitability_Score']*100:.1f}%")
+
+        # Create visualization
+        self._plot_price_category_analysis(grouped, gain_threshold, output_path)
+
+        return grouped
+
+    def _plot_price_category_analysis(self, grouped: pd.DataFrame, gain_threshold: float,
+                                       output_path: str):
+        """
+        Create visualization of price category performance.
+
+        Args:
+            grouped: DataFrame with metrics by price category
+            gain_threshold: Gain percentage threshold
+            output_path: Where to save plot
+        """
+        # Sort by price category order for better visualization
+        price_order = ['<$2', '$2-5', '$5-10', '$10-20', '$20-40', '>$40']
+        grouped_sorted = grouped.reindex([p for p in price_order if p in grouped.index])
+
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+        fig.suptitle(f'Squeeze Performance by Price Category - {gain_threshold}% Target',
+                     fontsize=16, fontweight='bold')
+
+        # 1. Win Rate comparison
+        ax1 = axes[0, 0]
+        x_pos = range(len(grouped_sorted))
+        win_col = f'Win_Rate_{int(gain_threshold)}pct'
+        bars = ax1.bar(x_pos, grouped_sorted[win_col] * 100, color='green', alpha=0.7)
+        ax1.axhline(y=grouped_sorted[win_col].mean() * 100, color='red', linestyle='--',
+                   label=f'Average ({grouped_sorted[win_col].mean()*100:.1f}%)')
+        ax1.set_xlabel('Price Category', fontweight='bold')
+        ax1.set_ylabel(f'{int(gain_threshold)}% Win Rate (%)', fontweight='bold')
+        ax1.set_title(f'{int(gain_threshold)}% Win Rate by Price Category', fontweight='bold')
+        ax1.set_xticks(x_pos)
+        ax1.set_xticklabels(grouped_sorted.index, rotation=45, ha='right')
+        ax1.legend()
+        ax1.grid(axis='y', alpha=0.3)
+
+        # Add value labels on bars
+        for i, (bar, val) in enumerate(zip(bars, grouped_sorted[win_col] * 100)):
+            ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 1,
+                    f'{val:.1f}%', ha='center', va='bottom', fontsize=9)
+
+        # 2. Stop Loss Rate
+        ax2 = axes[0, 1]
+        bars = ax2.bar(x_pos, grouped_sorted['Stop_Loss_Rate'] * 100, color='red', alpha=0.7)
+        ax2.axhline(y=grouped_sorted['Stop_Loss_Rate'].mean() * 100, color='blue', linestyle='--',
+                   label=f'Average ({grouped_sorted["Stop_Loss_Rate"].mean()*100:.1f}%)')
+        ax2.set_xlabel('Price Category', fontweight='bold')
+        ax2.set_ylabel('Stop Loss Rate (%)', fontweight='bold')
+        ax2.set_title('Stop Loss Rate by Price Category', fontweight='bold')
+        ax2.set_xticks(x_pos)
+        ax2.set_xticklabels(grouped_sorted.index, rotation=45, ha='right')
+        ax2.legend()
+        ax2.grid(axis='y', alpha=0.3)
+
+        for i, (bar, val) in enumerate(zip(bars, grouped_sorted['Stop_Loss_Rate'] * 100)):
+            ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 1,
+                    f'{val:.1f}%', ha='center', va='bottom', fontsize=9)
+
+        # 3. Profitability Score (Win Rate - Stop Loss Rate)
+        ax3 = axes[1, 0]
+        colors = ['green' if x > 0 else 'red' for x in grouped_sorted['Profitability_Score']]
+        bars = ax3.bar(x_pos, grouped_sorted['Profitability_Score'] * 100, color=colors, alpha=0.7)
+        ax3.axhline(y=0, color='black', linestyle='-', linewidth=0.8)
+        ax3.set_xlabel('Price Category', fontweight='bold')
+        ax3.set_ylabel('Profitability Score (%)', fontweight='bold')
+        ax3.set_title('Profitability Score (Win Rate - Stop Loss Rate)', fontweight='bold')
+        ax3.set_xticks(x_pos)
+        ax3.set_xticklabels(grouped_sorted.index, rotation=45, ha='right')
+        ax3.grid(axis='y', alpha=0.3)
+
+        for i, (bar, val) in enumerate(zip(bars, grouped_sorted['Profitability_Score'] * 100)):
+            y_pos = bar.get_height() + 1 if val > 0 else bar.get_height() - 3
+            ax3.text(bar.get_x() + bar.get_width()/2, y_pos,
+                    f'{val:.1f}%', ha='center', va='bottom' if val > 0 else 'top', fontsize=9)
+
+        # 4. Average Final Gain
+        ax4 = axes[1, 1]
+        colors = ['green' if x > 0 else 'red' for x in grouped_sorted['Avg_Final_Gain']]
+        bars = ax4.bar(x_pos, grouped_sorted['Avg_Final_Gain'], color=colors, alpha=0.7)
+        ax4.axhline(y=0, color='black', linestyle='-', linewidth=0.8)
+        ax4.set_xlabel('Price Category', fontweight='bold')
+        ax4.set_ylabel('Average Final Gain (%)', fontweight='bold')
+        ax4.set_title('Average Final Gain by Price Category', fontweight='bold')
+        ax4.set_xticks(x_pos)
+        ax4.set_xticklabels(grouped_sorted.index, rotation=45, ha='right')
+        ax4.grid(axis='y', alpha=0.3)
+
+        for i, (bar, val) in enumerate(zip(bars, grouped_sorted['Avg_Final_Gain'])):
+            y_pos = bar.get_height() + 0.3 if val > 0 else bar.get_height() - 0.5
+            ax4.text(bar.get_x() + bar.get_width()/2, y_pos,
+                    f'{val:.2f}%', ha='center', va='bottom' if val > 0 else 'top', fontsize=9)
+
+        plt.tight_layout()
+
+        output_file = Path(output_path)
+        plt.savefig(output_file, dpi=300, bbox_inches='tight')
+        print(f"\n✓ Saved price category analysis plot to: {output_file}")
+        plt.close()
+
 
 def main(gain_threshold: float = 5.0):
     """
@@ -1022,6 +1191,12 @@ def main(gain_threshold: float = 5.0):
     # Step 11: Generate summary report
     predictor.generate_summary_report(output_path=f'analysis/prediction_summary{threshold_suffix}.txt')
 
+    # Step 12: Price category analysis
+    price_analysis = predictor.analyze_by_price_category(
+        gain_threshold=gain_threshold,
+        output_path=f'analysis/price_category_analysis{threshold_suffix}.png'
+    )
+
     print("\n" + "="*80)
     print(f"ANALYSIS COMPLETE - {gain_threshold}% GAIN TARGET")
     print("="*80)
@@ -1029,11 +1204,13 @@ def main(gain_threshold: float = 5.0):
     print(f"  - analysis/feature_importance{threshold_suffix}.png")
     print(f"  - analysis/roc_curves{threshold_suffix}.png")
     print(f"  - analysis/prediction_summary{threshold_suffix}.txt")
+    print(f"  - analysis/price_category_analysis{threshold_suffix}.png")
     print("\nNext steps:")
     print("  1. Review model performance (aim for F1 > 0.60)")
     print("  2. Check feature importance (which features drive success?)")
-    print("  3. Validate on additional dates (out-of-sample testing)")
-    print("  4. Consider alternative targets (30s gains, stop loss avoidance)")
+    print("  3. Review price category analysis (which price bins perform best?)")
+    print("  4. Validate on additional dates (out-of-sample testing)")
+    print("  5. Consider alternative targets (30s gains, stop loss avoidance)")
     print("="*80)
 
     return predictor, results
