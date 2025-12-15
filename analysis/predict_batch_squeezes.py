@@ -34,10 +34,14 @@ import json
 import sys
 from pathlib import Path
 from datetime import datetime, time
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Tuple
 import pandas as pd
 import xgboost as xgb
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 class BatchSqueezePredictor:
@@ -217,6 +221,81 @@ def load_alerts_from_directory(directory: Path,
     return alerts
 
 
+def calculate_actual_profit(alert: Dict, take_profit_pct: float = 1.5,
+                           stop_loss_pct: float = 2.0) -> Tuple[float, str]:
+    """
+    Calculate actual profit from outcome_tracking data.
+
+    Uses chronological interval logic with take profit and trailing stop loss.
+
+    Args:
+        alert: Alert dictionary with outcome_tracking
+        take_profit_pct: Take profit percentage (default 1.5%)
+        stop_loss_pct: Stop loss percentage (default 2.0%)
+
+    Returns:
+        Tuple of (profit_pct, outcome_reason)
+    """
+    outcome_tracking = alert.get('outcome_tracking')
+    if not outcome_tracking:
+        return (None, 'no_outcome_data')
+
+    intervals = outcome_tracking.get('intervals', {})
+    if not intervals:
+        # Fallback to summary data
+        summary = outcome_tracking.get('summary', {})
+        max_gain = summary.get('max_gain_percent', 0)
+        if max_gain >= take_profit_pct:
+            return (take_profit_pct, 'summary_target_hit')
+        elif max_gain <= -stop_loss_pct:
+            return (-stop_loss_pct, 'summary_stop_loss')
+        else:
+            final_gain = summary.get('final_gain_percent', 0)
+            return (max(final_gain, -stop_loss_pct), 'summary_no_target')
+
+    # Process intervals chronologically
+    sorted_intervals = sorted(intervals.items(), key=lambda x: int(x[0]))
+
+    for interval_sec_str, interval_data in sorted_intervals:
+        # Check for interval_low and interval_high (new format)
+        has_range_data = ('interval_low_gain_percent' in interval_data and
+                         'interval_high_gain_percent' in interval_data and
+                         'interval_low_timestamp' in interval_data and
+                         'interval_high_timestamp' in interval_data)
+
+        if has_range_data:
+            low_gain = interval_data['interval_low_gain_percent']
+            high_gain = interval_data['interval_high_gain_percent']
+            low_ts = interval_data['interval_low_timestamp']
+            high_ts = interval_data['interval_high_timestamp']
+
+            # Determine which happened first
+            if high_ts < low_ts:
+                # Price went UP first
+                if high_gain >= take_profit_pct:
+                    return (take_profit_pct, f'target_hit_{interval_sec_str}s')
+                if low_gain <= -stop_loss_pct:
+                    return (-stop_loss_pct, f'stop_loss_{interval_sec_str}s')
+            else:
+                # Price went DOWN first
+                if low_gain <= -stop_loss_pct:
+                    return (-stop_loss_pct, f'stop_loss_{interval_sec_str}s')
+                if high_gain >= take_profit_pct:
+                    return (take_profit_pct, f'target_hit_{interval_sec_str}s')
+        else:
+            # Fallback: snapshot data
+            gain = interval_data.get('gain_percent', 0)
+            if gain >= take_profit_pct:
+                return (take_profit_pct, f'snapshot_target_{interval_sec_str}s')
+            if gain <= -stop_loss_pct:
+                return (-stop_loss_pct, f'snapshot_stop_{interval_sec_str}s')
+
+    # No target or stop hit - use final gain
+    summary = outcome_tracking.get('summary', {})
+    final_gain = summary.get('final_gain_percent', 0)
+    return (max(final_gain, -stop_loss_pct), 'final_no_target')
+
+
 def parse_time(time_str: str) -> time:
     """Parse time string in HH:MM format."""
     try:
@@ -364,6 +443,7 @@ Examples:
     # Process alerts
     print("Processing alerts...")
     results = []
+    has_outcomes = False
 
     for alert in alerts:
         prediction = predictor.predict_single_alert(alert)
@@ -376,6 +456,11 @@ Examples:
         else:
             time_str = 'N/A'
 
+        # Calculate actual profit if outcome_tracking exists
+        actual_profit, outcome_reason = calculate_actual_profit(alert, take_profit_pct=1.5, stop_loss_pct=2.0)
+        if actual_profit is not None:
+            has_outcomes = True
+
         results.append({
             'symbol': alert.get('symbol', 'N/A'),
             'timestamp': timestamp_str,
@@ -387,7 +472,9 @@ Examples:
             'probability': prediction['probability'],
             'day_gain': alert.get('day_gain', 0),
             'volume_surge': alert.get('window_volume_vs_1min_avg', 0),
-            'distance_vwap': alert.get('distance_from_vwap_percent', 0)
+            'distance_vwap': alert.get('distance_from_vwap_percent', 0),
+            'actual_profit': actual_profit,
+            'outcome_reason': outcome_reason
         })
 
     # Create DataFrame
@@ -429,6 +516,180 @@ Examples:
     category_summary.columns = ['Count', 'TAKE_Count', 'Avg_Probability']
     category_summary['TAKE_Pct'] = (category_summary['TAKE_Count'] / category_summary['Count'] * 100).round(1)
     print(category_summary.to_string())
+
+    print("\n" + "="*80)
+
+    # BACKTEST ANALYSIS (if outcome data available)
+    if has_outcomes:
+        print("\n" + "="*80)
+        print("BACKTEST ANALYSIS - ACTUAL OUTCOMES AVAILABLE")
+        print("="*80)
+
+        # Filter to alerts with outcome data
+        df_backtest = df[df['actual_profit'].notna()].copy()
+
+        print(f"\nBacktest Sample: {len(df_backtest)} alerts with outcome data")
+        print(f"Take Profit Target: 1.5%")
+        print(f"Stop Loss: -2.0%")
+
+        # Calculate actual results
+        df_backtest['actual_success'] = df_backtest['actual_profit'] > 0
+
+        # Calculate metrics for MODEL predictions
+        model_take = df_backtest[df_backtest['prediction'] == 'TAKE']
+        model_skip = df_backtest[df_backtest['prediction'] == 'SKIP']
+
+        if len(model_take) > 0:
+            model_win_rate = (model_take['actual_success']).mean()
+            model_avg_profit = model_take['actual_profit'].mean()
+            model_total_profit = model_take['actual_profit'].sum()
+            model_wins = (model_take['actual_profit'] > 0).sum()
+            model_losses = (model_take['actual_profit'] < 0).sum()
+        else:
+            model_win_rate = model_avg_profit = model_total_profit = 0
+            model_wins = model_losses = 0
+
+        # Calculate metrics for ALL trades (baseline)
+        all_win_rate = df_backtest['actual_success'].mean()
+        all_avg_profit = df_backtest['actual_profit'].mean()
+        all_total_profit = df_backtest['actual_profit'].sum()
+
+        # Display results
+        print("\n" + "="*80)
+        print("MODEL PERFORMANCE vs BASELINE")
+        print("="*80)
+        print(f"{'Metric':<30} {'Model (TAKE only)':<20} {'Baseline (All)':<20} {'Improvement':<15}")
+        print("-"*85)
+        print(f"{'Trades Taken':<30} {len(model_take):<20} {len(df_backtest):<20} {'':<15}")
+        print(f"{'Win Rate':<30} {model_win_rate*100:>18.1f}% {all_win_rate*100:>18.1f}% {(model_win_rate-all_win_rate)*100:>13.1f}%")
+        print(f"{'Avg Profit per Trade':<30} {model_avg_profit:>18.2f}% {all_avg_profit:>18.2f}% {model_avg_profit-all_avg_profit:>13.2f}%")
+        print(f"{'Total Profit':<30} {model_total_profit:>18.2f}% {all_total_profit:>18.2f}% {model_total_profit-all_total_profit:>13.2f}%")
+        print(f"{'Wins / Losses':<30} {f'{model_wins} / {model_losses}':<20} {f'{(df_backtest['actual_profit'] > 0).sum()} / {(df_backtest['actual_profit'] < 0).sum()}':<20} {'':<15}")
+
+        # Confusion Matrix
+        print("\n" + "="*80)
+        print("CONFUSION MATRIX")
+        print("="*80)
+
+        # Create binary columns for matrix
+        df_backtest['predicted_success'] = df_backtest['prediction'] == 'TAKE'
+
+        # Calculate confusion matrix values
+        tp = ((df_backtest['predicted_success'] == True) & (df_backtest['actual_success'] == True)).sum()
+        fp = ((df_backtest['predicted_success'] == True) & (df_backtest['actual_success'] == False)).sum()
+        tn = ((df_backtest['predicted_success'] == False) & (df_backtest['actual_success'] == False)).sum()
+        fn = ((df_backtest['predicted_success'] == False) & (df_backtest['actual_success'] == True)).sum()
+
+        # Calculate metrics
+        accuracy = (tp + tn) / len(df_backtest) if len(df_backtest) > 0 else 0
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+        f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+
+        print(f"                Predicted")
+        print(f"                SKIP    TAKE")
+        print(f"Actual  LOSS   {tn:5d}   {fp:5d}  <- False Positives (bad trades)")
+        print(f"        WIN    {fn:5d}   {tp:5d}  <- True Positives (good trades)")
+        print(f"\nMetrics:")
+        print(f"  Accuracy:  {accuracy:.3f} ({accuracy*100:.1f}%)")
+        print(f"  Precision: {precision:.3f} (of TAKE predictions, {precision*100:.1f}% were winners)")
+        print(f"  Recall:    {recall:.3f} (of actual winners, we predicted {recall*100:.1f}%)")
+        print(f"  F1-Score:  {f1:.3f}")
+
+        # Generate charts
+        print("\n" + "="*80)
+        print("GENERATING ANALYSIS CHARTS")
+        print("="*80)
+
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+        fig.suptitle('Model Backtest Analysis - 1.5% Target / 2.0% Stop', fontsize=16, fontweight='bold')
+
+        # Chart 1: Profit Distribution by Prediction
+        ax1 = axes[0, 0]
+        take_profits = df_backtest[df_backtest['prediction'] == 'TAKE']['actual_profit']
+        skip_profits = df_backtest[df_backtest['prediction'] == 'SKIP']['actual_profit']
+
+        ax1.hist([take_profits, skip_profits], bins=30, label=['TAKE', 'SKIP'],
+                alpha=0.7, color=['green', 'red'])
+        ax1.axvline(x=0, color='black', linestyle='--', linewidth=1)
+        ax1.axvline(x=1.5, color='green', linestyle='--', linewidth=1, alpha=0.5, label='Take Profit')
+        ax1.axvline(x=-2.0, color='red', linestyle='--', linewidth=1, alpha=0.5, label='Stop Loss')
+        ax1.set_xlabel('Actual Profit (%)', fontweight='bold')
+        ax1.set_ylabel('Frequency', fontweight='bold')
+        ax1.set_title('Profit Distribution by Prediction', fontweight='bold')
+        ax1.legend()
+        ax1.grid(axis='y', alpha=0.3)
+
+        # Chart 2: Cumulative Profit
+        ax2 = axes[0, 1]
+        model_trades = df_backtest[df_backtest['prediction'] == 'TAKE'].sort_values('timestamp')
+        all_trades = df_backtest.sort_values('timestamp')
+
+        if len(model_trades) > 0:
+            model_cumulative = model_trades['actual_profit'].cumsum()
+            ax2.plot(range(len(model_cumulative)), model_cumulative.values,
+                    label='Model (TAKE only)', color='green', linewidth=2)
+
+        all_cumulative = all_trades['actual_profit'].cumsum()
+        ax2.plot(range(len(all_cumulative)), all_cumulative.values,
+                label='Baseline (All trades)', color='blue', linewidth=2, alpha=0.7)
+
+        ax2.axhline(y=0, color='black', linestyle='--', linewidth=1)
+        ax2.set_xlabel('Trade Number', fontweight='bold')
+        ax2.set_ylabel('Cumulative Profit (%)', fontweight='bold')
+        ax2.set_title('Cumulative Profit Over Time', fontweight='bold')
+        ax2.legend()
+        ax2.grid(alpha=0.3)
+
+        # Chart 3: Confusion Matrix Heatmap
+        ax3 = axes[1, 0]
+        cm = np.array([[tn, fp], [fn, tp]])
+        sns.heatmap(cm, annot=True, fmt='d', cmap='RdYlGn', ax=ax3,
+                   xticklabels=['SKIP', 'TAKE'],
+                   yticklabels=['LOSS', 'WIN'],
+                   cbar_kws={'label': 'Count'})
+        ax3.set_xlabel('Predicted', fontweight='bold')
+        ax3.set_ylabel('Actual', fontweight='bold')
+        ax3.set_title(f'Confusion Matrix (Accuracy: {accuracy:.1%})', fontweight='bold')
+
+        # Chart 4: Win Rate by Probability Bucket
+        ax4 = axes[1, 1]
+        df_backtest['prob_bucket'] = pd.cut(df_backtest['probability'],
+                                            bins=[0, 0.3, 0.5, 0.7, 1.0],
+                                            labels=['<30%', '30-50%', '50-70%', '>70%'])
+        bucket_stats = df_backtest.groupby('prob_bucket').agg({
+            'actual_success': 'mean',
+            'symbol': 'count'
+        })
+
+        if len(bucket_stats) > 0:
+            x_pos = range(len(bucket_stats))
+            bars = ax4.bar(x_pos, bucket_stats['actual_success'] * 100, color='green', alpha=0.7)
+            ax4.set_xlabel('Probability Bucket', fontweight='bold')
+            ax4.set_ylabel('Actual Win Rate (%)', fontweight='bold')
+            ax4.set_title('Calibration: Predicted vs Actual Win Rate', fontweight='bold')
+            ax4.set_xticks(x_pos)
+            ax4.set_xticklabels(bucket_stats.index)
+            ax4.grid(axis='y', alpha=0.3)
+
+            # Add count labels
+            for i, (bar, count) in enumerate(zip(bars, bucket_stats['symbol'])):
+                ax4.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 2,
+                        f'n={int(count)}', ha='center', fontsize=9)
+
+        plt.tight_layout()
+
+        # Save chart
+        chart_path = Path(args.output).parent / 'batch_backtest_analysis.png'
+        plt.savefig(chart_path, dpi=300, bbox_inches='tight')
+        print(f"✓ Saved backtest analysis chart to: {chart_path}")
+        plt.close()
+
+        print("\n" + "="*80)
+        print("BACKTEST COMPLETE")
+        print("="*80)
+        print(f"\nKey Finding: Model filtering improves avg profit by {model_avg_profit - all_avg_profit:+.2f}%")
+        print(f"Win Rate: {model_win_rate*100:.1f}% (model) vs {all_win_rate*100:.1f}% (baseline)")
 
     print("\n" + "="*80)
 
