@@ -995,7 +995,9 @@ def main(gain_threshold: float = 5.0):
     results = predictor.evaluate_models(X_train_scaled, X_test_scaled, y_train, y_test)
 
     # Step 8: Feature importance
-    threshold_suffix = f"_{int(gain_threshold)}pct"
+    # Format threshold for filename (1.5 -> "1.5", 2.0 -> "2")
+    threshold_str = f"{gain_threshold:.1f}".rstrip('0').rstrip('.') if gain_threshold % 1 else str(int(gain_threshold))
+    threshold_suffix = f"_{threshold_str}pct"
     importance_df = predictor.plot_feature_importance(
         model_name='Random Forest',
         output_path=f'analysis/feature_importance{threshold_suffix}.png'
