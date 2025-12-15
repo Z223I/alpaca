@@ -1112,6 +1112,217 @@ class SqueezeOutcomePredictor:
         print(f"\n✓ Saved price category analysis plot to: {output_file}")
         plt.close()
 
+    def analyze_by_time_of_day(self, gain_threshold: float = 5.0,
+                                output_path: str = 'analysis/time_of_day_analysis_5pct.png') -> pd.DataFrame:
+        """
+        Analyze squeeze outcomes by time of day (30-minute bins).
+
+        Args:
+            gain_threshold: Gain percentage threshold for success
+            output_path: Where to save visualization
+
+        Returns:
+            DataFrame with performance metrics by time bin
+        """
+        print("\n" + "="*80)
+        print(f"TIME OF DAY ANALYSIS - {gain_threshold}% TARGET")
+        print("="*80)
+
+        # Create time bins from timestamp
+        df_copy = self.df.copy()
+
+        # Parse timestamp and extract time
+        df_copy['timestamp_parsed'] = pd.to_datetime(df_copy['timestamp'])
+        df_copy['hour'] = df_copy['timestamp_parsed'].dt.hour
+        df_copy['minute'] = df_copy['timestamp_parsed'].dt.minute
+
+        # Create 30-minute time bins (format: "HH:MM-HH:MM")
+        def create_time_bin(row):
+            hour = row['hour']
+            minute = row['minute']
+
+            # Round down to nearest 30-minute interval
+            if minute < 30:
+                start_min = 0
+                end_min = 30
+            else:
+                start_min = 30
+                end_min = 0
+                if end_min == 0:
+                    end_hour = hour + 1
+                else:
+                    end_hour = hour
+
+            if minute < 30:
+                end_hour = hour
+            else:
+                end_hour = hour + 1
+
+            start_time = f"{hour:02d}:{start_min:02d}"
+            end_time = f"{end_hour:02d}:{end_min:02d}"
+
+            return f"{start_time}-{end_time}"
+
+        df_copy['time_bin'] = df_copy.apply(create_time_bin, axis=1)
+
+        # Create target column name
+        target_col = f'achieved_{int(gain_threshold)}pct'
+
+        # Group by time_bin and calculate metrics
+        grouped = df_copy.groupby('time_bin').agg({
+            'symbol': 'count',
+            target_col: 'mean',
+            'achieved_10pct': 'mean',
+            'reached_stop_loss': 'mean',
+            'max_gain_percent': 'mean',
+            'final_gain_percent': 'mean'
+        }).round(4)
+
+        grouped.columns = ['Count', f'Win_Rate_{int(gain_threshold)}pct', 'Win_Rate_10pct',
+                          'Stop_Loss_Rate', 'Avg_Max_Gain', 'Avg_Final_Gain']
+
+        # Calculate profitability score
+        grouped['Profitability_Score'] = grouped[f'Win_Rate_{int(gain_threshold)}pct'] - grouped['Stop_Loss_Rate']
+
+        # Sort by time bin (chronologically)
+        grouped = grouped.sort_index()
+
+        # Print table
+        print(f"\nPerformance by Time of Day (sorted chronologically, 30-min bins):")
+        print("="*95)
+        print(f"{'Time Bin':<13} {'Count':>7} {f'{int(gain_threshold)}% Win':>10} {'10% Win':>10} "
+              f"{'Stop Loss':>11} {'Avg Max':>10} {'Avg Final':>11} {'Profit Score':>13}")
+        print("-"*95)
+
+        for time_bin, row in grouped.iterrows():
+            print(f"{time_bin:<13} {int(row['Count']):7d} "
+                  f"{row[f'Win_Rate_{int(gain_threshold)}pct']*100:9.1f}% "
+                  f"{row['Win_Rate_10pct']*100:9.1f}% "
+                  f"{row['Stop_Loss_Rate']*100:10.1f}% "
+                  f"{row['Avg_Max_Gain']:9.2f}% "
+                  f"{row['Avg_Final_Gain']:10.2f}% "
+                  f"{row['Profitability_Score']*100:12.1f}%")
+
+        print("="*95)
+
+        # Find best time bin
+        best_bin = grouped['Profitability_Score'].idxmax()
+        print(f"\n🏆 Best Performing Time: {best_bin}")
+        print(f"   {int(gain_threshold)}% Win Rate: {grouped.loc[best_bin, f'Win_Rate_{int(gain_threshold)}pct']*100:.1f}%")
+        print(f"   Stop Loss Rate: {grouped.loc[best_bin, 'Stop_Loss_Rate']*100:.1f}%")
+        print(f"   Profitability Score: {grouped.loc[best_bin, 'Profitability_Score']*100:.1f}%")
+
+        # Highlight first hour after open (9:30-10:30)
+        morning_bins = ['09:30-10:00', '10:00-10:30']
+        morning_data = grouped.loc[grouped.index.intersection(morning_bins)]
+
+        if len(morning_data) > 0:
+            print(f"\n📊 First Hour After Open (9:30-10:30 AM):")
+            for time_bin in morning_bins:
+                if time_bin in grouped.index:
+                    row = grouped.loc[time_bin]
+                    print(f"   {time_bin}: {row[f'Win_Rate_{int(gain_threshold)}pct']*100:.1f}% win rate, "
+                          f"{row['Profitability_Score']*100:.1f}% profit score ({int(row['Count'])} alerts)")
+
+        # Create visualization
+        self._plot_time_of_day_analysis(grouped, gain_threshold, output_path)
+
+        return grouped
+
+    def _plot_time_of_day_analysis(self, grouped: pd.DataFrame, gain_threshold: float,
+                                    output_path: str):
+        """
+        Create visualization of time of day performance.
+
+        Args:
+            grouped: DataFrame with metrics by time bin
+            gain_threshold: Gain percentage threshold
+            output_path: Where to save plot
+        """
+        fig, axes = plt.subplots(2, 2, figsize=(16, 10))
+        fig.suptitle(f'Squeeze Performance by Time of Day - {gain_threshold}% Target',
+                     fontsize=16, fontweight='bold')
+
+        x_pos = range(len(grouped))
+        time_labels = grouped.index.tolist()
+
+        # 1. Win Rate by time
+        ax1 = axes[0, 0]
+        win_col = f'Win_Rate_{int(gain_threshold)}pct'
+        bars = ax1.bar(x_pos, grouped[win_col] * 100, color='green', alpha=0.7)
+        ax1.axhline(y=grouped[win_col].mean() * 100, color='red', linestyle='--',
+                   label=f'Average ({grouped[win_col].mean()*100:.1f}%)')
+
+        # Highlight first hour (9:30-10:30)
+        morning_bins = ['09:30-10:00', '10:00-10:30']
+        for i, time_bin in enumerate(time_labels):
+            if time_bin in morning_bins:
+                bars[i].set_color('darkgreen')
+                bars[i].set_alpha(0.9)
+
+        ax1.set_xlabel('Time of Day', fontweight='bold')
+        ax1.set_ylabel(f'{int(gain_threshold)}% Win Rate (%)', fontweight='bold')
+        ax1.set_title(f'{int(gain_threshold)}% Win Rate by Time of Day (First hour highlighted)', fontweight='bold')
+        ax1.set_xticks(x_pos)
+        ax1.set_xticklabels(time_labels, rotation=45, ha='right', fontsize=8)
+        ax1.legend()
+        ax1.grid(axis='y', alpha=0.3)
+
+        # 2. Stop Loss Rate
+        ax2 = axes[0, 1]
+        bars = ax2.bar(x_pos, grouped['Stop_Loss_Rate'] * 100, color='red', alpha=0.7)
+        ax2.axhline(y=grouped['Stop_Loss_Rate'].mean() * 100, color='blue', linestyle='--',
+                   label=f'Average ({grouped["Stop_Loss_Rate"].mean()*100:.1f}%)')
+        ax2.set_xlabel('Time of Day', fontweight='bold')
+        ax2.set_ylabel('Stop Loss Rate (%)', fontweight='bold')
+        ax2.set_title('Stop Loss Rate by Time of Day', fontweight='bold')
+        ax2.set_xticks(x_pos)
+        ax2.set_xticklabels(time_labels, rotation=45, ha='right', fontsize=8)
+        ax2.legend()
+        ax2.grid(axis='y', alpha=0.3)
+
+        # 3. Profitability Score
+        ax3 = axes[1, 0]
+        colors = ['green' if x > 0 else 'red' for x in grouped['Profitability_Score']]
+        bars = ax3.bar(x_pos, grouped['Profitability_Score'] * 100, color=colors, alpha=0.7)
+
+        # Highlight first hour
+        for i, time_bin in enumerate(time_labels):
+            if time_bin in morning_bins:
+                if grouped.iloc[i]['Profitability_Score'] > 0:
+                    bars[i].set_color('darkgreen')
+                    bars[i].set_alpha(0.9)
+
+        ax3.axhline(y=0, color='black', linestyle='-', linewidth=0.8)
+        ax3.set_xlabel('Time of Day', fontweight='bold')
+        ax3.set_ylabel('Profitability Score (%)', fontweight='bold')
+        ax3.set_title('Profitability Score by Time of Day (First hour highlighted)', fontweight='bold')
+        ax3.set_xticks(x_pos)
+        ax3.set_xticklabels(time_labels, rotation=45, ha='right', fontsize=8)
+        ax3.grid(axis='y', alpha=0.3)
+
+        # 4. Alert Count (volume throughout day)
+        ax4 = axes[1, 1]
+        bars = ax4.bar(x_pos, grouped['Count'], color='blue', alpha=0.7)
+        ax4.set_xlabel('Time of Day', fontweight='bold')
+        ax4.set_ylabel('Number of Alerts', fontweight='bold')
+        ax4.set_title('Alert Volume by Time of Day', fontweight='bold')
+        ax4.set_xticks(x_pos)
+        ax4.set_xticklabels(time_labels, rotation=45, ha='right', fontsize=8)
+        ax4.grid(axis='y', alpha=0.3)
+
+        # Add value labels on volume bars
+        for i, (bar, val) in enumerate(zip(bars, grouped['Count'])):
+            ax4.text(bar.get_x() + bar.get_width()/2, bar.get_height() + max(grouped['Count'])*0.01,
+                    f'{int(val)}', ha='center', va='bottom', fontsize=8)
+
+        plt.tight_layout()
+
+        output_file = Path(output_path)
+        plt.savefig(output_file, dpi=300, bbox_inches='tight')
+        print(f"\n✓ Saved time of day analysis plot to: {output_file}")
+        plt.close()
+
 
 def main(gain_threshold: float = 5.0):
     """
@@ -1197,6 +1408,12 @@ def main(gain_threshold: float = 5.0):
         output_path=f'analysis/price_category_analysis{threshold_suffix}.png'
     )
 
+    # Step 13: Time of day analysis
+    time_analysis = predictor.analyze_by_time_of_day(
+        gain_threshold=gain_threshold,
+        output_path=f'analysis/time_of_day_analysis{threshold_suffix}.png'
+    )
+
     print("\n" + "="*80)
     print(f"ANALYSIS COMPLETE - {gain_threshold}% GAIN TARGET")
     print("="*80)
@@ -1205,12 +1422,14 @@ def main(gain_threshold: float = 5.0):
     print(f"  - analysis/roc_curves{threshold_suffix}.png")
     print(f"  - analysis/prediction_summary{threshold_suffix}.txt")
     print(f"  - analysis/price_category_analysis{threshold_suffix}.png")
+    print(f"  - analysis/time_of_day_analysis{threshold_suffix}.png")
     print("\nNext steps:")
     print("  1. Review model performance (aim for F1 > 0.60)")
     print("  2. Check feature importance (which features drive success?)")
     print("  3. Review price category analysis (which price bins perform best?)")
-    print("  4. Validate on additional dates (out-of-sample testing)")
-    print("  5. Consider alternative targets (30s gains, stop loss avoidance)")
+    print("  4. Review time of day analysis (when are squeezes most profitable?)")
+    print("  5. Validate on additional dates (out-of-sample testing)")
+    print("  6. Consider alternative targets (30s gains, stop loss avoidance)")
     print("="*80)
 
     return predictor, results
