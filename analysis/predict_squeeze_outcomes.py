@@ -327,10 +327,10 @@ class SqueezeOutcomePredictor:
             index=X.index
         )
 
-        # Create indicator variables for features with significant missing data
-        if 'ema_spread_pct' in X.columns and X['ema_spread_pct'].isnull().sum() > 0:
-            X_imputed['ema_spread_pct_missing'] = X['ema_spread_pct'].isnull().astype(int)
-            print(f"✓ Created ema_spread_pct_missing indicator")
+        # REMOVED: ema_spread_pct_missing indicator
+        # Previously created indicator for missing values, but this caused distribution
+        # mismatch between train/test (9% missing in train, 0% in some test sets).
+        # Now we just impute missing values without the indicator feature.
 
         # Exclude macd_histogram if too much missing data (>50%)
         if 'macd_histogram' in X_imputed.columns:
@@ -430,6 +430,9 @@ class SqueezeOutcomePredictor:
         scaler = StandardScaler()
         X_train_scaled = scaler.fit_transform(X_train)
         X_test_scaled = scaler.transform(X_test)
+
+        # Store scaler for later use in predictions
+        self.scaler = scaler
 
         print(f"✓ Scaled features to mean=0, std=1")
         print(f"  Training mean: {X_train_scaled.mean():.4f}")
@@ -1601,6 +1604,9 @@ def train(gain_threshold: float = 5.0):
     # Step 5: Scale features
     X_train_scaled, X_test_scaled = predictor.scale_features(X_train, X_test)
 
+    # Store scaler for later use in predictions
+    predictor.scaler = predictor.scaler  # scaler is created in scale_features method
+
     # Step 6: Train models
     models = predictor.train_models(X_train_scaled, X_test_scaled, y_train, y_test)
 
@@ -1658,6 +1664,12 @@ def train(gain_threshold: float = 5.0):
         # Also save feature names and scaler for later use
         import json
         import pickle
+
+        # Save the scaler
+        scaler_path = Path(f'analysis/xgboost_model{threshold_suffix}_scaler.pkl')
+        with open(scaler_path, 'wb') as f:
+            pickle.dump(predictor.scaler, f)
+        print(f"✓ Saved feature scaler to: {scaler_path}")
 
         feature_info = {
             'feature_names': predictor.feature_names,
@@ -1963,13 +1975,22 @@ def predict(model_path: str, test_dir: str, gain_threshold: float | None = None)
     print(f"    - Recall: {model_info['model_performance']['recall']:.4f}")
     print(f"    - F1-Score: {model_info['model_performance']['f1_score']:.4f}")
 
-    # Step 2: Load model
+    # Step 2: Load model and scaler
     print("\n" + "="*80)
     print("LOADING MODEL")
     print("="*80)
     model = xgb.XGBClassifier()
     model.load_model(model_file)
     print(f"✓ Loaded XGBoost model from: {model_file}")
+
+    # Load scaler
+    import pickle
+    scaler_path = Path(str(model_file).replace('.json', '_scaler.pkl'))
+    if not scaler_path.exists():
+        raise FileNotFoundError(f"Scaler not found: {scaler_path}. Please retrain the model.")
+    with open(scaler_path, 'rb') as f:
+        scaler = pickle.load(f)
+    print(f"✓ Loaded feature scaler from: {scaler_path}")
 
     # Step 3: Load test data
     print("\n" + "="*80)
@@ -2046,13 +2067,17 @@ def predict(model_path: str, test_dir: str, gain_threshold: float | None = None)
 
     print(f"✓ Prepared {len(X)} samples with {len(X.columns)} features")
 
-    # Step 5: Make predictions
+    # Step 5: Scale features and make predictions
     print("\n" + "="*80)
     print("MAKING PREDICTIONS")
     print("="*80)
 
-    y_pred = model.predict(X)
-    y_pred_proba = model.predict_proba(X)[:, 1]
+    # Apply scaler to features (critical - model was trained on scaled features!)
+    X_scaled = scaler.transform(X)
+    print(f"✓ Scaled features using training scaler")
+
+    y_pred = model.predict(X_scaled)
+    y_pred_proba = model.predict_proba(X_scaled)[:, 1]
 
     print(f"✓ Generated predictions for {len(y_pred)} samples")
     print(f"  Predicted positives: {y_pred.sum()} ({y_pred.mean()*100:.1f}%)")
