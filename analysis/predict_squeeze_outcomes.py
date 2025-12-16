@@ -4,12 +4,60 @@ Squeeze Alert Outcome Prediction
 
 Predicts price action following squeeze alerts using statistically independent features.
 
-This script:
+This script supports two modes:
+1. **TRAIN MODE** - Train ML models and evaluate performance
+2. **PREDICT MODE** - Use trained models to make predictions on new data
+
+TRAINING WORKFLOW:
 1. Extracts outcome_tracking data from JSON files
 2. Merges with independent features
 3. Trains multiple ML models (Logistic Regression, Random Forest, XGBoost)
 4. Evaluates trading-specific metrics (precision, recall, ROI simulation)
 5. Generates feature importance analysis
+6. Saves trained models for later use
+
+PREDICTION WORKFLOW:
+1. Loads a trained XGBoost model
+2. Extracts outcome data from specified test directory
+3. Applies same preprocessing as training
+4. Makes predictions and evaluates performance
+5. Saves predictions with probabilities to CSV
+
+USAGE EXAMPLES (run from project root):
+
+  # Train models for all thresholds (1.5%, 2%, 2.5%, 3%)
+  python analysis/predict_squeeze_outcomes.py train
+
+  # Train model for specific threshold
+  python analysis/predict_squeeze_outcomes.py train --threshold 1.5
+
+  # Make predictions on a specific date's data
+  python analysis/predict_squeeze_outcomes.py predict \
+    --model analysis/xgboost_model_1.5pct.json \
+    --test-dir historical_data/2025-12-15
+
+  # Make predictions on all dates in directory
+  python analysis/predict_squeeze_outcomes.py predict \\
+    --model analysis/xgboost_model_2pct.json \\
+    --test-dir historical_data
+
+  # Make predictions with custom threshold (overrides model's default)
+  python analysis/predict_squeeze_outcomes.py predict \\
+    --model analysis/xgboost_model_1.5pct.json \\
+    --test-dir historical_data/2025-12-15 \\
+    --threshold 2.0
+
+OUTPUT FILES (Training):
+  - analysis/plots/feature_importance_{threshold}pct.png
+  - analysis/plots/roc_curves_{threshold}pct.png
+  - analysis/prediction_summary_{threshold}pct.txt
+  - analysis/plots/price_category_analysis_{threshold}pct.png
+  - analysis/plots/time_of_day_analysis_{threshold}pct.png
+  - analysis/xgboost_model_{threshold}pct.json
+  - analysis/xgboost_model_{threshold}pct_info.json
+
+OUTPUT FILES (Prediction):
+  - analysis/predictions_{threshold}pct.csv
 
 NOTE: Some features have missing data in current dataset:
 - ema_spread_pct: ~10% missing (price-normalized EMA spread)
@@ -19,6 +67,7 @@ For now, we handle missing data via imputation and indicator variables.
 
 Author: Predictive Analytics Module
 Date: 2025-12-12
+Updated: 2025-12-16 (Added predict mode)
 """
 
 import json
@@ -1324,9 +1373,9 @@ class SqueezeOutcomePredictor:
         plt.close()
 
 
-def main(gain_threshold: float = 5.0):
+def train(gain_threshold: float = 5.0):
     """
-    Main execution function.
+    Train models and generate analysis for a given gain threshold.
 
     Args:
         gain_threshold: Percentage gain threshold for success classification (default: 5.0)
@@ -1414,18 +1463,20 @@ def main(gain_threshold: float = 5.0):
         output_path=f'analysis/plots/time_of_day_analysis{threshold_suffix}.png'
     )
 
-    # Step 14: Save XGBoost model for 1.5% target
-    if gain_threshold == 1.5 and 'XGBoost' in predictor.models:
+    # Step 14: Save XGBoost model for all thresholds
+    if 'XGBoost' in predictor.models:
         print("\n" + "="*80)
-        print("SAVING XGBOOST MODEL FOR 1.5% TARGET")
+        print(f"SAVING XGBOOST MODEL FOR {threshold_str}% TARGET")
         print("="*80)
 
-        model_path = Path('analysis/xgboost_model_1.5pct.json')
+        model_path = Path(f'analysis/xgboost_model{threshold_suffix}.json')
         predictor.models['XGBoost'].save_model(model_path)
         print(f"✓ Saved XGBoost model to: {model_path}")
 
-        # Also save feature names for later use
+        # Also save feature names and scaler for later use
         import json
+        import pickle
+
         feature_info = {
             'feature_names': predictor.feature_names,
             'gain_threshold': gain_threshold,
@@ -1440,7 +1491,7 @@ def main(gain_threshold: float = 5.0):
             }
         }
 
-        feature_info_path = Path('analysis/xgboost_model_1.5pct_info.json')
+        feature_info_path = Path(f'analysis/xgboost_model{threshold_suffix}_info.json')
         with open(feature_info_path, 'w') as f:
             json.dump(feature_info, f, indent=2)
         print(f"✓ Saved model metadata to: {feature_info_path}")
@@ -1454,9 +1505,8 @@ def main(gain_threshold: float = 5.0):
     print(f"  - analysis/prediction_summary{threshold_suffix}.txt")
     print(f"  - analysis/plots/price_category_analysis{threshold_suffix}.png")
     print(f"  - analysis/plots/time_of_day_analysis{threshold_suffix}.png")
-    if gain_threshold == 1.5:
-        print(f"  - analysis/xgboost_model_1.5pct.json")
-        print(f"  - analysis/xgboost_model_1.5pct_info.json")
+    print(f"  - analysis/xgboost_model{threshold_suffix}.json")
+    print(f"  - analysis/xgboost_model{threshold_suffix}_info.json")
     print("\nNext steps:")
     print("  1. Review model performance (aim for F1 > 0.60)")
     print("  2. Check feature importance (which features drive success?)")
@@ -1469,81 +1519,331 @@ def main(gain_threshold: float = 5.0):
     return predictor, results
 
 
-if __name__ == "__main__":
-    import sys
+def predict(model_path: str, test_dir: str, gain_threshold: float | None = None) -> pd.DataFrame:
+    """
+    Load a trained model and make predictions on new data.
 
-    # Check for command-line argument
-    if len(sys.argv) > 1:
-        threshold = float(sys.argv[1])
-        print(f"\nRunning analysis with {threshold}% gain threshold\n")
-        main(gain_threshold=threshold)
+    Args:
+        model_path: Path to saved XGBoost model (e.g., 'analysis/xgboost_model_1.5pct.json')
+        test_dir: Directory containing test data (e.g., 'historical_data/2025-12-15')
+        gain_threshold: Percentage gain threshold (if None, reads from model metadata)
+
+    Returns:
+        DataFrame with predictions and actual outcomes
+    """
+    import json
+    import xgboost as xgb
+    from sklearn.preprocessing import LabelEncoder
+    from sklearn.impute import SimpleImputer
+    from sklearn.metrics import (
+        accuracy_score, precision_score, recall_score, f1_score,
+        confusion_matrix, roc_auc_score
+    )
+
+    print("="*80)
+    print("SQUEEZE ALERT OUTCOME PREDICTION - PREDICTION MODE")
+    print("="*80)
+    print(f"Model: {model_path}")
+    print(f"Test directory: {test_dir}")
+    print("="*80)
+
+    # Step 1: Load model metadata
+    model_file = Path(model_path)
+    info_path = Path(str(model_file).replace('.json', '_info.json'))
+
+    if not model_file.exists():
+        raise FileNotFoundError(f"Model not found: {model_file}")
+    if not info_path.exists():
+        raise FileNotFoundError(f"Model metadata not found: {info_path}")
+
+    with open(info_path, 'r') as f:
+        model_info = json.load(f)
+
+    feature_names = model_info['feature_names']
+    if gain_threshold is None:
+        gain_threshold = float(model_info['gain_threshold'])
+
+    # Now gain_threshold is guaranteed to be a float
+    threshold_str = f"{gain_threshold:.1f}".rstrip('0').rstrip('.') if gain_threshold % 1 else str(int(gain_threshold))
+    threshold_suffix = f"_{threshold_str}pct"
+
+    print(f"\nModel Info:")
+    print(f"  Gain Threshold: {gain_threshold}%")
+    print(f"  Features: {len(feature_names)}")
+    print(f"  Training Samples: {model_info['train_samples']}")
+    print(f"  Training Performance:")
+    print(f"    - Accuracy: {model_info['model_performance']['test_accuracy']:.4f}")
+    print(f"    - Precision: {model_info['model_performance']['precision']:.4f}")
+    print(f"    - Recall: {model_info['model_performance']['recall']:.4f}")
+    print(f"    - F1-Score: {model_info['model_performance']['f1_score']:.4f}")
+
+    # Step 2: Load model
+    print("\n" + "="*80)
+    print("LOADING MODEL")
+    print("="*80)
+    model = xgb.XGBClassifier()
+    model.load_model(model_file)
+    print(f"✓ Loaded XGBoost model from: {model_file}")
+
+    # Step 3: Load test data
+    print("\n" + "="*80)
+    print("LOADING TEST DATA")
+    print("="*80)
+
+    # Create predictor instance
+    test_path = Path(test_dir)
+    if not test_path.exists():
+        raise FileNotFoundError(f"Test directory not found: {test_dir}")
+
+    # Determine if test_dir is a date directory or base directory
+    single_date_mode = False
+    if (test_path / 'squeeze_alerts_sent').exists():
+        # Single date directory
+        json_dir = test_path.parent
+        start_date = test_path.name
+        single_date_mode = True
+        print(f"Single date mode: extracting only from {start_date}")
     else:
-        # Run multiple thresholds for comparison
-        thresholds = [1.5, 2.0, 2.5, 3.0]
-        predictors = {}
-        results_all = {}
+        # Base directory, use all dates
+        json_dir = test_path
+        start_date = "2025-01-01"  # Default to all dates
+        print(f"Multi-date mode: extracting from {start_date} onwards")
 
-        for threshold in thresholds:
-            print(f"\n{'='*80}")
-            # Format threshold properly (1.5 -> "1.5%", 2.0 -> "2%")
-            threshold_str = f"{threshold:.1f}".rstrip('0').rstrip('.') if threshold % 1 else str(int(threshold))
-            print(f"RUNNING ANALYSIS: {threshold_str}% GAIN TARGET")
-            print(f"{'='*80}\n")
-            predictor, results = main(gain_threshold=threshold)
-            predictors[threshold] = predictor
-            results_all[threshold] = results
+    features_csv = "analysis/squeeze_alerts_independent_features.csv"
+    predictor = SqueezeOutcomePredictor(str(json_dir), features_csv)
 
-        # Print comprehensive comparison
-        print(f"\n\n{'='*80}")
-        print("FINAL COMPARISON: ALL GAIN TARGETS")
-        print(f"{'='*80}\n")
+    # Extract outcomes
+    outcomes_df = predictor.extract_outcomes(gain_threshold=gain_threshold, start_date=start_date)
 
-        # Header - format thresholds properly
-        header_cols = []
-        for t in thresholds:
-            t_str = f"{t:.1f}".rstrip('0').rstrip('.') if t % 1 else str(int(t))
-            header_cols.append(f"{t_str}% Target")
-        print(f"{'Metric':<20} " + "".join([f"{col:>15}" for col in header_cols]))
-        print("-"*80)
+    # If single date mode, filter to only that specific date
+    if single_date_mode:
+        # Filter outcomes to only include the specific date
+        outcomes_df['date'] = pd.to_datetime(outcomes_df['timestamp']).dt.date
+        target_date = pd.to_datetime(start_date).date()
+        outcomes_df = outcomes_df[outcomes_df['date'] == target_date].copy()
+        outcomes_df = outcomes_df.drop('date', axis=1)
+        print(f"✓ Filtered to {len(outcomes_df)} alerts from {start_date} only")
 
-        # Metrics comparison (Random Forest)
-        metrics = ['test_accuracy', 'precision', 'recall', 'f1_score', 'roc_auc']
-        metric_names = ['Test Accuracy', 'Precision', 'Recall', 'F1-Score', 'ROC-AUC']
+    # Merge with features
+    df = predictor.merge_with_features(outcomes_df)
+    print(f"✓ Loaded {len(df)} test samples")
 
-        for metric, metric_name in zip(metrics, metric_names):
-            print(f"{metric_name:<20} ", end="")
+    # Step 4: Prepare features (same preprocessing as training)
+    print("\n" + "="*80)
+    print("PREPARING FEATURES")
+    print("="*80)
+
+    target_col = f'achieved_{int(gain_threshold)}pct'
+    X, y = predictor.prepare_features(df, target_variable=target_col)
+
+    # Verify feature alignment
+    if list(X.columns) != feature_names:
+        print("⚠️  Warning: Feature names don't match exactly. Attempting to reorder...")
+        try:
+            X = X[feature_names]
+            print("✓ Features reordered to match training")
+        except KeyError as e:
+            raise ValueError(f"Feature mismatch: {e}")
+
+    print(f"✓ Prepared {len(X)} samples with {len(X.columns)} features")
+
+    # Step 5: Make predictions
+    print("\n" + "="*80)
+    print("MAKING PREDICTIONS")
+    print("="*80)
+
+    y_pred = model.predict(X)
+    y_pred_proba = model.predict_proba(X)[:, 1]
+
+    print(f"✓ Generated predictions for {len(y_pred)} samples")
+    print(f"  Predicted positives: {y_pred.sum()} ({y_pred.mean()*100:.1f}%)")
+    print(f"  Actual positives: {y.sum()} ({y.mean()*100:.1f}%)")
+
+    # Step 6: Evaluate predictions
+    print("\n" + "="*80)
+    print("EVALUATION RESULTS")
+    print("="*80)
+
+    accuracy = accuracy_score(y, y_pred)
+    precision = precision_score(y, y_pred, zero_division=0)
+    recall = recall_score(y, y_pred, zero_division=0)
+    f1 = f1_score(y, y_pred, zero_division=0)
+    roc_auc = roc_auc_score(y, y_pred_proba)
+
+    print(f"Accuracy:    {accuracy:.4f}")
+    print(f"Precision:   {precision:.4f}  (of predicted wins, % actually won)")
+    print(f"Recall:      {recall:.4f}  (of actual wins, % we predicted)")
+    print(f"F1-Score:    {f1:.4f}  (balanced metric)")
+    print(f"ROC-AUC:     {roc_auc:.4f}  (discrimination ability)")
+
+    # Confusion Matrix
+    cm = confusion_matrix(y, y_pred)
+    print(f"\nConfusion Matrix:")
+    print(f"                Predicted")
+    print(f"                0       1")
+    print(f"Actual    0   {cm[0,0]:4d}   {cm[0,1]:4d}  <- False Positives (bad trades)")
+    print(f"          1   {cm[1,0]:4d}   {cm[1,1]:4d}  <- False Negatives (missed opps)")
+
+    # Step 7: Create predictions DataFrame
+    predictions_df = df[['symbol', 'timestamp']].copy()
+    predictions_df['actual_outcome'] = y
+    predictions_df['predicted_outcome'] = y_pred
+    predictions_df['prediction_probability'] = y_pred_proba
+    predictions_df['max_gain_percent'] = df['max_gain_percent']
+    predictions_df['final_gain_percent'] = df['final_gain_percent']
+
+    # Save predictions
+    output_path = Path(f'analysis/predictions{threshold_suffix}.csv')
+    predictions_df.to_csv(output_path, index=False)
+    print(f"\n✓ Saved predictions to: {output_path}")
+
+    # Step 8: Summary report
+    print("\n" + "="*80)
+    print("PREDICTION SUMMARY")
+    print("="*80)
+    print(f"\nModel trained on {model_info['train_samples']} samples")
+    print(f"Tested on {len(y)} samples")
+    print(f"\nPerformance Comparison:")
+    print(f"  Training F1-Score: {model_info['model_performance']['f1_score']:.4f}")
+    print(f"  Test F1-Score:     {f1:.4f}")
+    print(f"  Difference:        {f1 - model_info['model_performance']['f1_score']:.4f}")
+
+    if f1 >= model_info['model_performance']['f1_score'] - 0.05:
+        print("\n✓ Model generalizes well to new data")
+    else:
+        print("\n⚠️  Warning: Performance degradation detected")
+
+    print("="*80)
+
+    return predictions_df
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description='Squeeze Alert Outcome Prediction - Train or Predict',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples (run from project root):
+  # Train model with specific threshold
+  python analysis/predict_squeeze_outcomes.py train --threshold 1.5
+
+  # Train models for all thresholds (default)
+  python analysis/predict_squeeze_outcomes.py train
+
+  # Make predictions using trained model
+  python analysis/predict_squeeze_outcomes.py predict --model analysis/xgboost_model_1.5pct.json --test-dir historical_data/2025-12-15
+
+  # Predict on all dates in directory
+  python analysis/predict_squeeze_outcomes.py predict --model analysis/xgboost_model_2pct.json --test-dir historical_data
+        """
+    )
+
+    subparsers = parser.add_subparsers(dest='mode', help='Mode: train or predict')
+
+    # Train mode
+    train_parser = subparsers.add_parser('train', help='Train models')
+    train_parser.add_argument('--threshold', type=float, default=None,
+                             help='Gain threshold percentage (e.g., 1.5, 2.0). If not specified, trains all thresholds [1.5, 2.0, 2.5, 3.0]')
+
+    # Predict mode
+    predict_parser = subparsers.add_parser('predict', help='Make predictions using trained model')
+    predict_parser.add_argument('--model', type=str, required=True,
+                               help='Path to trained model (e.g., analysis/xgboost_model_1.5pct.json)')
+    predict_parser.add_argument('--test-dir', type=str, required=True,
+                               help='Directory containing test data (e.g., historical_data/2025-12-15)')
+    predict_parser.add_argument('--threshold', type=float, default=None,
+                               help='Gain threshold (optional, will use model\'s threshold if not specified)')
+
+    args = parser.parse_args()
+
+    # Default to train mode if no mode specified
+    if args.mode is None:
+        args.mode = 'train'
+        args.threshold = None
+
+    if args.mode == 'train':
+        if args.threshold is not None:
+            # Train single threshold
+            print(f"\nTraining model with {args.threshold}% gain threshold\n")
+            train(gain_threshold=args.threshold)
+        else:
+            # Run multiple thresholds for comparison
+            thresholds = [1.5, 2.0, 2.5, 3.0]
+            predictors = {}
+            results_all = {}
+
             for threshold in thresholds:
+                print(f"\n{'='*80}")
+                # Format threshold properly (1.5 -> "1.5%", 2.0 -> "2%")
+                threshold_str = f"{threshold:.1f}".rstrip('0').rstrip('.') if threshold % 1 else str(int(threshold))
+                print(f"RUNNING ANALYSIS: {threshold_str}% GAIN TARGET")
+                print(f"{'='*80}\n")
+                predictor, results = train(gain_threshold=threshold)
+                predictors[threshold] = predictor
+                results_all[threshold] = results
+
+            # Print comprehensive comparison
+            print(f"\n\n{'='*80}")
+            print("FINAL COMPARISON: ALL GAIN TARGETS")
+            print(f"{'='*80}\n")
+
+            # Header - format thresholds properly
+            header_cols = []
+            for t in thresholds:
+                t_str = f"{t:.1f}".rstrip('0').rstrip('.') if t % 1 else str(int(t))
+                header_cols.append(f"{t_str}% Target")
+            print(f"{'Metric':<20} " + "".join([f"{col:>15}" for col in header_cols]))
+            print("-"*80)
+
+            # Metrics comparison (Random Forest)
+            metrics = ['test_accuracy', 'precision', 'recall', 'f1_score', 'roc_auc']
+            metric_names = ['Test Accuracy', 'Precision', 'Recall', 'F1-Score', 'ROC-AUC']
+
+            for metric, metric_name in zip(metrics, metric_names):
+                print(f"{metric_name:<20} ", end="")
+                for threshold in thresholds:
+                    rf_result = results_all[threshold]['Random Forest']
+                    value = rf_result[metric]
+                    if value is not None:
+                        print(f"{value:>14.4f} ", end="")
+                    else:
+                        print(f"{'N/A':>14} ", end="")
+                print()
+
+            # Find best model based on F1-score
+            print("\n" + "="*80)
+            print("RECOMMENDATION")
+            print("="*80)
+
+            best_threshold = thresholds[0]  # Initialize with first threshold
+            best_f1 = results_all[thresholds[0]]['Random Forest']['f1_score']
+            for threshold in thresholds[1:]:
                 rf_result = results_all[threshold]['Random Forest']
-                value = rf_result[metric]
-                if value is not None:
-                    print(f"{value:>14.4f} ", end="")
-                else:
-                    print(f"{'N/A':>14} ", end="")
-            print()
+                if rf_result['f1_score'] > best_f1:
+                    best_f1 = rf_result['f1_score']
+                    best_threshold = threshold
 
-        # Find best model based on F1-score
-        print("\n" + "="*80)
-        print("RECOMMENDATION")
-        print("="*80)
+            # Format best threshold
+            best_t_str = f"{best_threshold:.1f}".rstrip('0').rstrip('.') if best_threshold % 1 else str(int(best_threshold))
+            print(f"✓ Best performing target: {best_t_str}% (F1-Score: {best_f1:.4f})")
+            print(f"\nF1-Score ranking:")
+            sorted_by_f1 = sorted(thresholds,
+                                  key=lambda t: results_all[t]['Random Forest']['f1_score'],
+                                  reverse=True)
+            for i, threshold in enumerate(sorted_by_f1, 1):
+                f1 = results_all[threshold]['Random Forest']['f1_score']
+                t_str = f"{threshold:.1f}".rstrip('0').rstrip('.') if threshold % 1 else str(int(threshold))
+                print(f"  {i}. {t_str}% target: F1 = {f1:.4f}")
 
-        best_threshold = thresholds[0]  # Initialize with first threshold
-        best_f1 = results_all[thresholds[0]]['Random Forest']['f1_score']
-        for threshold in thresholds[1:]:
-            rf_result = results_all[threshold]['Random Forest']
-            if rf_result['f1_score'] > best_f1:
-                best_f1 = rf_result['f1_score']
-                best_threshold = threshold
+            print("\n" + "="*80)
 
-        # Format best threshold
-        best_t_str = f"{best_threshold:.1f}".rstrip('0').rstrip('.') if best_threshold % 1 else str(int(best_threshold))
-        print(f"✓ Best performing target: {best_t_str}% (F1-Score: {best_f1:.4f})")
-        print(f"\nF1-Score ranking:")
-        sorted_by_f1 = sorted(thresholds,
-                              key=lambda t: results_all[t]['Random Forest']['f1_score'],
-                              reverse=True)
-        for i, threshold in enumerate(sorted_by_f1, 1):
-            f1 = results_all[threshold]['Random Forest']['f1_score']
-            t_str = f"{threshold:.1f}".rstrip('0').rstrip('.') if threshold % 1 else str(int(threshold))
-            print(f"  {i}. {t_str}% target: F1 = {f1:.4f}")
-
-        print("\n" + "="*80)
+    elif args.mode == 'predict':
+        # Prediction mode
+        predictions_df = predict(
+            model_path=args.model,
+            test_dir=args.test_dir,
+            gain_threshold=args.threshold
+        )
+        print(f"\n✓ Prediction complete. Results saved to analysis/predictions_*.csv")

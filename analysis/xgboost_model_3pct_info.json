@@ -1,0 +1,26 @@
+{
+  "feature_names": [
+    "ema_spread_pct",
+    "macd_histogram",
+    "squeeze_number_today",
+    "minutes_since_last_squeeze",
+    "window_volume_vs_1min_avg",
+    "distance_from_vwap_percent",
+    "day_gain",
+    "spy_percent_change_concurrent",
+    "spread_percent",
+    "market_session_encoded",
+    "price_category_encoded",
+    "ema_spread_pct_missing"
+  ],
+  "gain_threshold": 3.0,
+  "train_samples": 504,
+  "test_samples": 127,
+  "model_performance": {
+    "test_accuracy": 0.7559055118110236,
+    "precision": 0.7638888888888888,
+    "recall": 0.7971014492753623,
+    "f1_score": 0.7801418439716312,
+    "roc_auc": 0.827336331834083
+  }
+}
