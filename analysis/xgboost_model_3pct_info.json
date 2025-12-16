@@ -10,17 +10,16 @@
     "spy_percent_change_concurrent",
     "spread_percent",
     "market_session_encoded",
-    "price_category_encoded",
-    "ema_spread_pct_missing"
+    "price_category_encoded"
   ],
   "gain_threshold": 3.0,
   "train_samples": 2016,
   "test_samples": 504,
   "model_performance": {
-    "test_accuracy": 0.621031746031746,
-    "precision": 0.67,
-    "recall": 0.6860068259385665,
-    "f1_score": 0.6779089376053963,
-    "roc_auc": 0.6747488798667163
+    "test_accuracy": 0.6111111111111112,
+    "precision": 0.6689895470383276,
+    "recall": 0.6552901023890785,
+    "f1_score": 0.6620689655172414,
+    "roc_auc": 0.6689581547320576
   }
 }

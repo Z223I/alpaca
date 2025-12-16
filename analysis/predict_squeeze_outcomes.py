@@ -120,6 +120,10 @@ class SqueezeOutcomePredictor:
         self.results = {}
         self.feature_names = None
 
+        # Create analysis/plots directory if it doesn't exist
+        plots_dir = Path('analysis/plots')
+        plots_dir.mkdir(parents=True, exist_ok=True)
+
         # Set random seed for reproducibility
         np.random.seed(42)
 
