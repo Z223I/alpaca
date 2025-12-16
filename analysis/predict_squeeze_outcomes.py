@@ -556,7 +556,7 @@ class SqueezeOutcomePredictor:
         return results
 
     def plot_feature_importance(self, model_name: str = 'Random Forest',
-                                output_path: str = 'analysis/feature_importance.png'):
+                                output_path: str = 'analysis/plots/feature_importance.png'):
         """
         Plot feature importance for tree-based models.
 
@@ -605,7 +605,7 @@ class SqueezeOutcomePredictor:
 
         return importance_df
 
-    def plot_roc_curves(self, output_path: str = 'analysis/roc_curves.png'):
+    def plot_roc_curves(self, output_path: str = 'analysis/plots/roc_curves.png'):
         """
         Plot ROC curves for all models.
 
@@ -944,7 +944,7 @@ class SqueezeOutcomePredictor:
         print(f"✓ Saved summary report to: {output_file}")
 
     def analyze_by_price_category(self, gain_threshold: float = 5.0,
-                                   output_path: str = 'analysis/price_category_analysis_5pct.png') -> pd.DataFrame:
+                                   output_path: str = 'analysis/plots/price_category_analysis_5pct.png') -> pd.DataFrame:
         """
         Analyze squeeze outcomes by price category to identify best performing bins.
 
@@ -1113,7 +1113,7 @@ class SqueezeOutcomePredictor:
         plt.close()
 
     def analyze_by_time_of_day(self, gain_threshold: float = 5.0,
-                                output_path: str = 'analysis/time_of_day_analysis_5pct.png') -> pd.DataFrame:
+                                output_path: str = 'analysis/plots/time_of_day_analysis_5pct.png') -> pd.DataFrame:
         """
         Analyze squeeze outcomes by time of day (30-minute bins).
 
@@ -1388,11 +1388,11 @@ def main(gain_threshold: float = 5.0):
     threshold_suffix = f"_{threshold_str}pct"
     importance_df = predictor.plot_feature_importance(
         model_name='Random Forest',
-        output_path=f'analysis/feature_importance{threshold_suffix}.png'
+        output_path=f'analysis/plots/feature_importance{threshold_suffix}.png'
     )
 
     # Step 9: ROC curves
-    predictor.plot_roc_curves(output_path=f'analysis/roc_curves{threshold_suffix}.png')
+    predictor.plot_roc_curves(output_path=f'analysis/plots/roc_curves{threshold_suffix}.png')
 
     # Step 10: Trading simulation
     trading_results = predictor.simulate_trading(df, model_name='Random Forest',
@@ -1405,13 +1405,13 @@ def main(gain_threshold: float = 5.0):
     # Step 12: Price category analysis
     price_analysis = predictor.analyze_by_price_category(
         gain_threshold=gain_threshold,
-        output_path=f'analysis/price_category_analysis{threshold_suffix}.png'
+        output_path=f'analysis/plots/price_category_analysis{threshold_suffix}.png'
     )
 
     # Step 13: Time of day analysis
     time_analysis = predictor.analyze_by_time_of_day(
         gain_threshold=gain_threshold,
-        output_path=f'analysis/time_of_day_analysis{threshold_suffix}.png'
+        output_path=f'analysis/plots/time_of_day_analysis{threshold_suffix}.png'
     )
 
     # Step 14: Save XGBoost model for 1.5% target
@@ -1449,11 +1449,11 @@ def main(gain_threshold: float = 5.0):
     print(f"ANALYSIS COMPLETE - {gain_threshold}% GAIN TARGET")
     print("="*80)
     print("\nGenerated files:")
-    print(f"  - analysis/feature_importance{threshold_suffix}.png")
-    print(f"  - analysis/roc_curves{threshold_suffix}.png")
+    print(f"  - analysis/plots/feature_importance{threshold_suffix}.png")
+    print(f"  - analysis/plots/roc_curves{threshold_suffix}.png")
     print(f"  - analysis/prediction_summary{threshold_suffix}.txt")
-    print(f"  - analysis/price_category_analysis{threshold_suffix}.png")
-    print(f"  - analysis/time_of_day_analysis{threshold_suffix}.png")
+    print(f"  - analysis/plots/price_category_analysis{threshold_suffix}.png")
+    print(f"  - analysis/plots/time_of_day_analysis{threshold_suffix}.png")
     if gain_threshold == 1.5:
         print(f"  - analysis/xgboost_model_1.5pct.json")
         print(f"  - analysis/xgboost_model_1.5pct_info.json")
@@ -1479,7 +1479,7 @@ if __name__ == "__main__":
         main(gain_threshold=threshold)
     else:
         # Run multiple thresholds for comparison
-        thresholds = [1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
+        thresholds = [1.5, 2.0, 2.5, 3.0]
         predictors = {}
         results_all = {}
 

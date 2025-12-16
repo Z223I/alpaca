@@ -227,23 +227,31 @@ def load_alerts_from_directory(directory: Path,
 
 
 def calculate_actual_profit(alert: Dict, take_profit_pct: float = 1.5,
-                           stop_loss_pct: float = 2.0) -> Tuple[float, str]:
+                           initial_stop_loss_pct: float = 2.0) -> Tuple[float, float, str]:
     """
-    Calculate actual profit from outcome_tracking data.
+    Calculate actual profit from outcome_tracking data using trailing stop loss.
 
-    Uses chronological interval logic with take profit and trailing stop loss.
+    Trailing Stop Logic:
+    - Initial stop: -2.0% from entry
+    - As price moves up, stop trails: stop_loss = max_profit - 2.0%
+    - Stop never moves down, only up
+    - Exit when: hit take profit (1.5%) OR hit trailing stop
 
     Args:
         alert: Alert dictionary with outcome_tracking
         take_profit_pct: Take profit percentage (default 1.5%)
-        stop_loss_pct: Stop loss percentage (default 2.0%)
+        initial_stop_loss_pct: Initial stop loss percentage (default 2.0%)
 
     Returns:
-        Tuple of (profit_pct, outcome_reason)
+        Tuple of (sell_price, profit_pct, outcome_reason)
     """
     outcome_tracking = alert.get('outcome_tracking')
     if not outcome_tracking:
-        return (None, 'no_outcome_data')
+        return (None, None, 'no_outcome_data')
+
+    entry_price = outcome_tracking.get('squeeze_entry_price')
+    if not entry_price:
+        return (None, None, 'no_entry_price')
 
     intervals = outcome_tracking.get('intervals', {})
     if not intervals:
@@ -251,18 +259,23 @@ def calculate_actual_profit(alert: Dict, take_profit_pct: float = 1.5,
         summary = outcome_tracking.get('summary', {})
         max_gain = summary.get('max_gain_percent', 0)
         if max_gain >= take_profit_pct:
-            return (take_profit_pct, 'summary_target_hit')
-        elif max_gain <= -stop_loss_pct:
-            return (-stop_loss_pct, 'summary_stop_loss')
+            sell_price = entry_price * (1 + take_profit_pct / 100)
+            return (sell_price, take_profit_pct, 'summary_target_hit')
         else:
             final_gain = summary.get('final_gain_percent', 0)
-            return (max(final_gain, -stop_loss_pct), 'summary_no_target')
+            trailing_stop = max(max_gain - initial_stop_loss_pct, -initial_stop_loss_pct)
+            exit_gain = max(final_gain, trailing_stop)
+            sell_price = entry_price * (1 + exit_gain / 100)
+            return (sell_price, exit_gain, 'summary_trailing_stop')
 
-    # Process intervals chronologically
+    # Process intervals chronologically with trailing stop
     sorted_intervals = sorted(intervals.items(), key=lambda x: int(x[0]))
 
+    running_max_profit = -100  # Start very low
+    current_stop_loss = -initial_stop_loss_pct  # Initial stop at -2%
+
     for interval_sec_str, interval_data in sorted_intervals:
-        # Check for interval_low and interval_high (new format)
+        # Get interval price range
         has_range_data = ('interval_low_gain_percent' in interval_data and
                          'interval_high_gain_percent' in interval_data and
                          'interval_low_timestamp' in interval_data and
@@ -274,31 +287,67 @@ def calculate_actual_profit(alert: Dict, take_profit_pct: float = 1.5,
             low_ts = interval_data['interval_low_timestamp']
             high_ts = interval_data['interval_high_timestamp']
 
-            # Determine which happened first
+            # Check exit conditions based on chronological order
             if high_ts < low_ts:
-                # Price went UP first
+                # Price went UP first, then DOWN
+                # Check if hit take profit on the way up
                 if high_gain >= take_profit_pct:
-                    return (take_profit_pct, f'target_hit_{interval_sec_str}s')
-                if low_gain <= -stop_loss_pct:
-                    return (-stop_loss_pct, f'stop_loss_{interval_sec_str}s')
+                    sell_price = entry_price * (1 + take_profit_pct / 100)
+                    return (sell_price, take_profit_pct, f'target_hit_{interval_sec_str}s')
+
+                # Update trailing stop based on the high reached
+                running_max_profit = max(running_max_profit, high_gain)
+                new_stop = running_max_profit - initial_stop_loss_pct
+                current_stop_loss = max(current_stop_loss, new_stop)
+
+                # Check if hit trailing stop on the way down
+                if low_gain <= current_stop_loss:
+                    sell_price = entry_price * (1 + current_stop_loss / 100)
+                    return (sell_price, current_stop_loss, f'trailing_stop_{interval_sec_str}s')
             else:
-                # Price went DOWN first
-                if low_gain <= -stop_loss_pct:
-                    return (-stop_loss_pct, f'stop_loss_{interval_sec_str}s')
+                # Price went DOWN first, then UP
+                # Check if hit current trailing stop (from previous intervals)
+                if low_gain <= current_stop_loss:
+                    sell_price = entry_price * (1 + current_stop_loss / 100)
+                    return (sell_price, current_stop_loss, f'trailing_stop_{interval_sec_str}s')
+
+                # Check if hit take profit on the way up
                 if high_gain >= take_profit_pct:
-                    return (take_profit_pct, f'target_hit_{interval_sec_str}s')
+                    sell_price = entry_price * (1 + take_profit_pct / 100)
+                    return (sell_price, take_profit_pct, f'target_hit_{interval_sec_str}s')
+
+                # Update trailing stop based on the high reached
+                running_max_profit = max(running_max_profit, high_gain)
+                new_stop = running_max_profit - initial_stop_loss_pct
+                current_stop_loss = max(current_stop_loss, new_stop)
         else:
             # Fallback: snapshot data
             gain = interval_data.get('gain_percent', 0)
-            if gain >= take_profit_pct:
-                return (take_profit_pct, f'snapshot_target_{interval_sec_str}s')
-            if gain <= -stop_loss_pct:
-                return (-stop_loss_pct, f'snapshot_stop_{interval_sec_str}s')
 
-    # No target or stop hit - use final gain
+            # Check if hit take profit
+            if gain >= take_profit_pct:
+                sell_price = entry_price * (1 + take_profit_pct / 100)
+                return (sell_price, take_profit_pct, f'snapshot_target_{interval_sec_str}s')
+
+            # Check if hit current trailing stop
+            if gain <= current_stop_loss:
+                sell_price = entry_price * (1 + current_stop_loss / 100)
+                return (sell_price, current_stop_loss, f'snapshot_trailing_{interval_sec_str}s')
+
+            # Update trailing stop for next interval
+            running_max_profit = max(running_max_profit, gain)
+            new_stop = running_max_profit - initial_stop_loss_pct
+            current_stop_loss = max(current_stop_loss, new_stop)
+
+    # No exit triggered - use final price with trailing stop
     summary = outcome_tracking.get('summary', {})
     final_gain = summary.get('final_gain_percent', 0)
-    return (max(final_gain, -stop_loss_pct), 'final_no_target')
+
+    # Apply trailing stop to final gain
+    exit_gain = max(final_gain, current_stop_loss)
+    sell_price = entry_price * (1 + exit_gain / 100)
+
+    return (sell_price, exit_gain, 'final_trailing_stop')
 
 
 def parse_time(time_str: str) -> time:
@@ -462,15 +511,33 @@ Examples:
             time_str = 'N/A'
 
         # Calculate actual profit if outcome_tracking exists
-        actual_profit, outcome_reason = calculate_actual_profit(alert, take_profit_pct=1.5, stop_loss_pct=2.0)
+        sell_price, actual_profit, outcome_reason = calculate_actual_profit(alert, take_profit_pct=1.5, initial_stop_loss_pct=2.0)
         if actual_profit is not None:
             has_outcomes = True
+
+        # Calculate profit in dollars
+        entry_price = alert.get('last_price', 0)
+        if sell_price is not None and entry_price > 0:
+            profit_dollars = sell_price - entry_price
+        else:
+            profit_dollars = None
+
+        # Classify result as win/tie/loss
+        if profit_dollars is not None:
+            if profit_dollars > 0:
+                result = 'win'
+            elif profit_dollars == 0:
+                result = 'tie'
+            else:
+                result = 'loss'
+        else:
+            result = None
 
         results.append({
             'symbol': alert.get('symbol', 'N/A'),
             'timestamp': timestamp_str,
             'time': time_str,
-            'price': alert.get('last_price', 0),
+            'price': entry_price,
             'price_category': prediction['price_category'],
             'market_session': alert.get('market_session', 'N/A'),
             'prediction': 'TAKE' if prediction['prediction'] else 'SKIP',
@@ -478,12 +545,20 @@ Examples:
             'day_gain': alert.get('day_gain', 0),
             'volume_surge': alert.get('window_volume_vs_1min_avg', 0),
             'distance_vwap': alert.get('distance_from_vwap_percent', 0),
+            'sell_price': sell_price,
             'actual_profit': actual_profit,
+            'profit_dollars': profit_dollars,
+            'result': result,
             'outcome_reason': outcome_reason
         })
 
     # Create DataFrame
     df = pd.DataFrame(results)
+
+    # Calculate cumulative profit for trades with outcome data
+    if has_outcomes:
+        df_with_outcomes = df[df['profit_dollars'].notna()].sort_values('timestamp')
+        df.loc[df_with_outcomes.index, 'cumulative_profit_dollars'] = df_with_outcomes['profit_dollars'].cumsum()
 
     # Display summary
     print("\n" + "="*80)
@@ -495,6 +570,38 @@ Examples:
     print(f"\nAverage Success Probability: {df['probability'].mean():.1%}")
     print(f"High Confidence (>70%): {(df['probability'] > 0.7).sum()} alerts")
     print(f"Low Confidence (<30%): {(df['probability'] < 0.3).sum()} alerts")
+
+    # Win/Tie/Loss statistics (if outcome data available)
+    # Only calculate for TAKE predictions
+    if has_outcomes:
+        df_results = df[(df['result'].notna()) & (df['prediction'] == 'TAKE')]
+        wins = (df_results['result'] == 'win').sum()
+        ties = (df_results['result'] == 'tie').sum()
+        losses = (df_results['result'] == 'loss').sum()
+        total_trades = len(df_results)
+
+        if total_trades > 0:
+            print("\n" + "-"*80)
+            print("OUTCOME STATISTICS (TAKE Predictions Only)")
+            print("-"*80)
+            print(f"Total TAKE Trades with Outcomes: {total_trades}")
+            print(f"Wins:   {wins:4d} ({wins/total_trades*100:5.1f}%)")
+            print(f"Ties:   {ties:4d} ({ties/total_trades*100:5.1f}%)")
+            print(f"Losses: {losses:4d} ({losses/total_trades*100:5.1f}%)")
+
+            # Dollar profit statistics
+            total_profit = df_results['profit_dollars'].sum()
+            avg_profit = df_results['profit_dollars'].mean()
+            avg_win = df_results[df_results['result'] == 'win']['profit_dollars'].mean() if wins > 0 else 0
+            avg_loss = df_results[df_results['result'] == 'loss']['profit_dollars'].mean() if losses > 0 else 0
+
+            print(f"\nTotal Profit:       ${total_profit:+.2f}")
+            print(f"Average Profit:     ${avg_profit:+.2f} per trade")
+            print(f"Average Win:        ${avg_win:+.2f}")
+            print(f"Average Loss:       ${avg_loss:+.2f}")
+            if losses > 0 and avg_loss != 0:
+                profit_factor = abs(avg_win * wins / (avg_loss * losses)) if avg_loss < 0 else 0
+                print(f"Profit Factor:      {profit_factor:.2f}")
 
     # Display top predictions
     print("\n" + "="*80)
@@ -548,16 +655,25 @@ Examples:
             model_win_rate = (model_take['actual_success']).mean()
             model_avg_profit = model_take['actual_profit'].mean()
             model_total_profit = model_take['actual_profit'].sum()
-            model_wins = (model_take['actual_profit'] > 0).sum()
-            model_losses = (model_take['actual_profit'] < 0).sum()
+            model_wins = (model_take['result'] == 'win').sum()
+            model_ties = (model_take['result'] == 'tie').sum()
+            model_losses = (model_take['result'] == 'loss').sum()
+            model_avg_profit_dollars = model_take['profit_dollars'].mean()
+            model_total_profit_dollars = model_take['profit_dollars'].sum()
         else:
             model_win_rate = model_avg_profit = model_total_profit = 0
-            model_wins = model_losses = 0
+            model_wins = model_ties = model_losses = 0
+            model_avg_profit_dollars = model_total_profit_dollars = 0
 
         # Calculate metrics for ALL trades (baseline)
         all_win_rate = df_backtest['actual_success'].mean()
         all_avg_profit = df_backtest['actual_profit'].mean()
         all_total_profit = df_backtest['actual_profit'].sum()
+        all_wins = (df_backtest['result'] == 'win').sum()
+        all_ties = (df_backtest['result'] == 'tie').sum()
+        all_losses = (df_backtest['result'] == 'loss').sum()
+        all_avg_profit_dollars = df_backtest['profit_dollars'].mean()
+        all_total_profit_dollars = df_backtest['profit_dollars'].sum()
 
         # Display results
         print("\n" + "="*80)
@@ -567,13 +683,19 @@ Examples:
         print("-"*85)
         print(f"{'Trades Taken':<30} {len(model_take):<20} {len(df_backtest):<20} {'':<15}")
         print(f"{'Win Rate':<30} {model_win_rate*100:>18.1f}% {all_win_rate*100:>18.1f}% {(model_win_rate-all_win_rate)*100:>13.1f}%")
+
+        # Win/Tie/Loss breakdown
+        model_wl_str = f"{model_wins}W/{model_ties}T/{model_losses}L"
+        all_wl_str = f"{all_wins}W/{all_ties}T/{all_losses}L"
+        print(f"{'Wins / Ties / Losses':<30} {model_wl_str:<20} {all_wl_str:<20} {'':<15}")
+
         print(f"{'Avg Profit per Trade':<30} {model_avg_profit:>18.2f}% {all_avg_profit:>18.2f}% {model_avg_profit-all_avg_profit:>13.2f}%")
         print(f"{'Total Profit':<30} {model_total_profit:>18.2f}% {all_total_profit:>18.2f}% {model_total_profit-all_total_profit:>13.2f}%")
 
-        # Calculate baseline wins/losses separately to avoid f-string nesting
-        baseline_wins = (df_backtest['actual_profit'] > 0).sum()
-        baseline_losses = (df_backtest['actual_profit'] < 0).sum()
-        print(f"{'Wins / Losses':<30} {f'{model_wins} / {model_losses}':<20} {f'{baseline_wins} / {baseline_losses}':<20} {'':<15}")
+        # Dollar profit metrics
+        print(f"\n{'--- Dollar Profits ---':<30}")
+        print(f"{'Avg Profit per Trade ($)':<30} ${model_avg_profit_dollars:>17.2f} ${all_avg_profit_dollars:>17.2f} ${model_avg_profit_dollars-all_avg_profit_dollars:>12.2f}")
+        print(f"{'Total Profit ($)':<30} ${model_total_profit_dollars:>17.2f} ${all_total_profit_dollars:>17.2f} ${model_total_profit_dollars-all_total_profit_dollars:>12.2f}")
 
         # Confusion Matrix
         print("\n" + "="*80)
@@ -666,7 +788,7 @@ Examples:
         df_backtest['prob_bucket'] = pd.cut(df_backtest['probability'],
                                             bins=[0, 0.3, 0.5, 0.7, 1.0],
                                             labels=['<30%', '30-50%', '50-70%', '>70%'])
-        bucket_stats = df_backtest.groupby('prob_bucket').agg({
+        bucket_stats = df_backtest.groupby('prob_bucket', observed=True).agg({
             'actual_success': 'mean',
             'symbol': 'count'
         })
