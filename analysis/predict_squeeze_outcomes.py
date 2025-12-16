@@ -2277,7 +2277,7 @@ Examples (run from project root):
             train(gain_threshold=args.threshold)
         else:
             # Run multiple thresholds for comparison
-            thresholds = [1.5, 2.0, 2.5, 3.0]
+            thresholds = [1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
             predictors = {}
             results_all = {}
 
