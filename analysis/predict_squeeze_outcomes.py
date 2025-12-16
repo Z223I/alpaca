@@ -37,6 +37,7 @@ USAGE EXAMPLES (run from project root):
     --test-dir historical_data/2025-12-15
 
   python analysis/predict_squeeze_outcomes.py predict --model analysis/xgboost_model_1.5pct.json --test-dir historical_data/2025-12-16
+  python analysis/predict_squeeze_outcomes.py predict --model analysis/xgboost_model_3pct.json --test-dir historical_data/2025-12-16
 
   # Make predictions on all dates in directory
   python analysis/predict_squeeze_outcomes.py predict \\
@@ -53,6 +54,7 @@ OUTPUT FILES (Training):
   - analysis/plots/feature_importance_{threshold}pct.png
   - analysis/plots/roc_curves_{threshold}pct.png
   - analysis/prediction_summary_{threshold}pct.txt
+  - analysis/plots/class_distribution_{threshold}pct.png
   - analysis/plots/price_category_analysis_{threshold}pct.png
   - analysis/plots/time_of_day_analysis_{threshold}pct.png
   - analysis/xgboost_model_{threshold}pct.json
@@ -948,6 +950,33 @@ class SqueezeOutcomePredictor:
             f.write(f"Features: {len(self.feature_names)}\n")
             f.write(f"Target Variable: achieved_5pct (reached 5% gain in 10 minutes)\n\n")
 
+            # Add class distribution
+            target_col = 'achieved_5pct'
+            if target_col in self.df.columns:
+                total = len(self.df)
+                successes = int(self.df[target_col].sum())
+                failures = total - successes
+                success_pct = (successes / total * 100) if total > 0 else 0
+                failure_pct = (failures / total * 100) if total > 0 else 0
+                imbalance_ratio = failures / successes if successes > 0 else 0
+
+                f.write("CLASS DISTRIBUTION\n")
+                f.write("-"*80 + "\n")
+                f.write(f"Successes: {successes} ({success_pct:.1f}%)\n")
+                f.write(f"Failures:  {failures} ({failure_pct:.1f}%)\n")
+                f.write(f"Imbalance Ratio: 1 : {imbalance_ratio:.2f}\n")
+
+                if 45 <= success_pct <= 55:
+                    f.write("Balance Assessment: ✓ Excellent (45-55%)\n\n")
+                elif 40 <= success_pct <= 60:
+                    f.write("Balance Assessment: ~ Good (40-60%)\n\n")
+                elif 35 <= success_pct <= 65:
+                    f.write("Balance Assessment: ⚠ Moderate Imbalance (35-65%)\n\n")
+                else:
+                    f.write("Balance Assessment: ❌ Severe Imbalance - May cause overfitting\n\n")
+            else:
+                f.write("\n")
+
             f.write("MODEL PERFORMANCE\n")
             f.write("-"*80 + "\n")
             f.write(f"{'Model':<20} {'Accuracy':>10} {'Precision':>10} {'Recall':>10} {'F1':>10} {'ROC-AUC':>10}\n")
@@ -993,6 +1022,151 @@ class SqueezeOutcomePredictor:
                 f.write("  - Check for data quality issues\n")
 
         print(f"✓ Saved summary report to: {output_file}")
+
+    def analyze_class_distribution(self, gain_threshold: float = 5.0) -> Dict[str, Any]:
+        """
+        Analyze class distribution (success vs failure) for the dataset.
+
+        Args:
+            gain_threshold: Gain percentage threshold for success
+
+        Returns:
+            Dictionary with class distribution statistics
+        """
+        target_col = f'achieved_{int(gain_threshold)}pct'
+
+        if target_col not in self.df.columns:
+            print(f"⚠️  Target column {target_col} not found in dataset")
+            return {}
+
+        # Count successes and failures
+        total = len(self.df)
+        successes = self.df[target_col].sum()
+        failures = total - successes
+
+        success_pct = (successes / total * 100) if total > 0 else 0
+        failure_pct = (failures / total * 100) if total > 0 else 0
+
+        imbalance_ratio = failures / successes if successes > 0 else 0
+
+        stats = {
+            'total': total,
+            'successes': int(successes),
+            'failures': int(failures),
+            'success_pct': success_pct,
+            'failure_pct': failure_pct,
+            'imbalance_ratio': imbalance_ratio
+        }
+
+        print(f"\n{'='*80}")
+        print(f"CLASS DISTRIBUTION - {int(gain_threshold)}% TARGET")
+        print(f"{'='*80}")
+        print(f"Total Alerts:    {total}")
+        print(f"Successes:       {successes} ({success_pct:.1f}%)")
+        print(f"Failures:        {failures} ({failure_pct:.1f}%)")
+        print(f"Imbalance Ratio: 1 : {imbalance_ratio:.2f}")
+        print(f"{'='*80}")
+
+        # Assess balance quality
+        if 45 <= success_pct <= 55:
+            print("✓ EXCELLENT BALANCE (45-55% success rate)")
+        elif 40 <= success_pct <= 60:
+            print("~ GOOD BALANCE (40-60% success rate)")
+        elif 35 <= success_pct <= 65:
+            print("⚠️  MODERATE IMBALANCE (35-65% success rate)")
+        else:
+            print("❌ SEVERE IMBALANCE - May cause model overfitting")
+            print("   Recommendation: Use downsampling, upsampling, or different threshold")
+
+        return stats
+
+    def plot_class_distribution(self, gain_threshold: float = 5.0,
+                                output_path: str = 'analysis/plots/class_distribution_5pct.png'):
+        """
+        Create pie chart showing class distribution.
+
+        Args:
+            gain_threshold: Gain percentage threshold for success
+            output_path: Where to save the plot
+        """
+        stats = self.analyze_class_distribution(gain_threshold)
+
+        if not stats:
+            return
+
+        # Create figure
+        fig, ax = plt.subplots(figsize=(10, 8))
+
+        # Data for pie chart
+        labels = ['Success', 'Failure']
+        sizes = [stats['successes'], stats['failures']]
+        colors = ['#2ecc71', '#e74c3c']  # Green for success, red for failure
+        explode = (0.05, 0)  # Slightly separate the success slice
+
+        # Create pie chart
+        wedges, texts, autotexts = ax.pie(
+            sizes,
+            explode=explode,
+            labels=labels,
+            colors=colors,
+            autopct='%1.1f%%',
+            shadow=True,
+            startangle=90,
+            textprops={'fontsize': 14, 'weight': 'bold'}
+        )
+
+        # Make percentage text more visible
+        for autotext in autotexts:
+            autotext.set_color('white')
+            autotext.set_fontsize(16)
+
+        # Add title with statistics
+        ax.set_title(
+            f'Class Distribution - {int(gain_threshold)}% Target\n\n'
+            f'Total Alerts: {stats["total"]:,}\n'
+            f'Success: {stats["successes"]:,} ({stats["success_pct"]:.1f}%) | '
+            f'Failure: {stats["failures"]:,} ({stats["failure_pct"]:.1f}%)\n'
+            f'Imbalance Ratio: 1 : {stats["imbalance_ratio"]:.2f}',
+            fontsize=14,
+            fontweight='bold',
+            pad=20
+        )
+
+        # Equal aspect ratio ensures that pie is drawn as a circle
+        ax.axis('equal')
+
+        # Add assessment text
+        if 45 <= stats['success_pct'] <= 55:
+            assessment = "✓ Excellent Balance"
+            assessment_color = 'green'
+        elif 40 <= stats['success_pct'] <= 60:
+            assessment = "~ Good Balance"
+            assessment_color = 'orange'
+        elif 35 <= stats['success_pct'] <= 65:
+            assessment = "⚠ Moderate Imbalance"
+            assessment_color = 'darkorange'
+        else:
+            assessment = "❌ Severe Imbalance"
+            assessment_color = 'red'
+
+        plt.figtext(
+            0.5, 0.02,
+            assessment,
+            ha='center',
+            fontsize=12,
+            weight='bold',
+            color=assessment_color
+        )
+
+        plt.tight_layout()
+
+        # Save plot
+        output_file = Path(output_path)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(output_file, dpi=150, bbox_inches='tight')
+        plt.close()
+
+        print(f"✓ Saved class distribution plot to: {output_file}")
 
     def analyze_by_price_category(self, gain_threshold: float = 5.0,
                                    output_path: str = 'analysis/plots/price_category_analysis_5pct.png') -> pd.DataFrame:
@@ -1453,6 +1627,12 @@ def train(gain_threshold: float = 5.0):
     # Step 11: Generate summary report
     predictor.generate_summary_report(output_path=f'analysis/prediction_summary{threshold_suffix}.txt')
 
+    # Step 11.5: Class distribution analysis
+    predictor.plot_class_distribution(
+        gain_threshold=gain_threshold,
+        output_path=f'analysis/plots/class_distribution{threshold_suffix}.png'
+    )
+
     # Step 12: Price category analysis
     price_analysis = predictor.analyze_by_price_category(
         gain_threshold=gain_threshold,
@@ -1505,6 +1685,7 @@ def train(gain_threshold: float = 5.0):
     print(f"  - analysis/plots/feature_importance{threshold_suffix}.png")
     print(f"  - analysis/plots/roc_curves{threshold_suffix}.png")
     print(f"  - analysis/prediction_summary{threshold_suffix}.txt")
+    print(f"  - analysis/plots/class_distribution{threshold_suffix}.png")
     print(f"  - analysis/plots/price_category_analysis{threshold_suffix}.png")
     print(f"  - analysis/plots/time_of_day_analysis{threshold_suffix}.png")
     print(f"  - analysis/xgboost_model{threshold_suffix}.json")

@@ -1,23 +1,30 @@
 ================================================================================
 SQUEEZE ALERT OUTCOME PREDICTION - SUMMARY REPORT
 ================================================================================
-Generated: 2025-12-16 09:46:44
+Generated: 2025-12-16 13:44:27
 
 DATASET
 --------------------------------------------------------------------------------
-Total Observations: 631
-Training Set: 504 samples
-Test Set: 127 samples
+Total Observations: 2520
+Training Set: 2016 samples
+Test Set: 504 samples
 Features: 12
 Target Variable: achieved_5pct (reached 5% gain in 10 minutes)
+
+CLASS DISTRIBUTION
+--------------------------------------------------------------------------------
+Successes: 948 (37.6%)
+Failures:  1572 (62.4%)
+Imbalance Ratio: 1 : 1.66
+Balance Assessment: ⚠ Moderate Imbalance (35-65%)
 
 MODEL PERFORMANCE
 --------------------------------------------------------------------------------
 Model                  Accuracy  Precision     Recall         F1    ROC-AUC
 --------------------------------------------------------------------------------
-Logistic Regression      0.7323     0.7612     0.7391     0.7500     0.7956
-Random Forest            0.7244     0.7125     0.8261     0.7651     0.8168
-XGBoost                  0.7559     0.7639     0.7971     0.7801     0.8273
+Logistic Regression      0.6091     0.6805     0.6177     0.6476     0.6676
+Random Forest            0.6091     0.6558     0.6894     0.6722     0.6566
+XGBoost                  0.6210     0.6700     0.6860     0.6779     0.6747
 
 INTERPRETATION
 --------------------------------------------------------------------------------
@@ -29,9 +36,9 @@ ROC-AUC:   Overall discrimination ability (0.5=random, 1.0=perfect)
 RECOMMENDATION
 --------------------------------------------------------------------------------
 Best Model: XGBoost
-  F1-Score: 0.7801
-  Precision: 0.7639
-  Recall: 0.7971
+  F1-Score: 0.6779
+  Precision: 0.6700
+  Recall: 0.6860
 
 ✓ Model shows good predictive performance (F1 > 0.60)
   Recommended for trade filtering in production

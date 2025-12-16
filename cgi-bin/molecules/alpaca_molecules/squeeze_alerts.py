@@ -32,6 +32,9 @@ from typing import List, Set, Dict, Deque, Any, Optional
 from collections import deque
 import websockets
 import pytz
+import matplotlib
+matplotlib.use('Agg')  # Non-interactive backend
+import matplotlib.pyplot as plt
 
 # Add project root to path
 script_dir = os.path.dirname(os.path.abspath(__file__))  # cgi-bin/molecules/alpaca_molecules/
@@ -3094,6 +3097,167 @@ class SqueezeAlertsMonitor:
             traceback.print_exc()
             return None
 
+    def analyze_class_distribution(self, lookback_days: int = 5) -> Dict[str, Any]:
+        """
+        Analyze class distribution for squeeze alert outcomes.
+
+        Reads all alert JSON files from the past N days and calculates
+        the success/failure split for each target threshold.
+
+        Args:
+            lookback_days: Number of days to look back (default: 5)
+
+        Returns:
+            Dictionary containing class distribution statistics
+        """
+        self.logger.info("\n" + "="*70)
+        self.logger.info("📊 CLASS DISTRIBUTION ANALYSIS")
+        self.logger.info("="*70)
+
+        # Collect all alert files from past N days
+        all_alerts = []
+        et_tz = pytz.timezone('US/Eastern')
+        today = datetime.now(et_tz)
+
+        for day_offset in range(lookback_days):
+            target_date = (today - timedelta(days=day_offset)).strftime('%Y-%m-%d')
+            alerts_dir = Path(project_root) / "historical_data" / target_date / "squeeze_alerts_sent"
+
+            if not alerts_dir.exists():
+                continue
+
+            alert_files = list(alerts_dir.glob('alert_*_*.json'))
+
+            for alert_file in alert_files:
+                try:
+                    with open(alert_file, 'r') as f:
+                        alert_data = json.load(f)
+
+                    # Only include alerts with outcome data
+                    if 'outcome' in alert_data and alert_data['outcome']:
+                        all_alerts.append(alert_data)
+
+                except Exception as e:
+                    self.logger.warning(f"⚠️  Error reading {alert_file.name}: {e}")
+
+        if not all_alerts:
+            self.logger.warning("⚠️  No alerts with outcome data found")
+            return {}
+
+        self.logger.info(f"Found {len(all_alerts)} alerts with outcome data from past {lookback_days} days")
+
+        # Analyze class distribution for each threshold
+        results = {}
+
+        for threshold in self.OUTCOME_TARGET_THRESHOLDS:
+            threshold_int = int(threshold)
+            threshold_key = f'achieved_{threshold_int}pct'
+
+            # Count successes and failures
+            successes = sum(1 for alert in all_alerts
+                          if alert.get('outcome', {}).get(threshold_key, False))
+            failures = len(all_alerts) - successes
+
+            success_pct = (successes / len(all_alerts) * 100) if len(all_alerts) > 0 else 0
+            failure_pct = (failures / len(all_alerts) * 100) if len(all_alerts) > 0 else 0
+
+            imbalance_ratio = failures / successes if successes > 0 else 0
+
+            results[f'{threshold_int}pct'] = {
+                'total': len(all_alerts),
+                'successes': successes,
+                'failures': failures,
+                'success_pct': success_pct,
+                'failure_pct': failure_pct,
+                'imbalance_ratio': imbalance_ratio
+            }
+
+            self.logger.info(
+                f"\n{threshold_int}% Target:"
+                f"\n  Total alerts: {len(all_alerts)}"
+                f"\n  Successes: {successes} ({success_pct:.1f}%)"
+                f"\n  Failures: {failures} ({failure_pct:.1f}%)"
+                f"\n  Imbalance ratio: 1 : {imbalance_ratio:.2f}"
+            )
+
+        self.logger.info("="*70)
+
+        return results
+
+    def plot_class_distribution(self, lookback_days: int = 5) -> None:
+        """
+        Create pie charts showing class distribution for each target threshold.
+
+        Args:
+            lookback_days: Number of days to look back (default: 5)
+        """
+        results = self.analyze_class_distribution(lookback_days)
+
+        if not results:
+            self.logger.warning("⚠️  No data to plot")
+            return
+
+        # Create output directory
+        plots_dir = Path(project_root) / "analysis" / "plots"
+        plots_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create a figure with subplots for each threshold
+        num_thresholds = len(self.OUTCOME_TARGET_THRESHOLDS)
+        fig, axes = plt.subplots(1, num_thresholds, figsize=(6*num_thresholds, 5))
+
+        # Handle single threshold case
+        if num_thresholds == 1:
+            axes = [axes]
+
+        for idx, threshold in enumerate(self.OUTCOME_TARGET_THRESHOLDS):
+            threshold_int = int(threshold)
+            key = f'{threshold_int}pct'
+
+            if key not in results:
+                continue
+
+            data = results[key]
+
+            # Create pie chart
+            labels = ['Success', 'Failure']
+            sizes = [data['successes'], data['failures']]
+            colors = ['#2ecc71', '#e74c3c']  # Green for success, red for failure
+            explode = (0.05, 0)  # Slightly separate the success slice
+
+            axes[idx].pie(
+                sizes,
+                explode=explode,
+                labels=labels,
+                colors=colors,
+                autopct='%1.1f%%',
+                shadow=True,
+                startangle=90
+            )
+
+            axes[idx].set_title(
+                f'{threshold_int}% Target\n'
+                f'Total: {data["total"]} alerts\n'
+                f'Ratio: 1 : {data["imbalance_ratio"]:.2f}',
+                fontsize=12,
+                fontweight='bold'
+            )
+
+        plt.suptitle(
+            f'Squeeze Alert Class Distribution (Past {lookback_days} Days)',
+            fontsize=14,
+            fontweight='bold',
+            y=1.02
+        )
+
+        plt.tight_layout()
+
+        # Save figure
+        output_file = plots_dir / f'class_distribution_{lookback_days}days.png'
+        plt.savefig(output_file, dpi=150, bbox_inches='tight')
+        plt.close()
+
+        self.logger.info(f"📊 Class distribution plot saved to: {output_file}")
+
     def _print_statistics(self):
         """Print monitoring statistics."""
         if not self.start_time:
@@ -3137,6 +3301,12 @@ class SqueezeAlertsMonitor:
 
         self.logger.info("="*70)
 
+        # Generate class distribution analysis and plot
+        try:
+            self.plot_class_distribution(lookback_days=5)
+        except Exception as e:
+            self.logger.warning(f"⚠️  Could not generate class distribution plot: {e}")
+
 
 async def main():
     """Main entry point."""
@@ -3165,6 +3335,9 @@ Examples:
 
   # Explicit use-existing flag (same as default if no symbols specified)
   python3 squeeze_alerts.py --use-existing
+
+  # Analyze class distribution for squeeze outcomes (past 5 days)
+  python3 squeeze_alerts.py --analyze-class-distribution 5
         """
     )
 
@@ -3212,8 +3385,21 @@ Examples:
         help='Auto-subscribe to existing symbols from other clients (ignores --symbols and --symbols-file)'
     )
 
+    parser.add_argument(
+        '--analyze-class-distribution',
+        type=int,
+        metavar='DAYS',
+        help='Analyze class distribution for past N days and exit (e.g., --analyze-class-distribution 5)'
+    )
+
 
     args = parser.parse_args()
+
+    # Handle standalone class distribution analysis
+    if args.analyze_class_distribution:
+        monitor = SqueezeAlertsMonitor(verbose=True)
+        monitor.plot_class_distribution(lookback_days=args.analyze_class_distribution)
+        return
 
     # Parse symbols if provided
     symbols = None

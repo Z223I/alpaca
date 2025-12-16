@@ -14,13 +14,13 @@
     "ema_spread_pct_missing"
   ],
   "gain_threshold": 2.0,
-  "train_samples": 504,
-  "test_samples": 127,
+  "train_samples": 2016,
+  "test_samples": 504,
   "model_performance": {
-    "test_accuracy": 0.7480314960629921,
-    "precision": 0.7872340425531915,
-    "recall": 0.8604651162790697,
-    "f1_score": 0.8222222222222222,
-    "roc_auc": 0.8133862733976177
+    "test_accuracy": 0.6884920634920635,
+    "precision": 0.7576601671309192,
+    "recall": 0.7953216374269005,
+    "f1_score": 0.776034236804565,
+    "roc_auc": 0.675943975164248
   }
 }

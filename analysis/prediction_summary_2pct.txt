@@ -1,23 +1,30 @@
 ================================================================================
 SQUEEZE ALERT OUTCOME PREDICTION - SUMMARY REPORT
 ================================================================================
-Generated: 2025-12-16 09:46:35
+Generated: 2025-12-16 13:44:12
 
 DATASET
 --------------------------------------------------------------------------------
-Total Observations: 631
-Training Set: 504 samples
-Test Set: 127 samples
+Total Observations: 2520
+Training Set: 2016 samples
+Test Set: 504 samples
 Features: 12
 Target Variable: achieved_5pct (reached 5% gain in 10 minutes)
+
+CLASS DISTRIBUTION
+--------------------------------------------------------------------------------
+Successes: 948 (37.6%)
+Failures:  1572 (62.4%)
+Imbalance Ratio: 1 : 1.66
+Balance Assessment: ⚠ Moderate Imbalance (35-65%)
 
 MODEL PERFORMANCE
 --------------------------------------------------------------------------------
 Model                  Accuracy  Precision     Recall         F1    ROC-AUC
 --------------------------------------------------------------------------------
-Logistic Regression      0.7008     0.8529     0.6744     0.7532     0.7935
-Random Forest            0.7402     0.7912     0.8372     0.8136     0.8230
-XGBoost                  0.7480     0.7872     0.8605     0.8222     0.8134
+Logistic Regression      0.6310     0.7635     0.6608     0.7085     0.6944
+Random Forest            0.7202     0.7531     0.8743     0.8092     0.6899
+XGBoost                  0.6885     0.7577     0.7953     0.7760     0.6759
 
 INTERPRETATION
 --------------------------------------------------------------------------------
@@ -28,10 +35,10 @@ ROC-AUC:   Overall discrimination ability (0.5=random, 1.0=perfect)
 
 RECOMMENDATION
 --------------------------------------------------------------------------------
-Best Model: XGBoost
-  F1-Score: 0.8222
-  Precision: 0.7872
-  Recall: 0.8605
+Best Model: Random Forest
+  F1-Score: 0.8092
+  Precision: 0.7531
+  Recall: 0.8743
 
 ✓ Model shows good predictive performance (F1 > 0.60)
   Recommended for trade filtering in production
