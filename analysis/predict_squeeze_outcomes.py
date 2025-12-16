@@ -698,7 +698,7 @@ class SqueezeOutcomePredictor:
         plt.close()
 
     def _calculate_trade_outcome(self, outcome: pd.Series, gain_threshold: float,
-                                  stop_loss_pct: float) -> Tuple[float, str]:
+                                  stop_loss_pct: float) -> Tuple[float, str, int]:
         """
         Calculate trade outcome using chronological interval price range logic.
 
@@ -718,7 +718,7 @@ class SqueezeOutcomePredictor:
             stop_loss_pct: Stop loss percentage (positive number, e.g., 2.0 for -2%)
 
         Returns:
-            Tuple of (gain_percent, reason_string)
+            Tuple of (gain_percent, reason_string, holding_time_seconds)
         """
         from datetime import datetime
 
@@ -754,65 +754,67 @@ class SqueezeOutcomePredictor:
                     high_timestamp = interval_data['interval_high_timestamp']
 
                     # Determine which event happened first
+                    interval_sec = int(interval_sec_str)
                     if high_timestamp < low_timestamp:
                         # Price went UP first, then DOWN
                         # Check if we hit target before stop loss
                         if high_gain >= gain_threshold:
                             # WIN: Hit target before stop loss (exact limit order)
-                            return (gain_threshold, f'target_hit_at_{interval_sec_str}s')
+                            return (gain_threshold, f'target_hit_at_{interval_sec_str}s', interval_sec)
 
                         # Check if stop loss was hit
                         if low_gain <= -stop_loss_pct:
                             # LOSS: Hit stop loss
-                            return (-stop_loss_pct, f'stop_loss_at_{interval_sec_str}s')
+                            return (-stop_loss_pct, f'stop_loss_at_{interval_sec_str}s', interval_sec)
 
                     else:
                         # Price went DOWN first, then UP (or at same time)
                         # Check if we hit stop loss before target
                         if low_gain <= -stop_loss_pct:
                             # LOSS: Hit stop loss before target
-                            return (-stop_loss_pct, f'stop_loss_at_{interval_sec_str}s')
+                            return (-stop_loss_pct, f'stop_loss_at_{interval_sec_str}s', interval_sec)
 
                         # Check if target was hit
                         if high_gain >= gain_threshold:
                             # WIN: Hit target (exact limit order)
-                            return (gain_threshold, f'target_hit_at_{interval_sec_str}s')
+                            return (gain_threshold, f'target_hit_at_{interval_sec_str}s', interval_sec)
 
                 else:
                     # FALLBACK: Use snapshot price if no range data
                     if 'gain_percent' in interval_data:
                         gain = interval_data['gain_percent']
+                        interval_sec = int(interval_sec_str)
 
                         # Check if hit target (exact limit order)
                         if gain >= gain_threshold:
-                            return (gain_threshold, f'snapshot_target_at_{interval_sec_str}s')
+                            return (gain_threshold, f'snapshot_target_at_{interval_sec_str}s', interval_sec)
 
                         # Check if hit stop loss
                         if gain <= -stop_loss_pct:
-                            return (-stop_loss_pct, f'snapshot_stop_at_{interval_sec_str}s')
+                            return (-stop_loss_pct, f'snapshot_stop_at_{interval_sec_str}s', interval_sec)
 
             # If we went through all intervals without hitting target or stop loss
-            # Use the final outcome
+            # Use the final outcome (assume max interval time of 600 seconds = 10 minutes)
             final_gain = outcome.get('final_gain_percent', 0)
             if final_gain >= gain_threshold:
-                return (gain_threshold, 'final_target')
+                return (gain_threshold, 'final_target', 600)
             elif final_gain <= -stop_loss_pct:
-                return (-stop_loss_pct, 'final_stop_loss')
+                return (-stop_loss_pct, 'final_stop_loss', 600)
             else:
-                return (final_gain, 'final_no_target')
+                return (final_gain, 'final_no_target', 600)
 
         # FALLBACK: Use max_gain_percent if no interval data
-        # This maintains backward compatibility
+        # This maintains backward compatibility (assume 600 seconds)
         max_gain = outcome.get('max_gain_percent', 0)
 
         if max_gain >= gain_threshold:
-            return (gain_threshold, 'legacy_target_hit')
+            return (gain_threshold, 'legacy_target_hit', 600)
         elif max_gain <= -stop_loss_pct:
-            return (-stop_loss_pct, 'legacy_stop_loss')
+            return (-stop_loss_pct, 'legacy_stop_loss', 600)
         else:
             # Didn't hit target or stop loss
             final_gain = outcome.get('final_gain_percent', max_gain)
-            return (max(final_gain, -stop_loss_pct), 'legacy_no_target')
+            return (max(final_gain, -stop_loss_pct), 'legacy_no_target', 600)
 
     def simulate_trading(self, df: pd.DataFrame, model_name: str = 'Random Forest',
                          gain_threshold: float = 5.0, stop_loss_pct: float = 2.0) -> Dict:
@@ -863,6 +865,9 @@ class SqueezeOutcomePredictor:
             return {}
 
         # Calculate P&L for each trade using chronological interval logic
+        import json
+        from datetime import datetime
+
         pnl_list = []
         detailed_results = []  # Track detailed outcome for each trade
 
@@ -872,17 +877,48 @@ class SqueezeOutcomePredictor:
 
             outcome = test_outcomes.loc[idx]
 
-            # Try to use interval price range data (NEW feature)
-            # This gives us chronological high/low information
-            gain, outcome_reason = self._calculate_trade_outcome(
-                outcome, gain_threshold, stop_loss_pct
-            )
+            # Load full JSON data to get interval information
+            try:
+                symbol = outcome.get('symbol', 'N/A')
+                timestamp = outcome.get('timestamp', '')
+
+                # Find the JSON file for this alert
+                # Format: historical_data/YYYY-MM-DD/squeeze_alerts_sent/alert_SYMBOL_YYYY-MM-DD_HHMMSS.json
+                date_obj = pd.to_datetime(timestamp)
+                date_str = date_obj.strftime('%Y-%m-%d')
+                time_str = date_obj.strftime('%H%M%S')
+
+                json_file = Path(self.json_dir) / date_str / 'squeeze_alerts_sent' / f'alert_{symbol}_{date_str}_{time_str}.json'
+
+                if json_file.exists():
+                    with open(json_file, 'r') as f:
+                        full_data = json.load(f)
+
+                    # Create enhanced row with full outcome_tracking structure
+                    enhanced_outcome = outcome.copy()
+                    if 'outcome_tracking' in full_data:
+                        enhanced_outcome['outcome_tracking'] = full_data['outcome_tracking']
+
+                    gain, outcome_reason, holding_time = self._calculate_trade_outcome(
+                        enhanced_outcome, gain_threshold, stop_loss_pct
+                    )
+                else:
+                    # Fallback if JSON not found
+                    gain, outcome_reason, holding_time = self._calculate_trade_outcome(
+                        outcome, gain_threshold, stop_loss_pct
+                    )
+            except Exception as e:
+                # Fallback on error
+                gain, outcome_reason, holding_time = self._calculate_trade_outcome(
+                    outcome, gain_threshold, stop_loss_pct
+                )
 
             pnl_list.append(gain)
             detailed_results.append({
                 'symbol': outcome.get('symbol', 'N/A'),
                 'gain': gain,
-                'reason': outcome_reason
+                'reason': outcome_reason,
+                'holding_time_sec': holding_time
             })
 
         # Calculate statistics
@@ -908,10 +944,33 @@ class SqueezeOutcomePredictor:
         for idx in test_outcomes.index:
             outcome = test_outcomes.loc[idx]
 
-            # Use same calculation logic
-            gain, _ = self._calculate_trade_outcome(
-                outcome, gain_threshold, stop_loss_pct
-            )
+            # Load full JSON data for accurate calculation
+            try:
+                symbol = outcome.get('symbol', 'N/A')
+                timestamp = outcome.get('timestamp', '')
+                date_obj = pd.to_datetime(timestamp)
+                date_str = date_obj.strftime('%Y-%m-%d')
+                time_str = date_obj.strftime('%H%M%S')
+                json_file = Path(self.json_dir) / date_str / 'squeeze_alerts_sent' / f'alert_{symbol}_{date_str}_{time_str}.json'
+
+                if json_file.exists():
+                    with open(json_file, 'r') as f:
+                        full_data = json.load(f)
+                    enhanced_outcome = outcome.copy()
+                    if 'outcome_tracking' in full_data:
+                        enhanced_outcome['outcome_tracking'] = full_data['outcome_tracking']
+                    gain, _, _ = self._calculate_trade_outcome(
+                        enhanced_outcome, gain_threshold, stop_loss_pct
+                    )
+                else:
+                    gain, _, _ = self._calculate_trade_outcome(
+                        outcome, gain_threshold, stop_loss_pct
+                    )
+            except Exception:
+                gain, _, _ = self._calculate_trade_outcome(
+                    outcome, gain_threshold, stop_loss_pct
+                )
+
             all_trades_pnl.append(gain)
 
         all_trades_avg = np.mean(all_trades_pnl)
@@ -928,8 +987,181 @@ class SqueezeOutcomePredictor:
             'avg_win': avg_win,
             'avg_loss': avg_loss,
             'all_trades_avg': all_trades_avg,
-            'improvement': avg_pnl - all_trades_avg
+            'improvement': avg_pnl - all_trades_avg,
+            'detailed_results': detailed_results
         }
+
+    def analyze_holding_period_distribution(self, trading_results: Dict,
+                                           gain_threshold: float = 5.0,
+                                           output_path: str = 'analysis/plots/holding_period_distribution.png'):
+        """
+        Analyze and visualize the distribution of holding periods for wins vs losses.
+
+        Args:
+            trading_results: Results from simulate_trading containing detailed_results
+            gain_threshold: Gain threshold used for classification
+            output_path: Where to save the distribution plot
+        """
+        print("\n" + "="*80)
+        print("ANALYZING HOLDING PERIOD DISTRIBUTION")
+        print("="*80)
+
+        detailed_results = trading_results.get('detailed_results', [])
+        if not detailed_results:
+            print("⚠️  No detailed results available")
+            return
+
+        # Separate wins and losses based on profitability
+        # Win = positive gain, Loss = negative or zero gain
+        wins = [r for r in detailed_results if r['gain'] > 0]
+        losses = [r for r in detailed_results if r['gain'] <= 0]
+
+        win_times = [r['holding_time_sec'] for r in wins]
+        loss_times = [r['holding_time_sec'] for r in losses]
+
+        # Calculate statistics
+        print(f"\nHolding Period Statistics:")
+        print(f"="*60)
+
+        if win_times:
+            print(f"\nWINS ({len(wins)} trades):")
+            print(f"  Average holding time: {np.mean(win_times):.1f} seconds ({np.mean(win_times)/60:.1f} minutes)")
+            print(f"  Median holding time:  {np.median(win_times):.1f} seconds ({np.median(win_times)/60:.1f} minutes)")
+            print(f"  Min holding time:     {min(win_times)} seconds ({min(win_times)/60:.1f} minutes)")
+            print(f"  Max holding time:     {max(win_times)} seconds ({max(win_times)/60:.1f} minutes)")
+            print(f"  Std deviation:        {np.std(win_times):.1f} seconds")
+
+        if loss_times:
+            print(f"\nLOSSES ({len(losses)} trades):")
+            print(f"  Average holding time: {np.mean(loss_times):.1f} seconds ({np.mean(loss_times)/60:.1f} minutes)")
+            print(f"  Median holding time:  {np.median(loss_times):.1f} seconds ({np.median(loss_times)/60:.1f} minutes)")
+            print(f"  Min holding time:     {min(loss_times)} seconds ({min(loss_times)/60:.1f} minutes)")
+            print(f"  Max holding time:     {max(loss_times)} seconds ({max(loss_times)/60:.1f} minutes)")
+            print(f"  Std deviation:        {np.std(loss_times):.1f} seconds")
+
+        if win_times and loss_times:
+            print(f"\nCOMPARISON:")
+            diff = np.mean(win_times) - np.mean(loss_times)
+            win_rate = len(wins) / (len(wins) + len(losses)) * 100
+            print(f"  Win rate: {win_rate:.1f}% ({len(wins)}/{len(wins)+len(losses)} profitable)")
+            if diff > 0:
+                print(f"  Wins held {diff:.1f} seconds ({diff/60:.1f} minutes) LONGER on average")
+            else:
+                print(f"  Losses held {abs(diff):.1f} seconds ({abs(diff)/60:.1f} minutes) LONGER on average")
+
+        # Create distribution plots
+        output_file = Path(output_path)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+        fig.suptitle(f'Holding Period Distribution - Wins vs Losses (Target: {gain_threshold}%)',
+                    fontsize=14, fontweight='bold')
+
+        # 1. Histogram - wins vs losses (seconds)
+        ax1 = axes[0, 0]
+        bins = [10, 20, 30, 60, 120, 180, 240, 300, 360, 420, 480, 540, 600]
+        if win_times and loss_times:
+            ax1.hist([win_times, loss_times], bins=bins, alpha=0.7,
+                    label=[f'Wins (n={len(wins)})', f'Losses (n={len(losses)})'],
+                    color=['green', 'red'], edgecolor='black')
+        elif win_times:
+            ax1.hist(win_times, bins=bins, alpha=0.7,
+                    label=f'Wins (n={len(wins)})', color='green', edgecolor='black')
+        elif loss_times:
+            ax1.hist(loss_times, bins=bins, alpha=0.7,
+                    label=f'Losses (n={len(losses)})', color='red', edgecolor='black')
+        ax1.set_xlabel('Holding Time (seconds)', fontweight='bold')
+        ax1.set_ylabel('Frequency', fontweight='bold')
+        ax1.set_title('Distribution by Time (Seconds)', fontweight='bold')
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+
+        # 2. Histogram - wins vs losses (minutes)
+        ax2 = axes[0, 1]
+        bins_minutes = [0.17, 0.33, 0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        win_times_min = [t/60 for t in win_times]
+        loss_times_min = [t/60 for t in loss_times]
+        if win_times_min and loss_times_min:
+            ax2.hist([win_times_min, loss_times_min], bins=bins_minutes, alpha=0.7,
+                    label=[f'Wins (n={len(wins)})', f'Losses (n={len(losses)})'],
+                    color=['green', 'red'], edgecolor='black')
+        elif win_times_min:
+            ax2.hist(win_times_min, bins=bins_minutes, alpha=0.7,
+                    label=f'Wins (n={len(wins)})', color='green', edgecolor='black')
+        elif loss_times_min:
+            ax2.hist(loss_times_min, bins=bins_minutes, alpha=0.7,
+                    label=f'Losses (n={len(losses)})', color='red', edgecolor='black')
+        ax2.set_xlabel('Holding Time (minutes)', fontweight='bold')
+        ax2.set_ylabel('Frequency', fontweight='bold')
+        ax2.set_title('Distribution by Time (Minutes)', fontweight='bold')
+        ax2.legend()
+        ax2.grid(True, alpha=0.3)
+
+        # 3. Box plot comparison
+        ax3 = axes[1, 0]
+        data_to_plot = []
+        labels = []
+        if win_times:
+            data_to_plot.append([t/60 for t in win_times])
+            labels.append(f'Wins\n(n={len(wins)})')
+        if loss_times:
+            data_to_plot.append([t/60 for t in loss_times])
+            labels.append(f'Losses\n(n={len(losses)})')
+
+        if data_to_plot:
+            bp = ax3.boxplot(data_to_plot, labels=labels, patch_artist=True)
+            colors = ['lightgreen' if 'Win' in label else 'lightcoral' for label in labels]
+            for patch, color in zip(bp['boxes'], colors):
+                patch.set_facecolor(color)
+        ax3.set_ylabel('Holding Time (minutes)', fontweight='bold')
+        ax3.set_title('Box Plot Comparison', fontweight='bold')
+        ax3.grid(True, alpha=0.3, axis='y')
+
+        # 4. Cumulative distribution
+        ax4 = axes[1, 1]
+        if win_times:
+            win_times_sorted = np.sort(win_times_min)
+            win_cumulative = np.arange(1, len(win_times_sorted)+1) / len(win_times_sorted) * 100
+            ax4.plot(win_times_sorted, win_cumulative, label=f'Wins (n={len(wins)})',
+                    color='green', linewidth=2, marker='o', markersize=3)
+        if loss_times:
+            loss_times_sorted = np.sort(loss_times_min)
+            loss_cumulative = np.arange(1, len(loss_times_sorted)+1) / len(loss_times_sorted) * 100
+            ax4.plot(loss_times_sorted, loss_cumulative, label=f'Losses (n={len(losses)})',
+                    color='red', linewidth=2, marker='s', markersize=3)
+        ax4.set_xlabel('Holding Time (minutes)', fontweight='bold')
+        ax4.set_ylabel('Cumulative Percentage (%)', fontweight='bold')
+        ax4.set_title('Cumulative Distribution', fontweight='bold')
+        ax4.legend()
+        ax4.grid(True, alpha=0.3)
+        ax4.set_xlim(left=0)
+        ax4.set_ylim([0, 100])
+
+        plt.tight_layout()
+        plt.savefig(output_file, dpi=300, bbox_inches='tight')
+        print(f"\n✓ Saved holding period distribution plot to: {output_file}")
+        plt.close()
+
+        # Print time bucket analysis
+        print(f"\nTime Bucket Analysis:")
+        print(f"="*60)
+        time_buckets = [
+            (0, 30, "0-30s"),
+            (30, 60, "30-60s"),
+            (60, 120, "1-2 min"),
+            (120, 300, "2-5 min"),
+            (300, 600, "5-10 min")
+        ]
+
+        for min_time, max_time, label in time_buckets:
+            wins_in_bucket = sum(1 for t in win_times if min_time <= t < max_time)
+            losses_in_bucket = sum(1 for t in loss_times if min_time <= t < max_time)
+            total_in_bucket = wins_in_bucket + losses_in_bucket
+
+            if total_in_bucket > 0:
+                win_pct = (wins_in_bucket / total_in_bucket * 100) if total_in_bucket else 0
+                print(f"  {label:12s}: {wins_in_bucket:3d} wins, {losses_in_bucket:3d} losses "
+                      f"({win_pct:.1f}% win rate)")
 
     def generate_summary_report(self, output_path: str = 'analysis/prediction_summary.txt'):
         """
@@ -1634,6 +1866,13 @@ def train(gain_threshold: float = 5.0):
                                                   gain_threshold=gain_threshold,
                                                   stop_loss_pct=2.0)
 
+    # Step 10a: Analyze holding period distribution
+    predictor.analyze_holding_period_distribution(
+        trading_results,
+        gain_threshold=gain_threshold,
+        output_path=f'analysis/plots/holding_period_distribution{threshold_suffix}.png'
+    )
+
     # Step 11: Generate summary report
     predictor.generate_summary_report(output_path=f'analysis/prediction_summary{threshold_suffix}.txt')
 
@@ -2120,33 +2359,56 @@ def predict(model_path: str, test_dir: str, gain_threshold: float | None = None)
     predictions_df['max_gain_percent'] = df['max_gain_percent']
     predictions_df['final_gain_percent'] = df['final_gain_percent']
 
-    # Step 7a: Calculate realistic trading outcomes with trailing stop
+    # Step 7a: Calculate realistic trading outcomes with interval-based stop loss
     print("\n" + "="*80)
-    print("CALCULATING TRADING PROFITS (1.5% Target + 2% Trailing Stop)")
+    print(f"CALCULATING TRADING PROFITS ({gain_threshold}% Target + 2% Stop Loss)")
+    print("Using interval-based chronological logic for realistic simulation")
     print("="*80)
 
     TRAILING_STOP_PCT = 2.0
 
-    def calculate_trailing_stop_outcome(row):
-        """Calculate trade outcome with trailing stop logic."""
-        max_gain = row['max_gain_percent']
-        final_gain = row['final_gain_percent']
+    # Calculate realistic profit using _calculate_trade_outcome with interval data
+    import json
+    realistic_profits = []
 
-        # Hit target?
-        if max_gain >= gain_threshold:
-            return gain_threshold
+    for idx in df.index:
+        outcome_row = df.loc[idx]
+        symbol = outcome_row.get('symbol', 'N/A')
+        timestamp = outcome_row.get('timestamp', '')
 
-        # Trailing stop: max_gain - 2%, but never below -2%
-        trailing_stop_level = max_gain - TRAILING_STOP_PCT
-        effective_stop = max(trailing_stop_level, -TRAILING_STOP_PCT)
+        # Load full JSON to get interval data
+        try:
+            date_obj = pd.to_datetime(timestamp)
+            date_str = date_obj.strftime('%Y-%m-%d')
+            time_str = date_obj.strftime('%H%M%S')
+            json_file = Path(json_dir) / date_str / 'squeeze_alerts_sent' / f'alert_{symbol}_{date_str}_{time_str}.json'
 
-        # Got stopped out?
-        if final_gain < effective_stop:
-            return effective_stop
-        else:
-            return final_gain
+            if json_file.exists():
+                with open(json_file, 'r') as f:
+                    full_data = json.load(f)
 
-    predictions_df['realistic_profit'] = predictions_df.apply(calculate_trailing_stop_outcome, axis=1)
+                enhanced_row = outcome_row.copy()
+                if 'outcome_tracking' in full_data:
+                    enhanced_row['outcome_tracking'] = full_data['outcome_tracking']
+
+                gain, reason, holding_time = predictor._calculate_trade_outcome(
+                    enhanced_row, gain_threshold, TRAILING_STOP_PCT
+                )
+                realistic_profits.append(gain)
+            else:
+                # Fallback - use simple calculation
+                gain, _, _ = predictor._calculate_trade_outcome(
+                    outcome_row, gain_threshold, TRAILING_STOP_PCT
+                )
+                realistic_profits.append(gain)
+        except Exception as e:
+            # Fallback on error
+            gain, _, _ = predictor._calculate_trade_outcome(
+                outcome_row, gain_threshold, TRAILING_STOP_PCT
+            )
+            realistic_profits.append(gain)
+
+    predictions_df['realistic_profit'] = realistic_profits
 
     # Save predictions
     output_path = Path(f'analysis/predictions{threshold_suffix}.csv')
@@ -2209,6 +2471,88 @@ def predict(model_path: str, test_dir: str, gain_threshold: float | None = None)
         print(f"\nModel Edge:")
         print(f"  Per Trade: {model_avg_profit - all_avg_profit:+.2f}%")
         print(f"  Total:     {model_total_profit - all_total_profit:+.2f}% ({(model_total_profit/all_total_profit - 1)*100:+.1f}%)")
+
+        # Step 9a: Analyze holding period distribution
+        print("\n" + "="*80)
+        print("CALCULATING HOLDING PERIOD DISTRIBUTION")
+        print("Using interval-based chronological logic (same as realistic_profit)")
+        print("="*80)
+
+        # Use _calculate_trade_outcome for holding period analysis (realistic stop loss logic)
+        detailed_results = []
+        json_loaded_count = 0
+        json_missing_count = 0
+
+        for idx in model_trades.index:
+            trade_row = model_trades.loc[idx]
+            symbol = trade_row.get('symbol', 'N/A')
+            timestamp = trade_row.get('timestamp', '')
+
+            # Load full JSON to get interval data and calculate realistic outcome
+            try:
+                # Find the JSON file for this alert
+                # Format: historical_data/YYYY-MM-DD/squeeze_alerts_sent/alert_SYMBOL_YYYY-MM-DD_HHMMSS.json
+                date_obj = pd.to_datetime(timestamp)
+                date_str = date_obj.strftime('%Y-%m-%d')
+                time_str = date_obj.strftime('%H%M%S')
+
+                json_file = Path(json_dir) / date_str / 'squeeze_alerts_sent' / f'alert_{symbol}_{date_str}_{time_str}.json'
+
+                if json_file.exists():
+                    with open(json_file, 'r') as f:
+                        full_data = json.load(f)
+
+                    # Create enhanced row with outcome_tracking structure
+                    outcome_row = df.loc[idx]
+                    enhanced_row = outcome_row.copy()
+                    if 'outcome_tracking' in full_data:
+                        enhanced_row['outcome_tracking'] = full_data['outcome_tracking']
+
+                    gain, reason, holding_time = predictor._calculate_trade_outcome(
+                        enhanced_row, gain_threshold, TRAILING_STOP_PCT
+                    )
+                    json_loaded_count += 1
+                else:
+                    # Fallback if JSON not found
+                    outcome_row = df.loc[idx]
+                    gain, reason, holding_time = predictor._calculate_trade_outcome(
+                        outcome_row, gain_threshold, TRAILING_STOP_PCT
+                    )
+                    json_missing_count += 1
+
+            except Exception as e:
+                # Fallback on error
+                outcome_row = df.loc[idx]
+                gain, reason, holding_time = predictor._calculate_trade_outcome(
+                    outcome_row, gain_threshold, TRAILING_STOP_PCT
+                )
+                json_missing_count += 1
+
+            detailed_results.append({
+                'symbol': symbol,
+                'gain': gain,
+                'reason': reason,
+                'holding_time_sec': holding_time
+            })
+
+        print(f"✓ Processed {json_loaded_count} JSON files with interval data")
+        if json_missing_count > 0:
+            print(f"⚠️  {json_missing_count} files not found or had errors (using fallback calculation)")
+
+        # Create trading_results structure for holding period analysis
+        trading_results_for_analysis = {
+            'detailed_results': detailed_results,
+            'num_trades': num_model_trades,
+            'win_rate': model_win_rate,
+            'avg_pnl': model_avg_profit
+        }
+
+        # Run holding period analysis
+        predictor.analyze_holding_period_distribution(
+            trading_results_for_analysis,
+            gain_threshold=gain_threshold,
+            output_path=f'analysis/plots/holding_period_distribution_predict{threshold_suffix}.png'
+        )
 
         # Step 10: Generate plots
         _generate_prediction_plots(predictions_df, model_trades, threshold_suffix, gain_threshold)

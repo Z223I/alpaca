@@ -1,23 +1,30 @@
 ================================================================================
 SQUEEZE ALERT OUTCOME PREDICTION - SUMMARY REPORT
 ================================================================================
-Generated: 2025-12-16 08:46:26
+Generated: 2025-12-16 15:41:03
 
 DATASET
 --------------------------------------------------------------------------------
-Total Observations: 631
-Training Set: 504 samples
-Test Set: 127 samples
-Features: 12
+Total Observations: 2520
+Training Set: 2016 samples
+Test Set: 504 samples
+Features: 11
 Target Variable: achieved_5pct (reached 5% gain in 10 minutes)
+
+CLASS DISTRIBUTION
+--------------------------------------------------------------------------------
+Successes: 948 (37.6%)
+Failures:  1572 (62.4%)
+Imbalance Ratio: 1 : 1.66
+Balance Assessment: ⚠ Moderate Imbalance (35-65%)
 
 MODEL PERFORMANCE
 --------------------------------------------------------------------------------
 Model                  Accuracy  Precision     Recall         F1    ROC-AUC
 --------------------------------------------------------------------------------
-Logistic Regression      0.6378     0.5167     0.6458     0.5741     0.7139
-Random Forest            0.7244     0.6140     0.7292     0.6667     0.8064
-XGBoost                  0.7638     0.6607     0.7708     0.7115     0.8270
+Logistic Regression      0.6012     0.5317     0.6895     0.6004     0.6669
+Random Forest            0.6290     0.5656     0.6301     0.5961     0.7047
+XGBoost                  0.6488     0.6000     0.5753     0.5874     0.7081
 
 INTERPRETATION
 --------------------------------------------------------------------------------
@@ -28,10 +35,10 @@ ROC-AUC:   Overall discrimination ability (0.5=random, 1.0=perfect)
 
 RECOMMENDATION
 --------------------------------------------------------------------------------
-Best Model: XGBoost
-  F1-Score: 0.7115
-  Precision: 0.6607
-  Recall: 0.7708
+Best Model: Logistic Regression
+  F1-Score: 0.6004
+  Precision: 0.5317
+  Recall: 0.6895
 
 ✓ Model shows good predictive performance (F1 > 0.60)
   Recommended for trade filtering in production
