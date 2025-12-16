@@ -41,9 +41,16 @@ class ProxyServer:
         backend_ws = None
 
         try:
-            # Connect to backend server
+            # Connect to backend server with extended timeout
+            # Backend can be slow to accept connections when broadcasting many trades
             logger.info(f"Connecting to backend: {BACKEND_URL}")
-            backend_ws = await websockets.connect(BACKEND_URL)
+            backend_ws = await websockets.connect(
+                BACKEND_URL,
+                open_timeout=30,  # Increased from default 10s to 30s
+                ping_interval=20,  # Send ping every 20s
+                ping_timeout=10,   # Wait 10s for pong
+                close_timeout=10   # Wait 10s for close handshake
+            )
             logger.info(f"Connected to backend for client {client_id}")
 
             # Create tasks for bidirectional forwarding

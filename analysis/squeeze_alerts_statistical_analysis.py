@@ -59,7 +59,7 @@ class SqueezeAlertsAnalyzer:
 
     def load_alerts(self) -> pd.DataFrame:
         """
-        Load all squeeze alert JSON files and flatten into DataFrame.
+        Load all squeeze alert JSON files from multiple date directories and flatten into DataFrame.
 
         Returns:
             DataFrame with all alerts and flattened phase1_analysis fields
@@ -67,8 +67,23 @@ class SqueezeAlertsAnalyzer:
         print(f"Loading alerts from: {self.data_dir}")
         alerts = []
 
-        json_files = list(self.data_dir.glob("alert_*.json"))
-        print(f"Found {len(json_files)} alert files")
+        # Find all date directories (YYYY-MM-DD format)
+        date_dirs = []
+        for date_dir in self.data_dir.glob('????-??-??'):
+            if date_dir.is_dir():
+                squeeze_dir = date_dir / 'squeeze_alerts_sent'
+                if squeeze_dir.exists():
+                    date_dirs.append(squeeze_dir)
+
+        date_dirs.sort()  # Sort chronologically
+        print(f"Found {len(date_dirs)} date directories: {[d.parent.name for d in date_dirs]}")
+
+        # Collect all JSON files from all directories
+        json_files = []
+        for squeeze_dir in date_dirs:
+            json_files.extend(list(squeeze_dir.glob('alert_*.json')))
+
+        print(f"Found {len(json_files)} total alert files across all directories")
 
         for alert_file in json_files:
             try:
@@ -529,14 +544,15 @@ class SqueezeAlertsAnalyzer:
 def main():
     """Main execution function."""
 
-    # Configuration
-    data_dir = "/home/wilsonb/dl/github.com/Z223I/alpaca/historical_data/2025-12-15/squeeze_alerts_sent"
+    # Configuration - use base directory to scan multiple dates
+    data_dir = "/home/wilsonb/dl/github.com/Z223I/alpaca/historical_data"
 
     print("="*80)
     print("SQUEEZE ALERTS STATISTICAL ANALYSIS")
     print("="*80)
     print(f"Analyzing data with focus on statistical independence")
     print(f"Target: 11 independent features (VIF < 5)")
+    print(f"Scanning all date directories in: {data_dir}")
     print(f"NEW: ema_spread_pct (price-normalized), price_category (6 bins)")
     print(f"EXCLUDED: spy_percent_change_day, percent_change, distance_from_day_low_percent")
     print("="*80)

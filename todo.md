@@ -269,6 +269,15 @@ Add news column to signals. Also, volume surge if possible.
 - [ ] Update code/premarket_top_gainers.py to eliminate reverse splits using yfinance.
 
 
+
+
+
+I need bad data.
+
+
+
+
+
 ## Bin Prices
 
 - [X] Review analysis/squeeze_alerts_statistical_analysis.py: I am guessing that the price of a stock will have an impact on the predictability of squeezes.  What do you think?  If it is used, it needs to be made statistally independent.

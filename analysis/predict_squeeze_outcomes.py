@@ -36,6 +36,8 @@ USAGE EXAMPLES (run from project root):
     --model analysis/xgboost_model_1.5pct.json \
     --test-dir historical_data/2025-12-15
 
+  python analysis/predict_squeeze_outcomes.py predict --model analysis/xgboost_model_1.5pct.json --test-dir historical_data/2025-12-16
+
   # Make predictions on all dates in directory
   python analysis/predict_squeeze_outcomes.py predict \\
     --model analysis/xgboost_model_2pct.json \\
@@ -1519,6 +1521,209 @@ def train(gain_threshold: float = 5.0):
     return predictor, results
 
 
+def _generate_prediction_plots(predictions_df: pd.DataFrame, model_trades: pd.DataFrame,
+                                threshold_suffix: str, gain_threshold: float):
+    """Generate plots for prediction analysis."""
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    plots_dir = Path('analysis/plots')
+    plots_dir.mkdir(parents=True, exist_ok=True)
+
+    # Set style
+    plt.style.use('default')
+    sns.set_palette("husl")
+
+    # Plot 1: Profit Distribution
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    fig.suptitle(f'Prediction Analysis - {gain_threshold}% Target', fontsize=16, fontweight='bold')
+
+    # 1a: Model trades profit distribution
+    ax1 = axes[0, 0]
+    if len(model_trades) > 0:
+        ax1.hist(model_trades['realistic_profit'], bins=30, alpha=0.7, color='green', edgecolor='black')
+        ax1.axvline(x=0, color='red', linestyle='--', linewidth=2, label='Break-even')
+        ax1.axvline(x=model_trades['realistic_profit'].mean(), color='blue', linestyle='--', linewidth=2,
+                   label=f'Avg: {model_trades["realistic_profit"].mean():.2f}%')
+        ax1.set_xlabel('Profit %', fontweight='bold')
+        ax1.set_ylabel('Number of Trades', fontweight='bold')
+        ax1.set_title(f'Model Trades Profit Distribution ({len(model_trades)} trades)', fontweight='bold')
+        ax1.legend()
+        ax1.grid(alpha=0.3)
+
+    # 1b: All trades profit distribution
+    ax2 = axes[0, 1]
+    ax2.hist(predictions_df['realistic_profit'], bins=30, alpha=0.7, color='orange', edgecolor='black')
+    ax2.axvline(x=0, color='red', linestyle='--', linewidth=2, label='Break-even')
+    ax2.axvline(x=predictions_df['realistic_profit'].mean(), color='blue', linestyle='--', linewidth=2,
+               label=f'Avg: {predictions_df["realistic_profit"].mean():.2f}%')
+    ax2.set_xlabel('Profit %', fontweight='bold')
+    ax2.set_ylabel('Number of Trades', fontweight='bold')
+    ax2.set_title(f'All Opportunities Profit Distribution ({len(predictions_df)} trades)', fontweight='bold')
+    ax2.legend()
+    ax2.grid(alpha=0.3)
+
+    # 1c: Cumulative profit comparison
+    ax3 = axes[1, 0]
+    if len(model_trades) > 0:
+        model_cumulative = model_trades['realistic_profit'].cumsum()
+        all_cumulative = predictions_df['realistic_profit'].cumsum()
+        ax3.plot(model_cumulative.values, label=f'Model ({len(model_trades)} trades)', linewidth=2, color='green')
+        ax3.plot(all_cumulative.values, label=f'Take-All ({len(predictions_df)} trades)', linewidth=2, color='orange')
+        ax3.axhline(y=0, color='red', linestyle='--', linewidth=1)
+        ax3.set_xlabel('Trade Number', fontweight='bold')
+        ax3.set_ylabel('Cumulative Profit %', fontweight='bold')
+        ax3.set_title('Cumulative Profit Comparison', fontweight='bold')
+        ax3.legend()
+        ax3.grid(alpha=0.3)
+
+    # 1d: Probability distribution of selected vs missed trades
+    ax4 = axes[1, 1]
+    selected = predictions_df[predictions_df['predicted_outcome'] == 1]['prediction_probability']
+    missed = predictions_df[predictions_df['predicted_outcome'] == 0]['prediction_probability']
+    ax4.hist([selected, missed], bins=30, alpha=0.7, label=['Selected', 'Missed'], color=['green', 'red'])
+    ax4.axvline(x=0.5, color='black', linestyle='--', linewidth=2, label='Threshold (0.5)')
+    ax4.set_xlabel('Prediction Probability', fontweight='bold')
+    ax4.set_ylabel('Count', fontweight='bold')
+    ax4.set_title('Probability Distribution: Selected vs Missed', fontweight='bold')
+    ax4.legend()
+    ax4.grid(alpha=0.3)
+
+    plt.tight_layout()
+    plot_file = plots_dir / f'prediction_analysis{threshold_suffix}.png'
+    plt.savefig(plot_file, dpi=300, bbox_inches='tight')
+    print(f"\n✓ Saved analysis plots to: {plot_file}")
+    plt.close()
+
+    # Plot 2: Win/Loss Breakdown
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    fig.suptitle(f'Win/Loss Analysis - {gain_threshold}% Target', fontsize=16, fontweight='bold')
+
+    # 2a: Model trades pie chart
+    ax1 = axes[0]
+    if len(model_trades) > 0:
+        model_wins = len(model_trades[model_trades['realistic_profit'] > 0])
+        model_losses = len(model_trades[model_trades['realistic_profit'] <= 0])
+        ax1.pie([model_wins, model_losses], labels=['Wins', 'Losses'],
+               autopct='%1.1f%%', colors=['green', 'red'], startangle=90)
+        ax1.set_title(f'Model Trades\n({model_wins} wins, {model_losses} losses)', fontweight='bold')
+
+    # 2b: Comparison bar chart
+    ax2 = axes[1]
+    if len(model_trades) > 0:
+        model_total = model_trades['realistic_profit'].sum()
+        all_total = predictions_df['realistic_profit'].sum()
+        model_avg = model_trades['realistic_profit'].mean()
+        all_avg = predictions_df['realistic_profit'].mean()
+
+        x = np.arange(2)
+        width = 0.35
+        ax2.bar(x - width/2, [model_total, model_avg], width, label='Model', color='green', alpha=0.7)
+        ax2.bar(x + width/2, [all_total, all_avg], width, label='Take-All', color='orange', alpha=0.7)
+        ax2.set_ylabel('Profit %', fontweight='bold')
+        ax2.set_title('Profit Comparison', fontweight='bold')
+        ax2.set_xticks(x)
+        ax2.set_xticklabels(['Total Profit', 'Avg Per Trade'])
+        ax2.legend()
+        ax2.grid(axis='y', alpha=0.3)
+
+        # Add value labels on bars
+        for i, (bars1, bars2) in enumerate(zip(ax2.containers[0], ax2.containers[1])):
+            ax2.text(bars1.get_x() + bars1.get_width()/2, bars1.get_height(),
+                    f'{bars1.get_height():.1f}%', ha='center', va='bottom', fontsize=9)
+            ax2.text(bars2.get_x() + bars2.get_width()/2, bars2.get_height(),
+                    f'{bars2.get_height():.1f}%', ha='center', va='bottom', fontsize=9)
+
+    plt.tight_layout()
+    plot_file = plots_dir / f'win_loss_analysis{threshold_suffix}.png'
+    plt.savefig(plot_file, dpi=300, bbox_inches='tight')
+    print(f"✓ Saved win/loss plots to: {plot_file}")
+    plt.close()
+
+
+def _generate_prediction_report(predictions_df: pd.DataFrame, model_trades: pd.DataFrame,
+                                 threshold_suffix: str, gain_threshold: float,
+                                 accuracy: float, precision: float, recall: float,
+                                 f1: float, roc_auc: float, model_info: dict, test_dir: str):
+    """Generate markdown report for predictions."""
+    from datetime import datetime
+
+    report_file = Path(f'analysis/prediction_report{threshold_suffix}.md')
+
+    with open(report_file, 'w') as f:
+        f.write(f"# Prediction Report - {gain_threshold}% Target\n\n")
+        f.write(f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        f.write(f"**Test Directory:** `{test_dir}`\n\n")
+        f.write(f"**Model:** `{model_info.get('gain_threshold', gain_threshold)}%` target\n\n")
+
+        f.write("---\n\n")
+        f.write("## Model Performance\n\n")
+        f.write("| Metric | Value |\n")
+        f.write("|--------|-------|\n")
+        f.write(f"| Accuracy | {accuracy:.4f} |\n")
+        f.write(f"| Precision | {precision:.4f} |\n")
+        f.write(f"| Recall | {recall:.4f} |\n")
+        f.write(f"| F1-Score | {f1:.4f} |\n")
+        f.write(f"| ROC-AUC | {roc_auc:.4f} |\n\n")
+
+        f.write("---\n\n")
+        f.write("## Trading Performance\n\n")
+        f.write("### Strategy: 1.5% Take-Profit + 2% Trailing Stop\n\n")
+
+        if len(model_trades) > 0:
+            model_total = model_trades['realistic_profit'].sum()
+            model_avg = model_trades['realistic_profit'].mean()
+            model_wins = model_trades[model_trades['realistic_profit'] > 0]
+            model_losses = model_trades[model_trades['realistic_profit'] <= 0]
+            win_rate = len(model_wins) / len(model_trades) * 100
+
+            f.write("#### Model-Selected Trades\n\n")
+            f.write("| Metric | Value |\n")
+            f.write("|--------|-------|\n")
+            f.write(f"| Trades Taken | {len(model_trades)} / {len(predictions_df)} ({len(model_trades)/len(predictions_df)*100:.1f}%) |\n")
+            f.write(f"| Total Profit | {model_total:.2f}% |\n")
+            f.write(f"| Average Profit | {model_avg:.2f}% per trade |\n")
+            f.write(f"| Win Rate | {win_rate:.1f}% ({len(model_wins)} wins, {len(model_losses)} losses) |\n")
+            if len(model_wins) > 0:
+                f.write(f"| Average Win | {model_wins['realistic_profit'].mean():.2f}% |\n")
+            if len(model_losses) > 0:
+                avg_loss = model_losses['realistic_profit'].mean()
+                f.write(f"| Average Loss | {avg_loss:.2f}% |\n")
+                if len(model_wins) > 0:
+                    profit_factor = abs(model_wins['realistic_profit'].sum() / model_losses['realistic_profit'].sum())
+                    f.write(f"| Profit Factor | {profit_factor:.2f} |\n")
+
+            all_total = predictions_df['realistic_profit'].sum()
+            all_avg = predictions_df['realistic_profit'].mean()
+
+            f.write("\n#### Comparison: Model vs Take-All\n\n")
+            f.write("| Strategy | Trades | Total Profit | Avg/Trade |\n")
+            f.write("|----------|--------|--------------|----------|\n")
+            f.write(f"| Model | {len(model_trades)} | {model_total:.2f}% | {model_avg:.2f}% |\n")
+            f.write(f"| Take-All | {len(predictions_df)} | {all_total:.2f}% | {all_avg:.2f}% |\n")
+            f.write(f"| **Difference** | {len(model_trades) - len(predictions_df)} | **{model_total - all_total:+.2f}%** | **{model_avg - all_avg:+.2f}%** |\n\n")
+
+            f.write("---\n\n")
+            f.write("## Analysis\n\n")
+
+            if model_avg > all_avg:
+                f.write(f"✅ **Model Edge:** The model achieves {model_avg - all_avg:+.2f}% better average profit per trade.\n\n")
+            else:
+                f.write(f"❌ **No Edge:** The model underperforms by {model_avg - all_avg:.2f}% per trade.\n\n")
+
+            if model_total < all_total:
+                missed_profit = all_total - model_total
+                f.write(f"⚠️ **Opportunity Cost:** By being selective ({len(model_trades)}/{len(predictions_df)} trades), ")
+                f.write(f"the model left **{missed_profit:.2f}%** profit on the table.\n\n")
+
+            f.write("---\n\n")
+            f.write("## Visualizations\n\n")
+            f.write(f"![Prediction Analysis](plots/prediction_analysis{threshold_suffix}.png)\n\n")
+            f.write(f"![Win/Loss Analysis](plots/win_loss_analysis{threshold_suffix}.png)\n\n")
+
+    print(f"✓ Saved markdown report to: {report_file}")
+
+
 def predict(model_path: str, test_dir: str, gain_threshold: float | None = None) -> pd.DataFrame:
     """
     Load a trained model and make predictions on new data.
@@ -1636,14 +1841,27 @@ def predict(model_path: str, test_dir: str, gain_threshold: float | None = None)
     target_col = f'achieved_{int(gain_threshold)}pct'
     X, y = predictor.prepare_features(df, target_variable=target_col)
 
-    # Verify feature alignment
+    # Verify feature alignment and create missing features
     if list(X.columns) != feature_names:
-        print("⚠️  Warning: Feature names don't match exactly. Attempting to reorder...")
+        print("⚠️  Warning: Feature names don't match exactly. Attempting to fix...")
+
+        # Create any missing features (typically missing indicators)
+        missing_features = set(feature_names) - set(X.columns)
+        if missing_features:
+            print(f"  Creating missing features: {missing_features}")
+            for feat in missing_features:
+                # Missing indicators should be 0 (no missing data)
+                if feat.endswith('_missing'):
+                    X[feat] = 0
+                else:
+                    raise ValueError(f"Unexpected missing feature: {feat}")
+
+        # Reorder to match training
         try:
             X = X[feature_names]
-            print("✓ Features reordered to match training")
+            print("✓ Features aligned to match training")
         except KeyError as e:
-            raise ValueError(f"Feature mismatch: {e}")
+            raise ValueError(f"Feature mismatch after alignment: {e}")
 
     print(f"✓ Prepared {len(X)} samples with {len(X.columns)} features")
 
@@ -1692,6 +1910,34 @@ def predict(model_path: str, test_dir: str, gain_threshold: float | None = None)
     predictions_df['max_gain_percent'] = df['max_gain_percent']
     predictions_df['final_gain_percent'] = df['final_gain_percent']
 
+    # Step 7a: Calculate realistic trading outcomes with trailing stop
+    print("\n" + "="*80)
+    print("CALCULATING TRADING PROFITS (1.5% Target + 2% Trailing Stop)")
+    print("="*80)
+
+    TRAILING_STOP_PCT = 2.0
+
+    def calculate_trailing_stop_outcome(row):
+        """Calculate trade outcome with trailing stop logic."""
+        max_gain = row['max_gain_percent']
+        final_gain = row['final_gain_percent']
+
+        # Hit target?
+        if max_gain >= gain_threshold:
+            return gain_threshold
+
+        # Trailing stop: max_gain - 2%, but never below -2%
+        trailing_stop_level = max_gain - TRAILING_STOP_PCT
+        effective_stop = max(trailing_stop_level, -TRAILING_STOP_PCT)
+
+        # Got stopped out?
+        if final_gain < effective_stop:
+            return effective_stop
+        else:
+            return final_gain
+
+    predictions_df['realistic_profit'] = predictions_df.apply(calculate_trailing_stop_outcome, axis=1)
+
     # Save predictions
     output_path = Path(f'analysis/predictions{threshold_suffix}.csv')
     predictions_df.to_csv(output_path, index=False)
@@ -1714,6 +1960,57 @@ def predict(model_path: str, test_dir: str, gain_threshold: float | None = None)
         print("\n⚠️  Warning: Performance degradation detected")
 
     print("="*80)
+
+    # Step 9: Profit Analysis
+    print("\n" + "="*80)
+    print("TRADING PROFIT ANALYSIS")
+    print("="*80)
+
+    # Model-selected trades
+    model_trades = predictions_df[predictions_df['predicted_outcome'] == 1].copy()
+    num_model_trades = len(model_trades)
+
+    if num_model_trades > 0:
+        model_total_profit = model_trades['realistic_profit'].sum()
+        model_avg_profit = model_trades['realistic_profit'].mean()
+        model_wins = model_trades[model_trades['realistic_profit'] > 0]
+        model_losses = model_trades[model_trades['realistic_profit'] <= 0]
+        model_win_rate = len(model_wins) / num_model_trades if num_model_trades > 0 else 0
+
+        print(f"\nModel-Selected Trades ({num_model_trades} trades):")
+        print(f"  Total Profit:   {model_total_profit:.2f}%")
+        print(f"  Average Profit: {model_avg_profit:.2f}% per trade")
+        print(f"  Win Rate:       {model_win_rate*100:.1f}%")
+        if len(model_wins) > 0:
+            print(f"  Average Win:    {model_wins['realistic_profit'].mean():.2f}%")
+        if len(model_losses) > 0:
+            print(f"  Average Loss:   {model_losses['realistic_profit'].mean():.2f}%")
+            profit_factor = abs(model_wins['realistic_profit'].sum() / model_losses['realistic_profit'].sum()) if len(model_losses) > 0 else 0
+            print(f"  Profit Factor:  {profit_factor:.2f}")
+
+        # Compare to take-all
+        all_total_profit = predictions_df['realistic_profit'].sum()
+        all_avg_profit = predictions_df['realistic_profit'].mean()
+
+        print(f"\nTake-All Strategy ({len(predictions_df)} trades):")
+        print(f"  Total Profit:   {all_total_profit:.2f}%")
+        print(f"  Average Profit: {all_avg_profit:.2f}% per trade")
+
+        print(f"\nModel Edge:")
+        print(f"  Per Trade: {model_avg_profit - all_avg_profit:+.2f}%")
+        print(f"  Total:     {model_total_profit - all_total_profit:+.2f}% ({(model_total_profit/all_total_profit - 1)*100:+.1f}%)")
+
+        # Step 10: Generate plots
+        _generate_prediction_plots(predictions_df, model_trades, threshold_suffix, gain_threshold)
+
+        # Step 11: Generate markdown report
+        _generate_prediction_report(
+            predictions_df, model_trades, threshold_suffix, gain_threshold,
+            accuracy, precision, recall, f1, roc_auc,
+            model_info, test_dir
+        )
+    else:
+        print("\n⚠️  No trades selected by model - skipping profit analysis")
 
     return predictions_df
 

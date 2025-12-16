@@ -164,8 +164,15 @@ class TradeStreamServer:
         except Exception as e:
             logger.error(f"Error handling client {client_id}: {e}")
         finally:
-            await self.unsubscribe_all(websocket)
+            # Clean up subscriptions (don't send messages to closed connection)
+            await self.unsubscribe_all(websocket, send_confirmation=False)
             self.clients.discard(websocket)
+
+            # CRITICAL: Explicitly close the websocket to prevent CLOSE_WAIT leak
+            try:
+                await websocket.close()
+            except Exception as e:
+                logger.debug(f"Error closing websocket for {client_id}: {e}")
 
     async def handle_message(self, websocket: WebSocketServerProtocol, message: str):
         """Handle incoming message from a client."""
@@ -249,8 +256,14 @@ class TradeStreamServer:
 
         logger.info(f"🔵 [SUBSCRIBE] ✅ Client subscribed to {symbol}. Total subscribers: {len(self.subscriptions[symbol])}")
 
-    async def unsubscribe_symbol(self, websocket: WebSocketServerProtocol, symbol: str):
-        """Unsubscribe a client from trades for a specific symbol."""
+    async def unsubscribe_symbol(self, websocket: WebSocketServerProtocol, symbol: str, send_confirmation: bool = True):
+        """Unsubscribe a client from trades for a specific symbol.
+
+        Args:
+            websocket: The client websocket
+            symbol: The symbol to unsubscribe from
+            send_confirmation: If False, skip sending confirmation message (for cleanup of closed connections)
+        """
         logger.info(f"🔴 [UNSUBSCRIBE] Client unsubscribing from {symbol}")
         logger.info(f"🔴 [UNSUBSCRIBE] Current subscriptions: {list(self.subscriptions.keys())}")
 
@@ -266,28 +279,34 @@ class TradeStreamServer:
                 await self._unsubscribe_alpaca_symbol(symbol)
                 logger.info(f"🔴 [UNSUBSCRIBE] Remaining subscriptions: {list(self.subscriptions.keys())}")
 
-            # Send confirmation (only if connection still open)
-            try:
-                await websocket.send(json.dumps({
-                    'type': 'unsubscribed',
-                    'symbol': symbol,
-                    'message': f'Unsubscribed from {symbol} trades'
-                }))
-                logger.info(f"🔴 [UNSUBSCRIBE] Sent unsubscribe confirmation to client")
-            except websockets.exceptions.ConnectionClosed:
-                logger.debug(f"🔴 [UNSUBSCRIBE] Could not send unsubscribe confirmation - connection already closed")
+            # Send confirmation (only if connection still open and confirmation requested)
+            if send_confirmation:
+                try:
+                    await websocket.send(json.dumps({
+                        'type': 'unsubscribed',
+                        'symbol': symbol,
+                        'message': f'Unsubscribed from {symbol} trades'
+                    }))
+                    logger.info(f"🔴 [UNSUBSCRIBE] Sent unsubscribe confirmation to client")
+                except websockets.exceptions.ConnectionClosed:
+                    logger.debug(f"🔴 [UNSUBSCRIBE] Could not send unsubscribe confirmation - connection already closed")
         else:
             logger.warning(f"🔴 [UNSUBSCRIBE] Symbol {symbol} not found in subscriptions")
 
-    async def unsubscribe_all(self, websocket: WebSocketServerProtocol):
-        """Unsubscribe a client from all symbols."""
+    async def unsubscribe_all(self, websocket: WebSocketServerProtocol, send_confirmation: bool = True):
+        """Unsubscribe a client from all symbols.
+
+        Args:
+            websocket: The client websocket
+            send_confirmation: If False, skip sending confirmation messages (for cleanup of closed connections)
+        """
         symbols_to_remove = []
         for symbol, subscribers in self.subscriptions.items():
             if websocket in subscribers:
                 symbols_to_remove.append(symbol)
 
         for symbol in symbols_to_remove:
-            await self.unsubscribe_symbol(websocket, symbol)
+            await self.unsubscribe_symbol(websocket, symbol, send_confirmation=send_confirmation)
 
     async def _subscribe_alpaca_symbol(self, symbol: str):
         """Subscribe to Alpaca trade stream for a symbol."""
@@ -402,8 +421,13 @@ class TradeStreamServer:
 
         # Clean up disconnected clients
         for client in disconnected:
-            await self.unsubscribe_all(client)
+            await self.unsubscribe_all(client, send_confirmation=False)
             self.clients.discard(client)
+            # Explicitly close the websocket to prevent CLOSE_WAIT leak
+            try:
+                await client.close()
+            except Exception as e:
+                logger.debug(f"Error closing disconnected client: {e}")
 
 
 async def main():
