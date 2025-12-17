@@ -830,13 +830,13 @@ class SqueezeOutcomePredictor:
         - Take trade only if model predicts success
         - Use interval price ranges to determine chronological order of events
         - If actual success: gain = interval_high or max_gain_percent (capped at 10%)
-        - If actual failure: loss = -stop_loss_pct (default -1%)
+        - If actual failure: loss = -stop_loss_pct (default -2%)
 
         Args:
             df: Original DataFrame with outcome data
             model_name: Which model's predictions to use
             gain_threshold: Percentage gain threshold for success (default 5.0%)
-            stop_loss_pct: Stop loss percentage (default 1.0%)
+            stop_loss_pct: Stop loss percentage (default 2.0%)
 
         Returns:
             Dictionary with trading simulation results
@@ -1864,7 +1864,7 @@ def train(gain_threshold: float = 5.0):
     # Step 10: Trading simulation
     trading_results = predictor.simulate_trading(df, model_name='Random Forest',
                                                   gain_threshold=gain_threshold,
-                                                  stop_loss_pct=1.0)
+                                                  stop_loss_pct=2.0)
 
     # Step 10a: Analyze holding period distribution
     predictor.analyze_holding_period_distribution(
@@ -2104,7 +2104,7 @@ def _generate_prediction_report(predictions_df: pd.DataFrame, model_trades: pd.D
 
         f.write("---\n\n")
         f.write("## Trading Performance\n\n")
-        f.write("### Strategy: 1.5% Take-Profit + 1% Trailing Stop\n\n")
+        f.write("### Strategy: 1.5% Take-Profit + 2% Trailing Stop\n\n")
 
         if len(model_trades) > 0:
             model_total = model_trades['realistic_profit'].sum()
@@ -2361,11 +2361,11 @@ def predict(model_path: str, test_dir: str, gain_threshold: float | None = None)
 
     # Step 7a: Calculate realistic trading outcomes with interval-based stop loss
     print("\n" + "="*80)
-    print(f"CALCULATING TRADING PROFITS ({gain_threshold}% Target + 1% Stop Loss)")
+    print(f"CALCULATING TRADING PROFITS ({gain_threshold}% Target + 2% Stop Loss)")
     print("Using interval-based chronological logic for realistic simulation")
     print("="*80)
 
-    TRAILING_STOP_PCT = 1.0
+    TRAILING_STOP_PCT = 2.0
 
     # Calculate realistic profit using _calculate_trade_outcome with interval data
     import json
