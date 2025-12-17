@@ -1,6 +1,6 @@
 # Prediction Report - 4.0% Target
 
-**Generated:** 2025-12-16 14:36:21
+**Generated:** 2025-12-16 17:49:15
 
 **Test Directory:** `historical_data/2025-12-16`
 
@@ -29,28 +29,26 @@
 | Metric | Value |
 |--------|-------|
 | Trades Taken | 102 / 302 (33.8%) |
-| Total Profit | 250.33% |
-| Average Profit | 2.45% per trade |
-| Win Rate | 76.5% (78 wins, 24 losses) |
-| Average Win | 3.51% |
-| Average Loss | -0.97% |
-| Profit Factor | 11.79 |
+| Total Profit | 36.00% |
+| Average Profit | 0.35% per trade |
+| Win Rate | 39.2% (40 wins, 62 losses) |
+| Average Win | 4.00% |
+| Average Loss | -2.00% |
+| Profit Factor | 1.29 |
 
 #### Comparison: Model vs Take-All
 
 | Strategy | Trades | Total Profit | Avg/Trade |
 |----------|--------|--------------|----------|
-| Model | 102 | 250.33% | 2.45% |
-| Take-All | 302 | 665.89% | 2.20% |
-| **Difference** | -200 | **-415.56%** | **+0.25%** |
+| Model | 102 | 36.00% | 0.35% |
+| Take-All | 302 | -11.10% | -0.04% |
+| **Difference** | -200 | **+47.10%** | **+0.39%** |
 
 ---
 
 ## Analysis
 
-✅ **Model Edge:** The model achieves +0.25% better average profit per trade.
-
-⚠️ **Opportunity Cost:** By being selective (102/302 trades), the model left **415.56%** profit on the table.
+✅ **Model Edge:** The model achieves +0.39% better average profit per trade.
 
 ---
 
