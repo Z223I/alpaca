@@ -700,22 +700,23 @@ class SqueezeOutcomePredictor:
     def _calculate_trade_outcome(self, outcome: pd.Series, gain_threshold: float,
                                   stop_loss_pct: float) -> Tuple[float, str, int]:
         """
-        Calculate trade outcome using chronological interval price range logic.
+        Calculate trade outcome using TRAILING STOP logic.
 
-        NEW: Uses interval low/high with timestamps to determine which event occurred first:
-        - If high timestamp < low timestamp: price went up first
-          → Check if high reached gain threshold (potential win)
-          → If not, check if low hit stop loss (loss)
-        - If low timestamp < high timestamp: price went down first
-          → Check if low hit stop loss (loss)
-          → If not, check if high reached gain threshold (win)
+        A trailing stop adjusts upward as the stock price rises:
+        - Initial stop loss: -stop_loss_pct from entry
+        - As price rises, stop loss rises with it
+        - Exit when price drops stop_loss_pct from the highest point reached
 
-        Falls back to simple max_gain_percent if interval data not available.
+        Example with 2% trailing stop and 5% target:
+        - Entry: $10.00, initial stop at $9.80 (-2%)
+        - Price reaches $10.50 (+5%), hits target, exit at +5.0%
+        - OR price reaches $10.40 (+4%), stop now at $10.19 (+1.9%)
+        - Price drops to $10.19, trailing stop triggered, exit at +1.9%
 
         Args:
             outcome: Row from test DataFrame with outcome_tracking data
             gain_threshold: Target gain percentage
-            stop_loss_pct: Stop loss percentage (positive number, e.g., 2.0 for -2%)
+            stop_loss_pct: Trailing stop percentage (positive number, e.g., 2.0 for -2%)
 
         Returns:
             Tuple of (gain_percent, reason_string, holding_time_seconds)
@@ -723,98 +724,116 @@ class SqueezeOutcomePredictor:
         from datetime import datetime
 
         # Try to load interval data from JSON if available
-        # The outcome row may have nested JSON structure
         intervals = None
 
-        # Check if we have direct access to interval data
-        # This would be the case if we loaded the full JSON structure
         if hasattr(outcome, 'get'):
-            # Try different possible locations for interval data
             if 'outcome_tracking' in outcome and outcome['outcome_tracking'] is not None:
                 if isinstance(outcome['outcome_tracking'], dict):
                     intervals = outcome['outcome_tracking'].get('intervals', {})
 
-        # Strategy: Look through intervals chronologically and apply trading logic
+        # Use interval-based trailing stop logic
         if intervals and len(intervals) > 0:
             # Process intervals in chronological order
             sorted_intervals = sorted(intervals.items(), key=lambda x: int(x[0]))
 
+            peak_gain = 0.0  # Track highest gain reached during the trade
+
             for interval_sec_str, interval_data in sorted_intervals:
-                # Check if we have the new interval_low and interval_high fields
+                interval_sec = int(interval_sec_str)
+
+                # Check if we have interval range data
                 has_range_data = ('interval_low' in interval_data and
                                  'interval_high' in interval_data and
                                  'interval_low_timestamp' in interval_data and
                                  'interval_high_timestamp' in interval_data)
 
                 if has_range_data:
-                    # NEW LOGIC: Use chronological high/low testing
                     low_gain = interval_data['interval_low_gain_percent']
                     high_gain = interval_data['interval_high_gain_percent']
                     low_timestamp = interval_data['interval_low_timestamp']
                     high_timestamp = interval_data['interval_high_timestamp']
 
-                    # Determine which event happened first
-                    interval_sec = int(interval_sec_str)
+                    # Process events chronologically
                     if high_timestamp < low_timestamp:
-                        # Price went UP first, then DOWN
-                        # Check if we hit target before stop loss
+                        # HIGH came first, then LOW
+
+                        # Update peak with the high
+                        peak_gain = max(peak_gain, high_gain)
+
+                        # Check if we hit the gain threshold (limit order fills at exact price)
                         if high_gain >= gain_threshold:
-                            # WIN: Hit target before stop loss (exact limit order)
                             return (gain_threshold, f'target_hit_at_{interval_sec_str}s', interval_sec)
 
-                        # Check if stop loss was hit
-                        if low_gain <= -stop_loss_pct:
-                            # LOSS: Hit stop loss
-                            return (-stop_loss_pct, f'stop_loss_at_{interval_sec_str}s', interval_sec)
+                        # Check if trailing stop was triggered by the low
+                        trailing_stop_level = peak_gain - stop_loss_pct
+                        if low_gain <= trailing_stop_level:
+                            # Trailing stop triggered - exit at the trailing stop level
+                            return (trailing_stop_level, f'trailing_stop_at_{interval_sec_str}s', interval_sec)
 
                     else:
-                        # Price went DOWN first, then UP (or at same time)
-                        # Check if we hit stop loss before target
-                        if low_gain <= -stop_loss_pct:
-                            # LOSS: Hit stop loss before target
-                            return (-stop_loss_pct, f'stop_loss_at_{interval_sec_str}s', interval_sec)
+                        # LOW came first (or same time), then HIGH
+
+                        # Check if initial stop loss was hit (before any gains)
+                        if low_gain <= -stop_loss_pct and peak_gain == 0:
+                            return (-stop_loss_pct, f'initial_stop_at_{interval_sec_str}s', interval_sec)
+
+                        # Check if trailing stop was triggered
+                        if peak_gain > 0:
+                            trailing_stop_level = peak_gain - stop_loss_pct
+                            if low_gain <= trailing_stop_level:
+                                return (trailing_stop_level, f'trailing_stop_at_{interval_sec_str}s', interval_sec)
+
+                        # Update peak with the high
+                        peak_gain = max(peak_gain, high_gain)
 
                         # Check if target was hit
                         if high_gain >= gain_threshold:
-                            # WIN: Hit target (exact limit order)
                             return (gain_threshold, f'target_hit_at_{interval_sec_str}s', interval_sec)
 
                 else:
                     # FALLBACK: Use snapshot price if no range data
                     if 'gain_percent' in interval_data:
                         gain = interval_data['gain_percent']
-                        interval_sec = int(interval_sec_str)
 
-                        # Check if hit target (exact limit order)
+                        # Update peak
+                        peak_gain = max(peak_gain, gain)
+
+                        # Check target
                         if gain >= gain_threshold:
                             return (gain_threshold, f'snapshot_target_at_{interval_sec_str}s', interval_sec)
 
-                        # Check if hit stop loss
-                        if gain <= -stop_loss_pct:
-                            return (-stop_loss_pct, f'snapshot_stop_at_{interval_sec_str}s', interval_sec)
+                        # Check trailing stop
+                        trailing_stop_level = peak_gain - stop_loss_pct
+                        if gain <= trailing_stop_level:
+                            return (trailing_stop_level, f'snapshot_trailing_stop_at_{interval_sec_str}s', interval_sec)
 
-            # If we went through all intervals without hitting target or stop loss
-            # Use the final outcome (assume max interval time of 600 seconds = 10 minutes)
+            # If we went through all intervals without hitting target or trailing stop
             final_gain = outcome.get('final_gain_percent', 0)
+
             if final_gain >= gain_threshold:
                 return (gain_threshold, 'final_target', 600)
-            elif final_gain <= -stop_loss_pct:
-                return (-stop_loss_pct, 'final_stop_loss', 600)
             else:
-                return (final_gain, 'final_no_target', 600)
+                # Check if final price triggered trailing stop
+                trailing_stop_level = peak_gain - stop_loss_pct
+                if final_gain <= trailing_stop_level:
+                    return (trailing_stop_level, 'final_trailing_stop', 600)
+                else:
+                    # Trade ended without hitting target or trailing stop
+                    return (final_gain, 'final_no_target', 600)
 
         # FALLBACK: Use max_gain_percent if no interval data
-        # This maintains backward compatibility (assume 600 seconds)
         max_gain = outcome.get('max_gain_percent', 0)
+        final_gain = outcome.get('final_gain_percent', max_gain)
 
         if max_gain >= gain_threshold:
             return (gain_threshold, 'legacy_target_hit', 600)
-        elif max_gain <= -stop_loss_pct:
-            return (-stop_loss_pct, 'legacy_stop_loss', 600)
         else:
-            # Didn't hit target or stop loss
-            final_gain = outcome.get('final_gain_percent', max_gain)
-            return (max(final_gain, -stop_loss_pct), 'legacy_no_target', 600)
+            # Apply trailing stop to legacy data
+            trailing_stop_level = max_gain - stop_loss_pct
+            if final_gain <= trailing_stop_level:
+                return (trailing_stop_level, 'legacy_trailing_stop', 600)
+            else:
+                return (final_gain, 'legacy_no_target', 600)
 
     def simulate_trading(self, df: pd.DataFrame, model_name: str = 'Random Forest',
                          gain_threshold: float = 5.0, stop_loss_pct: float = 2.0) -> Dict:
@@ -2365,11 +2384,16 @@ def predict(model_path: str, test_dir: str, gain_threshold: float | None = None)
     print("Using interval-based chronological logic for realistic simulation")
     print("="*80)
 
-    TRAILING_STOP_PCT = 1.0
+    TRAILING_STOP_PCT = 2.0
 
     # Calculate realistic profit using _calculate_trade_outcome with interval data
     import json
     realistic_profits = []
+    debug_count = 0
+    json_loaded_count = 0
+    json_missing_count = 0
+
+    print(f"Processing {len(df)} entries...")
 
     for idx in df.index:
         outcome_row = df.loc[idx]
@@ -2384,6 +2408,7 @@ def predict(model_path: str, test_dir: str, gain_threshold: float | None = None)
             json_file = Path(json_dir) / date_str / 'squeeze_alerts_sent' / f'alert_{symbol}_{date_str}_{time_str}.json'
 
             if json_file.exists():
+                json_loaded_count += 1
                 with open(json_file, 'r') as f:
                     full_data = json.load(f)
 
@@ -2394,21 +2419,41 @@ def predict(model_path: str, test_dir: str, gain_threshold: float | None = None)
                 gain, reason, holding_time = predictor._calculate_trade_outcome(
                     enhanced_row, gain_threshold, TRAILING_STOP_PCT
                 )
+
+                # Debug first few entries
+                if debug_count < 5:
+                    print(f"\nDEBUG {symbol} {timestamp}:")
+                    print(f"  Gain: {gain:.2f}%, Reason: {reason}, Time: {holding_time}s")
+                    if 'outcome_tracking' in enhanced_row:
+                        intervals = enhanced_row['outcome_tracking'].get('intervals', {})
+                        print(f"  Intervals loaded: {len(intervals)}")
+                    debug_count += 1
+
                 realistic_profits.append(gain)
             else:
+                json_missing_count += 1
                 # Fallback - use simple calculation
+                if json_missing_count <= 3:
+                    print(f"WARNING: JSON not found for {symbol} {timestamp}")
+                    print(f"  Looking for: {json_file}")
                 gain, _, _ = predictor._calculate_trade_outcome(
                     outcome_row, gain_threshold, TRAILING_STOP_PCT
                 )
                 realistic_profits.append(gain)
         except Exception as e:
             # Fallback on error
+            print(f"ERROR processing {symbol} {timestamp}: {e}")
             gain, _, _ = predictor._calculate_trade_outcome(
                 outcome_row, gain_threshold, TRAILING_STOP_PCT
             )
             realistic_profits.append(gain)
 
     predictions_df['realistic_profit'] = realistic_profits
+
+    print(f"\nJSON Loading Summary:")
+    print(f"  JSON files loaded: {json_loaded_count}")
+    print(f"  JSON files missing: {json_missing_count}")
+    print(f"  Total processed: {len(realistic_profits)}")
 
     # Save predictions
     output_path = Path(f'analysis/predictions{threshold_suffix}.csv')

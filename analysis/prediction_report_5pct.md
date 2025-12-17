@@ -1,6 +1,6 @@
 # Prediction Report - 5.0% Target
 
-**Generated:** 2025-12-16 17:49:26
+**Generated:** 2025-12-16 18:57:46
 
 **Test Directory:** `historical_data/2025-12-16`
 
@@ -22,33 +22,33 @@
 
 ## Trading Performance
 
-### Strategy: 1.5% Take-Profit + 2% Trailing Stop
+### Strategy: 1.5% Take-Profit + 1% Trailing Stop
 
 #### Model-Selected Trades
 
 | Metric | Value |
 |--------|-------|
 | Trades Taken | 77 / 302 (25.5%) |
-| Total Profit | 35.00% |
-| Average Profit | 0.45% per trade |
-| Win Rate | 35.1% (27 wins, 50 losses) |
-| Average Win | 5.00% |
-| Average Loss | -2.00% |
-| Profit Factor | 1.35 |
+| Total Profit | 54.85% |
+| Average Profit | 0.71% per trade |
+| Win Rate | 45.5% (35 wins, 42 losses) |
+| Average Win | 3.02% |
+| Average Loss | -1.21% |
+| Profit Factor | 2.08 |
 
 #### Comparison: Model vs Take-All
 
 | Strategy | Trades | Total Profit | Avg/Trade |
 |----------|--------|--------------|----------|
-| Model | 77 | 35.00% | 0.45% |
-| Take-All | 302 | 9.21% | 0.03% |
-| **Difference** | -225 | **+25.79%** | **+0.42%** |
+| Model | 77 | 54.85% | 0.71% |
+| Take-All | 302 | 24.34% | 0.08% |
+| **Difference** | -225 | **+30.51%** | **+0.63%** |
 
 ---
 
 ## Analysis
 
-✅ **Model Edge:** The model achieves +0.42% better average profit per trade.
+✅ **Model Edge:** The model achieves +0.63% better average profit per trade.
 
 ---
 
