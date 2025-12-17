@@ -62,6 +62,9 @@ OUTPUT FILES (Training):
 
 OUTPUT FILES (Prediction):
   - analysis/predictions_{threshold}pct.csv
+    (Columns: symbol, timestamp, actual_outcome, predicted_outcome,
+     prediction_probability, squeeze_entry_price, price_at_10min,
+     max_gain_percent, final_gain_percent, realistic_profit)
 
 NOTE: Some features have missing data in current dataset:
 - ema_spread_pct: ~10% missing (price-normalized EMA spread)
@@ -82,7 +85,7 @@ matplotlib.use('Agg')  # Use non-interactive backend to avoid threading issues
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Optional
 from datetime import datetime
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import StandardScaler, LabelEncoder
@@ -94,6 +97,9 @@ from sklearn.metrics import (
     confusion_matrix, classification_report, roc_auc_score, roc_curve,
     mean_squared_error, mean_absolute_error, r2_score
 )
+from imblearn.over_sampling import SMOTE, RandomOverSampler
+from imblearn.under_sampling import RandomUnderSampler
+from imblearn.combine import SMOTEENN
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -195,6 +201,7 @@ class SqueezeOutcomePredictor:
                     'achieved_10pct': summary.get('achieved_10pct'),
                     'achieved_15pct': summary.get('achieved_15pct'),
                     'time_to_5pct_minutes': summary.get('time_to_5pct_minutes'),
+                    'price_at_10min': summary.get('price_at_10min'),
 
                     # Interval-specific gains (for alternative targets)
                     'gain_at_10s': intervals.get('10', {}).get('gain_percent'),
@@ -447,6 +454,90 @@ class SqueezeOutcomePredictor:
         X_test_scaled = pd.DataFrame(X_test_scaled, columns=X_test.columns, index=X_test.index)
 
         return X_train_scaled, X_test_scaled
+
+    def balance_classes(self, X_train: pd.DataFrame, y_train: pd.Series,
+                       method: str = 'smote') -> Tuple[pd.DataFrame, pd.Series]:
+        """
+        Balance class distribution in training data using resampling techniques.
+
+        This addresses class imbalance by either oversampling the minority class,
+        undersampling the majority class, or a combination of both.
+
+        Methods:
+        - 'smote': SMOTE (Synthetic Minority Over-sampling Technique) - creates synthetic samples
+        - 'oversample': Random oversampling - duplicates minority class samples
+        - 'undersample': Random undersampling - reduces majority class samples
+        - 'smoteenn': SMOTE + Edited Nearest Neighbors - combines oversampling and cleaning
+
+        Args:
+            X_train: Training feature matrix
+            y_train: Training target variable
+            method: Resampling method ('smote', 'oversample', 'undersample', 'smoteenn')
+
+        Returns:
+            Tuple of (X_train_balanced, y_train_balanced)
+        """
+        print("\n" + "="*80)
+        print("STEP 5B: CLASS BALANCING")
+        print("="*80)
+
+        # Show original class distribution
+        class_counts = y_train.value_counts()
+        total = len(y_train)
+        print(f"\nOriginal class distribution:")
+        print(f"  Class 0 (unsuccessful): {class_counts.get(0, 0):4d} samples ({class_counts.get(0, 0)/total*100:5.1f}%)")
+        print(f"  Class 1 (successful):   {class_counts.get(1, 0):4d} samples ({class_counts.get(1, 0)/total*100:5.1f}%)")
+        print(f"  Imbalance ratio: {class_counts.get(0, 0) / class_counts.get(1, 1):.2f}:1")
+
+        # Apply resampling
+        try:
+            if method == 'smote':
+                print(f"\nApplying SMOTE (Synthetic Minority Over-sampling)...")
+                # SMOTE requires at least k_neighbors+1 samples in minority class
+                min_samples = min(class_counts)
+                k_neighbors = min(5, min_samples - 1) if min_samples > 1 else 1
+                sampler = SMOTE(random_state=42, k_neighbors=k_neighbors)
+            elif method == 'oversample':
+                print(f"\nApplying Random Oversampling...")
+                sampler = RandomOverSampler(random_state=42)
+            elif method == 'undersample':
+                print(f"\nApplying Random Undersampling...")
+                sampler = RandomUnderSampler(random_state=42)
+            elif method == 'smoteenn':
+                print(f"\nApplying SMOTE-ENN (SMOTE + Edited Nearest Neighbors)...")
+                min_samples = min(class_counts)
+                k_neighbors = min(5, min_samples - 1) if min_samples > 1 else 1
+                sampler = SMOTEENN(random_state=42, smote=SMOTE(random_state=42, k_neighbors=k_neighbors))
+            else:
+                raise ValueError(f"Unknown resampling method: {method}")
+
+            # Perform resampling
+            X_train_balanced, y_train_balanced = sampler.fit_resample(X_train, y_train)
+
+            # Convert back to DataFrame/Series with proper columns
+            X_train_balanced = pd.DataFrame(X_train_balanced, columns=X_train.columns)
+            y_train_balanced = pd.Series(y_train_balanced, name=y_train.name)
+
+            # Show new class distribution
+            class_counts_new = y_train_balanced.value_counts()
+            total_new = len(y_train_balanced)
+            print(f"\n✓ Balanced class distribution:")
+            print(f"  Class 0 (unsuccessful): {class_counts_new.get(0, 0):4d} samples ({class_counts_new.get(0, 0)/total_new*100:5.1f}%)")
+            print(f"  Class 1 (successful):   {class_counts_new.get(1, 0):4d} samples ({class_counts_new.get(1, 0)/total_new*100:5.1f}%)")
+            print(f"  New ratio: {class_counts_new.get(0, 0) / class_counts_new.get(1, 1):.2f}:1")
+            print(f"  Total samples: {total} → {total_new} ({total_new - total:+d})")
+
+            return X_train_balanced, y_train_balanced
+
+        except ImportError:
+            print("\n⚠️  imbalanced-learn library not available.")
+            print("    Install with: pip install imbalanced-learn")
+            print("    Continuing without resampling...")
+            return X_train, y_train
+        except Exception as e:
+            print(f"\n⚠️  Error during resampling: {e}")
+            print("    Continuing without resampling...")
+            return X_train, y_train
 
     def train_models(self, X_train: pd.DataFrame, X_test: pd.DataFrame,
                      y_train: pd.Series, y_test: pd.Series) -> Dict:
@@ -1339,31 +1430,34 @@ class SqueezeOutcomePredictor:
         return stats
 
     def plot_class_distribution(self, gain_threshold: float = 5.0,
-                                output_path: str = 'analysis/plots/class_distribution_5pct.png'):
+                                output_path: str = 'analysis/plots/class_distribution_5pct.png',
+                                y_train_balanced: Optional[pd.Series] = None):
         """
-        Create pie chart showing class distribution.
+        Create pie charts showing both original and SMOTE-balanced class distributions.
 
         Args:
             gain_threshold: Gain percentage threshold for success
             output_path: Where to save the plot
+            y_train_balanced: Balanced training labels after SMOTE (optional)
         """
         stats = self.analyze_class_distribution(gain_threshold)
 
         if not stats:
             return
 
-        # Create figure
-        fig, ax = plt.subplots(figsize=(10, 8))
+        # Create figure with 2 subplots side by side
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 8))
 
-        # Data for pie chart
+        # Common properties
         labels = ['Success', 'Failure']
-        sizes = [stats['successes'], stats['failures']]
         colors = ['#2ecc71', '#e74c3c']  # Green for success, red for failure
         explode = (0.05, 0)  # Slightly separate the success slice
 
-        # Create pie chart
-        wedges, texts, autotexts = ax.pie(
-            sizes,
+        # ===== LEFT PLOT: Original Distribution =====
+        sizes_original = [stats['successes'], stats['failures']]
+
+        wedges1, texts1, autotexts1 = ax1.pie(
+            sizes_original,
             explode=explode,
             labels=labels,
             colors=colors,
@@ -1374,38 +1468,83 @@ class SqueezeOutcomePredictor:
         )
 
         # Make percentage text more visible
-        for autotext in autotexts:
+        for autotext in autotexts1:
             autotext.set_color('white')
             autotext.set_fontsize(16)
 
         # Add title with statistics
-        ax.set_title(
-            f'Class Distribution - {int(gain_threshold)}% Target\n\n'
+        ax1.set_title(
+            f'Original Distribution\n{int(gain_threshold)}% Target\n\n'
             f'Total Alerts: {stats["total"]:,}\n'
             f'Success: {stats["successes"]:,} ({stats["success_pct"]:.1f}%) | '
             f'Failure: {stats["failures"]:,} ({stats["failure_pct"]:.1f}%)\n'
             f'Imbalance Ratio: 1 : {stats["imbalance_ratio"]:.2f}',
-            fontsize=14,
+            fontsize=12,
             fontweight='bold',
             pad=20
         )
+        ax1.axis('equal')
 
-        # Equal aspect ratio ensures that pie is drawn as a circle
-        ax.axis('equal')
+        # ===== RIGHT PLOT: Balanced Distribution =====
+        if y_train_balanced is not None:
+            balanced_successes = int(y_train_balanced.sum())
+            balanced_total = len(y_train_balanced)
+            balanced_failures = balanced_total - balanced_successes
+            balanced_success_pct = (balanced_successes / balanced_total * 100) if balanced_total > 0 else 0
+            balanced_failure_pct = (balanced_failures / balanced_total * 100) if balanced_total > 0 else 0
+            balanced_imbalance_ratio = balanced_failures / balanced_successes if balanced_successes > 0 else 0
 
-        # Add assessment text
-        if 45 <= stats['success_pct'] <= 55:
-            assessment = "✓ Excellent Balance"
-            assessment_color = 'green'
-        elif 40 <= stats['success_pct'] <= 60:
-            assessment = "~ Good Balance"
-            assessment_color = 'orange'
-        elif 35 <= stats['success_pct'] <= 65:
-            assessment = "⚠ Moderate Imbalance"
-            assessment_color = 'darkorange'
+            sizes_balanced = [balanced_successes, balanced_failures]
+
+            wedges2, texts2, autotexts2 = ax2.pie(
+                sizes_balanced,
+                explode=explode,
+                labels=labels,
+                colors=colors,
+                autopct='%1.1f%%',
+                shadow=True,
+                startangle=90,
+                textprops={'fontsize': 14, 'weight': 'bold'}
+            )
+
+            # Make percentage text more visible
+            for autotext in autotexts2:
+                autotext.set_color('white')
+                autotext.set_fontsize(16)
+
+            # Add title with statistics
+            ax2.set_title(
+                f'SMOTE-Balanced Distribution\n{int(gain_threshold)}% Target\n\n'
+                f'Total Alerts: {balanced_total:,}\n'
+                f'Success: {balanced_successes:,} ({balanced_success_pct:.1f}%) | '
+                f'Failure: {balanced_failures:,} ({balanced_failure_pct:.1f}%)\n'
+                f'Imbalance Ratio: 1 : {balanced_imbalance_ratio:.2f}',
+                fontsize=12,
+                fontweight='bold',
+                pad=20
+            )
+            ax2.axis('equal')
+
+            # Add assessment text for balanced data
+            if 45 <= balanced_success_pct <= 55:
+                assessment = "✓ Excellent Balance (Model Training Data)"
+                assessment_color = 'green'
+            elif 40 <= balanced_success_pct <= 60:
+                assessment = "~ Good Balance (Model Training Data)"
+                assessment_color = 'orange'
+            elif 35 <= balanced_success_pct <= 65:
+                assessment = "⚠ Moderate Imbalance (Model Training Data)"
+                assessment_color = 'darkorange'
+            else:
+                assessment = "❌ Severe Imbalance (Model Training Data)"
+                assessment_color = 'red'
         else:
-            assessment = "❌ Severe Imbalance"
-            assessment_color = 'red'
+            # If no balanced data provided, show a message
+            ax2.text(0.5, 0.5, 'No Balanced Data Provided\n(SMOTE not applied)',
+                    ha='center', va='center', fontsize=14, weight='bold')
+            ax2.axis('off')
+            assessment = "Original Distribution Only"
+            assessment_color = 'gray'
 
         plt.figtext(
             0.5, 0.02,
@@ -1862,11 +2001,14 @@ def train(gain_threshold: float = 5.0):
     # Store scaler for later use in predictions
     predictor.scaler = predictor.scaler  # scaler is created in scale_features method
 
-    # Step 6: Train models
-    models = predictor.train_models(X_train_scaled, X_test_scaled, y_train, y_test)
+    # Step 5B: Balance classes in training data
+    X_train_balanced, y_train_balanced = predictor.balance_classes(X_train_scaled, y_train, method='smote')
 
-    # Step 7: Evaluate models
-    results = predictor.evaluate_models(X_train_scaled, X_test_scaled, y_train, y_test)
+    # Step 6: Train models (using balanced training data)
+    models = predictor.train_models(X_train_balanced, X_test_scaled, y_train_balanced, y_test)
+
+    # Step 7: Evaluate models (using balanced training data for consistency)
+    results = predictor.evaluate_models(X_train_balanced, X_test_scaled, y_train_balanced, y_test)
 
     # Step 8: Feature importance
     # Format threshold for filename (1.5 -> "1.5", 2.0 -> "2")
@@ -1898,7 +2040,8 @@ def train(gain_threshold: float = 5.0):
     # Step 11.5: Class distribution analysis
     predictor.plot_class_distribution(
         gain_threshold=gain_threshold,
-        output_path=f'analysis/plots/class_distribution{threshold_suffix}.png'
+        output_path=f'analysis/plots/class_distribution{threshold_suffix}.png',
+        y_train_balanced=y_train_balanced
     )
 
     # Step 12: Price category analysis
@@ -2380,6 +2523,8 @@ def predict(model_path: str, test_dir: str, gain_threshold: float | None = None)
     predictions_df['actual_outcome'] = y
     predictions_df['predicted_outcome'] = y_pred
     predictions_df['prediction_probability'] = y_pred_proba
+    predictions_df['squeeze_entry_price'] = df['squeeze_entry_price']
+    predictions_df['price_at_10min'] = df['price_at_10min']
     predictions_df['max_gain_percent'] = df['max_gain_percent']
     predictions_df['final_gain_percent'] = df['final_gain_percent']
 

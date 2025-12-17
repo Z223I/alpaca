@@ -16,10 +16,10 @@
   "train_samples": 2016,
   "test_samples": 504,
   "model_performance": {
-    "test_accuracy": 0.6488095238095238,
-    "precision": 0.6,
-    "recall": 0.5753424657534246,
-    "f1_score": 0.5874125874125874,
-    "roc_auc": 0.7080829928703036
+    "test_accuracy": 0.6587301587301587,
+    "precision": 0.6008583690987125,
+    "recall": 0.639269406392694,
+    "f1_score": 0.6194690265486725,
+    "roc_auc": 0.7041416326203637
   }
 }
