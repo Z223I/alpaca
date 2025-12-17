@@ -2018,16 +2018,18 @@ def _generate_prediction_plots(predictions_df: pd.DataFrame, model_trades: pd.Da
     ax2.legend()
     ax2.grid(alpha=0.3)
 
-    # 1c: Cumulative profit comparison
+    # 1c: Cumulative profit comparison (using compounding multiplication, not addition)
     ax3 = axes[1, 0]
     if len(model_trades) > 0:
-        model_cumulative = model_trades['realistic_profit'].cumsum()
-        all_cumulative = predictions_df['realistic_profit'].cumsum()
+        # Correct compounding: convert % to decimal, multiply returns, convert back to %
+        # Example: 10% then 5% = 1.10 × 1.05 - 1 = 15.5% (not 15%)
+        model_cumulative = ((1 + model_trades['realistic_profit']/100).cumprod() - 1) * 100
+        all_cumulative = ((1 + predictions_df['realistic_profit']/100).cumprod() - 1) * 100
         ax3.plot(model_cumulative.values, label=f'Model ({len(model_trades)} trades)', linewidth=2, color='green')
         ax3.plot(all_cumulative.values, label=f'Take-All ({len(predictions_df)} trades)', linewidth=2, color='orange')
         ax3.axhline(y=0, color='red', linestyle='--', linewidth=1)
         ax3.set_xlabel('Trade Number', fontweight='bold')
-        ax3.set_ylabel('Cumulative Profit %', fontweight='bold')
+        ax3.set_ylabel('Cumulative Profit % (Compounded)', fontweight='bold')
         ax3.set_title('Cumulative Profit Comparison', fontweight='bold')
         ax3.legend()
         ax3.grid(alpha=0.3)
