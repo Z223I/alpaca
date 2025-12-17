@@ -2068,8 +2068,9 @@ def _generate_prediction_plots(predictions_df: pd.DataFrame, model_trades: pd.Da
     # 2b: Comparison bar chart
     ax2 = axes[1]
     if len(model_trades) > 0:
-        model_total = model_trades['realistic_profit'].sum()
-        all_total = predictions_df['realistic_profit'].sum()
+        # Use compounding multiplication for total profit, not addition
+        model_total = ((1 + model_trades['realistic_profit']/100).prod() - 1) * 100
+        all_total = ((1 + predictions_df['realistic_profit']/100).prod() - 1) * 100
         model_avg = model_trades['realistic_profit'].mean()
         all_avg = predictions_df['realistic_profit'].mean()
 
@@ -2080,7 +2081,7 @@ def _generate_prediction_plots(predictions_df: pd.DataFrame, model_trades: pd.Da
         ax2.set_ylabel('Profit %', fontweight='bold')
         ax2.set_title('Profit Comparison', fontweight='bold')
         ax2.set_xticks(x)
-        ax2.set_xticklabels(['Total Profit', 'Avg Per Trade'])
+        ax2.set_xticklabels(['Total Profit\n(Compounded)', 'Avg Per Trade'])
         ax2.legend()
         ax2.grid(axis='y', alpha=0.3)
 
@@ -2128,7 +2129,8 @@ def _generate_prediction_report(predictions_df: pd.DataFrame, model_trades: pd.D
         f.write("### Strategy: 1.5% Take-Profit + 1% Trailing Stop\n\n")
 
         if len(model_trades) > 0:
-            model_total = model_trades['realistic_profit'].sum()
+            # Use compounding for total profit
+            model_total = ((1 + model_trades['realistic_profit']/100).prod() - 1) * 100
             model_avg = model_trades['realistic_profit'].mean()
             model_wins = model_trades[model_trades['realistic_profit'] > 0]
             model_losses = model_trades[model_trades['realistic_profit'] <= 0]
@@ -2138,7 +2140,7 @@ def _generate_prediction_report(predictions_df: pd.DataFrame, model_trades: pd.D
             f.write("| Metric | Value |\n")
             f.write("|--------|-------|\n")
             f.write(f"| Trades Taken | {len(model_trades)} / {len(predictions_df)} ({len(model_trades)/len(predictions_df)*100:.1f}%) |\n")
-            f.write(f"| Total Profit | {model_total:.2f}% |\n")
+            f.write(f"| Total Profit (Compounded) | {model_total:.2f}% |\n")
             f.write(f"| Average Profit | {model_avg:.2f}% per trade |\n")
             f.write(f"| Win Rate | {win_rate:.1f}% ({len(model_wins)} wins, {len(model_losses)} losses) |\n")
             if len(model_wins) > 0:
@@ -2150,12 +2152,13 @@ def _generate_prediction_report(predictions_df: pd.DataFrame, model_trades: pd.D
                     profit_factor = abs(model_wins['realistic_profit'].sum() / model_losses['realistic_profit'].sum())
                     f.write(f"| Profit Factor | {profit_factor:.2f} |\n")
 
-            all_total = predictions_df['realistic_profit'].sum()
+            # Use compounding for total profit
+            all_total = ((1 + predictions_df['realistic_profit']/100).prod() - 1) * 100
             all_avg = predictions_df['realistic_profit'].mean()
 
             f.write("\n#### Comparison: Model vs Take-All\n\n")
-            f.write("| Strategy | Trades | Total Profit | Avg/Trade |\n")
-            f.write("|----------|--------|--------------|----------|\n")
+            f.write("| Strategy | Trades | Total Profit (Compounded) | Avg/Trade |\n")
+            f.write("|----------|--------|---------------------------|----------|\n")
             f.write(f"| Model | {len(model_trades)} | {model_total:.2f}% | {model_avg:.2f}% |\n")
             f.write(f"| Take-All | {len(predictions_df)} | {all_total:.2f}% | {all_avg:.2f}% |\n")
             f.write(f"| **Difference** | {len(model_trades) - len(predictions_df)} | **{model_total - all_total:+.2f}%** | **{model_avg - all_avg:+.2f}%** |\n\n")
@@ -2490,14 +2493,15 @@ def predict(model_path: str, test_dir: str, gain_threshold: float | None = None)
     num_model_trades = len(model_trades)
 
     if num_model_trades > 0:
-        model_total_profit = model_trades['realistic_profit'].sum()
+        # Use compounding for total profit
+        model_total_profit = ((1 + model_trades['realistic_profit']/100).prod() - 1) * 100
         model_avg_profit = model_trades['realistic_profit'].mean()
         model_wins = model_trades[model_trades['realistic_profit'] > 0]
         model_losses = model_trades[model_trades['realistic_profit'] <= 0]
         model_win_rate = len(model_wins) / num_model_trades if num_model_trades > 0 else 0
 
         print(f"\nModel-Selected Trades ({num_model_trades} trades):")
-        print(f"  Total Profit:   {model_total_profit:.2f}%")
+        print(f"  Total Profit:   {model_total_profit:.2f}% (compounded)")
         print(f"  Average Profit: {model_avg_profit:.2f}% per trade")
         print(f"  Win Rate:       {model_win_rate*100:.1f}%")
         if len(model_wins) > 0:
@@ -2508,11 +2512,12 @@ def predict(model_path: str, test_dir: str, gain_threshold: float | None = None)
             print(f"  Profit Factor:  {profit_factor:.2f}")
 
         # Compare to take-all
-        all_total_profit = predictions_df['realistic_profit'].sum()
+        # Use compounding for total profit
+        all_total_profit = ((1 + predictions_df['realistic_profit']/100).prod() - 1) * 100
         all_avg_profit = predictions_df['realistic_profit'].mean()
 
         print(f"\nTake-All Strategy ({len(predictions_df)} trades):")
-        print(f"  Total Profit:   {all_total_profit:.2f}%")
+        print(f"  Total Profit:   {all_total_profit:.2f}% (compounded)")
         print(f"  Average Profit: {all_avg_profit:.2f}% per trade")
 
         print(f"\nModel Edge:")
