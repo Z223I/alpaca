@@ -1,20 +1,20 @@
 ================================================================================
 SQUEEZE ALERT OUTCOME PREDICTION - SUMMARY REPORT
 ================================================================================
-Generated: 2025-12-18 07:53:37
+Generated: 2025-12-18 13:22:01
 
 DATASET
 --------------------------------------------------------------------------------
-Total Observations: 3340
-Training Set: 2672 samples
-Test Set: 668 samples
+Total Observations: 3261
+Training Set: 2608 samples
+Test Set: 653 samples
 Features: 11
 Target Variable: achieved_5pct (reached 5% gain in 10 minutes)
 
 CLASS DISTRIBUTION
 --------------------------------------------------------------------------------
-Successes: 1209 (36.2%)
-Failures:  2131 (63.8%)
+Successes: 1181 (36.2%)
+Failures:  2080 (63.8%)
 Imbalance Ratio: 1 : 1.76
 Balance Assessment: ⚠ Moderate Imbalance (35-65%)
 
@@ -22,9 +22,9 @@ MODEL PERFORMANCE
 --------------------------------------------------------------------------------
 Model                  Accuracy  Precision     Recall         F1    ROC-AUC
 --------------------------------------------------------------------------------
-Logistic Regression      0.5838     0.5599     0.5492     0.5545     0.6219
-Random Forest            0.5778     0.5424     0.6698     0.5994     0.6413
-XGBoost                  0.5823     0.5563     0.5651     0.5606     0.6439
+Logistic Regression      0.6034     0.5939     0.5032     0.5448     0.6529
+Random Forest            0.6003     0.5697     0.6234     0.5953     0.6702
+XGBoost                  0.6156     0.5893     0.6104     0.5997     0.6686
 
 INTERPRETATION
 --------------------------------------------------------------------------------
@@ -35,10 +35,10 @@ ROC-AUC:   Overall discrimination ability (0.5=random, 1.0=perfect)
 
 RECOMMENDATION
 --------------------------------------------------------------------------------
-Best Model: Random Forest
-  F1-Score: 0.5994
-  Precision: 0.5424
-  Recall: 0.6698
+Best Model: XGBoost
+  F1-Score: 0.5997
+  Precision: 0.5893
+  Recall: 0.6104
 
 ~ Model shows moderate predictive performance (F1 > 0.50)
   Consider additional feature engineering or more data

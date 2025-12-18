@@ -13,13 +13,13 @@
     "price_category_encoded"
   ],
   "gain_threshold": 4.0,
-  "train_samples": 2672,
-  "test_samples": 668,
+  "train_samples": 2608,
+  "test_samples": 653,
   "model_performance": {
-    "test_accuracy": 0.6212574850299402,
-    "precision": 0.5464684014869888,
-    "recall": 0.5287769784172662,
-    "f1_score": 0.5374771480804388,
-    "roc_auc": 0.6755026747832503
+    "test_accuracy": 0.6462480857580398,
+    "precision": 0.572992700729927,
+    "recall": 0.5793357933579336,
+    "f1_score": 0.5761467889908257,
+    "roc_auc": 0.6988466219740732
   }
 }

@@ -18,7 +18,7 @@ TRAINING WORKFLOW:
 
 PREDICTION WORKFLOW:
 1. Loads a trained XGBoost model
-2. Extracts outcome data from specified test directory
+2. Extracts outcome data from specified date range
 3. Applies same preprocessing as training
 4. Makes predictions and evaluates performance
 5. Saves predictions with probabilities to CSV
@@ -34,20 +34,19 @@ USAGE EXAMPLES (run from project root):
   # Make predictions on a specific date's data
   python analysis/predict_squeeze_outcomes.py predict \
     --model analysis/xgboost_model_1.5pct.json \
-    --test-dir historical_data/2025-12-15
+    --start-date 2025-12-17 \
+    --end-date 2025-12-17
 
-  python analysis/predict_squeeze_outcomes.py predict --model analysis/xgboost_model_1.5pct.json --test-dir historical_data/2025-12-16
-  python analysis/predict_squeeze_outcomes.py predict --model analysis/xgboost_model_3pct.json --test-dir historical_data/2025-12-16
-
-  # Make predictions on all dates in directory
-  python analysis/predict_squeeze_outcomes.py predict \\
-    --model analysis/xgboost_model_2pct.json \\
-    --test-dir historical_data
+  # Make predictions on a date range
+  python analysis/predict_squeeze_outcomes.py predict \
+    --model analysis/xgboost_model_2pct.json \
+    --start-date 2025-12-17 \
+    --end-date 2025-12-18
 
   # Make predictions with custom threshold (overrides model's default)
-  python analysis/predict_squeeze_outcomes.py predict \\
-    --model analysis/xgboost_model_1.5pct.json \\
-    --test-dir historical_data/2025-12-15 \\
+  python analysis/predict_squeeze_outcomes.py predict \
+    --model analysis/xgboost_model_1.5pct.json \
+    --start-date 2025-12-17 \
     --threshold 2.0
 
 OUTPUT FILES (Training):
@@ -133,13 +132,14 @@ class SqueezeOutcomePredictor:
         # Set random seed for reproducibility
         np.random.seed(42)
 
-    def extract_outcomes(self, gain_threshold: float = 5.0, start_date: str = "2025-12-12") -> pd.DataFrame:
+    def extract_outcomes(self, gain_threshold: float = 5.0, start_date: str = "2025-12-12", end_date: str = None) -> pd.DataFrame:
         """
         Extract outcome_tracking data from JSON files across multiple date directories.
 
         Args:
             gain_threshold: Gain percentage threshold for success classification
             start_date: Starting date for directory scan (YYYY-MM-DD format)
+            end_date: Ending date for directory scan (YYYY-MM-DD format). If None, includes all dates >= start_date.
 
         Returns:
             DataFrame with outcome metrics for each alert
@@ -148,17 +148,23 @@ class SqueezeOutcomePredictor:
         print("STEP 1: EXTRACTING OUTCOME DATA FROM JSON FILES")
         print("="*80)
         print(f"Gain threshold: {gain_threshold}%")
-        print(f"Scanning directories from {start_date} onwards")
+        if end_date:
+            print(f"Scanning directories from {start_date} to {end_date} (inclusive)")
+        else:
+            print(f"Scanning directories from {start_date} onwards")
 
         outcomes = []
 
-        # Find all date directories >= start_date
+        # Find all date directories within range
         date_dirs = []
         for date_dir in self.json_dir.glob('????-??-??'):
-            if date_dir.is_dir() and date_dir.name >= start_date:
-                squeeze_dir = date_dir / 'squeeze_alerts_sent'
-                if squeeze_dir.exists():
-                    date_dirs.append(squeeze_dir)
+            date_name = date_dir.name
+            # Check if within range
+            if date_dir.is_dir() and date_name >= start_date:
+                if end_date is None or date_name <= end_date:
+                    squeeze_dir = date_dir / 'squeeze_alerts_sent'
+                    if squeeze_dir.exists():
+                        date_dirs.append(squeeze_dir)
 
         date_dirs.sort()  # Sort chronologically
         print(f"Found {len(date_dirs)} date directories: {[d.parent.name for d in date_dirs]}")
@@ -2043,12 +2049,13 @@ def ensure_features_updated(features_csv: str = "analysis/squeeze_alerts_indepen
     return False
 
 
-def train(gain_threshold: float = 5.0):
+def train(gain_threshold: float = 5.0, end_date: str = "2025-12-16"):
     """
     Train models and generate analysis for a given gain threshold.
 
     Args:
         gain_threshold: Percentage gain threshold for success classification (default: 5.0)
+        end_date: Training data cutoff date (YYYY-MM-DD). Data after this is reserved for prediction.
     """
 
     # Configuration
@@ -2074,7 +2081,15 @@ def train(gain_threshold: float = 5.0):
     predictor = SqueezeOutcomePredictor(json_dir, features_csv)
 
     # Step 1: Extract outcomes from all directories starting 2025-12-12
-    outcomes_df = predictor.extract_outcomes(gain_threshold=gain_threshold, start_date="2025-12-12")
+    # CRITICAL: Use end_date to prevent temporal contamination
+    # Training should ONLY use data BEFORE prediction dates
+    print(f"\n⚠️  Training data cutoff: {end_date}")
+    print(f"   Data from {end_date} onwards is reserved for prediction/testing")
+    outcomes_df = predictor.extract_outcomes(
+        gain_threshold=gain_threshold,
+        start_date="2025-12-12",
+        end_date=end_date  # Configurable via --end-date argument
+    )
 
     # Step 2: Merge with features
     df = predictor.merge_with_features(outcomes_df)
@@ -2100,14 +2115,21 @@ def train(gain_threshold: float = 5.0):
     # Store scaler for later use in predictions
     predictor.scaler = predictor.scaler  # scaler is created in scale_features method
 
-    # Step 5B: Balance classes in training data
-    X_train_balanced, y_train_balanced = predictor.balance_classes(X_train_scaled, y_train, method='smote')
+    # Step 5B: REMOVED SMOTE - Now using class weights in models instead
+    # SMOTE creates synthetic samples that can cause overfitting
+    # Class weights provide similar benefit without synthetic data
+    print("\n" + "="*80)
+    print("CLASS IMBALANCE HANDLING")
+    print("="*80)
+    print("Using class_weight='balanced' in models instead of SMOTE")
+    print("This avoids overfitting to synthetic samples")
+    print("="*80)
 
-    # Step 6: Train models (using balanced training data)
-    models = predictor.train_models(X_train_balanced, X_test_scaled, y_train_balanced, y_test)
+    # Step 6: Train models (using original training data with class weights)
+    models = predictor.train_models(X_train_scaled, X_test_scaled, y_train, y_test)
 
-    # Step 7: Evaluate models (using balanced training data for consistency)
-    results = predictor.evaluate_models(X_train_balanced, X_test_scaled, y_train_balanced, y_test)
+    # Step 7: Evaluate models (using original training data)
+    results = predictor.evaluate_models(X_train_scaled, X_test_scaled, y_train, y_test)
 
     # Step 8: Feature importance
     # Format threshold for filename (1.5 -> "1.5", 2.0 -> "2")
@@ -2140,7 +2162,7 @@ def train(gain_threshold: float = 5.0):
     predictor.plot_class_distribution(
         gain_threshold=gain_threshold,
         output_path=f'analysis/plots/class_distribution{threshold_suffix}.png',
-        y_train_balanced=y_train_balanced
+        y_train_balanced=None  # No longer using SMOTE balancing
     )
 
     # Step 12: Price category analysis
@@ -2344,7 +2366,7 @@ def _generate_prediction_plots(predictions_df: pd.DataFrame, model_trades: pd.Da
 def _generate_prediction_report(predictions_df: pd.DataFrame, model_trades: pd.DataFrame,
                                  threshold_suffix: str, gain_threshold: float,
                                  accuracy: float, precision: float, recall: float,
-                                 f1: float, roc_auc: float, model_info: dict, test_dir: str):
+                                 f1: float, roc_auc: float, model_info: dict, date_range: str):
     """Generate markdown report for predictions."""
     from datetime import datetime
 
@@ -2353,7 +2375,7 @@ def _generate_prediction_report(predictions_df: pd.DataFrame, model_trades: pd.D
     with open(report_file, 'w') as f:
         f.write(f"# Prediction Report - {gain_threshold}% Target\n\n")
         f.write(f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-        f.write(f"**Test Directory:** `{test_dir}`\n\n")
+        f.write(f"**Date Range:** `{date_range}`\n\n")
         f.write(f"**Model:** `{model_info.get('gain_threshold', gain_threshold)}%` target\n\n")
 
         f.write("---\n\n")
@@ -2426,13 +2448,14 @@ def _generate_prediction_report(predictions_df: pd.DataFrame, model_trades: pd.D
     print(f"✓ Saved markdown report to: {report_file}")
 
 
-def predict(model_path: str, test_dir: str, gain_threshold: float | None = None) -> pd.DataFrame:
+def predict(model_path: str, start_date: str, end_date: str = None, gain_threshold: float | None = None) -> pd.DataFrame:
     """
     Load a trained model and make predictions on new data.
 
     Args:
         model_path: Path to saved XGBoost model (e.g., 'analysis/xgboost_model_1.5pct.json')
-        test_dir: Directory containing test data (e.g., 'historical_data/2025-12-15')
+        start_date: Start date for prediction (YYYY-MM-DD, e.g., '2025-12-17')
+        end_date: End date for prediction (YYYY-MM-DD). If None, uses only start_date
         gain_threshold: Percentage gain threshold (if None, reads from model metadata)
 
     Returns:
@@ -2452,11 +2475,15 @@ def predict(model_path: str, test_dir: str, gain_threshold: float | None = None)
     base_data_dir = "/home/wilsonb/dl/github.com/Z223I/alpaca/historical_data"
     ensure_features_updated(features_csv=features_csv, data_dir=base_data_dir)
 
+    # Set end_date to start_date if not provided (single date mode)
+    if end_date is None:
+        end_date = start_date
+
     print("="*80)
     print("SQUEEZE ALERT OUTCOME PREDICTION - PREDICTION MODE")
     print("="*80)
     print(f"Model: {model_path}")
-    print(f"Test directory: {test_dir}")
+    print(f"Date Range: {start_date} to {end_date}")
     print("="*80)
 
     # Step 1: Load model metadata
@@ -2511,38 +2538,18 @@ def predict(model_path: str, test_dir: str, gain_threshold: float | None = None)
     print("LOADING TEST DATA")
     print("="*80)
 
-    # Create predictor instance
-    test_path = Path(test_dir)
-    if not test_path.exists():
-        raise FileNotFoundError(f"Test directory not found: {test_dir}")
+    # Use base historical_data directory
+    json_dir = base_data_dir
+    predictor = SqueezeOutcomePredictor(json_dir, features_csv)
 
-    # Determine if test_dir is a date directory or base directory
-    single_date_mode = False
-    if (test_path / 'squeeze_alerts_sent').exists():
-        # Single date directory
-        json_dir = test_path.parent
-        start_date = test_path.name
-        single_date_mode = True
-        print(f"Single date mode: extracting only from {start_date}")
-    else:
-        # Base directory, use all dates
-        json_dir = test_path
-        start_date = "2025-01-01"  # Default to all dates
-        print(f"Multi-date mode: extracting from {start_date} onwards")
-
-    predictor = SqueezeOutcomePredictor(str(json_dir), features_csv)
-
-    # Extract outcomes
-    outcomes_df = predictor.extract_outcomes(gain_threshold=gain_threshold, start_date=start_date)
-
-    # If single date mode, filter to only that specific date
-    if single_date_mode:
-        # Filter outcomes to only include the specific date
-        outcomes_df['date'] = pd.to_datetime(outcomes_df['timestamp']).dt.date
-        target_date = pd.to_datetime(start_date).date()
-        outcomes_df = outcomes_df[outcomes_df['date'] == target_date].copy()
-        outcomes_df = outcomes_df.drop('date', axis=1)
-        print(f"✓ Filtered to {len(outcomes_df)} alerts from {start_date} only")
+    # Extract outcomes for the specified date range
+    print(f"Extracting data from {start_date} to {end_date}")
+    outcomes_df = predictor.extract_outcomes(
+        gain_threshold=gain_threshold,
+        start_date=start_date,
+        end_date=end_date
+    )
+    print(f"✓ Extracted {len(outcomes_df)} alerts from date range")
 
     # Merge with features
     df = predictor.merge_with_features(outcomes_df)
@@ -2858,10 +2865,11 @@ def predict(model_path: str, test_dir: str, gain_threshold: float | None = None)
         _generate_prediction_plots(predictions_df, model_trades, threshold_suffix, gain_threshold)
 
         # Step 11: Generate markdown report
+        date_range = f"{start_date} to {end_date}" if start_date != end_date else start_date
         _generate_prediction_report(
             predictions_df, model_trades, threshold_suffix, gain_threshold,
             accuracy, precision, recall, f1, roc_auc,
-            model_info, test_dir
+            model_info, date_range
         )
     else:
         print("\n⚠️  No trades selected by model - skipping profit analysis")
@@ -2883,11 +2891,11 @@ Examples (run from project root):
   # Train models for all thresholds (default)
   python analysis/predict_squeeze_outcomes.py train
 
-  # Make predictions using trained model
-  python analysis/predict_squeeze_outcomes.py predict --model analysis/xgboost_model_1.5pct.json --test-dir historical_data/2025-12-15
+  # Make predictions using trained model (single date)
+  python analysis/predict_squeeze_outcomes.py predict --model analysis/xgboost_model_1.5pct.json --start-date 2025-12-17 --end-date 2025-12-17
 
-  # Predict on all dates in directory
-  python analysis/predict_squeeze_outcomes.py predict --model analysis/xgboost_model_2pct.json --test-dir historical_data
+  # Predict on date range
+  python analysis/predict_squeeze_outcomes.py predict --model analysis/xgboost_model_2pct.json --start-date 2025-12-17 --end-date 2025-12-18
         """
     )
 
@@ -2897,13 +2905,17 @@ Examples (run from project root):
     train_parser = subparsers.add_parser('train', help='Train models')
     train_parser.add_argument('--threshold', type=float, default=None,
                              help='Gain threshold percentage (e.g., 1.5, 2.0). If not specified, trains all thresholds [1.5, 2.0, 2.5, 3.0]')
+    train_parser.add_argument('--end-date', type=str, default='2025-12-16',
+                             help='Training data cutoff date (YYYY-MM-DD). Data after this date is reserved for prediction. Default: 2025-12-16')
 
     # Predict mode
     predict_parser = subparsers.add_parser('predict', help='Make predictions using trained model')
     predict_parser.add_argument('--model', type=str, required=True,
                                help='Path to trained model (e.g., analysis/xgboost_model_1.5pct.json)')
-    predict_parser.add_argument('--test-dir', type=str, required=True,
-                               help='Directory containing test data (e.g., historical_data/2025-12-15)')
+    predict_parser.add_argument('--start-date', type=str, required=True,
+                               help='Start date for prediction (YYYY-MM-DD, e.g., 2025-12-17)')
+    predict_parser.add_argument('--end-date', type=str, default=None,
+                               help='End date for prediction (YYYY-MM-DD). If not specified, uses only start-date')
     predict_parser.add_argument('--threshold', type=float, default=None,
                                help='Gain threshold (optional, will use model\'s threshold if not specified)')
 
@@ -2918,7 +2930,7 @@ Examples (run from project root):
         if args.threshold is not None:
             # Train single threshold
             print(f"\nTraining model with {args.threshold}% gain threshold\n")
-            train(gain_threshold=args.threshold)
+            train(gain_threshold=args.threshold, end_date=args.end_date)
         else:
             # Run multiple thresholds for comparison
             thresholds = [1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 7.0]
@@ -2931,7 +2943,7 @@ Examples (run from project root):
                 threshold_str = f"{threshold:.1f}".rstrip('0').rstrip('.') if threshold % 1 else str(int(threshold))
                 print(f"RUNNING ANALYSIS: {threshold_str}% GAIN TARGET")
                 print(f"{'='*80}\n")
-                predictor, results = train(gain_threshold=threshold)
+                predictor, results = train(gain_threshold=threshold, end_date=args.end_date)
                 predictors[threshold] = predictor
                 results_all[threshold] = results
 
@@ -2992,9 +3004,12 @@ Examples (run from project root):
 
     elif args.mode == 'predict':
         # Prediction mode
+        # If end_date not specified, use start_date (single date mode)
+        end_date = args.end_date if args.end_date else args.start_date
         predictions_df = predict(
             model_path=args.model,
-            test_dir=args.test_dir,
+            start_date=args.start_date,
+            end_date=end_date,
             gain_threshold=args.threshold
         )
         print(f"\n✓ Prediction complete. Results saved to analysis/predictions_*.csv")

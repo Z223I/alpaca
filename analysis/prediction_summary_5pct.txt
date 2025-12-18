@@ -1,20 +1,20 @@
 ================================================================================
 SQUEEZE ALERT OUTCOME PREDICTION - SUMMARY REPORT
 ================================================================================
-Generated: 2025-12-18 07:53:44
+Generated: 2025-12-18 13:22:18
 
 DATASET
 --------------------------------------------------------------------------------
-Total Observations: 3340
-Training Set: 2672 samples
-Test Set: 668 samples
+Total Observations: 3261
+Training Set: 2608 samples
+Test Set: 653 samples
 Features: 11
 Target Variable: achieved_5pct (reached 5% gain in 10 minutes)
 
 CLASS DISTRIBUTION
 --------------------------------------------------------------------------------
-Successes: 1209 (36.2%)
-Failures:  2131 (63.8%)
+Successes: 1181 (36.2%)
+Failures:  2080 (63.8%)
 Imbalance Ratio: 1 : 1.76
 Balance Assessment: ⚠ Moderate Imbalance (35-65%)
 
@@ -22,9 +22,9 @@ MODEL PERFORMANCE
 --------------------------------------------------------------------------------
 Model                  Accuracy  Precision     Recall         F1    ROC-AUC
 --------------------------------------------------------------------------------
-Logistic Regression      0.5793     0.4357     0.5792     0.4973     0.5866
-Random Forest            0.5868     0.4396     0.5458     0.4870     0.6200
-XGBoost                  0.6018     0.4463     0.4500     0.4481     0.6262
+Logistic Regression      0.6126     0.4624     0.5279     0.4930     0.6184
+Random Forest            0.6187     0.4664     0.4764     0.4713     0.6457
+XGBoost                  0.6371     0.4915     0.4936     0.4925     0.6720
 
 INTERPRETATION
 --------------------------------------------------------------------------------
@@ -36,9 +36,9 @@ ROC-AUC:   Overall discrimination ability (0.5=random, 1.0=perfect)
 RECOMMENDATION
 --------------------------------------------------------------------------------
 Best Model: Logistic Regression
-  F1-Score: 0.4973
-  Precision: 0.4357
-  Recall: 0.5792
+  F1-Score: 0.4930
+  Precision: 0.4624
+  Recall: 0.5279
 
 ✗ Model shows weak predictive performance (F1 < 0.50)
   Not recommended for production use. Investigate:
