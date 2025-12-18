@@ -1,8 +1,8 @@
 # Prediction Report - 4.0% Target
 
-**Generated:** 2025-12-18 07:54:50
+**Generated:** 2025-12-18 08:04:48
 
-**Test Directory:** `historical_data/2025-12-16`
+**Test Directory:** `historical_data/2025-12-17`
 
 **Model:** `4.0%` target
 
@@ -12,11 +12,11 @@
 
 | Metric | Value |
 |--------|-------|
-| Accuracy | 0.8889 |
-| Precision | 0.8580 |
-| Recall | 0.9037 |
-| F1-Score | 0.8803 |
-| ROC-AUC | 0.9484 |
+| Accuracy | 0.5749 |
+| Precision | 0.4675 |
+| Recall | 0.4341 |
+| F1-Score | 0.4501 |
+| ROC-AUC | 0.6027 |
 
 ---
 
@@ -28,27 +28,27 @@
 
 | Metric | Value |
 |--------|-------|
-| Trades Taken | 317 / 666 (47.6%) |
-| Total Profit (Compounded) | 859.13% |
-| Average Profit | 0.74% per trade |
-| Win Rate | 51.7% (164 wins, 153 losses) |
-| Average Win | 2.60% |
-| Average Loss | -1.25% |
-| Profit Factor | 2.23 |
+| Trades Taken | 169 / 454 (37.2%) |
+| Total Profit (Compounded) | -60.60% |
+| Average Profit | -0.53% per trade |
+| Win Rate | 21.9% (37 wins, 132 losses) |
+| Average Win | 2.23% |
+| Average Loss | -1.31% |
+| Profit Factor | 0.48 |
 
 #### Comparison: Model vs Take-All
 
 | Strategy | Trades | Total Profit (Compounded) | Avg/Trade |
 |----------|--------|---------------------------|----------|
-| Model | 317 | 859.13% | 0.74% |
-| Take-All | 666 | -46.26% | -0.07% |
-| **Difference** | -349 | **+905.39%** | **+0.82%** |
+| Model | 169 | -60.60% | -0.53% |
+| Take-All | 454 | -97.08% | -0.76% |
+| **Difference** | -285 | **+36.49%** | **+0.23%** |
 
 ---
 
 ## Analysis
 
-✅ **Model Edge:** The model achieves +0.82% better average profit per trade.
+✅ **Model Edge:** The model achieves +0.23% better average profit per trade.
 
 ---
 
