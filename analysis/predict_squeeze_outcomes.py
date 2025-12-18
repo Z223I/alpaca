@@ -1946,6 +1946,103 @@ class SqueezeOutcomePredictor:
         plt.close()
 
 
+def ensure_features_updated(features_csv: str = "analysis/squeeze_alerts_independent_features.csv",
+                           data_dir: str = "/home/wilsonb/dl/github.com/Z223I/alpaca/historical_data") -> bool:
+    """
+    Intelligently check if features CSV needs updating and regenerate if necessary.
+
+    Checks:
+    1. Does the CSV exist?
+    2. Are there date directories newer than the latest data in the CSV?
+
+    Args:
+        features_csv: Path to the features CSV file
+        data_dir: Path to historical_data directory
+
+    Returns:
+        True if CSV was regenerated, False if it was already up to date
+    """
+    from datetime import datetime
+
+    csv_path = Path(features_csv)
+    data_path = Path(data_dir)
+
+    # Get all date directories (YYYY-MM-DD format)
+    date_dirs = []
+    for date_dir in data_path.glob('????-??-??'):
+        if date_dir.is_dir() and (date_dir / 'squeeze_alerts_sent').exists():
+            date_dirs.append(date_dir.name)
+
+    if not date_dirs:
+        print("⚠️  No date directories found - skipping features update")
+        return False
+
+    date_dirs.sort()
+    latest_data_date = date_dirs[-1]
+
+    # Check if CSV exists and get its latest date
+    needs_update = False
+    if not csv_path.exists():
+        print(f"✓ Features CSV not found - will generate: {features_csv}")
+        needs_update = True
+    else:
+        # Read CSV and find latest timestamp
+        try:
+            df = pd.read_csv(csv_path)
+            if 'timestamp' in df.columns and len(df) > 0:
+                # Extract dates from timestamps
+                df['date'] = pd.to_datetime(df['timestamp']).dt.date
+                latest_csv_date = df['date'].max().strftime('%Y-%m-%d')
+
+                if latest_data_date > latest_csv_date:
+                    print(f"✓ New data detected: CSV has data through {latest_csv_date}, "
+                          f"but {latest_data_date} directory exists")
+                    needs_update = True
+                else:
+                    print(f"✓ Features CSV is up to date (latest: {latest_csv_date})")
+                    return False
+            else:
+                print("⚠️  Features CSV exists but appears invalid - will regenerate")
+                needs_update = True
+        except Exception as e:
+            print(f"⚠️  Error reading features CSV: {e} - will regenerate")
+            needs_update = True
+
+    if needs_update:
+        print("\n" + "="*80)
+        print("REGENERATING FEATURES CSV")
+        print("="*80)
+        print(f"Running statistical analysis on all data in: {data_dir}")
+        print("="*80 + "\n")
+
+        # Import and run the statistical analysis
+        try:
+            import sys
+            sys.path.insert(0, str(Path(__file__).parent))
+            from squeeze_alerts_statistical_analysis import SqueezeAlertsAnalyzer
+
+            # Initialize analyzer
+            analyzer = SqueezeAlertsAnalyzer(data_dir)
+
+            # Run the analysis pipeline
+            analyzer.load_alerts()
+            analyzer.engineer_features()
+            analyzer.select_independent_features()
+            analyzer.export_clean_dataset(output_path=features_csv)
+
+            print("\n" + "="*80)
+            print("✓ Features CSV regenerated successfully")
+            print("="*80 + "\n")
+            return True
+
+        except Exception as e:
+            print(f"\n❌ Error regenerating features CSV: {e}")
+            print("Please run manually: python analysis/squeeze_alerts_statistical_analysis.py")
+            raise
+
+    return False
+
+
 def train(gain_threshold: float = 5.0):
     """
     Train models and generate analysis for a given gain threshold.
@@ -1953,6 +2050,13 @@ def train(gain_threshold: float = 5.0):
     Args:
         gain_threshold: Percentage gain threshold for success classification (default: 5.0)
     """
+
+    # Configuration
+    json_dir = "/home/wilsonb/dl/github.com/Z223I/alpaca/historical_data"
+    features_csv = "analysis/squeeze_alerts_independent_features.csv"
+
+    # Auto-update features CSV if needed
+    ensure_features_updated(features_csv=features_csv, data_dir=json_dir)
 
     print("="*80)
     print("SQUEEZE ALERT OUTCOME PREDICTION")
@@ -1965,11 +2069,6 @@ def train(gain_threshold: float = 5.0):
     print("  - macd_histogram: ~15% missing (will be 100% with daily MACD)")
     print("  We handle this via imputation for now.")
     print("="*80)
-
-    # Configuration
-    # Use base historical_data directory to scan all date directories from 2025-12-12 onwards
-    json_dir = "/home/wilsonb/dl/github.com/Z223I/alpaca/historical_data"
-    features_csv = "analysis/squeeze_alerts_independent_features.csv"
 
     # Initialize predictor
     predictor = SqueezeOutcomePredictor(json_dir, features_csv)
@@ -2348,6 +2447,11 @@ def predict(model_path: str, test_dir: str, gain_threshold: float | None = None)
         confusion_matrix, roc_auc_score
     )
 
+    # Auto-update features CSV if needed (before any other processing)
+    features_csv = "analysis/squeeze_alerts_independent_features.csv"
+    base_data_dir = "/home/wilsonb/dl/github.com/Z223I/alpaca/historical_data"
+    ensure_features_updated(features_csv=features_csv, data_dir=base_data_dir)
+
     print("="*80)
     print("SQUEEZE ALERT OUTCOME PREDICTION - PREDICTION MODE")
     print("="*80)
@@ -2426,7 +2530,6 @@ def predict(model_path: str, test_dir: str, gain_threshold: float | None = None)
         start_date = "2025-01-01"  # Default to all dates
         print(f"Multi-date mode: extracting from {start_date} onwards")
 
-    features_csv = "analysis/squeeze_alerts_independent_features.csv"
     predictor = SqueezeOutcomePredictor(str(json_dir), features_csv)
 
     # Extract outcomes

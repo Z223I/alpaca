@@ -1,30 +1,30 @@
 ================================================================================
 SQUEEZE ALERT OUTCOME PREDICTION - SUMMARY REPORT
 ================================================================================
-Generated: 2025-12-17 09:16:40
+Generated: 2025-12-18 07:53:47
 
 DATASET
 --------------------------------------------------------------------------------
-Total Observations: 2520
-Training Set: 2016 samples
-Test Set: 504 samples
+Total Observations: 3340
+Training Set: 2672 samples
+Test Set: 668 samples
 Features: 11
 Target Variable: achieved_5pct (reached 5% gain in 10 minutes)
 
 CLASS DISTRIBUTION
 --------------------------------------------------------------------------------
-Successes: 948 (37.6%)
-Failures:  1572 (62.4%)
-Imbalance Ratio: 1 : 1.66
+Successes: 1209 (36.2%)
+Failures:  2131 (63.8%)
+Imbalance Ratio: 1 : 1.76
 Balance Assessment: ⚠ Moderate Imbalance (35-65%)
 
 MODEL PERFORMANCE
 --------------------------------------------------------------------------------
 Model                  Accuracy  Precision     Recall         F1    ROC-AUC
 --------------------------------------------------------------------------------
-Logistic Regression      0.5853     0.4671     0.7513     0.5761     0.6602
-Random Forest            0.6310     0.5057     0.6984     0.5867     0.6877
-XGBoost                  0.6667     0.5533     0.5767     0.5648     0.6879
+Logistic Regression      0.5644     0.3642     0.5534     0.4393     0.5772
+Random Forest            0.5644     0.3466     0.4660     0.3975     0.6028
+XGBoost                  0.6527     0.4301     0.3883     0.4082     0.6202
 
 INTERPRETATION
 --------------------------------------------------------------------------------
@@ -35,10 +35,13 @@ ROC-AUC:   Overall discrimination ability (0.5=random, 1.0=perfect)
 
 RECOMMENDATION
 --------------------------------------------------------------------------------
-Best Model: Random Forest
-  F1-Score: 0.5867
-  Precision: 0.5057
-  Recall: 0.6984
+Best Model: Logistic Regression
+  F1-Score: 0.4393
+  Precision: 0.3642
+  Recall: 0.5534
 
-~ Model shows moderate predictive performance (F1 > 0.50)
-  Consider additional feature engineering or more data
+✗ Model shows weak predictive performance (F1 < 0.50)
+  Not recommended for production use. Investigate:
+  - Need more training data
+  - Try different features
+  - Check for data quality issues
