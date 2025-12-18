@@ -1,20 +1,20 @@
 ================================================================================
 SQUEEZE ALERT OUTCOME PREDICTION - SUMMARY REPORT
 ================================================================================
-Generated: 2025-12-18 13:22:09
+Generated: 2025-12-18 13:46:39
 
 DATASET
 --------------------------------------------------------------------------------
-Total Observations: 3261
-Training Set: 2608 samples
-Test Set: 653 samples
+Total Observations: 3259
+Training Set: 2607 samples
+Test Set: 652 samples
 Features: 11
 Target Variable: achieved_5pct (reached 5% gain in 10 minutes)
 
 CLASS DISTRIBUTION
 --------------------------------------------------------------------------------
 Successes: 1181 (36.2%)
-Failures:  2080 (63.8%)
+Failures:  2078 (63.8%)
 Imbalance Ratio: 1 : 1.76
 Balance Assessment: ⚠ Moderate Imbalance (35-65%)
 
@@ -22,9 +22,9 @@ MODEL PERFORMANCE
 --------------------------------------------------------------------------------
 Model                  Accuracy  Precision     Recall         F1    ROC-AUC
 --------------------------------------------------------------------------------
-Logistic Regression      0.5942     0.5114     0.4982     0.5047     0.6383
-Random Forest            0.6187     0.5382     0.5720     0.5546     0.6792
-XGBoost                  0.6462     0.5730     0.5793     0.5761     0.6988
+Logistic Regression      0.5936     0.5133     0.4963     0.5047     0.6408
+Random Forest            0.6104     0.5319     0.5515     0.5415     0.6745
+XGBoost                  0.6350     0.5644     0.5478     0.5560     0.6905
 
 INTERPRETATION
 --------------------------------------------------------------------------------
@@ -36,9 +36,9 @@ ROC-AUC:   Overall discrimination ability (0.5=random, 1.0=perfect)
 RECOMMENDATION
 --------------------------------------------------------------------------------
 Best Model: XGBoost
-  F1-Score: 0.5761
-  Precision: 0.5730
-  Recall: 0.5793
+  F1-Score: 0.5560
+  Precision: 0.5644
+  Recall: 0.5478
 
 ~ Model shows moderate predictive performance (F1 > 0.50)
   Consider additional feature engineering or more data

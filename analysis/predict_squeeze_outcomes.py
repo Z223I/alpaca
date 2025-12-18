@@ -2680,15 +2680,6 @@ def predict(model_path: str, start_date: str, end_date: str = None, gain_thresho
                     enhanced_row, gain_threshold, TRAILING_STOP_PCT
                 )
 
-                # Debug first few entries
-                if debug_count < 5:
-                    print(f"\nDEBUG {symbol} {timestamp}:")
-                    print(f"  Gain: {gain:.2f}%, Reason: {reason}, Time: {holding_time}s")
-                    if 'outcome_tracking' in enhanced_row:
-                        intervals = enhanced_row['outcome_tracking'].get('intervals', {})
-                        print(f"  Intervals loaded: {len(intervals)}")
-                    debug_count += 1
-
                 realistic_profits.append(gain)
             else:
                 json_missing_count += 1

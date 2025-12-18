@@ -1,20 +1,20 @@
 ================================================================================
 SQUEEZE ALERT OUTCOME PREDICTION - SUMMARY REPORT
 ================================================================================
-Generated: 2025-12-18 13:22:21
+Generated: 2025-12-18 13:46:52
 
 DATASET
 --------------------------------------------------------------------------------
-Total Observations: 3261
-Training Set: 2608 samples
-Test Set: 653 samples
+Total Observations: 3259
+Training Set: 2607 samples
+Test Set: 652 samples
 Features: 11
 Target Variable: achieved_5pct (reached 5% gain in 10 minutes)
 
 CLASS DISTRIBUTION
 --------------------------------------------------------------------------------
 Successes: 1181 (36.2%)
-Failures:  2080 (63.8%)
+Failures:  2078 (63.8%)
 Imbalance Ratio: 1 : 1.76
 Balance Assessment: ⚠ Moderate Imbalance (35-65%)
 
@@ -22,9 +22,9 @@ MODEL PERFORMANCE
 --------------------------------------------------------------------------------
 Model                  Accuracy  Precision     Recall         F1    ROC-AUC
 --------------------------------------------------------------------------------
-Logistic Regression      0.6049     0.3878     0.5126     0.4416     0.6015
-Random Forest            0.6095     0.3704     0.4020     0.3855     0.6214
-XGBoost                  0.6769     0.4706     0.4824     0.4764     0.6612
+Logistic Regression      0.6074     0.3931     0.5150     0.4459     0.6043
+Random Forest            0.6012     0.3571     0.3750     0.3659     0.6291
+XGBoost                  0.6764     0.4729     0.4800     0.4764     0.6600
 
 INTERPRETATION
 --------------------------------------------------------------------------------
@@ -37,8 +37,8 @@ RECOMMENDATION
 --------------------------------------------------------------------------------
 Best Model: XGBoost
   F1-Score: 0.4764
-  Precision: 0.4706
-  Recall: 0.4824
+  Precision: 0.4729
+  Recall: 0.4800
 
 ✗ Model shows weak predictive performance (F1 < 0.50)
   Not recommended for production use. Investigate:
