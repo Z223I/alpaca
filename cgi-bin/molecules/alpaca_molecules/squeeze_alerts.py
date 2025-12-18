@@ -406,7 +406,8 @@ class SqueezeAlertsMonitor:
                         start=start_time.astimezone(pytz.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'),
                         end=end_time.astimezone(pytz.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'),
                         limit=100,  # Up to 100 hours
-                        feed='sip'
+                        feed='sip',
+                        adjustment='split'
                     )
 
                     if bars and len(bars) > 0:
@@ -1284,7 +1285,8 @@ class SqueezeAlertsMonitor:
                 start=start_time.astimezone(pytz.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'),
                 end=end_time.astimezone(pytz.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'),
                 limit=35,
-                feed='sip'
+                feed='sip',
+                adjustment='split'
             )
 
             if not bars or len(bars) < 21:
@@ -1362,7 +1364,8 @@ class SqueezeAlertsMonitor:
                 start=start_time.astimezone(pytz.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'),
                 end=end_time.astimezone(pytz.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'),
                 limit=35,
-                feed='sip'
+                feed='sip',
+                adjustment='split'
             )
 
             if not bars or len(bars) < 26:
