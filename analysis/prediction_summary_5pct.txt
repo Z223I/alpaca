@@ -1,30 +1,30 @@
 ================================================================================
 SQUEEZE ALERT OUTCOME PREDICTION - SUMMARY REPORT
 ================================================================================
-Generated: 2025-12-18 13:46:42
+Generated: 2025-12-20 09:00:33
 
 DATASET
 --------------------------------------------------------------------------------
-Total Observations: 3259
-Training Set: 2607 samples
-Test Set: 652 samples
+Total Observations: 2218
+Training Set: 1774 samples
+Test Set: 444 samples
 Features: 11
 Target Variable: achieved_5pct (reached 5% gain in 10 minutes)
 
 CLASS DISTRIBUTION
 --------------------------------------------------------------------------------
-Successes: 1181 (36.2%)
-Failures:  2078 (63.8%)
-Imbalance Ratio: 1 : 1.76
+Successes: 792 (35.7%)
+Failures:  1426 (64.3%)
+Imbalance Ratio: 1 : 1.80
 Balance Assessment: ⚠ Moderate Imbalance (35-65%)
 
 MODEL PERFORMANCE
 --------------------------------------------------------------------------------
 Model                  Accuracy  Precision     Recall         F1    ROC-AUC
 --------------------------------------------------------------------------------
-Logistic Regression      0.6135     0.4662     0.5299     0.4960     0.6210
-Random Forest            0.6242     0.4772     0.4915     0.4842     0.6530
-XGBoost                  0.6304     0.4852     0.4915     0.4883     0.6659
+Logistic Regression      0.6577     0.4971     0.5629     0.5280     0.7259
+Random Forest            0.7050     0.5617     0.6026     0.5815     0.7766
+XGBoost                  0.7207     0.5799     0.6490     0.6125     0.7960
 
 INTERPRETATION
 --------------------------------------------------------------------------------
@@ -35,13 +35,10 @@ ROC-AUC:   Overall discrimination ability (0.5=random, 1.0=perfect)
 
 RECOMMENDATION
 --------------------------------------------------------------------------------
-Best Model: Logistic Regression
-  F1-Score: 0.4960
-  Precision: 0.4662
-  Recall: 0.5299
+Best Model: XGBoost
+  F1-Score: 0.6125
+  Precision: 0.5799
+  Recall: 0.6490
 
-✗ Model shows weak predictive performance (F1 < 0.50)
-  Not recommended for production use. Investigate:
-  - Need more training data
-  - Try different features
-  - Check for data quality issues
+✓ Model shows good predictive performance (F1 > 0.60)
+  Recommended for trade filtering in production
