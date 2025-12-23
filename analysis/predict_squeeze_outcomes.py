@@ -79,10 +79,6 @@ Updated: 2025-12-16 (Added predict mode)
 import json
 import pandas as pd
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')  # Use non-interactive backend to avoid threading issues
-import matplotlib.pyplot as plt
-import seaborn as sns
 from pathlib import Path
 from typing import Dict, List, Tuple, Any, Optional
 from datetime import datetime
@@ -101,6 +97,17 @@ from imblearn.under_sampling import RandomUnderSampler
 from imblearn.combine import SMOTEENN
 import warnings
 warnings.filterwarnings('ignore')
+
+# Import plotting functions from atoms_analysis
+from atoms_analysis.plotting import (
+    plot_feature_importance,
+    plot_roc_curves,
+    plot_class_distribution,
+    plot_price_category_analysis,
+    plot_time_of_day_analysis,
+    generate_prediction_plots,
+    generate_aligned_cumulative_profit_plot
+)
 
 
 class SqueezeOutcomePredictor:
@@ -721,10 +728,6 @@ class SqueezeOutcomePredictor:
             model_name: Name of model to analyze
             output_path: Where to save plot
         """
-        print("\n" + "="*80)
-        print(f"STEP 8: FEATURE IMPORTANCE ANALYSIS - {model_name}")
-        print("="*80)
-
         model = self.models.get(model_name)
         if model is None:
             print(f"Model '{model_name}' not found")
@@ -734,33 +737,12 @@ class SqueezeOutcomePredictor:
             print(f"Model '{model_name}' does not support feature_importances_")
             return
 
-        # Get feature importance
-        importance_df = pd.DataFrame({
-            'feature': self.feature_names,
-            'importance': model.feature_importances_
-        }).sort_values('importance', ascending=False)
-
-        # Print top features
-        print("\nTop 10 Most Important Features:")
-        print("="*60)
-        for idx, row in importance_df.head(10).iterrows():
-            print(f"{row['feature']:35s} {row['importance']:.4f}")
-
-        # Plot
-        plt.figure(figsize=(10, 8))
-        plt.barh(importance_df['feature'], importance_df['importance'])
-        plt.xlabel('Importance', fontsize=12, fontweight='bold')
-        plt.ylabel('Feature', fontsize=12, fontweight='bold')
-        plt.title(f'Feature Importance - {model_name}', fontsize=14, fontweight='bold')
-        plt.gca().invert_yaxis()
-        plt.tight_layout()
-
-        output_file = Path(output_path)
-        plt.savefig(output_file, dpi=300, bbox_inches='tight')
-        print(f"\n✓ Saved feature importance plot to: {output_file}")
-        plt.close()
-
-        return importance_df
+        return plot_feature_importance(
+            self.feature_names,
+            model.feature_importances_,
+            model_name,
+            output_path
+        )
 
     def plot_roc_curves(self, output_path: str = 'analysis/plots/roc_curves.png'):
         """
@@ -769,30 +751,7 @@ class SqueezeOutcomePredictor:
         Args:
             output_path: Where to save plot
         """
-        print("\n" + "="*80)
-        print("PLOTTING ROC CURVES")
-        print("="*80)
-
-        plt.figure(figsize=(10, 8))
-
-        for name, result in self.results.items():
-            if result['y_test_proba'] is not None:
-                fpr, tpr, _ = roc_curve(self.y_test, result['y_test_proba'])
-                auc = result['roc_auc']
-                plt.plot(fpr, tpr, label=f"{name} (AUC={auc:.3f})", linewidth=2)
-
-        plt.plot([0, 1], [0, 1], 'k--', label='Random Guess', linewidth=1)
-        plt.xlabel('False Positive Rate', fontsize=12, fontweight='bold')
-        plt.ylabel('True Positive Rate', fontsize=12, fontweight='bold')
-        plt.title('ROC Curves - Model Comparison', fontsize=14, fontweight='bold')
-        plt.legend(loc='lower right', fontsize=10)
-        plt.grid(alpha=0.3)
-        plt.tight_layout()
-
-        output_file = Path(output_path)
-        plt.savefig(output_file, dpi=300, bbox_inches='tight')
-        print(f"✓ Saved ROC curves to: {output_file}")
-        plt.close()
+        plot_roc_curves(self.results, self.y_test, output_path)
 
     def _calculate_trade_outcome(self, outcome: pd.Series, gain_threshold: float,
                                   stop_loss_pct: float) -> Tuple[float, str, int]:
@@ -1166,6 +1125,8 @@ class SqueezeOutcomePredictor:
                 print(f"  Losses held {abs(diff):.1f} seconds ({abs(diff)/60:.1f} minutes) LONGER on average")
 
         # Create distribution plots
+        import matplotlib.pyplot as plt
+
         output_file = Path(output_path)
         output_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -1447,129 +1408,7 @@ class SqueezeOutcomePredictor:
             y_train_balanced: Balanced training labels after SMOTE (optional)
         """
         stats = self.analyze_class_distribution(gain_threshold)
-
-        if not stats:
-            return
-
-        # Create figure with 2 subplots side by side
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 8))
-
-        # Common properties
-        labels = ['Success', 'Failure']
-        colors = ['#2ecc71', '#e74c3c']  # Green for success, red for failure
-        explode = (0.05, 0)  # Slightly separate the success slice
-
-        # ===== LEFT PLOT: Original Distribution =====
-        sizes_original = [stats['successes'], stats['failures']]
-
-        wedges1, texts1, autotexts1 = ax1.pie(
-            sizes_original,
-            explode=explode,
-            labels=labels,
-            colors=colors,
-            autopct='%1.1f%%',
-            shadow=True,
-            startangle=90,
-            textprops={'fontsize': 14, 'weight': 'bold'}
-        )
-
-        # Make percentage text more visible
-        for autotext in autotexts1:
-            autotext.set_color('white')
-            autotext.set_fontsize(16)
-
-        # Add title with statistics
-        ax1.set_title(
-            f'Original Distribution\n{int(gain_threshold)}% Target\n\n'
-            f'Total Alerts: {stats["total"]:,}\n'
-            f'Success: {stats["successes"]:,} ({stats["success_pct"]:.1f}%) | '
-            f'Failure: {stats["failures"]:,} ({stats["failure_pct"]:.1f}%)\n'
-            f'Imbalance Ratio: 1 : {stats["imbalance_ratio"]:.2f}',
-            fontsize=12,
-            fontweight='bold',
-            pad=20
-        )
-        ax1.axis('equal')
-
-        # ===== RIGHT PLOT: Balanced Distribution =====
-        if y_train_balanced is not None:
-            balanced_successes = int(y_train_balanced.sum())
-            balanced_total = len(y_train_balanced)
-            balanced_failures = balanced_total - balanced_successes
-            balanced_success_pct = (balanced_successes / balanced_total * 100) if balanced_total > 0 else 0
-            balanced_failure_pct = (balanced_failures / balanced_total * 100) if balanced_total > 0 else 0
-            balanced_imbalance_ratio = balanced_failures / balanced_successes if balanced_successes > 0 else 0
-
-            sizes_balanced = [balanced_successes, balanced_failures]
-
-            wedges2, texts2, autotexts2 = ax2.pie(
-                sizes_balanced,
-                explode=explode,
-                labels=labels,
-                colors=colors,
-                autopct='%1.1f%%',
-                shadow=True,
-                startangle=90,
-                textprops={'fontsize': 14, 'weight': 'bold'}
-            )
-
-            # Make percentage text more visible
-            for autotext in autotexts2:
-                autotext.set_color('white')
-                autotext.set_fontsize(16)
-
-            # Add title with statistics
-            ax2.set_title(
-                f'SMOTE-Balanced Distribution\n{int(gain_threshold)}% Target\n\n'
-                f'Total Alerts: {balanced_total:,}\n'
-                f'Success: {balanced_successes:,} ({balanced_success_pct:.1f}%) | '
-                f'Failure: {balanced_failures:,} ({balanced_failure_pct:.1f}%)\n'
-                f'Imbalance Ratio: 1 : {balanced_imbalance_ratio:.2f}',
-                fontsize=12,
-                fontweight='bold',
-                pad=20
-            )
-            ax2.axis('equal')
-
-            # Add assessment text for balanced data
-            if 45 <= balanced_success_pct <= 55:
-                assessment = "✓ Excellent Balance (Model Training Data)"
-                assessment_color = 'green'
-            elif 40 <= balanced_success_pct <= 60:
-                assessment = "~ Good Balance (Model Training Data)"
-                assessment_color = 'orange'
-            elif 35 <= balanced_success_pct <= 65:
-                assessment = "⚠ Moderate Imbalance (Model Training Data)"
-                assessment_color = 'darkorange'
-            else:
-                assessment = "❌ Severe Imbalance (Model Training Data)"
-                assessment_color = 'red'
-        else:
-            # If no balanced data provided, show a message
-            ax2.text(0.5, 0.5, 'No Balanced Data Provided\n(SMOTE not applied)',
-                    ha='center', va='center', fontsize=14, weight='bold')
-            ax2.axis('off')
-            assessment = "Original Distribution Only"
-            assessment_color = 'gray'
-
-        plt.figtext(
-            0.5, 0.02,
-            assessment,
-            ha='center',
-            fontsize=12,
-            weight='bold',
-            color=assessment_color
-        )
-
-        plt.tight_layout()
-
-        # Save plot
-        output_file = Path(output_path)
-        output_file.parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(output_file, dpi=150, bbox_inches='tight')
-        plt.close()
-
-        print(f"✓ Saved class distribution plot to: {output_file}")
+        plot_class_distribution(stats, gain_threshold, output_path, y_train_balanced)
 
     def analyze_by_price_category(self, gain_threshold: float = 5.0,
                                    output_path: str = 'analysis/plots/price_category_analysis_5pct.png') -> pd.DataFrame:
@@ -1640,105 +1479,9 @@ class SqueezeOutcomePredictor:
         print(f"   Profitability Score: {grouped.loc[best_bin, 'Profitability_Score']*100:.1f}%")
 
         # Create visualization
-        self._plot_price_category_analysis(grouped, gain_threshold, output_path)
+        plot_price_category_analysis(grouped, gain_threshold, output_path)
 
         return grouped
-
-    def _plot_price_category_analysis(self, grouped: pd.DataFrame, gain_threshold: float,
-                                       output_path: str):
-        """
-        Create visualization of price category performance.
-
-        Args:
-            grouped: DataFrame with metrics by price category
-            gain_threshold: Gain percentage threshold
-            output_path: Where to save plot
-        """
-        # Sort by price category order for better visualization
-        price_order = ['<$2', '$2-5', '$5-10', '$10-20', '$20-40', '>$40']
-        grouped_sorted = grouped.reindex([p for p in price_order if p in grouped.index])
-
-        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-        fig.suptitle(f'Squeeze Performance by Price Category - {gain_threshold}% Target',
-                     fontsize=16, fontweight='bold')
-
-        # 1. Win Rate comparison
-        ax1 = axes[0, 0]
-        x_pos = range(len(grouped_sorted))
-        win_col = f'Win_Rate_{int(gain_threshold)}pct'
-        bars = ax1.bar(x_pos, grouped_sorted[win_col] * 100, color='green', alpha=0.7)
-        ax1.axhline(y=grouped_sorted[win_col].mean() * 100, color='red', linestyle='--',
-                   label=f'Average ({grouped_sorted[win_col].mean()*100:.1f}%)')
-        ax1.set_xlabel('Price Category', fontweight='bold')
-        ax1.set_ylabel(f'{int(gain_threshold)}% Win Rate (%)', fontweight='bold')
-        ax1.set_title(f'{int(gain_threshold)}% Win Rate by Price Category', fontweight='bold')
-        ax1.set_xticks(x_pos)
-        ax1.set_xticklabels(grouped_sorted.index, rotation=45, ha='right')
-        ax1.legend()
-        ax1.grid(axis='y', alpha=0.3)
-
-        # Add value labels on bars
-        for i, (bar, val) in enumerate(zip(bars, grouped_sorted[win_col] * 100)):
-            ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 1,
-                    f'{val:.1f}%', ha='center', va='bottom', fontsize=9)
-
-        # 2. Stop Loss Rate
-        ax2 = axes[0, 1]
-        bars = ax2.bar(x_pos, grouped_sorted['Stop_Loss_Rate'] * 100, color='red', alpha=0.7)
-        ax2.axhline(y=grouped_sorted['Stop_Loss_Rate'].mean() * 100, color='blue', linestyle='--',
-                   label=f'Average ({grouped_sorted["Stop_Loss_Rate"].mean()*100:.1f}%)')
-        ax2.set_xlabel('Price Category', fontweight='bold')
-        ax2.set_ylabel('Stop Loss Rate (%)', fontweight='bold')
-        ax2.set_title('Stop Loss Rate by Price Category', fontweight='bold')
-        ax2.set_xticks(x_pos)
-        ax2.set_xticklabels(grouped_sorted.index, rotation=45, ha='right')
-        ax2.legend()
-        ax2.grid(axis='y', alpha=0.3)
-
-        for i, (bar, val) in enumerate(zip(bars, grouped_sorted['Stop_Loss_Rate'] * 100)):
-            ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 1,
-                    f'{val:.1f}%', ha='center', va='bottom', fontsize=9)
-
-        # 3. Profitability Score (Win Rate - Stop Loss Rate)
-        ax3 = axes[1, 0]
-        colors = ['green' if x > 0 else 'red' for x in grouped_sorted['Profitability_Score']]
-        bars = ax3.bar(x_pos, grouped_sorted['Profitability_Score'] * 100, color=colors, alpha=0.7)
-        ax3.axhline(y=0, color='black', linestyle='-', linewidth=0.8)
-        ax3.set_xlabel('Price Category', fontweight='bold')
-        ax3.set_ylabel('Profitability Score (%)', fontweight='bold')
-        ax3.set_title('Profitability Score (Win Rate - Stop Loss Rate)', fontweight='bold')
-        ax3.set_xticks(x_pos)
-        ax3.set_xticklabels(grouped_sorted.index, rotation=45, ha='right')
-        ax3.grid(axis='y', alpha=0.3)
-
-        for i, (bar, val) in enumerate(zip(bars, grouped_sorted['Profitability_Score'] * 100)):
-            y_pos = bar.get_height() + 1 if val > 0 else bar.get_height() - 3
-            ax3.text(bar.get_x() + bar.get_width()/2, y_pos,
-                    f'{val:.1f}%', ha='center', va='bottom' if val > 0 else 'top', fontsize=9)
-
-        # 4. Average Final Gain
-        ax4 = axes[1, 1]
-        colors = ['green' if x > 0 else 'red' for x in grouped_sorted['Avg_Final_Gain']]
-        bars = ax4.bar(x_pos, grouped_sorted['Avg_Final_Gain'], color=colors, alpha=0.7)
-        ax4.axhline(y=0, color='black', linestyle='-', linewidth=0.8)
-        ax4.set_xlabel('Price Category', fontweight='bold')
-        ax4.set_ylabel('Average Final Gain (%)', fontweight='bold')
-        ax4.set_title('Average Final Gain by Price Category', fontweight='bold')
-        ax4.set_xticks(x_pos)
-        ax4.set_xticklabels(grouped_sorted.index, rotation=45, ha='right')
-        ax4.grid(axis='y', alpha=0.3)
-
-        for i, (bar, val) in enumerate(zip(bars, grouped_sorted['Avg_Final_Gain'])):
-            y_pos = bar.get_height() + 0.3 if val > 0 else bar.get_height() - 0.5
-            ax4.text(bar.get_x() + bar.get_width()/2, y_pos,
-                    f'{val:.2f}%', ha='center', va='bottom' if val > 0 else 'top', fontsize=9)
-
-        plt.tight_layout()
-
-        output_file = Path(output_path)
-        plt.savefig(output_file, dpi=300, bbox_inches='tight')
-        print(f"\n✓ Saved price category analysis plot to: {output_file}")
-        plt.close()
 
     def analyze_by_time_of_day(self, gain_threshold: float = 5.0,
                                 output_path: str = 'analysis/plots/time_of_day_analysis_5pct.png') -> pd.DataFrame:
@@ -1853,104 +1596,9 @@ class SqueezeOutcomePredictor:
                           f"{row['Profitability_Score']*100:.1f}% profit score ({int(row['Count'])} alerts)")
 
         # Create visualization
-        self._plot_time_of_day_analysis(grouped, gain_threshold, output_path)
+        plot_time_of_day_analysis(grouped, gain_threshold, output_path)
 
         return grouped
-
-    def _plot_time_of_day_analysis(self, grouped: pd.DataFrame, gain_threshold: float,
-                                    output_path: str):
-        """
-        Create visualization of time of day performance.
-
-        Args:
-            grouped: DataFrame with metrics by time bin
-            gain_threshold: Gain percentage threshold
-            output_path: Where to save plot
-        """
-        fig, axes = plt.subplots(2, 2, figsize=(16, 10))
-        fig.suptitle(f'Squeeze Performance by Time of Day - {gain_threshold}% Target',
-                     fontsize=16, fontweight='bold')
-
-        x_pos = range(len(grouped))
-        time_labels = grouped.index.tolist()
-
-        # 1. Win Rate by time
-        ax1 = axes[0, 0]
-        win_col = f'Win_Rate_{int(gain_threshold)}pct'
-        bars = ax1.bar(x_pos, grouped[win_col] * 100, color='green', alpha=0.7)
-        ax1.axhline(y=grouped[win_col].mean() * 100, color='red', linestyle='--',
-                   label=f'Average ({grouped[win_col].mean()*100:.1f}%)')
-
-        # Highlight first hour (9:30-10:30)
-        morning_bins = ['09:30-10:00', '10:00-10:30']
-        for i, time_bin in enumerate(time_labels):
-            if time_bin in morning_bins:
-                bars[i].set_color('darkgreen')
-                bars[i].set_alpha(0.9)
-
-        ax1.set_xlabel('Time of Day', fontweight='bold')
-        ax1.set_ylabel(f'{int(gain_threshold)}% Win Rate (%)', fontweight='bold')
-        ax1.set_title(f'{int(gain_threshold)}% Win Rate by Time of Day (First hour highlighted)', fontweight='bold')
-        ax1.set_xticks(x_pos)
-        ax1.set_xticklabels(time_labels, rotation=45, ha='right', fontsize=8)
-        ax1.legend()
-        ax1.grid(axis='y', alpha=0.3)
-
-        # 2. Stop Loss Rate
-        ax2 = axes[0, 1]
-        bars = ax2.bar(x_pos, grouped['Stop_Loss_Rate'] * 100, color='red', alpha=0.7)
-        ax2.axhline(y=grouped['Stop_Loss_Rate'].mean() * 100, color='blue', linestyle='--',
-                   label=f'Average ({grouped["Stop_Loss_Rate"].mean()*100:.1f}%)')
-        ax2.set_xlabel('Time of Day', fontweight='bold')
-        ax2.set_ylabel('Stop Loss Rate (%)', fontweight='bold')
-        ax2.set_title('Stop Loss Rate by Time of Day', fontweight='bold')
-        ax2.set_xticks(x_pos)
-        ax2.set_xticklabels(time_labels, rotation=45, ha='right', fontsize=8)
-        ax2.legend()
-        ax2.grid(axis='y', alpha=0.3)
-
-        # 3. Profitability Score
-        ax3 = axes[1, 0]
-        colors = ['green' if x > 0 else 'red' for x in grouped['Profitability_Score']]
-        bars = ax3.bar(x_pos, grouped['Profitability_Score'] * 100, color=colors, alpha=0.7)
-
-        # Highlight first hour
-        for i, time_bin in enumerate(time_labels):
-            if time_bin in morning_bins:
-                if grouped.iloc[i]['Profitability_Score'] > 0:
-                    bars[i].set_color('darkgreen')
-                    bars[i].set_alpha(0.9)
-
-        ax3.axhline(y=0, color='black', linestyle='-', linewidth=0.8)
-        ax3.set_xlabel('Time of Day', fontweight='bold')
-        ax3.set_ylabel('Profitability Score (%)', fontweight='bold')
-        ax3.set_title('Profitability Score by Time of Day (First hour highlighted)', fontweight='bold')
-        ax3.set_xticks(x_pos)
-        ax3.set_xticklabels(time_labels, rotation=45, ha='right', fontsize=8)
-        ax3.grid(axis='y', alpha=0.3)
-
-        # 4. Alert Count (volume throughout day)
-        ax4 = axes[1, 1]
-        bars = ax4.bar(x_pos, grouped['Count'], color='blue', alpha=0.7)
-        ax4.set_xlabel('Time of Day', fontweight='bold')
-        ax4.set_ylabel('Number of Alerts', fontweight='bold')
-        ax4.set_title('Alert Volume by Time of Day', fontweight='bold')
-        ax4.set_xticks(x_pos)
-        ax4.set_xticklabels(time_labels, rotation=45, ha='right', fontsize=8)
-        ax4.grid(axis='y', alpha=0.3)
-
-        # Add value labels on volume bars
-        for i, (bar, val) in enumerate(zip(bars, grouped['Count'])):
-            ax4.text(bar.get_x() + bar.get_width()/2, bar.get_height() + max(grouped['Count'])*0.01,
-                    f'{int(val)}', ha='center', va='bottom', fontsize=8)
-
-        plt.tight_layout()
-
-        output_file = Path(output_path)
-        plt.savefig(output_file, dpi=300, bbox_inches='tight')
-        print(f"\n✓ Saved time of day analysis plot to: {output_file}")
-        plt.close()
-
 
 def ensure_features_updated(features_csv: str = "analysis/squeeze_alerts_independent_features.csv",
                            data_dir: str = "/home/wilsonb/dl/github.com/Z223I/alpaca/historical_data") -> bool:
@@ -2238,129 +1886,6 @@ def train(gain_threshold: float = 5.0, end_date: str = "2025-12-16"):
     print("="*80)
 
     return predictor, results
-
-
-def _generate_prediction_plots(predictions_df: pd.DataFrame, model_trades: pd.DataFrame,
-                                threshold_suffix: str, gain_threshold: float):
-    """Generate plots for prediction analysis."""
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-
-    plots_dir = Path('analysis/plots')
-    plots_dir.mkdir(parents=True, exist_ok=True)
-
-    # Set style
-    plt.style.use('default')
-    sns.set_palette("husl")
-
-    # Plot 1: Profit Distribution
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-    fig.suptitle(f'Prediction Analysis - {gain_threshold}% Target', fontsize=16, fontweight='bold')
-
-    # 1a: Model trades profit distribution
-    ax1 = axes[0, 0]
-    if len(model_trades) > 0:
-        ax1.hist(model_trades['realistic_profit'], bins=30, alpha=0.7, color='green', edgecolor='black')
-        ax1.axvline(x=0, color='red', linestyle='--', linewidth=2, label='Break-even')
-        ax1.axvline(x=model_trades['realistic_profit'].mean(), color='blue', linestyle='--', linewidth=2,
-                   label=f'Avg: {model_trades["realistic_profit"].mean():.2f}%')
-        ax1.set_xlabel('Profit %', fontweight='bold')
-        ax1.set_ylabel('Number of Trades', fontweight='bold')
-        ax1.set_title(f'Model Trades Profit Distribution ({len(model_trades)} trades)', fontweight='bold')
-        ax1.legend()
-        ax1.grid(alpha=0.3)
-
-    # 1b: All trades profit distribution
-    ax2 = axes[0, 1]
-    ax2.hist(predictions_df['realistic_profit'], bins=30, alpha=0.7, color='orange', edgecolor='black')
-    ax2.axvline(x=0, color='red', linestyle='--', linewidth=2, label='Break-even')
-    ax2.axvline(x=predictions_df['realistic_profit'].mean(), color='blue', linestyle='--', linewidth=2,
-               label=f'Avg: {predictions_df["realistic_profit"].mean():.2f}%')
-    ax2.set_xlabel('Profit %', fontweight='bold')
-    ax2.set_ylabel('Number of Trades', fontweight='bold')
-    ax2.set_title(f'All Opportunities Profit Distribution ({len(predictions_df)} trades)', fontweight='bold')
-    ax2.legend()
-    ax2.grid(alpha=0.3)
-
-    # 1c: Cumulative profit comparison (using compounding multiplication, not addition)
-    ax3 = axes[1, 0]
-    if len(model_trades) > 0:
-        # Correct compounding: convert % to decimal, multiply returns, convert back to %
-        # Example: 10% then 5% = 1.10 × 1.05 - 1 = 15.5% (not 15%)
-        model_cumulative = ((1 + model_trades['realistic_profit']/100).cumprod() - 1) * 100
-        all_cumulative = ((1 + predictions_df['realistic_profit']/100).cumprod() - 1) * 100
-        ax3.plot(model_cumulative.values, label=f'Model ({len(model_trades)} trades)', linewidth=2, color='green')
-        ax3.plot(all_cumulative.values, label=f'Take-All ({len(predictions_df)} trades)', linewidth=2, color='orange')
-        ax3.axhline(y=0, color='red', linestyle='--', linewidth=1)
-        ax3.set_xlabel('Trade Number', fontweight='bold')
-        ax3.set_ylabel('Cumulative Profit % (Compounded)', fontweight='bold')
-        ax3.set_title('Cumulative Profit Comparison', fontweight='bold')
-        ax3.legend()
-        ax3.grid(alpha=0.3)
-
-    # 1d: Probability distribution of selected vs missed trades
-    ax4 = axes[1, 1]
-    selected = predictions_df[predictions_df['predicted_outcome'] == 1]['prediction_probability']
-    missed = predictions_df[predictions_df['predicted_outcome'] == 0]['prediction_probability']
-    ax4.hist([selected, missed], bins=30, alpha=0.7, label=['Selected', 'Missed'], color=['green', 'red'])
-    ax4.axvline(x=0.5, color='black', linestyle='--', linewidth=2, label='Threshold (0.5)')
-    ax4.set_xlabel('Prediction Probability', fontweight='bold')
-    ax4.set_ylabel('Count', fontweight='bold')
-    ax4.set_title('Probability Distribution: Selected vs Missed', fontweight='bold')
-    ax4.legend()
-    ax4.grid(alpha=0.3)
-
-    plt.tight_layout()
-    plot_file = plots_dir / f'prediction_analysis{threshold_suffix}.png'
-    plt.savefig(plot_file, dpi=300, bbox_inches='tight')
-    print(f"\n✓ Saved analysis plots to: {plot_file}")
-    plt.close()
-
-    # Plot 2: Win/Loss Breakdown
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    fig.suptitle(f'Win/Loss Analysis - {gain_threshold}% Target', fontsize=16, fontweight='bold')
-
-    # 2a: Model trades pie chart
-    ax1 = axes[0]
-    if len(model_trades) > 0:
-        model_wins = len(model_trades[model_trades['realistic_profit'] > 0])
-        model_losses = len(model_trades[model_trades['realistic_profit'] <= 0])
-        ax1.pie([model_wins, model_losses], labels=['Wins', 'Losses'],
-               autopct='%1.1f%%', colors=['green', 'red'], startangle=90)
-        ax1.set_title(f'Model Trades\n({model_wins} wins, {model_losses} losses)', fontweight='bold')
-
-    # 2b: Comparison bar chart
-    ax2 = axes[1]
-    if len(model_trades) > 0:
-        # Use compounding multiplication for total profit, not addition
-        model_total = ((1 + model_trades['realistic_profit']/100).prod() - 1) * 100
-        all_total = ((1 + predictions_df['realistic_profit']/100).prod() - 1) * 100
-        model_avg = model_trades['realistic_profit'].mean()
-        all_avg = predictions_df['realistic_profit'].mean()
-
-        x = np.arange(2)
-        width = 0.35
-        ax2.bar(x - width/2, [model_total, model_avg], width, label='Model', color='green', alpha=0.7)
-        ax2.bar(x + width/2, [all_total, all_avg], width, label='Take-All', color='orange', alpha=0.7)
-        ax2.set_ylabel('Profit %', fontweight='bold')
-        ax2.set_title('Profit Comparison', fontweight='bold')
-        ax2.set_xticks(x)
-        ax2.set_xticklabels(['Total Profit\n(Compounded)', 'Avg Per Trade'])
-        ax2.legend()
-        ax2.grid(axis='y', alpha=0.3)
-
-        # Add value labels on bars
-        for i, (bars1, bars2) in enumerate(zip(ax2.containers[0], ax2.containers[1])):
-            ax2.text(bars1.get_x() + bars1.get_width()/2, bars1.get_height(),
-                    f'{bars1.get_height():.1f}%', ha='center', va='bottom', fontsize=9)
-            ax2.text(bars2.get_x() + bars2.get_width()/2, bars2.get_height(),
-                    f'{bars2.get_height():.1f}%', ha='center', va='bottom', fontsize=9)
-
-    plt.tight_layout()
-    plot_file = plots_dir / f'win_loss_analysis{threshold_suffix}.png'
-    plt.savefig(plot_file, dpi=300, bbox_inches='tight')
-    print(f"✓ Saved win/loss plots to: {plot_file}")
-    plt.close()
 
 
 def _generate_prediction_report(predictions_df: pd.DataFrame, model_trades: pd.DataFrame,
@@ -2853,7 +2378,10 @@ def predict(model_path: str, start_date: str, end_date: str = None, gain_thresho
         )
 
         # Step 10: Generate plots
-        _generate_prediction_plots(predictions_df, model_trades, threshold_suffix, gain_threshold)
+        generate_prediction_plots(predictions_df, model_trades, threshold_suffix, gain_threshold)
+
+        # Step 10b: Generate aligned cumulative profit plot
+        generate_aligned_cumulative_profit_plot(predictions_df, model_trades, threshold_suffix, gain_threshold)
 
         # Step 11: Generate markdown report
         date_range = f"{start_date} to {end_date}" if start_date != end_date else start_date

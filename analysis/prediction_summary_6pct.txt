@@ -1,30 +1,30 @@
 ================================================================================
 SQUEEZE ALERT OUTCOME PREDICTION - SUMMARY REPORT
 ================================================================================
-Generated: 2025-12-20 09:00:36
+Generated: 2025-12-22 17:49:02
 
 DATASET
 --------------------------------------------------------------------------------
-Total Observations: 2218
-Training Set: 1774 samples
-Test Set: 444 samples
+Total Observations: 3804
+Training Set: 3043 samples
+Test Set: 761 samples
 Features: 11
 Target Variable: achieved_5pct (reached 5% gain in 10 minutes)
 
 CLASS DISTRIBUTION
 --------------------------------------------------------------------------------
-Successes: 792 (35.7%)
-Failures:  1426 (64.3%)
-Imbalance Ratio: 1 : 1.80
+Successes: 1352 (35.5%)
+Failures:  2452 (64.5%)
+Imbalance Ratio: 1 : 1.81
 Balance Assessment: ⚠ Moderate Imbalance (35-65%)
 
 MODEL PERFORMANCE
 --------------------------------------------------------------------------------
 Model                  Accuracy  Precision     Recall         F1    ROC-AUC
 --------------------------------------------------------------------------------
-Logistic Regression      0.6689     0.4540     0.6031     0.5180     0.7312
-Random Forest            0.7387     0.5581     0.5496     0.5538     0.7864
-XGBoost                  0.7252     0.5306     0.5954     0.5612     0.8017
+Logistic Regression      0.5979     0.3769     0.7000     0.4900     0.6513
+Random Forest            0.6478     0.4000     0.5524     0.4640     0.6888
+XGBoost                  0.6321     0.3785     0.5190     0.4378     0.6760
 
 INTERPRETATION
 --------------------------------------------------------------------------------
@@ -35,10 +35,13 @@ ROC-AUC:   Overall discrimination ability (0.5=random, 1.0=perfect)
 
 RECOMMENDATION
 --------------------------------------------------------------------------------
-Best Model: XGBoost
-  F1-Score: 0.5612
-  Precision: 0.5306
-  Recall: 0.5954
+Best Model: Logistic Regression
+  F1-Score: 0.4900
+  Precision: 0.3769
+  Recall: 0.7000
 
-~ Model shows moderate predictive performance (F1 > 0.50)
-  Consider additional feature engineering or more data
+✗ Model shows weak predictive performance (F1 < 0.50)
+  Not recommended for production use. Investigate:
+  - Need more training data
+  - Try different features
+  - Check for data quality issues

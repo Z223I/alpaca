@@ -2757,7 +2757,7 @@ class SqueezeAlertsMonitor:
                 entry_price=last_price,
                 quantity=1,  # Default: 1 share
                 trailing_stop_loss=2.0,  # Default: 2% trailing stop
-                take_profit=5.0  # Default: 5% take profit
+                take_profit=7.0
             )
 
     def _send_telegram_alert(self, symbol: str, first_price: float, last_price: float,
