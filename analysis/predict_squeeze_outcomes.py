@@ -1973,7 +1973,8 @@ def _generate_prediction_report(predictions_df: pd.DataFrame, model_trades: pd.D
     print(f"✓ Saved markdown report to: {report_file}")
 
 
-def predict(model_path: str, start_date: str, end_date: str = None, gain_threshold: float | None = None) -> pd.DataFrame:
+def predict(model_path: str, start_date: str, end_date: str = None, gain_threshold: float | None = None,
+           prediction_threshold: float = 0.5) -> pd.DataFrame:
     """
     Load a trained model and make predictions on new data.
 
@@ -1982,6 +1983,9 @@ def predict(model_path: str, start_date: str, end_date: str = None, gain_thresho
         start_date: Start date for prediction (YYYY-MM-DD, e.g., '2025-12-17')
         end_date: End date for prediction (YYYY-MM-DD). If None, uses only start_date
         gain_threshold: Percentage gain threshold (if None, reads from model metadata)
+        prediction_threshold: Probability threshold for binary classification (default: 0.5)
+                            Higher values = more conservative (fewer trades, higher precision)
+                            Lower values = more aggressive (more trades, higher recall)
 
     Returns:
         DataFrame with predictions and actual outcomes
@@ -2121,10 +2125,14 @@ def predict(model_path: str, start_date: str, end_date: str = None, gain_thresho
     X_scaled = scaler.transform(X)
     print(f"✓ Scaled features using training scaler")
 
-    y_pred = model.predict(X_scaled)
+    # Get prediction probabilities
     y_pred_proba = model.predict_proba(X_scaled)[:, 1]
 
+    # Apply custom threshold for binary classification
+    y_pred = (y_pred_proba >= prediction_threshold).astype(int)
+
     print(f"✓ Generated predictions for {len(y_pred)} samples")
+    print(f"  Prediction threshold: {prediction_threshold:.2f} {'(default)' if prediction_threshold == 0.5 else '(custom)'}")
     print(f"  Predicted positives: {y_pred.sum()} ({y_pred.mean()*100:.1f}%)")
     print(f"  Actual positives: {y.sum()} ({y.mean()*100:.1f}%)")
 
@@ -2437,6 +2445,8 @@ Examples (run from project root):
                                help='End date for prediction (YYYY-MM-DD). If not specified, uses only start-date')
     predict_parser.add_argument('--threshold', type=float, default=None,
                                help='Gain threshold (optional, will use model\'s threshold if not specified)')
+    predict_parser.add_argument('--prediction-threshold', type=float, default=0.5,
+                               help='Prediction probability threshold (default: 0.5). Higher = more conservative (fewer trades, higher precision). Lower = more aggressive (more trades, higher recall)')
 
     args = parser.parse_args()
 
@@ -2529,6 +2539,7 @@ Examples (run from project root):
             model_path=args.model,
             start_date=args.start_date,
             end_date=end_date,
-            gain_threshold=args.threshold
+            gain_threshold=args.threshold,
+            prediction_threshold=args.prediction_threshold
         )
         print(f"\n✓ Prediction complete. Results saved to analysis/predictions_*.csv")

@@ -21,7 +21,8 @@ for percent in 1.5 2 2.5 3 4 5 6 7; do
     python analysis/predict_squeeze_outcomes.py predict \
         --model analysis/xgboost_model_${percent}pct.json \
         --start-date "$START_DATE" \
-        --end-date "$END_DATE"
+        --end-date "$END_DATE" \
+        --prediction-threshold 0.7
     echo
 done
 
