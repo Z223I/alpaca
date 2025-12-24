@@ -22,7 +22,7 @@ for percent in 1.5 2 2.5 3 4 5 6 7; do
         --model analysis/xgboost_model_${percent}pct.json \
         --start-date "$START_DATE" \
         --end-date "$END_DATE" \
-        --prediction-threshold 0.7
+        --prediction-threshold 0.5
     echo
 done
 
