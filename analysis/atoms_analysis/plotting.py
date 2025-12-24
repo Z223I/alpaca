@@ -651,3 +651,125 @@ def generate_aligned_cumulative_profit_plot(predictions_df: pd.DataFrame, model_
     plt.savefig(plot_file, dpi=300, bbox_inches='tight')
     print(f"✓ Saved aligned cumulative profit plot to: {plot_file}")
     plt.close()
+
+
+def generate_time_binned_outcomes_chart(predictions_df: pd.DataFrame, threshold_suffix: str,
+                                        gain_threshold: float):
+    """
+    Generate a bar chart showing wins and losses by 30-minute time bins.
+
+    Args:
+        predictions_df: DataFrame with predictions and timestamps
+        threshold_suffix: Suffix for filename (e.g., '_2pct')
+        gain_threshold: Gain threshold percentage
+    """
+    print("\n" + "="*80)
+    print("GENERATING TIME-BINNED OUTCOMES CHART")
+    print("="*80)
+
+    # Make a copy to avoid modifying original
+    df = predictions_df.copy()
+
+    # Convert timestamp to datetime if not already
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+
+    # Extract time of day
+    df['time_of_day'] = df['timestamp'].dt.time
+
+    # Create 30-minute bins
+    # Convert time to minutes since midnight for easier binning
+    df['minutes_since_midnight'] = (
+        df['timestamp'].dt.hour * 60 + df['timestamp'].dt.minute
+    )
+
+    # Create 30-minute bins (0, 30, 60, 90, ...)
+    bin_size = 30
+    df['time_bin'] = (df['minutes_since_midnight'] // bin_size) * bin_size
+
+    # Convert bin back to time format for display (HH:MM)
+    df['time_bin_label'] = df['time_bin'].apply(
+        lambda x: f"{int(x // 60):02d}:{int(x % 60):02d}"
+    )
+
+    # Count wins and losses per bin using actual_outcome
+    # actual_outcome == 1 means the trade achieved the gain threshold
+    bins_data = df.groupby('time_bin_label').agg({
+        'actual_outcome': ['sum', 'count']
+    }).reset_index()
+
+    # Flatten column names
+    bins_data.columns = ['time_bin', 'wins', 'total']
+    bins_data['losses'] = bins_data['total'] - bins_data['wins']
+
+    # Sort by time
+    bins_data['sort_key'] = bins_data['time_bin'].apply(
+        lambda x: int(x.split(':')[0]) * 60 + int(x.split(':')[1])
+    )
+    bins_data = bins_data.sort_values('sort_key').reset_index(drop=True)
+
+    print(f"\nTime-binned outcomes (30-minute bins):")
+    print(f"{'Time Bin':<12} {'Wins':<8} {'Losses':<8} {'Total':<8} {'Win Rate':<10}")
+    print("-" * 50)
+    for _, row in bins_data.iterrows():
+        win_rate = row['wins'] / row['total'] * 100 if row['total'] > 0 else 0
+        print(f"{row['time_bin']:<12} {int(row['wins']):<8} {int(row['losses']):<8} "
+              f"{int(row['total']):<8} {win_rate:>6.1f}%")
+
+    # Create the bar chart
+    fig, ax = plt.subplots(figsize=(14, 7))
+
+    x = np.arange(len(bins_data))
+    width = 0.35
+
+    # Plot wins and losses side by side
+    bars1 = ax.bar(x - width/2, bins_data['wins'], width, label='Wins',
+                   color='#2ecc71', alpha=0.8)
+    bars2 = ax.bar(x + width/2, bins_data['losses'], width, label='Losses',
+                   color='#e74c3c', alpha=0.8)
+
+    # Customize the plot
+    ax.set_xlabel('Time of Day (30-minute bins)', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Number of Trades', fontsize=12, fontweight='bold')
+    ax.set_title(f'Wins vs Losses by Time of Day ({gain_threshold}% Target)',
+                fontsize=14, fontweight='bold')
+    ax.set_xticks(x)
+    ax.set_xticklabels(bins_data['time_bin'], rotation=45, ha='right')
+    ax.legend(fontsize=11)
+    ax.grid(axis='y', alpha=0.3, linestyle='--')
+
+    # Add value labels on bars
+    def add_value_labels(bars):
+        for bar in bars:
+            height = bar.get_height()
+            if height > 0:
+                ax.text(bar.get_x() + bar.get_width()/2., height,
+                       f'{int(height)}',
+                       ha='center', va='bottom', fontsize=9)
+
+    add_value_labels(bars1)
+    add_value_labels(bars2)
+
+    # Add statistics text box
+    total_wins = bins_data['wins'].sum()
+    total_losses = bins_data['losses'].sum()
+    total_trades = bins_data['total'].sum()
+    overall_win_rate = total_wins / total_trades * 100 if total_trades > 0 else 0
+
+    stats_text = f'Overall Statistics:\n'
+    stats_text += f'Total Trades: {int(total_trades)}\n'
+    stats_text += f'Wins: {int(total_wins)} ({overall_win_rate:.1f}%)\n'
+    stats_text += f'Losses: {int(total_losses)} ({100-overall_win_rate:.1f}%)'
+
+    ax.text(0.02, 0.98, stats_text, transform=ax.transAxes,
+            fontsize=10, verticalalignment='top',
+            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+
+    plt.tight_layout()
+
+    # Save the plot
+    plots_dir = Path('analysis/plots')
+    plots_dir.mkdir(parents=True, exist_ok=True)
+    plot_file = plots_dir / f'time_binned_outcomes{threshold_suffix}.png'
+    plt.savefig(plot_file, dpi=300, bbox_inches='tight')
+    print(f"✓ Saved time-binned outcomes chart to: {plot_file}")
+    plt.close()

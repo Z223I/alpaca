@@ -106,7 +106,8 @@ from atoms_analysis.plotting import (
     plot_price_category_analysis,
     plot_time_of_day_analysis,
     generate_prediction_plots,
-    generate_aligned_cumulative_profit_plot
+    generate_aligned_cumulative_profit_plot,
+    generate_time_binned_outcomes_chart
 )
 
 
@@ -1973,8 +1974,8 @@ def _generate_prediction_report(predictions_df: pd.DataFrame, model_trades: pd.D
     print(f"✓ Saved markdown report to: {report_file}")
 
 
-def predict(model_path: str, start_date: str, end_date: str = None, gain_threshold: float | None = None,
-           prediction_threshold: float = 0.5) -> pd.DataFrame:
+def predict(model_path: str, start_date: str, end_date: str | None = None, gain_threshold: float | None = None,
+           prediction_threshold: float = 0.5, start_time: str | None = None, end_time: str | None = None) -> pd.DataFrame:
     """
     Load a trained model and make predictions on new data.
 
@@ -1986,6 +1987,10 @@ def predict(model_path: str, start_date: str, end_date: str = None, gain_thresho
         prediction_threshold: Probability threshold for binary classification (default: 0.5)
                             Higher values = more conservative (fewer trades, higher precision)
                             Lower values = more aggressive (more trades, higher recall)
+        start_time: Start time of day filter (HH:MM format, e.g., '09:30'). If provided, only alerts
+                   at or after this time will be included
+        end_time: End time of day filter (HH:MM format, e.g., '16:00'). If provided, only alerts
+                 before this time will be included
 
     Returns:
         DataFrame with predictions and actual outcomes
@@ -2083,6 +2088,43 @@ def predict(model_path: str, start_date: str, end_date: str = None, gain_thresho
     # Merge with features
     df = predictor.merge_with_features(outcomes_df)
     print(f"✓ Loaded {len(df)} test samples")
+
+    # Step 3.5: Filter by time of day if specified
+    if start_time or end_time:
+        print("\n" + "="*80)
+        print("FILTERING BY TIME OF DAY")
+        print("="*80)
+
+        # Convert timestamp to datetime if not already
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+
+        # Extract time of day
+        df['time_of_day'] = df['timestamp'].dt.time
+
+        initial_count = len(df)
+
+        # Apply start time filter
+        if start_time:
+            from datetime import datetime
+            start_time_obj = datetime.strptime(start_time, '%H:%M').time()
+            df = df[df['time_of_day'] >= start_time_obj]
+            print(f"  After start time filter (>= {start_time}): {len(df)} samples")
+
+        # Apply end time filter
+        if end_time:
+            from datetime import datetime
+            end_time_obj = datetime.strptime(end_time, '%H:%M').time()
+            df = df[df['time_of_day'] < end_time_obj]
+            print(f"  After end time filter (< {end_time}): {len(df)} samples")
+
+        # Clean up temporary column
+        df = df.drop(columns=['time_of_day'])
+
+        filtered_count = initial_count - len(df)
+        print(f"✓ Filtered out {filtered_count} samples, {len(df)} remaining")
+
+        if len(df) == 0:
+            raise ValueError("No samples remaining after time filtering. Adjust your time range.")
 
     # Step 4: Prepare features (same preprocessing as training)
     print("\n" + "="*80)
@@ -2391,6 +2433,9 @@ def predict(model_path: str, start_date: str, end_date: str = None, gain_thresho
         # Step 10b: Generate aligned cumulative profit plot
         generate_aligned_cumulative_profit_plot(predictions_df, model_trades, threshold_suffix, gain_threshold)
 
+        # Step 10c: Generate time-binned outcomes chart
+        generate_time_binned_outcomes_chart(predictions_df, threshold_suffix, gain_threshold)
+
         # Step 11: Generate markdown report
         date_range = f"{start_date} to {end_date}" if start_date != end_date else start_date
         _generate_prediction_report(
@@ -2423,6 +2468,9 @@ Examples (run from project root):
 
   # Predict on date range
   python analysis/predict_squeeze_outcomes.py predict --model analysis/xgboost_model_2pct.json --start-date 2025-12-17 --end-date 2025-12-18
+
+  # Predict with time-of-day filtering (e.g., only alerts between 9:30 AM and 4:00 PM)
+  python analysis/predict_squeeze_outcomes.py predict --model analysis/xgboost_model_2pct.json --start-date 2025-12-17 --start-time 09:30 --end-time 16:00
         """
     )
 
@@ -2447,6 +2495,10 @@ Examples (run from project root):
                                help='Gain threshold (optional, will use model\'s threshold if not specified)')
     predict_parser.add_argument('--prediction-threshold', type=float, default=0.5,
                                help='Prediction probability threshold (default: 0.5). Higher = more conservative (fewer trades, higher precision). Lower = more aggressive (more trades, higher recall)')
+    predict_parser.add_argument('--start-time', type=str, default=None,
+                               help='Filter predictions by start time of day (HH:MM format, e.g., 09:30). Only alerts at or after this time will be included.')
+    predict_parser.add_argument('--end-time', type=str, default=None,
+                               help='Filter predictions by end time of day (HH:MM format, e.g., 16:00). Only alerts before this time will be included.')
 
     args = parser.parse_args()
 
@@ -2540,6 +2592,8 @@ Examples (run from project root):
             start_date=args.start_date,
             end_date=end_date,
             gain_threshold=args.threshold,
-            prediction_threshold=args.prediction_threshold
+            prediction_threshold=args.prediction_threshold,
+            start_time=args.start_time,
+            end_time=args.end_time
         )
         print(f"\n✓ Prediction complete. Results saved to analysis/predictions_*.csv")
