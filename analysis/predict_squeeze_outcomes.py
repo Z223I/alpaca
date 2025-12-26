@@ -107,7 +107,8 @@ from atoms_analysis.plotting import (
     plot_time_of_day_analysis,
     generate_prediction_plots,
     generate_aligned_cumulative_profit_plot,
-    generate_time_binned_outcomes_chart
+    generate_time_binned_outcomes_chart,
+    generate_price_binned_outcomes_chart
 )
 
 
@@ -2435,6 +2436,9 @@ def predict(model_path: str, start_date: str, end_date: str | None = None, gain_
 
         # Step 10c: Generate time-binned outcomes chart
         generate_time_binned_outcomes_chart(predictions_df, threshold_suffix, gain_threshold)
+
+        # Step 10d: Generate price-binned outcomes chart
+        generate_price_binned_outcomes_chart(predictions_df, threshold_suffix, gain_threshold)
 
         # Step 11: Generate markdown report
         date_range = f"{start_date} to {end_date}" if start_date != end_date else start_date

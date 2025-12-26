@@ -1,30 +1,30 @@
 ================================================================================
 SQUEEZE ALERT OUTCOME PREDICTION - SUMMARY REPORT
 ================================================================================
-Generated: 2025-12-23 15:55:40
+Generated: 2025-12-24 14:17:32
 
 DATASET
 --------------------------------------------------------------------------------
-Total Observations: 3804
-Training Set: 3043 samples
-Test Set: 761 samples
+Total Observations: 4873
+Training Set: 3898 samples
+Test Set: 975 samples
 Features: 11
 Target Variable: achieved_5pct (reached 5% gain in 10 minutes)
 
 CLASS DISTRIBUTION
 --------------------------------------------------------------------------------
-Successes: 1352 (35.5%)
-Failures:  2452 (64.5%)
-Imbalance Ratio: 1 : 1.81
+Successes: 1751 (35.9%)
+Failures:  3122 (64.1%)
+Imbalance Ratio: 1 : 1.78
 Balance Assessment: ⚠ Moderate Imbalance (35-65%)
 
 MODEL PERFORMANCE
 --------------------------------------------------------------------------------
 Model                  Accuracy  Precision     Recall         F1    ROC-AUC
 --------------------------------------------------------------------------------
-Logistic Regression      0.5742     0.3192     0.7151     0.4414     0.6388
-Random Forest            0.6413     0.3192     0.4637     0.3781     0.6649
-XGBoost                  0.6741     0.3568     0.4804     0.4095     0.6764
+Logistic Regression      0.5364     0.3662     0.8327     0.5087     0.6542
+Random Forest            0.6359     0.4213     0.7046     0.5273     0.6960
+XGBoost                  0.6277     0.3975     0.5658     0.4670     0.6670
 
 INTERPRETATION
 --------------------------------------------------------------------------------
@@ -35,13 +35,10 @@ ROC-AUC:   Overall discrimination ability (0.5=random, 1.0=perfect)
 
 RECOMMENDATION
 --------------------------------------------------------------------------------
-Best Model: Logistic Regression
-  F1-Score: 0.4414
-  Precision: 0.3192
-  Recall: 0.7151
+Best Model: Random Forest
+  F1-Score: 0.5273
+  Precision: 0.4213
+  Recall: 0.7046
 
-✗ Model shows weak predictive performance (F1 < 0.50)
-  Not recommended for production use. Investigate:
-  - Need more training data
-  - Try different features
-  - Check for data quality issues
+~ Model shows moderate predictive performance (F1 > 0.50)
+  Consider additional feature engineering or more data

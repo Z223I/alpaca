@@ -773,3 +773,166 @@ def generate_time_binned_outcomes_chart(predictions_df: pd.DataFrame, threshold_
     plt.savefig(plot_file, dpi=300, bbox_inches='tight')
     print(f"✓ Saved time-binned outcomes chart to: {plot_file}")
     plt.close()
+
+
+def generate_price_binned_outcomes_chart(predictions_df: pd.DataFrame, threshold_suffix: str,
+                                        gain_threshold: float):
+    """
+    Generate a bar chart showing wins and losses by price bins.
+
+    Args:
+        predictions_df: DataFrame with predictions and squeeze_entry_price
+        threshold_suffix: Suffix for filename (e.g., '_2pct')
+        gain_threshold: Gain threshold percentage
+    """
+    print("\n" + "="*80)
+    print("GENERATING PRICE-BINNED OUTCOMES CHART")
+    print("="*80)
+
+    # Make a copy to avoid modifying original
+    df = predictions_df.copy()
+
+    # Remove rows with missing prices
+    df = df.dropna(subset=['squeeze_entry_price'])
+
+    if len(df) == 0:
+        print("⚠ No valid price data available for price binning")
+        return
+
+    # Determine price bins based on data distribution
+    min_price = df['squeeze_entry_price'].min()
+    max_price = df['squeeze_entry_price'].max()
+
+    # Create bins - doubled number of bins (half the width)
+    # Using finer granularity for better analysis
+    price_range = max_price - min_price
+
+    if price_range < 50:
+        # For lower-priced stocks, use $2.50 bins
+        bin_width = 2.5
+    elif price_range < 200:
+        # For mid-priced stocks, use $5 bins
+        bin_width = 5
+    elif price_range < 500:
+        # For higher-priced stocks, use $12.50 bins
+        bin_width = 12.5
+    else:
+        # For very high-priced stocks, use $25 bins
+        bin_width = 25
+
+    # Create bin edges using float bins
+    bin_start = (int(min_price / bin_width)) * bin_width
+    bin_end = ((int(max_price / bin_width)) + 1) * bin_width
+    bins = list(np.arange(bin_start, bin_end + bin_width, bin_width))
+
+    # Create price bins
+    df['price_bin'] = pd.cut(df['squeeze_entry_price'], bins=bins,
+                              include_lowest=True, right=False)
+
+    # Create bin labels - format based on whether we have fractional dollars
+    # e.g., "$2.50-$5.00" or "$100-$105"
+    def format_price_label(interval):
+        if pd.notna(interval):
+            left = interval.left
+            right = interval.right
+            # Use .2f for bins with decimals, otherwise use int
+            if bin_width % 1 == 0:
+                return f"${int(left)}-${int(right)}"
+            else:
+                return f"${left:.2f}-${right:.2f}"
+        return "Unknown"
+
+    df['price_bin_label'] = df['price_bin'].apply(format_price_label)
+
+    # Count wins and losses per bin using actual_outcome
+    # actual_outcome == 1 means the trade achieved the gain threshold
+    bins_data = df.groupby('price_bin_label').agg({
+        'actual_outcome': ['sum', 'count']
+    }).reset_index()
+
+    # Flatten column names
+    bins_data.columns = ['price_bin', 'wins', 'total']
+    bins_data['losses'] = bins_data['total'] - bins_data['wins']
+
+    # Sort by price (extract lower bound from label, handle floats)
+    bins_data['sort_key'] = bins_data['price_bin'].apply(
+        lambda x: float(x.split('-')[0].replace('$', '')) if '-' in x else 0
+    )
+    bins_data = bins_data.sort_values('sort_key').reset_index(drop=True)
+
+    # Remove bins with no trades
+    bins_data = bins_data[bins_data['total'] > 0]
+
+    if len(bins_data) == 0:
+        print("⚠ No valid data after binning")
+        return
+
+    # Format bin width display
+    bin_width_str = f"{int(bin_width)}" if bin_width % 1 == 0 else f"{bin_width:.2f}"
+    print(f"\nPrice-binned outcomes (${bin_width_str} bins):")
+    print(f"{'Price Range':<15} {'Wins':<8} {'Losses':<8} {'Total':<8} {'Win Rate':<10}")
+    print("-" * 55)
+    for _, row in bins_data.iterrows():
+        win_rate = row['wins'] / row['total'] * 100 if row['total'] > 0 else 0
+        print(f"{row['price_bin']:<15} {int(row['wins']):<8} {int(row['losses']):<8} "
+              f"{int(row['total']):<8} {win_rate:>6.1f}%")
+
+    # Create the bar chart
+    fig, ax = plt.subplots(figsize=(14, 7))
+
+    x = np.arange(len(bins_data))
+    width = 0.35
+
+    # Plot wins and losses side by side
+    bars1 = ax.bar(x - width/2, bins_data['wins'], width, label='Wins',
+                   color='#2ecc71', alpha=0.8)
+    bars2 = ax.bar(x + width/2, bins_data['losses'], width, label='Losses',
+                   color='#e74c3c', alpha=0.8)
+
+    # Customize the plot
+    ax.set_xlabel(f'Stock Price at Entry (${bin_width_str} bins)', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Number of Trades', fontsize=12, fontweight='bold')
+    ax.set_title(f'Wins vs Losses by Entry Price ({gain_threshold}% Target)',
+                fontsize=14, fontweight='bold')
+    ax.set_xticks(x)
+    ax.set_xticklabels(bins_data['price_bin'], rotation=45, ha='right')
+    ax.legend(fontsize=11)
+    ax.grid(axis='y', alpha=0.3, linestyle='--')
+
+    # Add value labels on bars
+    def add_value_labels(bars):
+        for bar in bars:
+            height = bar.get_height()
+            if height > 0:
+                ax.text(bar.get_x() + bar.get_width()/2., height,
+                       f'{int(height)}',
+                       ha='center', va='bottom', fontsize=9)
+
+    add_value_labels(bars1)
+    add_value_labels(bars2)
+
+    # Add statistics text box
+    total_wins = bins_data['wins'].sum()
+    total_losses = bins_data['losses'].sum()
+    total_trades = bins_data['total'].sum()
+    overall_win_rate = total_wins / total_trades * 100 if total_trades > 0 else 0
+
+    stats_text = f'Overall Statistics:\n'
+    stats_text += f'Total Trades: {int(total_trades)}\n'
+    stats_text += f'Wins: {int(total_wins)} ({overall_win_rate:.1f}%)\n'
+    stats_text += f'Losses: {int(total_losses)} ({100-overall_win_rate:.1f}%)\n'
+    stats_text += f'Price Range: ${min_price:.2f} - ${max_price:.2f}'
+
+    ax.text(0.02, 0.98, stats_text, transform=ax.transAxes,
+            fontsize=10, verticalalignment='top',
+            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+
+    plt.tight_layout()
+
+    # Save the plot
+    plots_dir = Path('analysis/plots')
+    plots_dir.mkdir(parents=True, exist_ok=True)
+    plot_file = plots_dir / f'price_binned_outcomes{threshold_suffix}.png'
+    plt.savefig(plot_file, dpi=300, bbox_inches='tight')
+    print(f"✓ Saved price-binned outcomes chart to: {plot_file}")
+    plt.close()
