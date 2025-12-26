@@ -1699,13 +1699,16 @@ def ensure_features_updated(features_csv: str = "analysis/squeeze_alerts_indepen
     return False
 
 
-def train(gain_threshold: float = 5.0, end_date: str = "2025-12-16"):
+def train(gain_threshold: float = 5.0, end_date: str = "2025-12-16",
+          min_price: Optional[float] = None, max_price: Optional[float] = None):
     """
     Train models and generate analysis for a given gain threshold.
 
     Args:
         gain_threshold: Percentage gain threshold for success classification (default: 5.0)
         end_date: Training data cutoff date (YYYY-MM-DD). Data after this is reserved for prediction.
+        min_price: Minimum squeeze entry price to include in training (optional)
+        max_price: Maximum squeeze entry price to include in training (optional)
     """
 
     # Configuration
@@ -1744,6 +1747,32 @@ def train(gain_threshold: float = 5.0, end_date: str = "2025-12-16"):
     # Step 2: Merge with features
     df = predictor.merge_with_features(outcomes_df)
     predictor.df = df
+
+    # Step 2.5: Filter by price if specified
+    if min_price is not None or max_price is not None:
+        print("\n" + "="*80)
+        print("PRICE FILTERING")
+        print("="*80)
+        original_count = len(df)
+
+        if min_price is not None:
+            df = df[df['squeeze_entry_price'] >= min_price]
+            print(f"Min price: ${min_price:.2f}")
+
+        if max_price is not None:
+            df = df[df['squeeze_entry_price'] <= max_price]
+            print(f"Max price: ${max_price:.2f}")
+
+        filtered_count = len(df)
+        removed_count = original_count - filtered_count
+        print(f"Filtered: {original_count} → {filtered_count} alerts ({removed_count} removed)")
+        print("="*80)
+
+        # Reset index to avoid issues with non-contiguous indices
+        df = df.reset_index(drop=True)
+
+        # Update predictor's dataframe
+        predictor.df = df
 
     # Step 3: Prepare features and target
     # Target: achieved_{threshold}pct (binary - did squeeze reach threshold% gain?)
@@ -1976,7 +2005,8 @@ def _generate_prediction_report(predictions_df: pd.DataFrame, model_trades: pd.D
 
 
 def predict(model_path: str, start_date: str, end_date: str | None = None, gain_threshold: float | None = None,
-           prediction_threshold: float = 0.5, start_time: str | None = None, end_time: str | None = None) -> pd.DataFrame:
+           prediction_threshold: float = 0.5, start_time: str | None = None, end_time: str | None = None,
+           min_price: float | None = None, max_price: float | None = None) -> pd.DataFrame:
     """
     Load a trained model and make predictions on new data.
 
@@ -1986,12 +2016,10 @@ def predict(model_path: str, start_date: str, end_date: str | None = None, gain_
         end_date: End date for prediction (YYYY-MM-DD). If None, uses only start_date
         gain_threshold: Percentage gain threshold (if None, reads from model metadata)
         prediction_threshold: Probability threshold for binary classification (default: 0.5)
-                            Higher values = more conservative (fewer trades, higher precision)
-                            Lower values = more aggressive (more trades, higher recall)
-        start_time: Start time of day filter (HH:MM format, e.g., '09:30'). If provided, only alerts
-                   at or after this time will be included
-        end_time: End time of day filter (HH:MM format, e.g., '16:00'). If provided, only alerts
-                 before this time will be included
+        start_time: Filter by start time of day (HH:MM format). Only alerts at or after this time will be included.
+        end_time: Filter by end time of day (HH:MM format). Only alerts before this time will be included.
+        min_price: Minimum squeeze entry price to include in predictions (optional)
+        max_price: Maximum squeeze entry price to include in predictions (optional)
 
     Returns:
         DataFrame with predictions and actual outcomes
@@ -2126,6 +2154,33 @@ def predict(model_path: str, start_date: str, end_date: str | None = None, gain_
 
         if len(df) == 0:
             raise ValueError("No samples remaining after time filtering. Adjust your time range.")
+
+    # Step 3.6: Filter by price if specified
+    if min_price is not None or max_price is not None:
+        print("\n" + "="*80)
+        print("FILTERING BY PRICE")
+        print("="*80)
+
+        initial_count = len(df)
+
+        # Apply minimum price filter
+        if min_price is not None:
+            df = df[df['squeeze_entry_price'] >= min_price]
+            print(f"  After min price filter (>= ${min_price:.2f}): {len(df)} samples")
+
+        # Apply maximum price filter
+        if max_price is not None:
+            df = df[df['squeeze_entry_price'] <= max_price]
+            print(f"  After max price filter (<= ${max_price:.2f}): {len(df)} samples")
+
+        filtered_count = initial_count - len(df)
+        print(f"✓ Filtered out {filtered_count} samples, {len(df)} remaining")
+
+        if len(df) == 0:
+            raise ValueError("No samples remaining after price filtering. Adjust your price range.")
+
+        # Reset index to avoid issues with non-contiguous indices
+        df = df.reset_index(drop=True)
 
     # Step 4: Prepare features (same preprocessing as training)
     print("\n" + "="*80)
@@ -2486,6 +2541,10 @@ Examples (run from project root):
                              help='Gain threshold percentage (e.g., 1.5, 2.0). If not specified, trains all thresholds [1.5, 2.0, 2.5, 3.0]')
     train_parser.add_argument('--end-date', type=str, default='2025-12-16',
                              help='Training data cutoff date (YYYY-MM-DD). Data after this date is reserved for prediction. Default: 2025-12-16')
+    train_parser.add_argument('--min-price', type=float, default=None,
+                             help='Minimum squeeze entry price to include in training (optional)')
+    train_parser.add_argument('--max-price', type=float, default=None,
+                             help='Maximum squeeze entry price to include in training (optional)')
 
     # Predict mode
     predict_parser = subparsers.add_parser('predict', help='Make predictions using trained model')
@@ -2503,6 +2562,10 @@ Examples (run from project root):
                                help='Filter predictions by start time of day (HH:MM format, e.g., 09:30). Only alerts at or after this time will be included.')
     predict_parser.add_argument('--end-time', type=str, default=None,
                                help='Filter predictions by end time of day (HH:MM format, e.g., 16:00). Only alerts before this time will be included.')
+    predict_parser.add_argument('--min-price', type=float, default=None,
+                               help='Minimum squeeze entry price to include in predictions (optional)')
+    predict_parser.add_argument('--max-price', type=float, default=None,
+                               help='Maximum squeeze entry price to include in predictions (optional)')
 
     args = parser.parse_args()
 
@@ -2510,12 +2573,15 @@ Examples (run from project root):
     if args.mode is None:
         args.mode = 'train'
         args.threshold = None
+        args.min_price = None
+        args.max_price = None
 
     if args.mode == 'train':
         if args.threshold is not None:
             # Train single threshold
             print(f"\nTraining model with {args.threshold}% gain threshold\n")
-            train(gain_threshold=args.threshold, end_date=args.end_date)
+            train(gain_threshold=args.threshold, end_date=args.end_date,
+                  min_price=args.min_price, max_price=args.max_price)
         else:
             # Run multiple thresholds for comparison
             thresholds = [1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 7.0]
@@ -2528,7 +2594,8 @@ Examples (run from project root):
                 threshold_str = f"{threshold:.1f}".rstrip('0').rstrip('.') if threshold % 1 else str(int(threshold))
                 print(f"RUNNING ANALYSIS: {threshold_str}% GAIN TARGET")
                 print(f"{'='*80}\n")
-                predictor, results = train(gain_threshold=threshold, end_date=args.end_date)
+                predictor, results = train(gain_threshold=threshold, end_date=args.end_date,
+                                          min_price=args.min_price, max_price=args.max_price)
                 predictors[threshold] = predictor
                 results_all[threshold] = results
 
@@ -2598,6 +2665,8 @@ Examples (run from project root):
             gain_threshold=args.threshold,
             prediction_threshold=args.prediction_threshold,
             start_time=args.start_time,
-            end_time=args.end_time
+            end_time=args.end_time,
+            min_price=args.min_price,
+            max_price=args.max_price
         )
         print(f"\n✓ Prediction complete. Results saved to analysis/predictions_*.csv")
