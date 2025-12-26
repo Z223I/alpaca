@@ -272,7 +272,39 @@ Add news column to signals. Also, volume surge if possible.
 
 
 
-I need bad data.
+Method 1: Automatic (Recommended)
+
+  # Detect and install recommended driver automatically
+  sudo ubuntu-drivers autoinstall
+
+  # Reboot after installation
+  sudo reboot
+
+  Method 2: Manual Selection
+
+  # List available drivers for your GPU
+  ubuntu-drivers devices
+
+  # Install specific version (example: 560)
+  sudo apt update
+  sudo apt install nvidia-driver-560
+
+  # Reboot
+  sudo reboot
+
+  Method 3: GUI
+
+  Open Software & Updates → Additional Drivers tab → Select NVIDIA driver → Apply Changes → Reboot
+
+  After Installation - Verify
+
+  # Check driver loaded successfully
+  nvidia-smi
+
+  # Verify XGBoost can use GPU
+  python -c "import xgboost as xgb; print('XGBoost version:', xgb.__version__)"
+
+  Note: Ubuntu 24.04 uses kernel 6.8.0, which is compatible with all current NVIDIA drivers.
 
 
 

@@ -1,0 +1,62 @@
+{
+  "threshold": 6.0,
+  "study_name": "xgb-6.0pct-study",
+  "best_trial_number": 22,
+  "best_value": 0.5256830256398057,
+  "best_params": {
+    "max_depth": 4,
+    "min_child_weight": 8,
+    "n_estimators": 200,
+    "learning_rate": 0.008268942264672476,
+    "gamma": 0.03435990625742633,
+    "reg_alpha": 0.010915311395728986,
+    "reg_lambda": 2.5761074735450302,
+    "subsample": 0.7790446314021827,
+    "colsample_bytree": 0.9414985488286376,
+    "colsample_bylevel": 0.9181419980886699,
+    "colsample_bynode": 0.8809404910710323
+  },
+  "test_metrics": {
+    "accuracy": 0.6017110266159695,
+    "precision": 0.40229885057471265,
+    "recall": 0.8166666666666667,
+    "f1_score": 0.5390539053905391,
+    "roc_auc": 0.7023559397163122
+  },
+  "cv_results": {
+    "accuracy_mean": 0.6937142857142857,
+    "accuracy_std": 0.03856190358583539,
+    "precision_mean": 0.559123284123284,
+    "precision_std": 0.0761826733820699,
+    "recall_mean": 0.08879265625937297,
+    "recall_std": 0.03592145635628171,
+    "f1_score_mean": 0.14934679947332757,
+    "f1_score_std": 0.05297978067081869,
+    "roc_auc_mean": 0.6656990807998305,
+    "roc_auc_std": 0.03460610343600118
+  },
+  "feature_names": [
+    "ema_spread_pct",
+    "macd_histogram",
+    "squeeze_number_today",
+    "minutes_since_last_squeeze",
+    "window_volume_vs_1min_avg",
+    "distance_from_vwap_percent",
+    "day_gain",
+    "spy_percent_change_concurrent",
+    "spread_percent",
+    "market_session_encoded",
+    "price_category_encoded"
+  ],
+  "baseline_comparison": {
+    "baseline_f1": 0,
+    "tuned_f1": 0.5390539053905391,
+    "improvement_percent": 0
+  },
+  "training_info": {
+    "n_trials": 75,
+    "pruned_trials": 0,
+    "timestamp": "2025-12-26T16:13:17.223497",
+    "gpu_used": false
+  }
+}

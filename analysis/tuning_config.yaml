@@ -1,0 +1,160 @@
+# XGBoost Hyperparameter Tuning Configuration
+# Configuration for Optuna + Weights & Biases hyperparameter optimization
+
+# Data configuration
+data:
+  json_dir: "/home/wilsonb/dl/github.com/Z223I/alpaca/historical_data"
+  features_csv: "analysis/squeeze_alerts_independent_features.csv"
+  train_end_date: "2025-12-16"  # Data cutoff for training
+  test_size: 0.20
+  random_seed: 42
+
+# Optuna configuration
+optuna:
+  n_trials: 100
+  timeout: null  # seconds, null = no timeout
+  n_jobs: 1  # Parallel trials (use 1 for GPU to avoid conflicts)
+  sampler: "TPE"  # Tree-structured Parzen Estimator
+  pruner: "MedianPruner"  # Early stopping for bad trials
+  pruner_config:
+    n_startup_trials: 10  # Don't prune first 10 trials
+    n_warmup_steps: 5  # Don't prune before step 5
+    interval_steps: 1  # Prune at every step
+  study_storage: "sqlite:///analysis/optuna_studies.db"  # Persistent storage
+
+# Cross-validation configuration
+cross_validation:
+  enabled: true
+  strategy: "time_series_split"  # Time-series aware CV
+  n_folds: 5
+  shuffle: false  # Never shuffle time-series data
+
+# XGBoost hyperparameter search space
+xgboost_search_space:
+  # Tree structure parameters
+  max_depth:
+    type: "int"
+    low: 3
+    high: 10
+    step: 1
+    description: "Maximum tree depth (controls overfitting)"
+
+  min_child_weight:
+    type: "int"
+    low: 1
+    high: 10
+    step: 1
+    description: "Minimum sum of instance weight in child"
+
+  # Boosting parameters
+  n_estimators:
+    type: "int"
+    low: 100
+    high: 500
+    step: 50
+    description: "Number of boosting rounds"
+
+  learning_rate:
+    type: "loguniform"
+    low: 0.001
+    high: 0.3
+    description: "Step size shrinkage (eta)"
+
+  # Regularization parameters
+  gamma:
+    type: "loguniform"
+    low: 0.0001
+    high: 1.0
+    description: "Minimum loss reduction for split"
+
+  reg_alpha:
+    type: "loguniform"
+    low: 0.0001
+    high: 10.0
+    description: "L1 regularization term"
+
+  reg_lambda:
+    type: "loguniform"
+    low: 0.0001
+    high: 10.0
+    description: "L2 regularization term"
+
+  # Sampling parameters
+  subsample:
+    type: "uniform"
+    low: 0.5
+    high: 1.0
+    description: "Fraction of samples for training each tree"
+
+  colsample_bytree:
+    type: "uniform"
+    low: 0.5
+    high: 1.0
+    description: "Fraction of features per tree"
+
+  colsample_bylevel:
+    type: "uniform"
+    low: 0.5
+    high: 1.0
+    description: "Fraction of features per level"
+
+  colsample_bynode:
+    type: "uniform"
+    low: 0.5
+    high: 1.0
+    description: "Fraction of features per node/split"
+
+  # Fixed parameters (not tuned)
+  fixed:
+    objective: "binary:logistic"
+    eval_metric: "logloss"
+    random_state: 42
+    verbosity: 0
+    n_jobs: -1  # Will be overridden if GPU is used
+
+# Weights & Biases configuration
+wandb:
+  project: "alpaca-squeeze-prediction"
+  entity: null  # Will use default W&B username
+  mode: "online"  # "online", "offline", or "disabled"
+  log_frequency: 1  # Log every N trials
+  save_code: true
+  tags:
+    - "xgboost"
+    - "hyperparameter-tuning"
+    - "optuna"
+    - "gpu"
+
+# Optimization metric configuration
+optimization:
+  primary_metric: "f1_score"  # Metric to optimize
+  direction: "maximize"  # "maximize" or "minimize"
+
+  # Metrics to track (all will be logged to W&B)
+  track_metrics:
+    - "accuracy"
+    - "precision"
+    - "recall"
+    - "f1_score"
+    - "roc_auc"
+
+# GPU configuration
+gpu:
+  enabled: true  # Auto-detect if true
+  tree_method: "gpu_hist"  # GPU-accelerated histogram algorithm
+  gpu_id: 0  # GPU device ID to use
+  fallback_to_cpu: true  # Automatically fallback to CPU if GPU fails
+
+# Early stopping configuration (for XGBoost training)
+early_stopping:
+  enabled: true
+  rounds: 20  # Stop if no improvement for N rounds
+
+# Baseline model parameters (for comparison)
+baseline:
+  max_depth: 6
+  learning_rate: 0.05
+  n_estimators: 200
+  subsample: 0.8
+  colsample_bytree: 0.8
+  scale_pos_weight: null  # Calculated dynamically
