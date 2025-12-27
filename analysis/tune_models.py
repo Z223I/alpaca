@@ -7,16 +7,19 @@ using Bayesian optimization (Optuna) with experiment tracking (W&B) and GPU acce
 
 Usage:
     # Single threshold tuning
-    python analysis/tune_models.py --threshold 6.0 --trials 100
+    python analysis/tune_models.py train --threshold 6.0 --trials 100
+
+    # Single threshold with custom end date
+    python analysis/tune_models.py train --threshold 6.0 --trials 100 --end-date 2025-12-20
 
     # All thresholds
-    python analysis/tune_models.py --all-thresholds --trials 50
+    python analysis/tune_models.py train --all-thresholds --trials 50
 
     # Resume previous study
-    python analysis/tune_models.py --threshold 6.0 --resume
+    python analysis/tune_models.py train --threshold 6.0 --resume
 
     # Dry run
-    python analysis/tune_models.py --threshold 6.0 --trials 5 --dry-run
+    python analysis/tune_models.py train --threshold 6.0 --trials 5 --dry-run
 """
 
 import argparse
@@ -41,6 +44,12 @@ from sklearn.metrics import (
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import StandardScaler
 
+# Plotting imports
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 # Optuna imports
 import optuna
 from optuna.pruners import MedianPruner
@@ -58,6 +67,7 @@ import wandb
 # Import from existing prediction script
 sys.path.append(str(Path(__file__).parent))
 from predict_squeeze_outcomes import SqueezeOutcomePredictor
+from atoms_analysis.plotting import generate_aligned_cumulative_profit_plot
 
 
 # =============================================================================
@@ -100,7 +110,7 @@ def load_and_prepare_data(
     threshold: float,
     config: Dict,
     end_date: Optional[str] = None
-) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, StandardScaler, List[str]]:
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, StandardScaler, List[str], SqueezeOutcomePredictor]:
     """
     Load and prepare data using existing SqueezeOutcomePredictor pipeline.
 
@@ -110,7 +120,7 @@ def load_and_prepare_data(
         end_date: Optional end date filter (format: "YYYY-MM-DD")
 
     Returns:
-        Tuple of (X_train, X_test, y_train, y_test, scaler, feature_names)
+        Tuple of (X_train, X_test, y_train, y_test, scaler, feature_names, predictor)
     """
     print("\n" + "="*80)
     print(f"LOADING DATA FOR {threshold}% THRESHOLD")
@@ -165,7 +175,7 @@ def load_and_prepare_data(
         index=X_test.index
     )
 
-    return X_train_scaled, X_test_scaled, y_train, y_test, scaler, feature_names
+    return X_train_scaled, X_test_scaled, y_train, y_test, scaler, feature_names, predictor
 
 
 # =============================================================================
@@ -334,6 +344,211 @@ def calculate_metrics(
         'f1_score': f1_score(y_true, y_pred, zero_division=0),
         'roc_auc': roc_auc_score(y_true, y_proba),
     }
+
+
+def plot_confusion_matrix(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    threshold: float,
+    output_dir: Path = Path("analysis/plots")
+) -> Path:
+    """
+    Generate and save confusion matrix plot.
+
+    Args:
+        y_true: True labels
+        y_pred: Predicted labels
+        threshold: Gain threshold percentage
+        output_dir: Directory to save the plot
+
+    Returns:
+        Path to saved plot
+    """
+    # Create output directory
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Calculate confusion matrix
+    cm = confusion_matrix(y_true, y_pred)
+
+    # Create figure
+    plt.figure(figsize=(10, 8))
+
+    # Plot using seaborn
+    sns.heatmap(
+        cm,
+        annot=True,
+        fmt='d',
+        cmap='Blues',
+        square=True,
+        cbar_kws={'label': 'Count'},
+        xticklabels=['Did Not Achieve', 'Achieved'],
+        yticklabels=['Did Not Achieve', 'Achieved']
+    )
+
+    # Add labels and title
+    plt.ylabel('True Label', fontsize=12)
+    plt.xlabel('Predicted Label', fontsize=12)
+    plt.title(f'Confusion Matrix - {threshold}% Gain Threshold\nBest Model Performance',
+              fontsize=14, fontweight='bold')
+
+    # Add metrics annotation
+    tn, fp, fn, tp = cm.ravel()
+    total = tn + fp + fn + tp
+    accuracy = (tp + tn) / total
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+
+    # Add text box with metrics
+    metrics_text = (
+        f'Accuracy: {accuracy:.3f}\n'
+        f'Precision: {precision:.3f}\n'
+        f'Recall: {recall:.3f}\n'
+        f'F1-Score: {f1:.3f}\n'
+        f'\n'
+        f'Total: {total:,} samples'
+    )
+    plt.text(
+        1.5, 0.5, metrics_text,
+        fontsize=10,
+        bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5),
+        verticalalignment='center',
+        transform=plt.gca().transAxes
+    )
+
+    plt.tight_layout()
+
+    # Save figure
+    output_file = output_dir / f"{threshold}pct_confusion_matrix.png"
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    plt.close()
+
+    return output_file
+
+
+def calculate_realistic_profits_and_plot(
+    X_test: pd.DataFrame,
+    y_test: pd.Series,
+    y_pred: np.ndarray,
+    threshold: float,
+    predictor: SqueezeOutcomePredictor,
+    config: Dict
+) -> Path:
+    """
+    Calculate realistic trading profits using trailing stop logic and generate cumulative profit chart.
+
+    This mirrors the logic from predict_squeeze_outcomes.py:
+    - Uses 2% trailing stop loss
+    - Processes interval data chronologically
+    - Compares model predictions vs take-all strategy
+
+    Args:
+        X_test: Test feature matrix
+        y_test: Test labels
+        y_pred: Model predictions
+        threshold: Gain threshold percentage
+        predictor: SqueezeOutcomePredictor instance
+        config: Configuration dictionary
+
+    Returns:
+        Path to saved cumulative profit plot
+    """
+    print(f"\nCalculating realistic trading profits with trailing stop...")
+
+    TRAILING_STOP_PCT = 2.0
+
+    # Load the merged data to get outcome_tracking information
+    # We need to reload because X_test doesn't have the raw outcome data
+    json_dir = config['data']['json_dir']
+    features_csv = config['data']['features_csv']
+
+    # Re-extract outcomes to get the full dataframe
+    outcomes_df = predictor.extract_outcomes(
+        gain_threshold=threshold,
+        start_date="2025-12-12",
+        end_date=config.get('end_date')
+    )
+
+    merged_df = predictor.merge_with_features(outcomes_df)
+
+    # Get the test set indices (they should match X_test)
+    test_df = merged_df.loc[X_test.index].copy()
+
+    # Add predictions
+    test_df['predicted_outcome'] = y_pred
+    test_df['actual_outcome'] = y_test.values
+
+    # Calculate realistic profit for each test sample
+    realistic_profits = []
+
+    for idx in test_df.index:
+        outcome_row = test_df.loc[idx]
+
+        try:
+            # Try to load full JSON with interval data
+            symbol = outcome_row.get('symbol', 'N/A')
+            timestamp = outcome_row.get('timestamp', '')
+
+            if timestamp:
+                date_obj = pd.to_datetime(timestamp)
+                date_str = date_obj.strftime('%Y-%m-%d')
+                time_str = date_obj.strftime('%H%M%S')
+                json_file = Path(json_dir) / date_str / 'squeeze_alerts_sent' / f'alert_{symbol}_{date_str}_{time_str}.json'
+
+                if json_file.exists():
+                    with open(json_file, 'r') as f:
+                        full_data = json.load(f)
+
+                    enhanced_row = outcome_row.copy()
+                    if 'outcome_tracking' in full_data:
+                        enhanced_row['outcome_tracking'] = full_data['outcome_tracking']
+
+                    gain, _, _ = predictor._calculate_trade_outcome(
+                        enhanced_row, threshold, TRAILING_STOP_PCT
+                    )
+                    realistic_profits.append(gain)
+                else:
+                    # Fallback without interval data
+                    gain, _, _ = predictor._calculate_trade_outcome(
+                        outcome_row, threshold, TRAILING_STOP_PCT
+                    )
+                    realistic_profits.append(gain)
+            else:
+                gain, _, _ = predictor._calculate_trade_outcome(
+                    outcome_row, threshold, TRAILING_STOP_PCT
+                )
+                realistic_profits.append(gain)
+
+        except Exception as e:
+            # Fallback on error
+            gain, _, _ = predictor._calculate_trade_outcome(
+                outcome_row, threshold, TRAILING_STOP_PCT
+            )
+            realistic_profits.append(gain)
+
+    test_df['realistic_profit'] = realistic_profits
+
+    # Separate into model trades (predictions == 1) and all trades
+    model_trades = test_df[test_df['predicted_outcome'] == 1].copy()
+
+    print(f"✓ Calculated realistic profits for {len(test_df)} test samples")
+    print(f"  Model selected {len(model_trades)} trades ({len(model_trades)/len(test_df)*100:.1f}%)")
+    print(f"  Average profit (take-all): {test_df['realistic_profit'].mean():.2f}%")
+    if len(model_trades) > 0:
+        print(f"  Average profit (model): {model_trades['realistic_profit'].mean():.2f}%")
+
+    # Generate cumulative profit plot
+    print(f"\nGenerating cumulative profit chart...")
+    threshold_suffix = f"_{threshold}pct"
+    generate_aligned_cumulative_profit_plot(
+        predictions_df=test_df,
+        model_trades=model_trades,
+        threshold_suffix=threshold_suffix,
+        gain_threshold=threshold
+    )
+
+    plot_path = Path("analysis/plots") / f"aligned_cumulative_profit{threshold_suffix}.png"
+    return plot_path
 
 
 # =============================================================================
@@ -606,7 +821,8 @@ def save_and_log_best_model(
     scaler: StandardScaler,
     feature_names: List[str],
     baseline_metrics: Dict,
-    config: Dict
+    config: Dict,
+    cm_plot_path: Optional[Path] = None
 ):
     """
     Save best model and log as W&B artifact.
@@ -621,6 +837,7 @@ def save_and_log_best_model(
         feature_names: List of feature names
         baseline_metrics: Baseline model metrics for comparison
         config: Configuration dictionary
+        cm_plot_path: Path to confusion matrix plot (optional)
     """
     print(f"\nSaving best model for {threshold}% threshold...")
 
@@ -685,6 +902,13 @@ def save_and_log_best_model(
         artifact.add_file(str(model_path))
         artifact.add_file(str(scaler_path))
         artifact.add_file(str(info_path))
+
+        # Add confusion matrix plot if available
+        if cm_plot_path and cm_plot_path.exists():
+            artifact.add_file(str(cm_plot_path))
+            # Also log as image to W&B
+            wandb.log({f"confusion_matrix_{threshold}pct": wandb.Image(str(cm_plot_path))})
+
         wandb.log_artifact(artifact)
         print(f"✓ Logged artifact to W&B")
     except Exception as e:
@@ -729,7 +953,7 @@ def tune_for_threshold(
 
     try:
         # Load data
-        X_train, X_test, y_train, y_test, scaler, feature_names = load_and_prepare_data(
+        X_train, X_test, y_train, y_test, scaler, feature_names, predictor = load_and_prepare_data(
             threshold, config, end_date=args.end_date if hasattr(args, 'end_date') else None
         )
 
@@ -794,6 +1018,17 @@ def tune_for_threshold(
         for metric, value in final_metrics.items():
             print(f"  {metric}: {value:.4f}")
 
+        # Generate and save confusion matrix
+        print(f"\nGenerating confusion matrix...")
+        cm_plot_path = plot_confusion_matrix(y_test, y_pred, threshold)
+        print(f"✓ Saved confusion matrix: {cm_plot_path}")
+
+        # Generate cumulative profit chart with trailing stop logic
+        cumulative_profit_path = calculate_realistic_profits_and_plot(
+            X_test, y_test, y_pred, threshold, predictor, config
+        )
+        print(f"✓ Saved cumulative profit chart: {cumulative_profit_path}")
+
         # Get baseline metrics for comparison
         baseline_metrics = config.get('baseline', {})
 
@@ -809,7 +1044,8 @@ def tune_for_threshold(
         # Save model and artifacts
         save_and_log_best_model(
             final_model, study, final_metrics, cv_results,
-            threshold, scaler, feature_names, baseline_metrics, config
+            threshold, scaler, feature_names, baseline_metrics, config,
+            cm_plot_path=cm_plot_path
         )
 
         # Finish W&B run
@@ -840,52 +1076,68 @@ def parse_arguments():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description="XGBoost Hyperparameter Tuning with Optuna and W&B",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples (run from project root):
+  # Train model for single threshold
+  python analysis/tune_models.py train --threshold 6.0 --trials 100
+
+  # Train with custom end date
+  python analysis/tune_models.py train --threshold 6.0 --trials 100 --end-date 2025-12-20
+
+  # Train all thresholds
+  python analysis/tune_models.py train --all-thresholds --trials 50
+        """
     )
 
-    parser.add_argument(
+    # Create subparsers for different modes
+    subparsers = parser.add_subparsers(dest='mode', help='Operation mode')
+
+    # Train subcommand
+    train_parser = subparsers.add_parser('train', help='Train models with hyperparameter tuning')
+    train_parser.add_argument(
         '--threshold', type=float, default=6.0,
         help='Gain threshold percentage (e.g., 6.0 for 6%%)'
     )
-    parser.add_argument(
+    train_parser.add_argument(
         '--all-thresholds', action='store_true',
         help='Tune for all thresholds (1.5%%, 2%%, 2.5%%, 3%%, 4%%, 5%%, 6%%, 7%%)'
     )
-    parser.add_argument(
+    train_parser.add_argument(
         '--trials', type=int, default=100,
         help='Number of Optuna trials'
     )
-    parser.add_argument(
+    train_parser.add_argument(
         '--cv-folds', type=int, default=None,
         help='Number of cross-validation folds (overrides config)'
     )
-    parser.add_argument(
+    train_parser.add_argument(
         '--metric', type=str, default=None,
         help='Optimization metric (overrides config)'
     )
-    parser.add_argument(
+    train_parser.add_argument(
         '--use-gpu', action='store_true',
         help='Use GPU acceleration (auto-detected by default)'
     )
-    parser.add_argument(
+    train_parser.add_argument(
         '--resume', action='store_true',
         help='Resume previous study'
     )
-    parser.add_argument(
+    train_parser.add_argument(
         '--study-name', type=str, default=None,
         help='Study name for resume (default: auto-generated)'
     )
-    parser.add_argument(
+    train_parser.add_argument(
         '--dry-run', action='store_true',
         help='Dry run mode (limited trials for testing)'
     )
-    parser.add_argument(
+    train_parser.add_argument(
         '--config', type=str, default='analysis/tuning_config.yaml',
         help='Path to configuration file'
     )
-    parser.add_argument(
-        '--end-date', type=str, default=None,
-        help='End date for data (YYYY-MM-DD)'
+    train_parser.add_argument(
+        '--end-date', type=str, default='2025-12-22',
+        help='Training data cutoff date (YYYY-MM-DD). Data after this date is reserved for prediction/testing. Default: 2025-12-22'
     )
 
     return parser.parse_args()
@@ -895,58 +1147,71 @@ def main():
     """Main entry point."""
     args = parse_arguments()
 
-    # Load configuration
-    config_path = Path(args.config)
-    if not config_path.exists():
-        print(f"❌ Configuration file not found: {config_path}")
+    # Check if mode is specified
+    if not args.mode:
+        print("❌ Error: No mode specified. Use 'train' subcommand.")
+        print("\nUsage: python analysis/tune_models.py train --threshold 6.0 --trials 100")
+        print("Run with --help for more information.")
         sys.exit(1)
 
-    with open(config_path, 'r') as f:
-        config = yaml.safe_load(f)
+    if args.mode == 'train':
+        # Training mode
+        # Load configuration
+        config_path = Path(args.config)
+        if not config_path.exists():
+            print(f"❌ Configuration file not found: {config_path}")
+            sys.exit(1)
 
-    # Override config with CLI arguments
-    if args.trials:
-        config['optuna']['n_trials'] = args.trials
-    if args.cv_folds:
-        config['cross_validation']['n_folds'] = args.cv_folds
-    if args.metric:
-        config['optimization']['primary_metric'] = args.metric
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
 
-    # Dry run mode
-    if args.dry_run:
-        print("\n🧪 DRY RUN MODE - Using 5 trials for testing")
-        args.trials = 5
-        config['optuna']['n_trials'] = 5
-        config['wandb']['mode'] = 'disabled'
+        # Override config with CLI arguments
+        if args.trials:
+            config['optuna']['n_trials'] = args.trials
+        if args.cv_folds:
+            config['cross_validation']['n_folds'] = args.cv_folds
+        if args.metric:
+            config['optimization']['primary_metric'] = args.metric
 
-    # Determine thresholds to tune
-    if args.all_thresholds:
-        thresholds = [1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 7.0]
-        print(f"\nTuning for all {len(thresholds)} thresholds")
+        # Dry run mode
+        if args.dry_run:
+            print("\n🧪 DRY RUN MODE - Using 5 trials for testing")
+            args.trials = 5
+            config['optuna']['n_trials'] = 5
+            config['wandb']['mode'] = 'disabled'
+
+        # Determine thresholds to tune
+        if args.all_thresholds:
+            thresholds = [1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 7.0]
+            print(f"\nTuning for all {len(thresholds)} thresholds")
+        else:
+            thresholds = [args.threshold]
+
+        # Tune for each threshold
+        all_results = {}
+        for threshold in thresholds:
+            try:
+                results = tune_for_threshold(threshold, config, args)
+                all_results[threshold] = results
+                print(f"\n✓ Completed tuning for {threshold}% threshold")
+            except Exception as e:
+                print(f"\n❌ Failed tuning for {threshold}% threshold: {e}")
+                continue
+
+        # Summary
+        print("\n" + "="*80)
+        print("TUNING SUMMARY")
+        print("="*80)
+        for threshold, results in all_results.items():
+            print(f"\n{threshold}% threshold:")
+            print(f"  Best F1-score: {results['final_metrics']['f1_score']:.4f}")
+            print(f"  Best trial: {results['best_params']}")
+
+        print("\n✓ All tuning complete!")
+
     else:
-        thresholds = [args.threshold]
-
-    # Tune for each threshold
-    all_results = {}
-    for threshold in thresholds:
-        try:
-            results = tune_for_threshold(threshold, config, args)
-            all_results[threshold] = results
-            print(f"\n✓ Completed tuning for {threshold}% threshold")
-        except Exception as e:
-            print(f"\n❌ Failed tuning for {threshold}% threshold: {e}")
-            continue
-
-    # Summary
-    print("\n" + "="*80)
-    print("TUNING SUMMARY")
-    print("="*80)
-    for threshold, results in all_results.items():
-        print(f"\n{threshold}% threshold:")
-        print(f"  Best F1-score: {results['final_metrics']['f1_score']:.4f}")
-        print(f"  Best trial: {results['best_params']}")
-
-    print("\n✓ All tuning complete!")
+        print(f"❌ Error: Unknown mode '{args.mode}'")
+        sys.exit(1)
 
 
 if __name__ == '__main__':

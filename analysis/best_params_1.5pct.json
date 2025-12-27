@@ -1,39 +1,39 @@
 {
   "threshold": 1.5,
   "study_name": "xgb-1.5pct-study",
-  "best_trial_number": 29,
-  "best_value": 0.7910788088481009,
+  "best_trial_number": 55,
+  "best_value": 0.7972642330244047,
   "best_params": {
     "max_depth": 9,
     "min_child_weight": 1,
-    "n_estimators": 150,
-    "learning_rate": 0.0016594512513459108,
-    "gamma": 0.0001101909723600499,
-    "reg_alpha": 0.02990700897598788,
-    "reg_lambda": 0.004919971403092369,
-    "subsample": 0.9168737559840091,
-    "colsample_bytree": 0.7198415261247826,
-    "colsample_bylevel": 0.6906842268132117,
-    "colsample_bynode": 0.5924354647849017
+    "n_estimators": 100,
+    "learning_rate": 0.0013235910549774278,
+    "gamma": 0.0001709788447166313,
+    "reg_alpha": 0.007593927940854749,
+    "reg_lambda": 0.001098875600947436,
+    "subsample": 0.9988223383721228,
+    "colsample_bytree": 0.7305883229614227,
+    "colsample_bylevel": 0.6065492701048893,
+    "colsample_bynode": 0.5688817715685446
   },
   "test_metrics": {
-    "accuracy": 0.6787072243346007,
-    "precision": 0.72,
-    "recall": 0.7945205479452054,
-    "f1_score": 0.7554269175108539,
-    "roc_auc": 0.7209756661464655
+    "accuracy": 0.7435597189695551,
+    "precision": 0.7660818713450293,
+    "recall": 0.8987993138936535,
+    "f1_score": 0.8271507498026835,
+    "roc_auc": 0.7336844037394062
   },
   "cv_results": {
-    "accuracy_mean": 0.6517142857142858,
-    "accuracy_std": 0.03588416739159147,
-    "precision_mean": 0.6517142857142858,
-    "precision_std": 0.03588416739159147,
+    "accuracy_mean": 0.6446397188049209,
+    "accuracy_std": 0.02666260986785642,
+    "precision_mean": 0.6446397188049209,
+    "precision_std": 0.02666260986785642,
     "recall_mean": 1.0,
     "recall_std": 0.0,
-    "f1_score_mean": 0.7885630830883373,
-    "f1_score_std": 0.026412467205886192,
-    "roc_auc_mean": 0.7162260511462618,
-    "roc_auc_std": 0.032162733427071814
+    "f1_score_mean": 0.7836075095925858,
+    "f1_score_std": 0.01978321195570994,
+    "roc_auc_mean": 0.6986051013953947,
+    "roc_auc_std": 0.059420206563194716
   },
   "feature_names": [
     "ema_spread_pct",
@@ -50,13 +50,13 @@
   ],
   "baseline_comparison": {
     "baseline_f1": 0,
-    "tuned_f1": 0.7554269175108539,
+    "tuned_f1": 0.8271507498026835,
     "improvement_percent": 0
   },
   "training_info": {
-    "n_trials": 52,
+    "n_trials": 95,
     "pruned_trials": 0,
-    "timestamp": "2025-12-26T14:06:45.860227",
+    "timestamp": "2025-12-26T17:39:47.693603",
     "gpu_used": false
   }
 }

@@ -1,39 +1,39 @@
 {
   "threshold": 2.0,
   "study_name": "xgb-2.0pct-study",
-  "best_trial_number": 14,
-  "best_value": 0.741413740619506,
+  "best_trial_number": 53,
+  "best_value": 0.7484488752299852,
   "best_params": {
     "max_depth": 7,
-    "min_child_weight": 3,
+    "min_child_weight": 1,
     "n_estimators": 100,
-    "learning_rate": 0.002316739255549258,
-    "gamma": 0.00264641498772706,
-    "reg_alpha": 0.006670790380052197,
-    "reg_lambda": 0.0006433288892232992,
-    "subsample": 0.8150990902574846,
-    "colsample_bytree": 0.582448150836848,
-    "colsample_bylevel": 0.5320243774095285,
-    "colsample_bynode": 0.7665717766271902
+    "learning_rate": 0.0012214770332391676,
+    "gamma": 0.025724430895128127,
+    "reg_alpha": 0.00010577625955999176,
+    "reg_lambda": 0.0022727804148723932,
+    "subsample": 0.8407201841915815,
+    "colsample_bytree": 0.935851550437755,
+    "colsample_bylevel": 0.5197160226543237,
+    "colsample_bynode": 0.6904384958508891
   },
   "test_metrics": {
-    "accuracy": 0.6625475285171103,
-    "precision": 0.6858407079646017,
-    "recall": 0.7660626029654036,
-    "f1_score": 0.7237354085603113,
-    "roc_auc": 0.7211354423116081
+    "accuracy": 0.7131147540983607,
+    "precision": 0.7271386430678466,
+    "recall": 0.891500904159132,
+    "f1_score": 0.8009748172217709,
+    "roc_auc": 0.7047334683063688
   },
   "cv_results": {
-    "accuracy_mean": 0.5974285714285714,
-    "accuracy_std": 0.0410216468490001,
-    "precision_mean": 0.5974285714285714,
-    "precision_std": 0.0410216468490001,
+    "accuracy_mean": 0.5855887521968366,
+    "accuracy_std": 0.028368841861484827,
+    "precision_mean": 0.5855887521968366,
+    "precision_std": 0.028368841861484827,
     "recall_mean": 1.0,
     "recall_std": 0.0,
-    "f1_score_mean": 0.7471664793135768,
-    "f1_score_std": 0.031997320714598855,
-    "roc_auc_mean": 0.6911095146198192,
-    "roc_auc_std": 0.029847691448449884
+    "f1_score_mean": 0.7382334642729104,
+    "f1_score_std": 0.022663157749069542,
+    "roc_auc_mean": 0.6850808846634495,
+    "roc_auc_std": 0.054675392635982645
   },
   "feature_names": [
     "ema_spread_pct",
@@ -50,13 +50,13 @@
   ],
   "baseline_comparison": {
     "baseline_f1": 0,
-    "tuned_f1": 0.7237354085603113,
+    "tuned_f1": 0.8009748172217709,
     "improvement_percent": 0
   },
   "training_info": {
-    "n_trials": 50,
+    "n_trials": 61,
     "pruned_trials": 0,
-    "timestamp": "2025-12-26T14:14:43.199169",
+    "timestamp": "2025-12-26T17:43:20.186121",
     "gpu_used": false
   }
 }
