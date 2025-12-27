@@ -150,3 +150,15 @@ code/alpaca_config.py
 
 # Plot output directory
 plots/
+
+# Machine learning models and artifacts
+analysis/tuned_models/*.json
+analysis/tuned_models/*.pkl
+analysis/xgboost_model_*.json
+analysis/xgboost_model_*_info.json
+analysis/best_params_*.json
+analysis/optuna_studies.db
+analysis/*.db
+
+# Weights & Biases tracking data
+wandb/
