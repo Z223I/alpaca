@@ -811,42 +811,56 @@ class SqueezeOutcomePredictor:
                     low_timestamp = interval_data['interval_low_timestamp']
                     high_timestamp = interval_data['interval_high_timestamp']
 
-                    # Process events chronologically
-                    if high_timestamp < low_timestamp:
-                        # HIGH came first, then LOW
+                    # OCO (One Cancels Other) BRACKET ORDER LOGIC:
+                    # Check if BOTH target (limit order) and stop hit within this interval
+                    # Use timestamps to determine which happened FIRST
 
-                        # Update peak with the high
-                        peak_gain = max(peak_gain, high_gain)
+                    # Update peak for trailing stop calculation
+                    potential_peak = max(peak_gain, high_gain)
 
-                        # Check if we hit the gain threshold (limit order fills at exact price)
-                        if high_gain >= gain_threshold:
-                            return (gain_threshold, f'target_hit_at_{interval_sec_str}s', interval_sec)
+                    # Determine if target would be hit
+                    target_hit = high_gain >= gain_threshold
 
-                        # Check if trailing stop was triggered by the low
+                    # Determine if stop would be hit
+                    stop_hit = False
+                    stop_price = None
+                    stop_reason = None
+
+                    if peak_gain == 0:
+                        # No previous gains - check initial stop loss
+                        if low_gain <= -stop_loss_pct:
+                            stop_hit = True
+                            stop_price = -stop_loss_pct
+                            stop_reason = f'initial_stop_at_{interval_sec_str}s'
+                    else:
+                        # Previous gains exist - check trailing stop
                         trailing_stop_level = peak_gain - stop_loss_pct
                         if low_gain <= trailing_stop_level:
-                            # Trailing stop triggered - exit at the trailing stop level
-                            return (trailing_stop_level, f'trailing_stop_at_{interval_sec_str}s', interval_sec)
+                            stop_hit = True
+                            stop_price = low_gain  # Exit at actual low, not stop level
+                            stop_reason = f'trailing_stop_at_{interval_sec_str}s'
+
+                    # OCO DECISION: If both hit, use timestamp to determine which came first
+                    if target_hit and stop_hit:
+                        if high_timestamp < low_timestamp:
+                            # Target hit FIRST - exit with profit (limit order fills)
+                            return (gain_threshold, f'target_hit_first_at_{interval_sec_str}s', interval_sec)
+                        else:
+                            # Stop hit FIRST - exit with loss (stop order fills)
+                            return (stop_price, f'stop_hit_first_at_{interval_sec_str}s', interval_sec)
+
+                    elif target_hit:
+                        # Only target hit - exit with profit
+                        peak_gain = potential_peak  # Update peak before exiting
+                        return (gain_threshold, f'target_hit_at_{interval_sec_str}s', interval_sec)
+
+                    elif stop_hit:
+                        # Only stop hit - exit with loss
+                        return (stop_price, stop_reason, interval_sec)
 
                     else:
-                        # LOW came first (or same time), then HIGH
-
-                        # Check if initial stop loss was hit (before any gains)
-                        if low_gain <= -stop_loss_pct and peak_gain == 0:
-                            return (-stop_loss_pct, f'initial_stop_at_{interval_sec_str}s', interval_sec)
-
-                        # Check if trailing stop was triggered
-                        if peak_gain > 0:
-                            trailing_stop_level = peak_gain - stop_loss_pct
-                            if low_gain <= trailing_stop_level:
-                                return (trailing_stop_level, f'trailing_stop_at_{interval_sec_str}s', interval_sec)
-
-                        # Update peak with the high
-                        peak_gain = max(peak_gain, high_gain)
-
-                        # Check if target was hit
-                        if high_gain >= gain_threshold:
-                            return (gain_threshold, f'target_hit_at_{interval_sec_str}s', interval_sec)
+                        # Neither hit - update peak and continue
+                        peak_gain = potential_peak
 
                 else:
                     # FALLBACK: Use snapshot price if no range data
@@ -854,16 +868,27 @@ class SqueezeOutcomePredictor:
                         gain = interval_data['gain_percent']
 
                         # Update peak
-                        peak_gain = max(peak_gain, gain)
+                        potential_peak = max(peak_gain, gain)
 
-                        # Check target
-                        if gain >= gain_threshold:
+                        # Check if target hit
+                        target_hit = gain >= gain_threshold
+
+                        # Check if stop hit
+                        stop_hit = False
+                        if peak_gain > 0:
+                            trailing_stop_level = peak_gain - stop_loss_pct
+                            stop_hit = gain <= trailing_stop_level
+
+                        # OCO logic for snapshot data
+                        if target_hit:
+                            # Target hit - lock in profit with limit order
                             return (gain_threshold, f'snapshot_target_at_{interval_sec_str}s', interval_sec)
-
-                        # Check trailing stop
-                        trailing_stop_level = peak_gain - stop_loss_pct
-                        if gain <= trailing_stop_level:
-                            return (trailing_stop_level, f'snapshot_trailing_stop_at_{interval_sec_str}s', interval_sec)
+                        elif stop_hit:
+                            # Trailing stop hit - exit at actual price, not stop level
+                            return (gain, f'snapshot_trailing_stop_at_{interval_sec_str}s', interval_sec)
+                        else:
+                            # Update peak and continue
+                            peak_gain = potential_peak
 
             # If we went through all intervals without hitting target or trailing stop
             final_gain = outcome.get('final_gain_percent', 0)
@@ -2280,7 +2305,8 @@ def predict(model_path: str, start_date: str, end_date: str | None = None, gain_
     # Calculate realistic profit using _calculate_trade_outcome with interval data
     import json
     realistic_profits = []
-    debug_count = 0
+    exit_reasons = []
+    holding_times = []
     json_loaded_count = 0
     json_missing_count = 0
 
@@ -2312,25 +2338,33 @@ def predict(model_path: str, start_date: str, end_date: str | None = None, gain_
                 )
 
                 realistic_profits.append(gain)
+                exit_reasons.append(reason)
+                holding_times.append(holding_time)
             else:
                 json_missing_count += 1
                 # Fallback - use simple calculation
                 if json_missing_count <= 3:
                     print(f"WARNING: JSON not found for {symbol} {timestamp}")
                     print(f"  Looking for: {json_file}")
-                gain, _, _ = predictor._calculate_trade_outcome(
+                gain, reason, holding_time = predictor._calculate_trade_outcome(
                     outcome_row, gain_threshold, TRAILING_STOP_PCT
                 )
                 realistic_profits.append(gain)
+                exit_reasons.append(reason)
+                holding_times.append(holding_time)
         except Exception as e:
             # Fallback on error
             print(f"ERROR processing {symbol} {timestamp}: {e}")
-            gain, _, _ = predictor._calculate_trade_outcome(
+            gain, reason, holding_time = predictor._calculate_trade_outcome(
                 outcome_row, gain_threshold, TRAILING_STOP_PCT
             )
             realistic_profits.append(gain)
+            exit_reasons.append(reason)
+            holding_times.append(holding_time)
 
     predictions_df['realistic_profit'] = realistic_profits
+    predictions_df['exit_reason'] = exit_reasons
+    predictions_df['holding_time_sec'] = holding_times
 
     print(f"\nJSON Loading Summary:")
     print(f"  JSON files loaded: {json_loaded_count}")

@@ -25,6 +25,9 @@ if [ -n "$MIN_PRICE" ] || [ -n "$MAX_PRICE" ]; then
     echo "Price Range: \$${MIN_PRICE:-any} to \$${MAX_PRICE:-any}"
 fi
 echo
+echo "NOTE: Models 1.5% and 6.0% use REALISTIC labels (hit target before stop)."
+echo "      Other models use MAX_GAIN labels (eventually hit target)."
+echo
 
 for percent in 1.5 2 2.5 3 4 5 6 7; do
     echo "================================================"
@@ -33,7 +36,7 @@ for percent in 1.5 2 2.5 3 4 5 6 7; do
 
     # Build command with optional price filters
     CMD="python analysis/predict_squeeze_outcomes.py predict \
-        --model analysis/xgboost_model_${percent}pct.json \
+        --model analysis/tuned_models/xgboost_tuned_${percent}pct.json \
         --start-date \"$START_DATE\" \
         --end-date \"$END_DATE\" \
         --start-time \"$START_TIME\" \

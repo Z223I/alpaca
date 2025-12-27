@@ -1,0 +1,46 @@
+{
+  "os":  "Linux-6.14.0-37-generic-x86_64-with-glibc2.39",
+  "python":  "CPython 3.10.18",
+  "startedAt":  "2025-12-26T22:46:17.899150Z",
+  "args":  [
+    "--use-gpu",
+    "--all-thresholds",
+    "--trials",
+    "50"
+  ],
+  "program":  "/home/wilsonb/dl/github.com/Z223I/alpaca/analysis/tune_models.py",
+  "codePath":  "analysis/tune_models.py",
+  "codePathLocal":  "analysis/tune_models.py",
+  "git":  {
+    "remote":  "https://github.com/Z223i/alpaca.git",
+    "commit":  "00bd4d0b07af272fcebe04014f677aba57a461f4"
+  },
+  "email":  "BruceWilsonPH@yahoo.com.ph",
+  "root":  "/home/wilsonb/dl/github.com/Z223I/alpaca",
+  "host":  "Ubuntu-24.04-MS-7D43",
+  "executable":  "/home/wilsonb/miniconda3/envs/alpaca/bin/python",
+  "cpu_count":  24,
+  "cpu_count_logical":  32,
+  "gpu":  "NVIDIA GeForce RTX 4090",
+  "gpu_count":  1,
+  "disk":  {
+    "/":  {
+      "total":  "5951574343680",
+      "used":  "183313747968"
+    }
+  },
+  "memory":  {
+    "total":  "67272130560"
+  },
+  "gpu_nvidia":  [
+    {
+      "name":  "NVIDIA GeForce RTX 4090",
+      "memoryTotal":  "25757220864",
+      "cudaCores":  16384,
+      "architecture":  "Ada",
+      "uuid":  "GPU-f23b93bd-2c90-4c1e-6c77-4611f3146eff"
+    }
+  ],
+  "cudaVersion":  "13.0",
+  "writerId":  "vnmzd5vsl579e969tu28ksrhojtunlir"
+}
