@@ -25,11 +25,11 @@ if [ -n "$MIN_PRICE" ] || [ -n "$MAX_PRICE" ]; then
     echo "Price Range: \$${MIN_PRICE:-any} to \$${MAX_PRICE:-any}"
 fi
 echo
-echo "NOTE: Models 1.5% and 6.0% use REALISTIC labels (hit target before stop)."
-echo "      Other models use MAX_GAIN labels (eventually hit target)."
+echo "NOTE: All models use REALISTIC labels (hit target before 2% trailing stop)."
+echo "      Each model's take-profit matches its training threshold."
 echo
 
-for percent in 1.5 2 2.5 3 4 5 6 7; do
+for percent in 1.5 2.0 2.5 3.0 4.0 5.0 6.0 7.0; do
     echo "================================================"
     echo "Running predictions for ${percent}% model"
     echo "================================================"

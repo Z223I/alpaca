@@ -1850,7 +1850,7 @@ def train(gain_threshold: float = 5.0, end_date: str = "2025-12-16",
     # Step 10: Trading simulation
     trading_results = predictor.simulate_trading(df, model_name='Random Forest',
                                                   gain_threshold=gain_threshold,
-                                                  stop_loss_pct=1.0)
+                                                  stop_loss_pct=2.0)
 
     # Step 10a: Analyze holding period distribution
     predictor.analyze_holding_period_distribution(
@@ -1947,7 +1947,8 @@ def train(gain_threshold: float = 5.0, end_date: str = "2025-12-16",
 def _generate_prediction_report(predictions_df: pd.DataFrame, model_trades: pd.DataFrame,
                                  threshold_suffix: str, gain_threshold: float,
                                  accuracy: float, precision: float, recall: float,
-                                 f1: float, roc_auc: float, model_info: dict, date_range: str):
+                                 f1: float, roc_auc: float, model_info: dict, date_range: str,
+                                 stop_loss_pct: float = 2.0):
     """Generate markdown report for predictions."""
     from datetime import datetime
 
@@ -1971,7 +1972,7 @@ def _generate_prediction_report(predictions_df: pd.DataFrame, model_trades: pd.D
 
         f.write("---\n\n")
         f.write("## Trading Performance\n\n")
-        f.write("### Strategy: 1.5% Take-Profit + 1% Trailing Stop\n\n")
+        f.write(f"### Strategy: {gain_threshold}% Take-Profit + {stop_loss_pct}% Trailing Stop\n\n")
 
         if len(model_trades) > 0:
             # Use compounding for total profit
@@ -2296,7 +2297,7 @@ def predict(model_path: str, start_date: str, end_date: str | None = None, gain_
 
     # Step 7a: Calculate realistic trading outcomes with interval-based stop loss
     print("\n" + "="*80)
-    print(f"CALCULATING TRADING PROFITS ({gain_threshold}% Target + 1% Stop Loss)")
+    print(f"CALCULATING TRADING PROFITS ({gain_threshold}% Target + 2% Trailing Stop)")
     print("Using interval-based chronological logic for realistic simulation")
     print("="*80)
 
@@ -2534,7 +2535,7 @@ def predict(model_path: str, start_date: str, end_date: str | None = None, gain_
         _generate_prediction_report(
             predictions_df, model_trades, threshold_suffix, gain_threshold,
             accuracy, precision, recall, f1, roc_auc,
-            model_info, date_range
+            model_info, date_range, stop_loss_pct=TRAILING_STOP_PCT
         )
     else:
         print("\n⚠️  No trades selected by model - skipping profit analysis")

@@ -109,7 +109,8 @@ def detect_gpu() -> Tuple[bool, str]:
 def load_and_prepare_data(
     threshold: float,
     config: Dict,
-    end_date: Optional[str] = None
+    end_date: Optional[str] = None,
+    trailing_stop_pct: float = 2.0
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, StandardScaler, List[str], SqueezeOutcomePredictor]:
     """
     Load and prepare data using existing SqueezeOutcomePredictor pipeline.
@@ -118,6 +119,7 @@ def load_and_prepare_data(
         threshold: Gain threshold (e.g., 6.0 for 6%)
         config: Configuration dictionary
         end_date: Optional end date filter (format: "YYYY-MM-DD")
+        trailing_stop_pct: Trailing stop loss percentage (default: 2.0)
 
     Returns:
         Tuple of (X_train, X_test, y_train, y_test, scaler, feature_names, predictor)
@@ -147,12 +149,12 @@ def load_and_prepare_data(
     # Create target variable based on REALISTIC outcomes (OCO trailing stop logic)
     target_col = f"achieved_{threshold}pct"
     if target_col not in merged_df.columns:
-        print(f"\n⚙️  Calculating realistic outcomes with 2% trailing stop...")
+        print(f"\n⚙️  Calculating realistic outcomes with {trailing_stop_pct}% trailing stop...")
 
         import json
         from pathlib import Path
 
-        TRAILING_STOP_PCT = 2.0
+        TRAILING_STOP_PCT = trailing_stop_pct
         realistic_outcomes = []
         json_loaded = 0
         json_missing = 0
@@ -217,6 +219,35 @@ def load_and_prepare_data(
     X_train, X_test, y_train, y_test = predictor.time_based_split(
         merged_df, X, y, test_size=config['data']['test_size']
     )
+
+    # Balanced sampling: Take equal samples from both classes
+    print(f"\n⚙️  Applying balanced sampling to training set...")
+    n_positive = (y_train == 1).sum()
+    n_negative = (y_train == 0).sum()
+    print(f"  - Before balancing: {n_positive} positive, {n_negative} negative ({n_positive/(n_positive+n_negative)*100:.1f}% positive)")
+
+    # Use the minority class size for both classes
+    n_samples_per_class = min(n_positive, n_negative)
+
+    # Get indices for each class
+    positive_indices = y_train[y_train == 1].index
+    negative_indices = y_train[y_train == 0].index
+
+    # Randomly sample equal numbers from each class
+    np.random.seed(42)  # For reproducibility
+    sampled_positive_indices = np.random.choice(positive_indices, size=n_samples_per_class, replace=False)
+    sampled_negative_indices = np.random.choice(negative_indices, size=n_samples_per_class, replace=False)
+
+    # Combine and shuffle
+    balanced_indices = np.concatenate([sampled_positive_indices, sampled_negative_indices])
+    np.random.shuffle(balanced_indices)
+
+    # Apply to training data
+    X_train = X_train.loc[balanced_indices]
+    y_train = y_train.loc[balanced_indices]
+
+    print(f"  - After balancing: {n_samples_per_class} positive, {n_samples_per_class} negative (50.0% positive)")
+    print(f"  - Training set size: {len(y_train)} samples (reduced from {n_positive + n_negative})")
 
     # Scale features
     scaler = StandardScaler()
@@ -488,13 +519,14 @@ def calculate_realistic_profits_and_plot(
     y_pred: np.ndarray,
     threshold: float,
     predictor: SqueezeOutcomePredictor,
-    config: Dict
+    config: Dict,
+    trailing_stop_pct: float = 2.0
 ) -> Path:
     """
     Calculate realistic trading profits using trailing stop logic and generate cumulative profit chart.
 
     This mirrors the logic from predict_squeeze_outcomes.py:
-    - Uses 2% trailing stop loss
+    - Uses configurable trailing stop loss
     - Processes interval data chronologically
     - Compares model predictions vs take-all strategy
 
@@ -505,13 +537,14 @@ def calculate_realistic_profits_and_plot(
         threshold: Gain threshold percentage
         predictor: SqueezeOutcomePredictor instance
         config: Configuration dictionary
+        trailing_stop_pct: Trailing stop loss percentage (default: 2.0)
 
     Returns:
         Path to saved cumulative profit plot
     """
-    print(f"\nCalculating realistic trading profits with trailing stop...")
+    print(f"\nCalculating realistic trading profits with {trailing_stop_pct}% trailing stop...")
 
-    TRAILING_STOP_PCT = 2.0
+    TRAILING_STOP_PCT = trailing_stop_pct
 
     # Load the merged data to get outcome_tracking information
     # We need to reload because X_test doesn't have the raw outcome data
@@ -624,10 +657,12 @@ def initialize_wandb(config: Dict, threshold: float, args) -> wandb.sdk.wandb_ru
         W&B run object
     """
     timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
-    run_name = f"tune-xgb-{threshold}pct-{timestamp}"
+    trailing_stop = args.trailing_stop if hasattr(args, 'trailing_stop') else 2.0
+    run_name = f"tune-xgb-{threshold}pct-stop{trailing_stop}-{timestamp}"
 
     tags = config['wandb']['tags'].copy()
     tags.append(f"{threshold}pct")
+    tags.append(f"stop{trailing_stop}")
 
     run = wandb.init(
         project=config['wandb']['project'],
@@ -635,6 +670,7 @@ def initialize_wandb(config: Dict, threshold: float, args) -> wandb.sdk.wandb_ru
         name=run_name,
         config={
             'threshold': threshold,
+            'trailing_stop_pct': trailing_stop,
             'n_trials': args.trials,
             'cv_folds': args.cv_folds if hasattr(args, 'cv_folds') else config['cross_validation']['n_folds'],
             'optimization_metric': config['optimization']['primary_metric'],
@@ -775,6 +811,7 @@ def objective(
     params = suggest_hyperparameters(trial, config, tree_method)
 
     # Calculate scale_pos_weight for class imbalance
+    # NOTE: With balanced sampling, this will be ~1.0 (50/50 split)
     scale_pos_weight = (y_train == 0).sum() / (y_train == 1).sum()
     params['scale_pos_weight'] = scale_pos_weight
 
@@ -856,6 +893,7 @@ def train_final_model(
     print("\nTraining final model with best parameters...")
 
     # Calculate scale_pos_weight
+    # NOTE: With balanced sampling, this will be ~1.0 (50/50 split)
     scale_pos_weight = (y_train == 0).sum() / (y_train == 1).sum()
     best_params['scale_pos_weight'] = scale_pos_weight
 
@@ -878,7 +916,8 @@ def save_and_log_best_model(
     feature_names: List[str],
     baseline_metrics: Dict,
     config: Dict,
-    cm_plot_path: Optional[Path] = None
+    cm_plot_path: Optional[Path] = None,
+    trailing_stop_pct: float = 2.0
 ):
     """
     Save best model and log as W&B artifact.
@@ -894,20 +933,24 @@ def save_and_log_best_model(
         baseline_metrics: Baseline model metrics for comparison
         config: Configuration dictionary
         cm_plot_path: Path to confusion matrix plot (optional)
+        trailing_stop_pct: Trailing stop loss percentage (default: 2.0)
     """
-    print(f"\nSaving best model for {threshold}% threshold...")
+    print(f"\nSaving best model for {threshold}% threshold with {trailing_stop_pct}% trailing stop...")
 
     # Create output directory
     output_dir = Path("analysis/tuned_models")
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # File naming includes trailing stop for parametric testing
+    model_name = f"xgboost_tuned_{threshold}pct_stop{trailing_stop_pct}"
+
     # Save model
-    model_path = output_dir / f"xgboost_tuned_{threshold}pct.json"
+    model_path = output_dir / f"{model_name}.json"
     model.save_model(model_path)
     print(f"✓ Saved model: {model_path}")
 
     # Save scaler
-    scaler_path = output_dir / f"xgboost_tuned_{threshold}pct_scaler.pkl"
+    scaler_path = output_dir / f"{model_name}_scaler.pkl"
     with open(scaler_path, 'wb') as f:
         pickle.dump(scaler, f)
     print(f"✓ Saved scaler: {scaler_path}")
@@ -915,6 +958,8 @@ def save_and_log_best_model(
     # Save metadata
     info = {
         'threshold': threshold,
+        'gain_threshold': threshold,  # Alias for compatibility with predict_squeeze_outcomes.py
+        'trailing_stop_pct': trailing_stop_pct,
         'study_name': study.study_name,
         'best_trial_number': study.best_trial.number,
         'best_value': study.best_value,
@@ -938,7 +983,7 @@ def save_and_log_best_model(
         }
     }
 
-    info_path = Path(f"analysis/best_params_{threshold}pct.json")
+    info_path = output_dir / f"{model_name}_info.json"
     with open(info_path, 'w') as f:
         json.dump(info, f, indent=2)
     print(f"✓ Saved metadata: {info_path}")
@@ -946,11 +991,12 @@ def save_and_log_best_model(
     # Log as W&B artifact
     try:
         artifact = wandb.Artifact(
-            name=f"xgboost-tuned-{threshold}pct",
+            name=f"xgboost-tuned-{threshold}pct-stop{trailing_stop_pct}",
             type="model",
-            description=f"Best XGBoost model for {threshold}% gain threshold",
+            description=f"Best XGBoost model for {threshold}% gain threshold with {trailing_stop_pct}% trailing stop",
             metadata={
                 'threshold': threshold,
+                'trailing_stop_pct': trailing_stop_pct,
                 'best_f1': test_metrics['f1_score'],
                 'best_params': study.best_params,
             }
@@ -1010,11 +1056,14 @@ def tune_for_threshold(
     try:
         # Load data
         X_train, X_test, y_train, y_test, scaler, feature_names, predictor = load_and_prepare_data(
-            threshold, config, end_date=args.end_date if hasattr(args, 'end_date') else None
+            threshold, config,
+            end_date=args.end_date if hasattr(args, 'end_date') else None,
+            trailing_stop_pct=args.trailing_stop if hasattr(args, 'trailing_stop') else 2.0
         )
 
         # Create or resume Optuna study
-        study_name = args.study_name if hasattr(args, 'study_name') and args.study_name else f"xgb-{threshold}pct-study"
+        trailing_stop = args.trailing_stop if hasattr(args, 'trailing_stop') else 2.0
+        study_name = args.study_name if hasattr(args, 'study_name') and args.study_name else f"xgb-{threshold}pct-stop{trailing_stop}-study"
         storage = config['optuna']['study_storage']
 
         if args.resume and hasattr(args, 'study_name'):
@@ -1081,7 +1130,8 @@ def tune_for_threshold(
 
         # Generate cumulative profit chart with trailing stop logic
         cumulative_profit_path = calculate_realistic_profits_and_plot(
-            X_test, y_test, y_pred, threshold, predictor, config
+            X_test, y_test, y_pred, threshold, predictor, config,
+            trailing_stop_pct=args.trailing_stop if hasattr(args, 'trailing_stop') else 2.0
         )
         print(f"✓ Saved cumulative profit chart: {cumulative_profit_path}")
 
@@ -1101,7 +1151,8 @@ def tune_for_threshold(
         save_and_log_best_model(
             final_model, study, final_metrics, cv_results,
             threshold, scaler, feature_names, baseline_metrics, config,
-            cm_plot_path=cm_plot_path
+            cm_plot_path=cm_plot_path,
+            trailing_stop_pct=args.trailing_stop if hasattr(args, 'trailing_stop') else 2.0
         )
 
         # Finish W&B run
@@ -1138,11 +1189,14 @@ Examples (run from project root):
   # Train model for single threshold
   python analysis/tune_models.py train --threshold 6.0 --trials 100
 
-  # Train with custom end date
-  python analysis/tune_models.py train --threshold 6.0 --trials 100 --end-date 2025-12-20
+  # Train with custom trailing stop
+  python analysis/tune_models.py train --threshold 6.0 --trials 100 --trailing-stop 3.0
 
-  # Train all thresholds
+  # Train all thresholds with default 2% trailing stop
   python analysis/tune_models.py train --all-thresholds --trials 50
+
+  # Parametric testing: train all thresholds with 1% trailing stop
+  python analysis/tune_models.py train --all-thresholds --trials 50 --trailing-stop 1.0
         """
     )
 
@@ -1194,6 +1248,10 @@ Examples (run from project root):
     train_parser.add_argument(
         '--end-date', type=str, default='2025-12-22',
         help='Training data cutoff date (YYYY-MM-DD). Data after this date is reserved for prediction/testing. Default: 2025-12-22'
+    )
+    train_parser.add_argument(
+        '--trailing-stop', type=float, default=2.0,
+        help='Trailing stop loss percentage (e.g., 2.0 for -2%%). Default: 2.0'
     )
 
     return parser.parse_args()
