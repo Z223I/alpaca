@@ -71,6 +71,14 @@ from atoms_analysis.plotting import generate_aligned_cumulative_profit_plot
 
 
 # =============================================================================
+# Constants
+# =============================================================================
+
+# Training data start date
+TRAINING_START_DATE = "2025-12-15"
+
+
+# =============================================================================
 # GPU Detection
 # =============================================================================
 
@@ -111,7 +119,7 @@ def load_and_prepare_data(
     config: Dict,
     end_date: Optional[str] = None,
     trailing_stop_pct: float = 2.0
-) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, StandardScaler, List[str], SqueezeOutcomePredictor]:
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, StandardScaler, List[str], SqueezeOutcomePredictor, Optional[Dict]]:
     """
     Load and prepare data using existing SqueezeOutcomePredictor pipeline.
 
@@ -122,7 +130,8 @@ def load_and_prepare_data(
         trailing_stop_pct: Trailing stop loss percentage (default: 2.0)
 
     Returns:
-        Tuple of (X_train, X_test, y_train, y_test, scaler, feature_names, predictor)
+        Tuple of (X_train, X_test, y_train, y_test, scaler, feature_names, predictor, category_stats)
+        where category_stats is a dict with trade outcome category statistics (or None if not calculated)
     """
     print("\n" + "="*80)
     print(f"LOADING DATA FOR {threshold}% THRESHOLD")
@@ -137,7 +146,7 @@ def load_and_prepare_data(
     # Extract outcomes
     outcomes_df = predictor.extract_outcomes(
         gain_threshold=threshold,
-        start_date="2025-12-12",
+        start_date=TRAINING_START_DATE,
         end_date=end_date
     )
     print(f"✓ Extracted outcomes: {len(outcomes_df)} alerts")
@@ -148,6 +157,7 @@ def load_and_prepare_data(
 
     # Create target variable based on REALISTIC outcomes (OCO trailing stop logic)
     target_col = f"achieved_{threshold}pct"
+    category_stats = None  # Initialize category statistics
     if target_col not in merged_df.columns:
         print(f"\n⚙️  Calculating realistic outcomes with {trailing_stop_pct}% trailing stop...")
 
@@ -156,6 +166,7 @@ def load_and_prepare_data(
 
         TRAILING_STOP_PCT = trailing_stop_pct
         realistic_outcomes = []
+        outcome_reasons = []  # Track reasons for analysis
         json_loaded = 0
         json_missing = 0
 
@@ -190,13 +201,16 @@ def load_and_prepare_data(
                     # Using >= 0 means any profit counts as success
                     # Using >= threshold means we need to actually hit the target
                     realistic_outcomes.append(1 if gain >= threshold else 0)
+                    outcome_reasons.append(reason)
                 else:
                     json_missing += 1
                     # Fallback to max_gain if no interval data
                     realistic_outcomes.append(1 if row.get('max_gain_percent', 0) >= threshold else 0)
+                    outcome_reasons.append('fallback_max_gain')
             except Exception as e:
                 # Fallback on error
                 realistic_outcomes.append(1 if row.get('max_gain_percent', 0) >= threshold else 0)
+                outcome_reasons.append('fallback_error')
 
         merged_df[target_col] = realistic_outcomes
 
@@ -209,6 +223,43 @@ def load_and_prepare_data(
         old_labels = (merged_df['max_gain_percent'] >= threshold).astype(int)
         print(f"  - Achieved (max_gain): {sum(old_labels)} ({sum(old_labels)/len(old_labels)*100:.1f}%)")
         print(f"  - Label difference: {abs(sum(old_labels) - sum(realistic_outcomes))} samples ({abs(sum(old_labels) - sum(realistic_outcomes))/len(old_labels)*100:.1f}%)")
+
+        # Categorize outcome reasons
+        print(f"\n📊 Trade Outcome Categories (OCO Bracket Order Logic):")
+        total_trades = len(outcome_reasons)
+
+        # Category 1: Target hit first
+        target_hit_first = sum(1 for r in outcome_reasons if 'target_hit_first' in r or 'target_hit_at' in r or 'snapshot_target' in r or 'final_target' in r or 'legacy_target' in r)
+
+        # Category 2: Stop hit first
+        stop_hit_first = sum(1 for r in outcome_reasons if 'stop_hit_first' in r or ('stop' in r and 'target' not in r and 'fallback' not in r))
+
+        # Category 3: Both hit (OCO decision made via timestamps)
+        both_hit = sum(1 for r in outcome_reasons if 'target_hit_first' in r or 'stop_hit_first' in r)
+
+        # Category 4: Neither hit (ended without trigger)
+        neither_hit = sum(1 for r in outcome_reasons if 'final_no_target' in r or 'legacy_no_target' in r)
+
+        # Fallback cases
+        fallback_cases = sum(1 for r in outcome_reasons if 'fallback' in r)
+
+        print(f"  1️⃣  Target Hit First (Label=1):      {target_hit_first:4d} ({target_hit_first/total_trades*100:5.1f}%)")
+        print(f"  2️⃣  Stop Hit First (Label=0):        {stop_hit_first:4d} ({stop_hit_first/total_trades*100:5.1f}%)")
+        print(f"  3️⃣  Both Hit (OCO timestamp logic):  {both_hit:4d} ({both_hit/total_trades*100:5.1f}%)")
+        print(f"  4️⃣  Neither Hit (final gain check):  {neither_hit:4d} ({neither_hit/total_trades*100:5.1f}%)")
+        print(f"  📋 Fallback (no interval data):     {fallback_cases:4d} ({fallback_cases/total_trades*100:5.1f}%)")
+        print(f"  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print(f"  📈 Total:                            {total_trades:4d} (100.0%)")
+
+        # Store category statistics for saving to file
+        category_stats = {
+            'total_trades': total_trades,
+            'target_hit_first': {'count': target_hit_first, 'percentage': target_hit_first/total_trades*100},
+            'stop_hit_first': {'count': stop_hit_first, 'percentage': stop_hit_first/total_trades*100},
+            'both_hit_oco_decision': {'count': both_hit, 'percentage': both_hit/total_trades*100},
+            'neither_hit': {'count': neither_hit, 'percentage': neither_hit/total_trades*100},
+            'fallback_no_interval_data': {'count': fallback_cases, 'percentage': fallback_cases/total_trades*100},
+        }
 
     # Prepare features (handle missing data, encode categoricals)
     X, y = predictor.prepare_features(merged_df, target_variable=target_col)
@@ -262,7 +313,7 @@ def load_and_prepare_data(
         index=X_test.index
     )
 
-    return X_train_scaled, X_test_scaled, y_train, y_test, scaler, feature_names, predictor
+    return X_train_scaled, X_test_scaled, y_train, y_test, scaler, feature_names, predictor, category_stats
 
 
 # =============================================================================
@@ -554,7 +605,7 @@ def calculate_realistic_profits_and_plot(
     # Re-extract outcomes to get the full dataframe
     outcomes_df = predictor.extract_outcomes(
         gain_threshold=threshold,
-        start_date="2025-12-12",
+        start_date=TRAINING_START_DATE,
         end_date=config.get('end_date')
     )
 
@@ -917,7 +968,8 @@ def save_and_log_best_model(
     baseline_metrics: Dict,
     config: Dict,
     cm_plot_path: Optional[Path] = None,
-    trailing_stop_pct: float = 2.0
+    trailing_stop_pct: float = 2.0,
+    category_stats: Optional[Dict] = None
 ):
     """
     Save best model and log as W&B artifact.
@@ -934,6 +986,7 @@ def save_and_log_best_model(
         config: Configuration dictionary
         cm_plot_path: Path to confusion matrix plot (optional)
         trailing_stop_pct: Trailing stop loss percentage (default: 2.0)
+        category_stats: Trade outcome category statistics (optional)
     """
     print(f"\nSaving best model for {threshold}% threshold with {trailing_stop_pct}% trailing stop...")
 
@@ -980,7 +1033,8 @@ def save_and_log_best_model(
             'pruned_trials': len([t for t in study.trials if t.state == TrialState.PRUNED]),
             'timestamp': datetime.now().isoformat(),
             'gpu_used': 'gpu_hist' in str(study.best_params.get('tree_method', '')),
-        }
+        },
+        'outcome_categories': category_stats if category_stats else None
     }
 
     info_path = output_dir / f"{model_name}_info.json"
@@ -1055,7 +1109,7 @@ def tune_for_threshold(
 
     try:
         # Load data
-        X_train, X_test, y_train, y_test, scaler, feature_names, predictor = load_and_prepare_data(
+        X_train, X_test, y_train, y_test, scaler, feature_names, predictor, category_stats = load_and_prepare_data(
             threshold, config,
             end_date=args.end_date if hasattr(args, 'end_date') else None,
             trailing_stop_pct=args.trailing_stop if hasattr(args, 'trailing_stop') else 2.0
@@ -1152,7 +1206,8 @@ def tune_for_threshold(
             final_model, study, final_metrics, cv_results,
             threshold, scaler, feature_names, baseline_metrics, config,
             cm_plot_path=cm_plot_path,
-            trailing_stop_pct=args.trailing_stop if hasattr(args, 'trailing_stop') else 2.0
+            trailing_stop_pct=args.trailing_stop if hasattr(args, 'trailing_stop') else 2.0,
+            category_stats=category_stats
         )
 
         # Finish W&B run
