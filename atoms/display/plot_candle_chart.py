@@ -307,6 +307,8 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
                     color = 'blue'  # Blue color for momentum alerts (distinct from superduper alerts)
                 elif alert_type == 'vwap_bounce':
                     color = 'cyan'  # Cyan color for VWAP bounce alerts (different from momentum)
+                elif alert_type == 'squeeze' or alert_level == 'squeeze':
+                    color = 'magenta'  # Magenta color for squeeze alerts
                 else:
                     # For superduper alerts, use MACD score if available, otherwise fall back to alert level
                     macd_score = alert.get('macd_score', None)
@@ -362,6 +364,8 @@ def plot_candle_chart(df: pd.DataFrame, symbol: str, output_dir: str = 'plots', 
                     alert_symbol = 'V'  # V for VWAP bounce
                 elif alert_type == 'momentum_bullish':
                     alert_symbol = 'M'  # M for momentum alerts
+                elif alert_type == 'squeeze':
+                    alert_symbol = 'S'  # S for squeeze alerts
                 else:
                     alert_symbol = '↑' if alert_type == 'bullish' else '↓'
 

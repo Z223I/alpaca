@@ -85,9 +85,13 @@ def find_all_model_infos() -> List[Tuple[float, float, Dict]]:
             threshold_str = [p for p in parts if 'pct' in p and 'stop' not in p][0]
             threshold = float(threshold_str.replace('pct', ''))
 
-            # Extract trailing stop
-            stop_str = [p for p in parts if 'stop' in p][0]
-            trailing_stop = float(stop_str.replace('stop', ''))
+            # Extract trailing stop (skip files without stop parameter - old format)
+            stop_parts = [p for p in parts if 'stop' in p]
+            if not stop_parts:
+                # Old format without stop parameter - skip this file
+                continue
+
+            trailing_stop = float(stop_parts[0].replace('stop', ''))
 
             with open(info_file, 'r') as f:
                 info = json.load(f)
@@ -430,20 +434,20 @@ def plot_detailed_breakdown(
 
     OUTCOME BREAKDOWN:
 
-    ✅ Target Hit First: {success:,} ({success/category_stats['total_trades']*100:.1f}%)
-       → Successful trades that reached target
+    [+] Target Hit First: {success:,} ({success/category_stats['total_trades']*100:.1f}%)
+        -> Successful trades that reached target
 
-    ❌ Stop Hit First: {failure:,} ({failure/category_stats['total_trades']*100:.1f}%)
-       → Trades stopped out before target
+    [-] Stop Hit First: {failure:,} ({failure/category_stats['total_trades']*100:.1f}%)
+        -> Trades stopped out before target
 
-    ⚖️  Both Hit (OCO): {category_stats['both_hit_oco_decision']['count']:,} ({category_stats['both_hit_oco_decision']['percentage']:.1f}%)
-       → Timestamp-based decision
+    [*] Both Hit (OCO): {category_stats['both_hit_oco_decision']['count']:,} ({category_stats['both_hit_oco_decision']['percentage']:.1f}%)
+        -> Timestamp-based decision
 
-    ⏸️  Neither Hit: {category_stats['neither_hit']['count']:,} ({category_stats['neither_hit']['percentage']:.1f}%)
-       → Ended without trigger
+    [=] Neither Hit: {category_stats['neither_hit']['count']:,} ({category_stats['neither_hit']['percentage']:.1f}%)
+        -> Ended without trigger
 
-    📋 Fallback: {category_stats['fallback_no_interval_data']['count']:,} ({category_stats['fallback_no_interval_data']['percentage']:.1f}%)
-       → No interval data available
+    [ ] Fallback: {category_stats['fallback_no_interval_data']['count']:,} ({category_stats['fallback_no_interval_data']['percentage']:.1f}%)
+        -> No interval data available
     """
     ax4.text(0.1, 0.9, summary_text, transform=ax4.transAxes,
              fontsize=10, verticalalignment='top', fontfamily='monospace',
