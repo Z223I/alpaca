@@ -673,34 +673,46 @@ class AlpacaScreener:
             if not filename.startswith(directory):
                 filename = os.path.join(directory, os.path.basename(filename))
 
-        with open(filename, 'w', newline='') as csvfile:
-            fieldnames = [
-                'symbol', 'price', 'volume', 'percent_change', 'dollar_volume',
-                'day_range', 'timestamp', 'trades', 'avg_volume_5d', 'avg_range_5d',
-                'volume_surge_detected', 'volume_surge_ratio'
-            ]
+        # Create timestamped filename for archival purposes
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
+        base_filename = os.path.basename(filename)
+        base_name, ext = os.path.splitext(base_filename)
+        timestamped_filename = os.path.join(
+            os.path.dirname(filename),
+            f"{base_name}_{timestamp}{ext}"
+        )
 
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
+        # Write to both files
+        for output_filename in [filename, timestamped_filename]:
+            with open(output_filename, 'w', newline='') as csvfile:
+                fieldnames = [
+                    'symbol', 'price', 'volume', 'percent_change', 'dollar_volume',
+                    'day_range', 'timestamp', 'trades', 'avg_volume_5d', 'avg_range_5d',
+                    'volume_surge_detected', 'volume_surge_ratio'
+                ]
 
-            for result in results:
-                row = {
-                    'symbol': result.symbol,
-                    'price': result.price,
-                    'volume': result.volume,
-                    'percent_change': result.percent_change,
-                    'dollar_volume': result.dollar_volume,
-                    'day_range': result.day_range,
-                    'timestamp': result.timestamp.isoformat(),
-                    'trades': result.trades,
-                    'avg_volume_5d': result.avg_volume_5d,
-                    'avg_range_5d': result.avg_range_5d,
-                    'volume_surge_detected': result.volume_surge_detected,
-                    'volume_surge_ratio': result.volume_surge_ratio
-                }
-                writer.writerow(row)
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+
+                for result in results:
+                    row = {
+                        'symbol': result.symbol,
+                        'price': result.price,
+                        'volume': result.volume,
+                        'percent_change': result.percent_change,
+                        'dollar_volume': result.dollar_volume,
+                        'day_range': result.day_range,
+                        'timestamp': result.timestamp.isoformat(),
+                        'trades': result.trades,
+                        'avg_volume_5d': result.avg_volume_5d,
+                        'avg_range_5d': result.avg_range_5d,
+                        'volume_surge_detected': result.volume_surge_detected,
+                        'volume_surge_ratio': result.volume_surge_ratio
+                    }
+                    writer.writerow(row)
 
         print(f"Results exported to {filename}")
+        print(f"Timestamped copy saved to {timestamped_filename}")
 
     def export_to_json(self, results: List[StockResult], filename: str, criteria: ScreeningCriteria):
         """Export screening results to JSON file with metadata."""
