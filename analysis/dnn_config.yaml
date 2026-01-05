@@ -1,0 +1,163 @@
+# Deep Neural Network Training Configuration
+# Configuration for W&B Sweeps hyperparameter optimization
+
+# Data configuration
+data:
+  json_dir: "/home/wilsonb/dl/github.com/Z223I/alpaca/historical_data"
+  features_csv: "analysis/squeeze_alerts_independent_features.csv"
+  train_end_date: "2025-12-22"  # Data cutoff for training
+  test_size: 0.20
+  random_seed: 42
+
+# Training configuration
+training:
+  epochs: 100
+  batch_size: 32
+  early_stopping_patience: 20
+  reduce_lr_patience: 10
+  validation_split: 0.0  # We use separate test set
+
+# DNN architecture hyperparameters (default values)
+dnn_hyperparameters:
+  # Number of hidden layers (1-4)
+  n_layers: 3
+
+  # Units per layer
+  units_layer1: 128
+  units_layer2: 64
+  units_layer3: 32
+  units_layer4: 16
+
+  # Regularization
+  dropout_rate: 0.3
+  l2_regularization: 0.001
+
+  # Optimization
+  learning_rate: 0.001
+
+  # Activation function
+  activation: "relu"  # relu, elu, selu, tanh
+
+  # Batch normalization
+  use_batch_norm: true
+
+# W&B Sweeps search space
+dnn_search_space:
+  # Architecture parameters
+  n_layers:
+    type: "int"
+    min: 2
+    max: 4
+    description: "Number of hidden layers"
+
+  units_layer1:
+    type: "categorical"
+    values: [64, 128, 256, 512]
+    description: "Units in first hidden layer"
+
+  units_layer2:
+    type: "categorical"
+    values: [32, 64, 128, 256]
+    description: "Units in second hidden layer"
+
+  units_layer3:
+    type: "categorical"
+    values: [16, 32, 64, 128]
+    description: "Units in third hidden layer"
+
+  units_layer4:
+    type: "categorical"
+    values: [8, 16, 32, 64]
+    description: "Units in fourth hidden layer"
+
+  # Regularization parameters
+  dropout_rate:
+    type: "float"
+    min: 0.1
+    max: 0.5
+    description: "Dropout rate for regularization"
+
+  l2_regularization:
+    type: "log_uniform"
+    min: 0.00001
+    max: 0.01
+    description: "L2 regularization strength"
+
+  # Optimization parameters
+  learning_rate:
+    type: "log_uniform"
+    min: 0.0001
+    max: 0.01
+    description: "Initial learning rate"
+
+  batch_size:
+    type: "categorical"
+    values: [16, 32, 64, 128]
+    description: "Training batch size"
+
+  # Activation function
+  activation:
+    type: "categorical"
+    values: ["relu", "elu", "selu"]
+    description: "Activation function for hidden layers"
+
+  # Batch normalization
+  use_batch_norm:
+    type: "categorical"
+    values: [true, false]
+    description: "Whether to use batch normalization"
+
+  # Early stopping
+  early_stopping_patience:
+    type: "int"
+    min: 10
+    max: 30
+    description: "Patience for early stopping"
+
+  # Epochs
+  epochs:
+    type: "int"
+    min: 50
+    max: 200
+    description: "Maximum number of epochs"
+
+# W&B Sweeps configuration
+wandb_sweep:
+  method: "bayes"  # bayes, grid, random
+  metric: "f1_score"  # Metric to optimize
+  goal: "maximize"  # maximize or minimize
+
+  # Early termination (Hyperband)
+  early_terminate: true
+  early_terminate_config:
+    type: "hyperband"
+    min_iter: 10  # Minimum iterations before early termination
+
+# Weights & Biases configuration
+wandb:
+  project: "alpaca-squeeze-prediction"
+  entity: null  # Will use default W&B username
+  mode: "online"  # "online", "offline", or "disabled"
+  save_code: true
+  tags:
+    - "dnn"
+    - "deep-learning"
+    - "tensorflow"
+    - "keras"
+    - "wandb-sweep"
+
+# GPU configuration
+gpu:
+  enabled: true  # Auto-detect if true
+  memory_growth: true  # Enable memory growth to prevent TF from allocating all GPU memory
+
+# Baseline model parameters (for comparison)
+baseline:
+  n_layers: 3
+  units_layer1: 128
+  units_layer2: 64
+  units_layer3: 32
+  dropout_rate: 0.3
+  learning_rate: 0.001
+  batch_size: 32
+  epochs: 100
