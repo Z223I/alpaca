@@ -42,6 +42,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Union
+from zoneinfo import ZoneInfo
 import pandas as pd
 import alpaca_trade_api as tradeapi
 
@@ -169,8 +170,7 @@ class AlpacaScreener:
         if len(self.call_times) >= self.rate_limit_calls_per_minute:
             sleep_time = 60 - (current_time - self.call_times[0])
             if sleep_time > 0:
-                if self.verbose:
-                    print(f"Rate limiting: sleeping for {sleep_time:.2f} seconds")
+                # Rate limiting is working in the background - no need to spam verbose output
                 time.sleep(sleep_time)
 
         self.call_times.append(current_time)
@@ -374,7 +374,74 @@ class AlpacaScreener:
 
         return stock_data
 
-    def detect_volume_surge(self, symbol: str, stock_data: Dict, n_multiplier: float, m_days: int) -> VolumeSurge:
+    def get_intraday_volume(self, symbol: str, target_date: Optional[datetime] = None, feed: str = 'sip') -> Dict:
+        """
+        Fetch intraday (hourly) bars for a symbol and aggregate volume.
+
+        Args:
+            symbol: Stock ticker symbol
+            target_date: Date to fetch intraday data for (defaults to today)
+            feed: Data feed to use ('iex', 'sip', 'boats')
+
+        Returns:
+            Dictionary with 'total_volume', 'bar_count', and 'bars' keys
+        """
+        if target_date is None:
+            target_date = datetime.now()
+
+        try:
+            # Get start and end of target date
+            start_dt = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_dt = target_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+            # Format for Alpaca API
+            start_str = start_dt.strftime('%Y-%m-%d')
+            end_str = end_dt.strftime('%Y-%m-%d')
+
+            self._rate_limit_check()
+
+            # Fetch hourly bars for the day
+            bars = self.client.get_bars(
+                symbol,
+                tradeapi.TimeFrame.Hour,
+                start=start_str,
+                end=end_str,
+                feed=feed
+            )
+
+            if not bars or len(bars) == 0:
+                return {'total_volume': 0, 'bar_count': 0, 'bars': []}
+
+            # Aggregate volume from all hourly bars
+            total_volume = 0
+            bar_data = []
+
+            for bar in bars:
+                volume = int(bar.v)
+                total_volume += volume
+                bar_data.append({
+                    'timestamp': bar.t,
+                    'volume': volume,
+                    'close': float(bar.c),
+                    'high': float(bar.h),
+                    'low': float(bar.l),
+                    'open': float(bar.o)
+                })
+
+            return {
+                'total_volume': total_volume,
+                'bar_count': len(bar_data),
+                'bars': bar_data,
+                'date': target_date.date()
+            }
+
+        except Exception as e:
+            if self.verbose:
+                print(f"Error fetching intraday volume for {symbol}: {e}")
+            return {'total_volume': 0, 'bar_count': 0, 'bars': []}
+
+    def detect_volume_surge(self, symbol: str, stock_data: Dict, n_multiplier: float, m_days: int,
+                           current_volume: Optional[int] = None) -> VolumeSurge:
         """
         Detect if current volume is N times higher than M-day average.
 
@@ -383,6 +450,7 @@ class AlpacaScreener:
             stock_data: Historical stock data for the symbol
             n_multiplier: Volume multiplier threshold (e.g., 2.0 for 2x volume)
             m_days: Lookback period for average calculation
+            current_volume: Optional override for current volume (e.g., from intraday data)
 
         Returns:
             VolumeSurge object with analysis results
@@ -392,7 +460,9 @@ class AlpacaScreener:
             if len(bars) < 2:
                 return VolumeSurge(symbol, 0, 0, 0, False, 0)
 
-            current_volume = bars.iloc[-1]['volume']
+            # Use provided current_volume if available, otherwise use last bar's volume
+            if current_volume is None:
+                current_volume = bars.iloc[-1]['volume']
 
             # Calculate average volume over m_days (excluding current day)
             historical_bars = bars.iloc[:-1]
@@ -461,12 +531,40 @@ class AlpacaScreener:
                 current_bar = data['current_bar']
                 bars = data['bars']
 
-                # Extract current metrics
+                # Check if last bar is from today or within 1 trading day
+                last_bar_date = pd.to_datetime(current_bar.name).date()
+                today = datetime.now().date()
+                days_old = (today - last_bar_date).days
+
+                # Flag to track if we're using intraday volume
+                using_intraday_volume = False
+                intraday_bar_count = 0
+
+                # Skip if data is more than 4 days old (allows for weekends/holidays)
+                # Example: Monday (today) - Friday (last bar) = 3 days, which is acceptable
+                # But data older than 4 days indicates stale/illiquid stock
+                if days_old > 4:
+                    if self.verbose:
+                        print(f"Skipping {symbol}: Last bar is {days_old} days old ({last_bar_date})")
+                    continue
+
+                # Extract current metrics from daily bar
                 price = float(current_bar['close'])
                 volume = int(current_bar['volume'])
                 high = float(current_bar['high'])
                 low = float(current_bar['low'])
                 day_range = high - low
+
+                # If last bar is not from today, fetch intraday volume for today
+                if days_old > 0:
+                    intraday_data = self.get_intraday_volume(symbol, datetime.now(), criteria.feed)
+                    if intraday_data['total_volume'] > 0:
+                        volume = intraday_data['total_volume']
+                        intraday_bar_count = intraday_data['bar_count']
+                        using_intraday_volume = True
+                        if self.verbose:
+                            print(f"{symbol}: Using intraday volume {volume:,} from {intraday_bar_count} hourly bars "
+                                  f"(last daily bar: {last_bar_date}, {days_old} days old)")
 
                 # Calculate percent change (current vs previous close)
                 if len(bars) >= 2:
@@ -511,10 +609,16 @@ class AlpacaScreener:
                 volume_surge_ratio = None
                 if criteria.volume_surge_multiplier and criteria.volume_surge_days:
                     surge = self.detect_volume_surge(
-                        symbol, data, criteria.volume_surge_multiplier, criteria.volume_surge_days
+                        symbol, data, criteria.volume_surge_multiplier, criteria.volume_surge_days,
+                        current_volume=volume  # Pass the volume (may be intraday or daily)
                     )
                     volume_surge_detected = surge.detected
                     volume_surge_ratio = surge.surge_ratio if surge.surge_ratio > 0 else None
+
+                    if self.verbose and volume_surge_detected:
+                        volume_source = "intraday" if using_intraday_volume else "daily"
+                        print(f"{symbol}: Volume surge detected! {volume_surge_ratio:.2f}x avg "
+                              f"(current: {volume:,} {volume_source}, avg: {surge.avg_volume:,.0f})")
 
                 # Calculate SMA values if requested
                 sma_values = {}
@@ -665,16 +769,17 @@ class AlpacaScreener:
 
         # Auto-create directory structure for historical_data/YYYY-MM-DD/{subdirectory}/
         # Use volume_surge for relative_volume files, scanner for symbol_list files
+        et_tz = ZoneInfo("America/New_York")
         if not filename.startswith('/'):
-            today = datetime.now().strftime('%Y-%m-%d')
+            today = datetime.now(et_tz).strftime('%Y-%m-%d')
             subdirectory = "volume_surge" if "relative_volume" in filename else "scanner"
             directory = f"./historical_data/{today}/{subdirectory}"
             os.makedirs(directory, exist_ok=True)
             if not filename.startswith(directory):
                 filename = os.path.join(directory, os.path.basename(filename))
 
-        # Create timestamped filename for archival purposes
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
+        # Create timestamped filename for archival purposes (in ET)
+        timestamp = datetime.now(et_tz).strftime('%Y-%m-%d_%H%M%S')
         base_filename = os.path.basename(filename)
         base_name, ext = os.path.splitext(base_filename)
         timestamped_filename = os.path.join(
@@ -722,8 +827,9 @@ class AlpacaScreener:
 
         # Auto-create directory structure for historical_data/YYYY-MM-DD/{subdirectory}/
         # Use volume_surge for relative_volume files, scanner for symbol_list files
+        et_tz = ZoneInfo("America/New_York")
         if not filename.startswith('/'):
-            today = datetime.now().strftime('%Y-%m-%d')
+            today = datetime.now(et_tz).strftime('%Y-%m-%d')
             subdirectory = "volume_surge" if "relative_volume" in filename else "scanner"
             directory = f"./historical_data/{today}/{subdirectory}"
             os.makedirs(directory, exist_ok=True)
@@ -732,7 +838,7 @@ class AlpacaScreener:
 
         export_data = {
             "scan_metadata": {
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(et_tz).isoformat(),
                 "total_symbols_scanned": criteria.max_symbols,
                 "results_count": len(results),
                 "account": self.account,
@@ -845,7 +951,8 @@ def print_results(results: List[StockResult], criteria: ScreeningCriteria):
 
     print("\nAlpaca Stock Screener Results")
     print("=" * 80)
-    print(f"Scan completed at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    et_tz = ZoneInfo("America/New_York")
+    print(f"Scan completed at: {datetime.now(et_tz).strftime('%Y-%m-%d %H:%M:%S')} ET")
     print(f"Results found: {len(results)} stocks")
     print()
 
