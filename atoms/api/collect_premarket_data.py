@@ -122,7 +122,15 @@ def collect_premarket_data(
                             failed_symbols.append(symbol)
 
                 except Exception as symbol_error:
-                    if verbose:
+                    error_message = str(symbol_error)
+                    # Suppress specific error messages
+                    should_suppress = (
+                        "Period 'max' is invalid" in error_message or
+                        "possibly delisted" in error_message or
+                        "Period" in error_message
+                    )
+
+                    if verbose and not should_suppress:
                         print(f"Error fetching data for {symbol}: {symbol_error}")
 
                     # Track failed symbols for retry
@@ -194,7 +202,15 @@ def collect_premarket_data(
                         retry_failed.append(symbol)
 
                 except Exception as retry_error:
-                    if verbose:
+                    error_message = str(retry_error)
+                    # Suppress specific error messages
+                    should_suppress = (
+                        "Period 'max' is invalid" in error_message or
+                        "possibly delisted" in error_message or
+                        "Period" in error_message
+                    )
+
+                    if verbose and not should_suppress:
                         print(f"Retry failed for {symbol}: {retry_error}")
                     retry_failed.append(symbol)
 

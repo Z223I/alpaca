@@ -165,6 +165,19 @@ class PremarketTopGainersScanner:
         """
         return len(symbol) == 5 and symbol.endswith('W')
 
+    def should_skip_symbol(self, symbol: str) -> bool:
+        """
+        Check if a symbol should be skipped entirely (no data fetching).
+        Filters out symbols that start with "$" or end in ".WS".
+
+        Args:
+            symbol: Stock ticker symbol
+
+        Returns:
+            True if symbol should be skipped, False otherwise
+        """
+        return symbol.startswith('$') or symbol.endswith('.WS')
+
     def has_recent_reverse_split(self, symbol: str, days: int = 2) -> bool:
         """
         Check if a symbol has had a reverse split in the last N days using yfinance.
@@ -255,11 +268,16 @@ class PremarketTopGainersScanner:
                 most_actives = self.client.get_most_actives(by='volume', top=min(max_symbols, 1000))
                 symbols = []
                 warrants_filtered = 0
+                skipped_symbols = 0
 
                 for stock in most_actives:
                     # Filter out warrants
                     if self.is_warrant(stock.symbol):
                         warrants_filtered += 1
+                        continue
+                    # Filter out problematic symbols
+                    if self.should_skip_symbol(stock.symbol):
+                        skipped_symbols += 1
                         continue
                     symbols.append(stock.symbol)
 
@@ -267,6 +285,8 @@ class PremarketTopGainersScanner:
                     print(f"Found {len(symbols)} active symbols for premarket scanning")
                     if warrants_filtered > 0:
                         print(f"Filtered out {warrants_filtered} warrants")
+                    if skipped_symbols > 0:
+                        print(f"Filtered out {skipped_symbols} symbols (starting with $ or ending in .WS)")
 
                 return symbols
             else:
@@ -314,6 +334,7 @@ class PremarketTopGainersScanner:
             assets = self.client.list_assets(status='active', asset_class='us_equity')
             filtered_symbols = []
             warrants_filtered = 0
+            skipped_symbols = 0
 
             for asset in assets:
                 if (asset.exchange.upper() in exchanges_upper and
@@ -324,6 +345,11 @@ class PremarketTopGainersScanner:
                         warrants_filtered += 1
                         continue
 
+                    # Filter out problematic symbols
+                    if self.should_skip_symbol(asset.symbol):
+                        skipped_symbols += 1
+                        continue
+
                     filtered_symbols.append(asset.symbol)
                     if len(filtered_symbols) >= max_symbols:
                         break
@@ -332,6 +358,8 @@ class PremarketTopGainersScanner:
                 print(f"Found {len(filtered_symbols)} symbols from exchanges")
                 if warrants_filtered > 0:
                     print(f"Filtered out {warrants_filtered} warrants")
+                if skipped_symbols > 0:
+                    print(f"Filtered out {skipped_symbols} symbols (starting with $ or ending in .WS)")
 
             return filtered_symbols
 
@@ -543,14 +571,20 @@ class PremarketTopGainersScanner:
 
         # Get symbols to analyze
         if criteria.specific_symbols:
-            # Filter out warrants from specific symbols
+            # Filter out warrants and problematic symbols from specific symbols
             symbols = []
             warrants_filtered = 0
+            skipped_symbols = 0
             for symbol in criteria.specific_symbols:
                 if self.is_warrant(symbol):
                     warrants_filtered += 1
                     if self.verbose:
                         print(f"Filtering out warrant: {symbol}")
+                    continue
+                if self.should_skip_symbol(symbol):
+                    skipped_symbols += 1
+                    if self.verbose:
+                        print(f"Filtering out symbol: {symbol} (starts with $ or ends in .WS)")
                     continue
                 symbols.append(symbol)
 
@@ -558,6 +592,8 @@ class PremarketTopGainersScanner:
                 print(f"Analyzing {len(symbols)} specific symbols: {', '.join(symbols)}")
                 if warrants_filtered > 0:
                     print(f"Filtered out {warrants_filtered} warrants from specific symbols")
+                if skipped_symbols > 0:
+                    print(f"Filtered out {skipped_symbols} symbols (starting with $ or ending in .WS)")
         else:
             symbols = self.get_active_symbols(criteria.max_symbols, criteria.exchanges)
 
