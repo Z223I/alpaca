@@ -134,6 +134,9 @@ class StockResult:
 class AlpacaScreener:
     """Main stock screener class with volume surge detection capabilities."""
 
+    # Feature flag to control intraday candlestick usage for volume surge detection
+    USE_INTRADAY_CANDLES = False
+
     def __init__(self, provider: str = "alpaca", account: str = "Bruce", environment: str = "paper",
                  verbose: bool = False):
         """
@@ -555,8 +558,8 @@ class AlpacaScreener:
                 low = float(current_bar['low'])
                 day_range = high - low
 
-                # If last bar is not from today, fetch intraday volume for today
-                if days_old > 0:
+                # If last bar is not from today, fetch intraday volume for today (if enabled)
+                if self.USE_INTRADAY_CANDLES and days_old > 0:
                     intraday_data = self.get_intraday_volume(symbol, datetime.now(), criteria.feed)
                     if intraday_data['total_volume'] > 0:
                         volume = intraday_data['total_volume']

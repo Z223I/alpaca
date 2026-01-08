@@ -87,9 +87,9 @@ def detect_gpu() -> Tuple[bool, str]:
     Detect if NVIDIA GPU is available for XGBoost training.
 
     Returns:
-        Tuple of (has_gpu: bool, tree_method: str)
+        Tuple of (has_gpu: bool, device: str)
         - has_gpu: True if GPU detected
-        - tree_method: "gpu_hist" if GPU available, "hist" otherwise
+        - device: "cuda" if GPU available, "cpu" otherwise
     """
     try:
         result = subprocess.run(
@@ -101,13 +101,13 @@ def detect_gpu() -> Tuple[bool, str]:
         if result.returncode == 0 and result.stdout.strip():
             gpu_name = result.stdout.strip()
             print(f"✓ GPU detected: {gpu_name}")
-            print(f"  Using tree_method='gpu_hist' for GPU acceleration")
-            return True, "gpu_hist"
+            print(f"  Using device='cuda' with tree_method='hist' for GPU acceleration")
+            return True, "cuda"
     except (FileNotFoundError, subprocess.TimeoutExpired) as e:
         print(f"⚠️  GPU detection failed: {e}")
 
-    print("⚠️  No GPU detected. Using CPU with tree_method='hist'")
-    return False, "hist"
+    print("⚠️  No GPU detected. Using device='cpu' with tree_method='hist'")
+    return False, "cpu"
 
 
 # =============================================================================
@@ -320,14 +320,14 @@ def load_and_prepare_data(
 # Hyperparameter Suggestion
 # =============================================================================
 
-def suggest_hyperparameters(trial: Trial, config: Dict, tree_method: str) -> Dict:
+def suggest_hyperparameters(trial: Trial, config: Dict, device: str) -> Dict:
     """
     Suggest hyperparameters for XGBoost based on search space in config.
 
     Args:
         trial: Optuna trial object
         config: Configuration dictionary with search space
-        tree_method: "gpu_hist" or "hist"
+        device: "cuda" or "cpu"
 
     Returns:
         Dictionary of XGBoost parameters
@@ -366,14 +366,18 @@ def suggest_hyperparameters(trial: Trial, config: Dict, tree_method: str) -> Dic
     # Add fixed parameters
     params.update(search_space['fixed'])
 
-    # Add tree method (GPU or CPU)
-    params['tree_method'] = tree_method
+    # Set tree method to 'hist' (works for both CPU and GPU)
+    params['tree_method'] = 'hist'
 
-    # If GPU, set GPU-specific params
-    if tree_method == 'gpu_hist':
-        params['gpu_id'] = config['gpu']['gpu_id']
-        params['predictor'] = 'gpu_predictor'
+    # Set device (GPU or CPU)
+    if device == 'cuda':
+        # For GPU: use cuda device with specific GPU ID
+        gpu_id = config.get('gpu', {}).get('gpu_id', 0)
+        params['device'] = f"cuda:{gpu_id}"
         params['n_jobs'] = 1  # GPU doesn't need multi-threading
+    else:
+        # For CPU: use cpu device
+        params['device'] = 'cpu'
 
     return params
 
@@ -839,7 +843,7 @@ def objective(
     y_test: pd.Series,
     config: Dict,
     threshold: float,
-    tree_method: str
+    device: str
 ) -> float:
     """
     Optuna objective function for hyperparameter optimization.
@@ -850,7 +854,7 @@ def objective(
         X_test, y_test: Test/validation data
         config: Configuration dictionary
         threshold: Gain threshold
-        tree_method: "gpu_hist" or "hist"
+        device: "cuda" or "cpu"
 
     Returns:
         Primary metric value (F1-score by default)
@@ -859,7 +863,7 @@ def objective(
     start_time = time.time()
 
     # Suggest hyperparameters
-    params = suggest_hyperparameters(trial, config, tree_method)
+    params = suggest_hyperparameters(trial, config, device)
 
     # Calculate scale_pos_weight for class imbalance
     # NOTE: With balanced sampling, this will be ~1.0 (50/50 split)
@@ -1032,7 +1036,7 @@ def save_and_log_best_model(
             'n_trials': len(study.trials),
             'pruned_trials': len([t for t in study.trials if t.state == TrialState.PRUNED]),
             'timestamp': datetime.now().isoformat(),
-            'gpu_used': 'gpu_hist' in str(study.best_params.get('tree_method', '')),
+            'gpu_used': 'cuda' in str(study.best_params.get('device', '')),
         },
         'outcome_categories': category_stats if category_stats else None
     }
@@ -1096,12 +1100,12 @@ def tune_for_threshold(
     print("="*80)
 
     # Detect GPU
-    has_gpu, tree_method = detect_gpu()
+    has_gpu, device = detect_gpu()
     if args.use_gpu and not has_gpu:
         print("⚠️  --use-gpu specified but no GPU detected. Using CPU.")
-        tree_method = "hist"
+        device = "cpu"
     elif not args.use_gpu:
-        tree_method = "hist"
+        device = "cpu"
         print("GPU disabled by user (--use-gpu not specified)")
 
     # Initialize W&B
@@ -1145,7 +1149,7 @@ def tune_for_threshold(
         study.optimize(
             lambda trial: objective(
                 trial, X_train, y_train, X_test, y_test,
-                config, threshold, tree_method
+                config, threshold, device
             ),
             n_trials=args.trials,
             timeout=config['optuna']['timeout'],
