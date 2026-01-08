@@ -293,7 +293,8 @@ class AlpacaScreener:
 
     def collect_stock_data(self, symbols: List[str], lookback_days: int = 10, feed: str = 'sip') -> Dict[str, Dict]:
         """
-        Collect current and historical data for multiple symbols.
+        Collect current and historical data for multiple symbols using 1-hour candlesticks.
+        Aggregates hourly bars into daily bars for more accurate volume data.
 
         Args:
             symbols: List of stock symbols
@@ -304,7 +305,7 @@ class AlpacaScreener:
             Dictionary mapping symbols to their data
         """
         if self.verbose:
-            print(f"Collecting data for {len(symbols)} symbols using {feed.upper()} feed...")
+            print(f"Collecting hourly data for {len(symbols)} symbols using {feed.upper()} feed...")
 
         stock_data = {}
         batch_size = 200  # Process symbols in batches to avoid API limits
@@ -328,12 +329,12 @@ class AlpacaScreener:
                         start_str = start_date.strftime('%Y-%m-%d')
                         end_str = end_date.strftime('%Y-%m-%d')
 
+                        # Fetch 1-hour candlesticks instead of daily
                         bars = self.client.get_bars(
                             symbol,
-                            tradeapi.TimeFrame.Day,
+                            tradeapi.TimeFrame.Hour,
                             start=start_str,
                             end=end_str,
-                            limit=lookback_days + 5,
                             feed=feed  # Use configured data feed
                         )
 
@@ -355,12 +356,35 @@ class AlpacaScreener:
                                 bar_data.append(bar_dict)
 
                             if bar_data:
-                                df = pd.DataFrame(bar_data)
-                                df.set_index('timestamp', inplace=True)
+                                # Create DataFrame from hourly bars
+                                hourly_df = pd.DataFrame(bar_data)
+
+                                # Aggregate hourly bars into daily bars
+                                # Group by date (extract date from timestamp)
+                                hourly_df['date'] = pd.to_datetime(hourly_df['timestamp']).dt.date
+
+                                # Aggregate by date
+                                daily_bars = hourly_df.groupby('date').agg({
+                                    'open': 'first',      # First open of the day
+                                    'high': 'max',        # Highest high of the day
+                                    'low': 'min',         # Lowest low of the day
+                                    'close': 'last',      # Last close of the day
+                                    'volume': 'sum',      # Sum of all hourly volumes
+                                    'timestamp': 'first'  # Use first timestamp for the day
+                                }).reset_index(drop=True)
+
+                                # Add trade count aggregation if available
+                                if 'trade_count' in hourly_df.columns:
+                                    trade_counts = hourly_df.groupby('date')['trade_count'].sum().values
+                                    daily_bars['trade_count'] = trade_counts
+
+                                # Set timestamp as index
+                                daily_bars.set_index('timestamp', inplace=True)
+
                                 stock_data[symbol] = {
-                                    'bars': df,
-                                    'current_bar': df.iloc[-1],
-                                    'historical_bars': df.iloc[:-1] if len(df) > 1 else df
+                                    'bars': daily_bars,
+                                    'current_bar': daily_bars.iloc[-1],
+                                    'historical_bars': daily_bars.iloc[:-1] if len(daily_bars) > 1 else daily_bars
                                 }
                     except Exception as symbol_error:
                         if self.verbose:
