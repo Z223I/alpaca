@@ -1833,8 +1833,8 @@
                     <thead>
                         <tr>
                             <th onclick="sortWatchList('symbol')">Symbol <span class="sort-indicator"></span></th>
-                            <th class="source-col" onclick="sortWatchList('oracle')" title="Oracle">🔮 <span class="sort-indicator"></span></th>
                             <th class="source-col" onclick="sortWatchList('manual')" title="Manual">✏️ <span class="sort-indicator"></span></th>
+                            <th class="source-col" onclick="sortWatchList('news')" title="News">📰 <span class="sort-indicator"></span></th>
                             <th class="source-col" onclick="sortWatchList('top_gainers')" title="Premarket Top Gainers">🌅 <span class="sort-indicator"></span></th>
                             <th class="source-col" onclick="sortWatchList('alpaca_top_gainers')" title="Alpaca Top Gainers">📈 <span class="sort-indicator"></span></th>
                             <th class="surge-col" onclick="sortWatchList('surge_amount')" title="Volume Surge Ratio">Surge <span class="sort-indicator"></span></th>
@@ -2538,15 +2538,15 @@
                     </div>
                     <div class="control-group">
                         <label class="control-checkbox">
-                            <input type="checkbox" onchange="toggleIndicator('${symbol}', 'ema9', this.checked)">
+                            <input type="checkbox" id="ema9-checkbox-${symbol}" onchange="toggleIndicator('${symbol}', 'ema9', this.checked)">
                             EMA(9)
                         </label>
                         <label class="control-checkbox">
-                            <input type="checkbox" onchange="toggleIndicator('${symbol}', 'ema21', this.checked)">
+                            <input type="checkbox" id="ema21-checkbox-${symbol}" onchange="toggleIndicator('${symbol}', 'ema21', this.checked)">
                             EMA(21)
                         </label>
                         <label class="control-checkbox">
-                            <input type="checkbox" onchange="toggleIndicator('${symbol}', 'ema50', this.checked)">
+                            <input type="checkbox" id="ema50-checkbox-${symbol}" onchange="toggleIndicator('${symbol}', 'ema50', this.checked)">
                             EMA(50)
                         </label>
                         <label class="control-checkbox" id="vwap-label-${symbol}">
@@ -2554,11 +2554,11 @@
                             VWAP <span class="indicator-note">(1D only)</span>
                         </label>
                         <label class="control-checkbox">
-                            <input type="checkbox" onchange="toggleIndicator('${symbol}', 'macd', this.checked)">
+                            <input type="checkbox" id="macd-checkbox-${symbol}" onchange="toggleIndicator('${symbol}', 'macd', this.checked)">
                             MACD
                         </label>
                         <label class="control-checkbox">
-                            <input type="checkbox" checked onchange="toggleIndicator('${symbol}', 'volume', this.checked)">
+                            <input type="checkbox" id="volume-checkbox-${symbol}" checked onchange="toggleIndicator('${symbol}', 'volume', this.checked)">
                             Volume
                         </label>
                         <button class="save-settings-btn" id="save-btn-${symbol}" onclick="saveChartSettings('${symbol}')" title="Save chart settings">💾</button>
@@ -3109,9 +3109,9 @@
                     chartData.indicators.vwap = false;
                 }
 
-                // Update checkboxes
+                // Update checkboxes using their IDs
                 Object.keys(settings.indicators).forEach(indicator => {
-                    const checkbox = panel.querySelector(`input[onchange*="'${indicator}'"]`);
+                    const checkbox = document.getElementById(`${indicator}-checkbox-${symbol}`);
                     if (checkbox) {
                         checkbox.checked = settings.indicators[indicator];
                     }
@@ -4451,8 +4451,8 @@
 
                             symbols.push({
                                 symbol: symbol,
-                                oracle: false,
                                 manual: false,
+                                news: false,
                                 top_gainers: true, // Mark as coming from data directory
                                 alpaca_top_gainers: false,
                                 surge: false,
@@ -4511,8 +4511,8 @@
                             // Add manual symbol if it's not already in the list
                             watchListState.symbols.push({
                                 symbol: manualSymbol,
-                                oracle: false,
                                 manual: true,
+                                news: false,
                                 top_gainers: false,
                                 alpaca_top_gainers: false,
                                 surge: false,
@@ -4603,12 +4603,12 @@
                     <tr ondblclick="openChartFromWatchList('${symbol.symbol}')">
                         <td class="symbol-cell">${symbol.symbol}</td>
                         <td class="source-cell">
-                            <span class="source-indicator ${symbol.oracle ? 'on' : 'off'}"
-                                  title="${symbol.oracle ? 'Oracle: Yes' : 'Oracle: No'}"></span>
-                        </td>
-                        <td class="source-cell">
                             <span class="source-indicator ${symbol.manual ? 'on' : 'off'}"
                                   title="${symbol.manual ? 'Manual: Yes' : 'Manual: No'}"></span>
+                        </td>
+                        <td class="source-cell" onclick="event.stopPropagation(); toggleNewsIndicator('${symbol.symbol}')" style="cursor: pointer;">
+                            <span class="source-indicator ${symbol.news ? 'on' : 'off'}"
+                                  title="${symbol.news ? 'News: Yes' : 'News: No'}"></span>
                         </td>
                         <td class="source-cell">
                             <span class="source-indicator ${symbol.top_gainers ? 'on' : 'off'}"
@@ -4659,7 +4659,7 @@
 
         // Sort watch list data
         function sortWatchListData(column, direction) {
-            const booleanColumns = ['oracle', 'manual', 'top_gainers', 'alpaca_top_gainers'];
+            const booleanColumns = ['manual', 'news', 'top_gainers', 'alpaca_top_gainers'];
 
             watchListState.symbols.sort((a, b) => {
                 // Special handling for boolean source columns
@@ -4795,8 +4795,8 @@
             // Add symbol to list
             const newSymbol = {
                 symbol: symbol,
-                oracle: false,
                 manual: true,
+                news: false,
                 top_gainers: false,
                 alpaca_top_gainers: false,
                 surge: false,
@@ -4835,6 +4835,29 @@
                 }
             } catch (error) {
                 console.error(`❌ Error sending ${symbol} to backend:`, error);
+            }
+        }
+
+        // Toggle news indicator for a symbol
+        function toggleNewsIndicator(symbol) {
+            if (!symbol) return;
+
+            console.log(`Toggling news indicator for ${symbol}`);
+
+            // Find the symbol in the watch list
+            const symbolObj = watchListState.symbols.find(s => s.symbol === symbol);
+            if (symbolObj) {
+                // Toggle the news property
+                symbolObj.news = !symbolObj.news;
+                console.log(`News indicator for ${symbol} is now ${symbolObj.news ? 'on' : 'off'}`);
+
+                // Re-render the watch list to update the display
+                renderWatchList();
+
+                // Save to backend if it's a manual symbol
+                if (watchListState.manualSymbols.has(symbol)) {
+                    saveManualSymbolsToBackend();
+                }
             }
         }
 
