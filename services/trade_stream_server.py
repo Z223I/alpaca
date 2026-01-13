@@ -68,6 +68,8 @@ class TradeStreamServer:
         self.alpaca_task = None
         self.alpaca_connected = False
         self.reconnect_delay = 1  # Start with 1 second delay
+        self.last_data_received = None  # Track when we last received data for health monitoring
+        self.connection_watchdog_task = None  # Watchdog task to monitor connection health
 
     async def start(self):
         """Start the WebSocket server and Alpaca stream."""
@@ -105,7 +107,24 @@ class TradeStreamServer:
                 # Mark as connected after successful start
                 # CRITICAL FIX: Wait longer (5 seconds) to allow full WebSocket authentication
                 # The Alpaca WebSocket needs time to: connect -> authenticate -> be ready for subscriptions
-                await asyncio.sleep(5)  # Give it time to establish connection and authenticate
+                try:
+                    await asyncio.wait_for(asyncio.sleep(5), timeout=10)  # Add timeout wrapper
+                except asyncio.TimeoutError:
+                    logger.error("❌ Connection timeout during initial sleep!")
+                    stream_task.cancel()
+                    raise Exception("Connection timeout during initialization")
+
+                # Verify the stream task is still running
+                if stream_task.done():
+                    logger.error("❌ Stream task died during connection!")
+                    try:
+                        stream_task.result()  # This will raise the exception if there was one
+                    except Exception as e:
+                        logger.error(f"Stream task exception: {e}")
+                        raise
+                    # If we get here, task completed without exception (shouldn't happen)
+                    raise Exception("Stream task completed unexpectedly during connection")
+
                 self.alpaca_connected = True
                 self.reconnect_delay = 1  # Reset delay on successful connection
                 logger.info("✅ Alpaca stream connected successfully")
@@ -115,21 +134,70 @@ class TradeStreamServer:
                     logger.info(f"Subscribing to {len(self.subscriptions)} pending symbols")
                     for symbol in list(self.subscriptions.keys()):
                         try:
-                            await self._subscribe_alpaca_symbol(symbol)
+                            # Add timeout to subscription attempts
+                            await asyncio.wait_for(
+                                self._subscribe_alpaca_symbol(symbol),
+                                timeout=15
+                            )
+                        except asyncio.TimeoutError:
+                            logger.error(f"Timeout subscribing to {symbol}")
                         except Exception as e:
                             logger.error(f"Failed to subscribe to pending symbol {symbol}: {e}")
 
+                # Start connection watchdog to monitor health
+                self.connection_watchdog_task = asyncio.create_task(
+                    self._connection_watchdog(stream_task, max_idle_time=120)
+                )
+
                 # Wait for the stream task to complete (or fail)
-                await stream_task
+                # Use asyncio.wait with a timeout to prevent infinite blocking
+                done, pending = await asyncio.wait(
+                    [stream_task, self.connection_watchdog_task],
+                    return_when=asyncio.FIRST_COMPLETED
+                )
+
+                # Cancel any remaining tasks
+                for task in pending:
+                    task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
+
+                # Check if stream_task failed
+                if stream_task in done:
+                    # Stream task completed - check for exceptions
+                    try:
+                        stream_task.result()
+                    except Exception as e:
+                        logger.error(f"Stream task failed: {e}")
+                        raise
 
             except asyncio.CancelledError:
                 logger.info("Alpaca stream task cancelled")
                 self.alpaca_connected = False
+
+                # Clean up watchdog task
+                if self.connection_watchdog_task and not self.connection_watchdog_task.done():
+                    self.connection_watchdog_task.cancel()
+                    try:
+                        await self.connection_watchdog_task
+                    except asyncio.CancelledError:
+                        pass
                 raise
             except Exception as e:
                 self.alpaca_connected = False
                 logger.error(f"Alpaca stream error: {e}", exc_info=True)
                 logger.info(f"Reconnecting in {self.reconnect_delay} seconds...")
+
+                # Clean up watchdog task
+                if self.connection_watchdog_task and not self.connection_watchdog_task.done():
+                    self.connection_watchdog_task.cancel()
+                    try:
+                        await self.connection_watchdog_task
+                    except asyncio.CancelledError:
+                        pass
+
                 await asyncio.sleep(self.reconnect_delay)
 
                 # Exponential backoff up to 60 seconds
@@ -145,6 +213,47 @@ class TradeStreamServer:
 
                 # Re-subscribe to all active symbols
                 await self._resubscribe_all_symbols()
+
+    async def _connection_watchdog(self, stream_task, max_idle_time=120):
+        """Monitor the connection health and force reconnect if stuck.
+
+        Args:
+            stream_task: The asyncio task running the Alpaca stream
+            max_idle_time: Maximum seconds without data before forcing reconnect (default 120s)
+        """
+        logger.info(f"Starting connection watchdog (max idle time: {max_idle_time}s)")
+
+        # Wait a bit after connection before starting health checks
+        # This gives time for subscriptions to complete
+        await asyncio.sleep(30)
+
+        while not stream_task.done():
+            try:
+                await asyncio.sleep(10)  # Check every 10 seconds
+
+                # If we have subscriptions but haven't received data in a while, something is wrong
+                if self.subscriptions and self.last_data_received:
+                    time_since_data = (datetime.now() - self.last_data_received).total_seconds()
+
+                    if time_since_data > max_idle_time:
+                        logger.error(f"⚠️  Connection appears stuck! No data received for {time_since_data:.0f}s")
+                        logger.error(f"   Active subscriptions: {list(self.subscriptions.keys())}")
+                        logger.error(f"   Forcing reconnection...")
+
+                        # Cancel the stream task to trigger reconnection
+                        stream_task.cancel()
+                        return
+                    elif time_since_data > max_idle_time / 2:
+                        # Warning at half the timeout
+                        logger.warning(f"⚠️  No data received for {time_since_data:.0f}s (warning threshold)")
+
+            except asyncio.CancelledError:
+                logger.info("Watchdog cancelled")
+                raise
+            except Exception as e:
+                logger.error(f"Watchdog error: {e}", exc_info=True)
+
+        logger.info("Watchdog exiting - stream task completed")
 
     async def handle_client(self, websocket: WebSocketServerProtocol):
         """Handle a new WebSocket client connection."""
@@ -387,6 +496,9 @@ class TradeStreamServer:
         if symbol not in self.subscriptions:
             logger.warning(f"Received trade for {symbol} but no subscribers")
             return
+
+        # Update health check timestamp
+        self.last_data_received = datetime.now()
 
         # Format trade data for frontend
         trade_data = {
