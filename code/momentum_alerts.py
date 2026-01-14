@@ -451,7 +451,7 @@ class MomentumAlertsSystem:
             "--min-volume", "250000",
             "--min-percent-change", "5.0",
             "--surge-days", "50",
-            "--volume-surge", "5.0",
+            "--volume-surge", "2.2",
             "--export-csv", "relative_volume_nasdaq_amex.csv",
             "--verbose"
         ]
@@ -512,7 +512,7 @@ class MomentumAlertsSystem:
         cmd.extend(symbols)
         cmd.extend([
             "--surge-days", "50",
-            "--volume-surge", "5.0",
+            "--volume-surge", "2.2",
             "--export-csv", "symbol_list.csv",
             "--verbose"
         ])
