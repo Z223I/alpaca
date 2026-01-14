@@ -1554,6 +1554,7 @@
             tradeBuffer: new Map(),  // Buffer for real-time trades
             wsReconnectAttempts: 0,
             wsMaxReconnectAttempts: 5,
+            wsPingInterval: null,  // Track ping interval to prevent stacking
             leftSidebarResize: {
                 isResizing: false,
                 startX: 0,
@@ -1665,6 +1666,12 @@
             console.log('Connecting to trade stream:', wsUrl);
             updateStatus('Connecting', 'Connecting to real-time trade stream...');
 
+            // Clear any existing ping interval to prevent stacking on reconnect
+            if (state.wsPingInterval) {
+                clearInterval(state.wsPingInterval);
+                state.wsPingInterval = null;
+            }
+
             try {
                 state.tradeWebSocket = new WebSocket(wsUrl);
 
@@ -1677,6 +1684,13 @@
                     state.charts.forEach((chartData, symbol) => {
                         subscribeToSymbol(symbol);
                     });
+
+                    // Start keep-alive ping every 30 seconds (only after successful connection)
+                    state.wsPingInterval = setInterval(() => {
+                        if (state.tradeWebSocket && state.tradeWebSocket.readyState === WebSocket.OPEN) {
+                            state.tradeWebSocket.send(JSON.stringify({ action: 'ping' }));
+                        }
+                    }, 30000);
                 };
 
                 state.tradeWebSocket.onmessage = (event) => {
@@ -1693,6 +1707,12 @@
                     updateStatus('Disconnected', 'Trade stream disconnected');
                     state.tradeWebSocket = null;
 
+                    // Clear ping interval on disconnect
+                    if (state.wsPingInterval) {
+                        clearInterval(state.wsPingInterval);
+                        state.wsPingInterval = null;
+                    }
+
                     // Attempt reconnection
                     if (state.wsReconnectAttempts < state.wsMaxReconnectAttempts) {
                         state.wsReconnectAttempts++;
@@ -1704,13 +1724,6 @@
                         updateStatus('Error', 'Trade stream unavailable. Please refresh page.');
                     }
                 };
-
-                // Keep-alive ping every 30 seconds
-                setInterval(() => {
-                    if (state.tradeWebSocket && state.tradeWebSocket.readyState === WebSocket.OPEN) {
-                        state.tradeWebSocket.send(JSON.stringify({ action: 'ping' }));
-                    }
-                }, 30000);
 
             } catch (error) {
                 console.error('Failed to create WebSocket:', error);
@@ -1774,7 +1787,11 @@
 
         // Handle a real-time trade update
         function handleRealTimeTrade(symbol, tradeData) {
-            console.log(`Real-time trade for ${symbol}:`, tradeData);
+            // Skip if chart was closed (trades may arrive after unsubscribe)
+            const chartData = state.charts.get(symbol);
+            if (!chartData) {
+                return;
+            }
 
             // Add symbol to tradeData if not present
             if (!tradeData.symbol) {
@@ -1791,17 +1808,14 @@
             }
             state.tradeBuffer.set(symbol, buffer);
 
-            // Update display if this symbol is active
-            const chartData = state.charts.get(symbol);
-            if (chartData) {
-                addTradeToDisplay(symbol, tradeData);
-            }
+            // Update display
+            addTradeToDisplay(symbol, tradeData);
         }
 
         // Add a single trade to the display
         function addTradeToDisplay(symbol, tradeData) {
             const container = document.getElementById(`trades-${symbol}`);
-            if (!container) {
+            if (!container || !container.isConnected) {
                 return;
             }
 
@@ -1845,9 +1859,12 @@
             // Insert at top
             container.insertBefore(tradeItem, container.firstChild);
 
-            // Remove excess items (keep only 100)
-            while (container.children.length > 100) {
+            // Remove excess items (keep only 100, with safety limit)
+            let removeCount = 0;
+            const maxRemoves = 10;  // Safety limit to prevent infinite loop
+            while (container.children.length > 100 && removeCount < maxRemoves) {
                 container.removeChild(container.lastChild);
+                removeCount++;
             }
 
             // Auto-scroll to top to show newest trades (only if already near top)
@@ -1945,6 +1962,7 @@
             if (!state.timeSalesResize.mouseMoveAttached) {
                 document.addEventListener('mousemove', (e) => {
                     if (!state.timeSalesResize.isResizing) return;
+                    if (!state.timeSalesResize.currentPanel) return;
 
                     // Calculate new width (subtract because we're dragging from left edge)
                     // Dragging left (decreasing pageX) should increase width
@@ -2021,6 +2039,7 @@
             if (!state.chartResize.mouseMoveAttached) {
                 document.addEventListener('mousemove', (e) => {
                     if (!state.chartResize.isResizing) return;
+                    if (!state.chartResize.currentMainChart || !state.chartResize.currentVolumeChart) return;
 
                     const diff = e.pageY - state.chartResize.startY;
                     const newMainHeight = state.chartResize.startMainHeight + diff;
@@ -2470,6 +2489,28 @@
                 if (chartData.volumeChart) {
                     chartData.volumeChart.remove();
                 }
+            }
+
+            // Clean up Time & Sales resize state if it references this panel
+            const timeSalesPanel = document.getElementById(`time-sales-${symbol}`);
+            if (state.timeSalesResize.currentPanel === timeSalesPanel) {
+                state.timeSalesResize.isResizing = false;
+                state.timeSalesResize.currentPanel = null;
+                state.timeSalesResize.chartMain = null;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            }
+
+            // Clean up chart resize state if it references this chart
+            const mainChart = document.getElementById(`chart-${symbol}`);
+            const volumeChart = document.getElementById(`volume-${symbol}`);
+            if (state.chartResize.currentMainChart === mainChart ||
+                state.chartResize.currentVolumeChart === volumeChart) {
+                state.chartResize.isResizing = false;
+                state.chartResize.currentMainChart = null;
+                state.chartResize.currentVolumeChart = null;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
             }
 
             // Remove tab and panel
