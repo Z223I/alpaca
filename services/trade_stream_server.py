@@ -459,24 +459,38 @@ class TradeStreamServer:
 
     async def _unsubscribe_alpaca_symbol(self, symbol: str):
         """Unsubscribe from Alpaca trade stream for a symbol."""
+        logger.info(f"🟠 [ALPACA_UNSUB] Attempting to unsubscribe from Alpaca stream for {symbol}")
+        logger.info(f"🟠 [ALPACA_UNSUB] Current state - Alpaca connected: {self.alpaca_connected}, Alpaca subscriptions: {self.alpaca_subscribed}")
+
         # Only unsubscribe if we actually subscribed to Alpaca
         if symbol not in self.alpaca_subscribed:
-            logger.info(f"Symbol {symbol} was never subscribed to Alpaca, skipping unsubscribe")
+            logger.info(f"🟠 [ALPACA_UNSUB] Symbol {symbol} was never subscribed to Alpaca, skipping unsubscribe")
             return
 
         # CRITICAL FIX: Don't unsubscribe if Alpaca isn't connected yet
         # This prevents sending invalid commands during authentication
         if not self.alpaca_connected:
-            logger.warning(f"Alpaca stream not connected, deferring unsubscribe for {symbol}")
+            logger.warning(f"🟠 [ALPACA_UNSUB] Alpaca stream not connected, deferring unsubscribe for {symbol}")
             self.alpaca_subscribed.discard(symbol)  # Remove from tracking but don't send command
+            logger.info(f"🟠 [ALPACA_UNSUB] Removed {symbol} from tracking (deferred). Remaining: {self.alpaca_subscribed}")
             return
 
-        logger.info(f"Unsubscribing from Alpaca stream for {symbol}")
+        logger.info(f"🟠 [ALPACA_UNSUB] Alpaca is connected, proceeding with unsubscribe for {symbol}")
         try:
-            self.alpaca_stream.unsubscribe_trades(symbol)
+            logger.info(f"🟠 [ALPACA_UNSUB] Calling alpaca_stream.unsubscribe_trades for {symbol}...")
+            # CRITICAL FIX: Run unsubscribe_trades in a thread executor to prevent blocking
+            # (same pattern as subscribe_trades which was also blocking)
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(
+                None,  # Use default ThreadPoolExecutor
+                self.alpaca_stream.unsubscribe_trades,
+                symbol
+            )
+            logger.info(f"🟠 [ALPACA_UNSUB] ✅ unsubscribe_trades call completed for {symbol}")
             self.alpaca_subscribed.discard(symbol)  # Remove from tracking
+            logger.info(f"🟠 [ALPACA_UNSUB] ✅ Removed {symbol} from tracking. Remaining Alpaca subscriptions: {self.alpaca_subscribed}")
         except Exception as e:
-            logger.error(f"Error unsubscribing from {symbol}: {e}")
+            logger.error(f"🟠 [ALPACA_UNSUB] ❌ Error unsubscribing from {symbol}: {e}", exc_info=True)
 
     async def _resubscribe_all_symbols(self):
         """Re-subscribe to all active symbols after reconnection."""

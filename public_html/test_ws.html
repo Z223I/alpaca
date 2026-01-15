@@ -4,22 +4,42 @@
     <title>WebSocket Diagnostic</title>
     <style>
         body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #00ff00; }
-        #log { white-space: pre-wrap; border: 1px solid #00ff00; padding: 10px; min-height: 400px; }
+        #log { white-space: pre-wrap; border: 1px solid #00ff00; padding: 10px; min-height: 400px; max-height: 600px; overflow-y: auto; }
         button { padding: 10px; margin: 5px; background: #00ff00; color: #000; border: none; cursor: pointer; }
         button:hover { background: #00cc00; }
+        button:disabled { background: #666; color: #999; cursor: not-allowed; }
+        input { padding: 8px; margin: 5px; background: #333; color: #00ff00; border: 1px solid #00ff00; font-family: monospace; }
+        .controls { margin: 10px 0; padding: 10px; border: 1px solid #444; }
+        .controls label { margin-right: 10px; }
+        #subscribed-list { color: #ffff00; margin: 10px 0; }
     </style>
 </head>
 <body>
     <h1>WebSocket Diagnostic Tool</h1>
-    <div>
-        <button onclick="testConnection()">Test Connection</button>
+
+    <div class="controls">
+        <strong>Connection:</strong>
+        <button id="btn-connect" onclick="connect()">Connect</button>
+        <button id="btn-disconnect" onclick="disconnect()" disabled>Disconnect</button>
+        <button onclick="sendPing()">Ping</button>
+        <button onclick="sendHealth()">Health Check</button>
         <button onclick="clearLog()">Clear Log</button>
     </div>
+
+    <div class="controls">
+        <strong>Subscriptions:</strong>
+        <label>Symbol: <input type="text" id="symbol-input" value="AAPL" placeholder="e.g. AAPL" /></label>
+        <button id="btn-subscribe" onclick="subscribe()" disabled>Subscribe</button>
+        <button id="btn-unsubscribe" onclick="unsubscribe()" disabled>Unsubscribe</button>
+        <div id="subscribed-list">Subscribed: (none)</div>
+    </div>
+
     <div id="log"></div>
 
     <script>
         let ws = null;
         const log = document.getElementById('log');
+        const subscribedSymbols = new Set();
 
         function addLog(message) {
             const timestamp = new Date().toISOString();
@@ -32,12 +52,28 @@
             log.textContent = '';
         }
 
-        function testConnection() {
-            addLog('=== Starting WebSocket Connection Test ===');
-            addLog(`window.location.hostname = "${window.location.hostname}"`);
-            addLog(`window.location.href = "${window.location.href}"`);
+        function updateButtons() {
+            const connected = ws && ws.readyState === WebSocket.OPEN;
+            document.getElementById('btn-connect').disabled = connected;
+            document.getElementById('btn-disconnect').disabled = !connected;
+            document.getElementById('btn-subscribe').disabled = !connected;
+            document.getElementById('btn-unsubscribe').disabled = !connected;
+        }
 
-            const wsUrl = 'ws://' + (window.location.hostname || 'localhost') + ':8766';
+        function updateSubscribedList() {
+            const listEl = document.getElementById('subscribed-list');
+            if (subscribedSymbols.size === 0) {
+                listEl.textContent = 'Subscribed: (none)';
+            } else {
+                listEl.textContent = 'Subscribed: ' + Array.from(subscribedSymbols).join(', ');
+            }
+        }
+
+        function connect() {
+            addLog('=== Starting WebSocket Connection ===');
+            addLog(`window.location.hostname = "${window.location.hostname}"`);
+
+            const wsUrl = 'ws://' + (window.location.hostname || 'localhost') + ':8765';
             addLog(`Connecting to: ${wsUrl}`);
 
             try {
@@ -45,41 +81,42 @@
 
                 ws.onopen = () => {
                     addLog('✅ WebSocket CONNECTED!');
-
-                    // Test ping
-                    addLog('Sending ping...');
-                    ws.send(JSON.stringify({ action: 'ping' }));
+                    updateButtons();
                 };
 
                 ws.onmessage = (event) => {
                     addLog(`📨 Received: ${event.data}`);
-                    const data = JSON.parse(event.data);
+                    try {
+                        const data = JSON.parse(event.data);
 
-                    if (data.type === 'pong') {
-                        addLog('✅ Ping successful!');
-                        // Test health
-                        addLog('Sending health check...');
-                        ws.send(JSON.stringify({ action: 'health' }));
-                    } else if (data.type === 'health') {
-                        addLog(`✅ Health check successful!`);
-                        addLog(`   Alpaca connected: ${data.alpaca_connected}`);
-                        addLog(`   Active symbols: ${data.active_symbols.join(', ') || 'none'}`);
-                        addLog(`   Total clients: ${data.total_clients}`);
-
-                        // Test subscription
-                        addLog('Subscribing to AAPL...');
-                        ws.send(JSON.stringify({ action: 'subscribe', symbol: 'AAPL' }));
-                    } else if (data.type === 'subscribed') {
-                        addLog(`✅ Subscription successful: ${data.symbol}`);
-                        addLog('Waiting for trades...');
-                    } else if (data.type === 'trade') {
-                        addLog(`📊 TRADE: ${data.symbol} @ $${data.data.price} x ${data.data.size}`);
+                        if (data.type === 'pong') {
+                            addLog('✅ Pong received - connection alive');
+                        } else if (data.type === 'health') {
+                            addLog(`✅ Health check response:`);
+                            addLog(`   Alpaca connected: ${data.alpaca_connected}`);
+                            addLog(`   Active symbols: ${data.active_symbols.join(', ') || 'none'}`);
+                            addLog(`   Total clients: ${data.total_clients}`);
+                        } else if (data.type === 'connecting') {
+                            addLog(`⏳ Connecting: ${data.message}`);
+                        } else if (data.type === 'subscribed') {
+                            addLog(`✅ Subscribed to: ${data.symbol}`);
+                            subscribedSymbols.add(data.symbol);
+                            updateSubscribedList();
+                        } else if (data.type === 'unsubscribed') {
+                            addLog(`✅ Unsubscribed from: ${data.symbol}`);
+                            subscribedSymbols.delete(data.symbol);
+                            updateSubscribedList();
+                        } else if (data.type === 'trade') {
+                            addLog(`📊 TRADE: ${data.symbol} @ $${data.data.price} x ${data.data.size}`);
+                        }
+                    } catch (e) {
+                        addLog(`⚠️ Could not parse message: ${e}`);
                     }
                 };
 
                 ws.onerror = (error) => {
                     addLog(`❌ WebSocket ERROR: ${error}`);
-                    addLog(`   Error object: ${JSON.stringify(error)}`);
+                    updateButtons();
                 };
 
                 ws.onclose = (event) => {
@@ -87,6 +124,9 @@
                     addLog(`   Code: ${event.code}`);
                     addLog(`   Reason: ${event.reason || 'none'}`);
                     addLog(`   Was clean: ${event.wasClean}`);
+                    subscribedSymbols.clear();
+                    updateSubscribedList();
+                    updateButtons();
                 };
 
             } catch (error) {
@@ -95,9 +135,63 @@
             }
         }
 
-        // Auto-start test on page load
-        addLog('Page loaded. Click "Test Connection" button to begin.');
+        function disconnect() {
+            if (ws) {
+                addLog('=== Closing WebSocket Connection ===');
+                ws.close();
+            }
+        }
+
+        function sendPing() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                addLog('Sending ping...');
+                ws.send(JSON.stringify({ action: 'ping' }));
+            } else {
+                addLog('❌ Not connected');
+            }
+        }
+
+        function sendHealth() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                addLog('Sending health check...');
+                ws.send(JSON.stringify({ action: 'health' }));
+            } else {
+                addLog('❌ Not connected');
+            }
+        }
+
+        function subscribe() {
+            const symbol = document.getElementById('symbol-input').value.trim().toUpperCase();
+            if (!symbol) {
+                addLog('❌ Please enter a symbol');
+                return;
+            }
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                addLog(`Subscribing to ${symbol}...`);
+                ws.send(JSON.stringify({ action: 'subscribe', symbol: symbol }));
+            } else {
+                addLog('❌ Not connected');
+            }
+        }
+
+        function unsubscribe() {
+            const symbol = document.getElementById('symbol-input').value.trim().toUpperCase();
+            if (!symbol) {
+                addLog('❌ Please enter a symbol');
+                return;
+            }
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                addLog(`Unsubscribing from ${symbol}...`);
+                ws.send(JSON.stringify({ action: 'unsubscribe', symbol: symbol }));
+            } else {
+                addLog('❌ Not connected');
+            }
+        }
+
+        // Initialize on page load
+        addLog('Page loaded. Click "Connect" to begin.');
         addLog(`Browser: ${navigator.userAgent}`);
+        updateButtons();
     </script>
 </body>
 </html>
