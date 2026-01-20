@@ -278,7 +278,37 @@ window_volume_vs_1min_avg - Volume surge ratio
 distance_from_vwap_percent - Distance from VWAP
 
 
+## Market Closures
 
+- [ ]
+
+## Market Closures impact on Surge
+
+- [ ]
+
+## Premarket Top Gainers
+
+- [ ] Premarket top gainers icon not working on public_html/index.html the day after a holiday.
+
+## Bin Momentum Alerts
+
+Create a to do list.
+Create cgi-bin/molecules/alpaca_molecules/momentum_charts.py.
+Add args --start-date and --end-date. The are to default to 2025-09-01 and today.
+for each date and for each symbol read all the momentum alters in historical_data/YYYY-MM-DD/momentum_alerts_sent/bullish/alert_<symbol>_*.json: using the "Price" field calculate max gain = max(prices) / min(prices)
+end for loops
+Bin the max gains by 10% and plot them.
+
+Create a to do list.
+Change the script name to momentum-alerts-plots.py.
+Change y-axis title to quantity.
+Put the quantity above each column.
+Make the default start date December 12.
+Begin every chart name with momo.
+Put the plots in the historical data directory with the momentum alerts sent.
+Chart max gain per day.
+Plot time of day between min and max per stock day as a line with dots at the end for each pair of data.  The y-axis is to be a date.
+Plot the duration between the minimum and the maximum.
 
 
 ## Bin Prices
