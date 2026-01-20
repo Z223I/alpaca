@@ -1,0 +1,3 @@
+[submodule "python-holidays"]
+	path = python-holidays
+	url = https://github.com/Z223I/python-holidays.git
