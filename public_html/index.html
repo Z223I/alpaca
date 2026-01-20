@@ -3742,6 +3742,69 @@
             sortDirection: 'desc'
         };
 
+        // NYSE holidays (computed from python-holidays library)
+        // Includes: New Year's Day, MLK Day, Presidents Day, Good Friday,
+        // Memorial Day, Juneteenth, Independence Day, Labor Day, Thanksgiving,
+        // Christmas, and special closures
+        const NYSE_HOLIDAYS = new Set([
+            // 2024
+            '2024-01-01', '2024-01-15', '2024-02-19', '2024-03-29',
+            '2024-05-27', '2024-06-19', '2024-07-04', '2024-09-02',
+            '2024-11-28', '2024-12-25',
+            // 2025
+            '2025-01-01', '2025-01-09', '2025-01-20', '2025-02-17', '2025-04-18',
+            '2025-05-26', '2025-06-19', '2025-07-04', '2025-09-01',
+            '2025-11-27', '2025-12-25',
+            // 2026
+            '2026-01-01', '2026-01-19', '2026-02-16', '2026-04-03',
+            '2026-05-25', '2026-06-19', '2026-07-03', '2026-09-07',
+            '2026-11-26', '2026-12-25'
+        ]);
+
+        /**
+         * Get the last trading day, accounting for weekends and NYSE holidays.
+         * @returns {string} Date string in YYYY-MM-DD format
+         */
+        function getLastTradingDay() {
+            // Get today's date in ET timezone
+            const now = new Date();
+            const etOptions = { timeZone: 'America/New_York' };
+            const etDateStr = now.toLocaleDateString('en-CA', etOptions); // YYYY-MM-DD format
+            let date = new Date(etDateStr + 'T12:00:00'); // Noon to avoid timezone issues
+
+            // Go back until we find a trading day (not weekend, not holiday)
+            const MAX_LOOKBACK = 10; // Safety limit
+            for (let i = 0; i < MAX_LOOKBACK; i++) {
+                const dateStr = date.toISOString().split('T')[0];
+                const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
+
+                // Check if it's a weekend
+                if (dayOfWeek === 0) {
+                    // Sunday -> go back to Friday
+                    date.setDate(date.getDate() - 2);
+                    continue;
+                }
+                if (dayOfWeek === 6) {
+                    // Saturday -> go back to Friday
+                    date.setDate(date.getDate() - 1);
+                    continue;
+                }
+
+                // Check if it's an NYSE holiday
+                if (NYSE_HOLIDAYS.has(dateStr)) {
+                    date.setDate(date.getDate() - 1);
+                    continue;
+                }
+
+                // It's a trading day
+                return dateStr;
+            }
+
+            // Fallback: return today's date if something went wrong
+            console.warn('Could not determine last trading day, using today');
+            return etDateStr;
+        }
+
         function openPremarketPopup() {
             const popup = document.getElementById('premarketPopup');
             popup.style.display = 'block';
@@ -3880,14 +3943,8 @@
             tableContainer.style.display = 'none';
 
             try {
-                // Get today's date in YYYY-MM-DD format (ET timezone)
-                const today = new Date().toLocaleDateString('en-US', {
-                    timeZone: 'America/New_York',
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit'
-                }).split('/');
-                const dateStr = `${today[2]}-${today[0]}-${today[1]}`;
+                // Get the last trading day (accounts for weekends and NYSE holidays)
+                const dateStr = getLastTradingDay();
 
                 const csvPath = `historical_data/${dateStr}/premarket/top_gainers_nasdaq_amex.csv`;
 

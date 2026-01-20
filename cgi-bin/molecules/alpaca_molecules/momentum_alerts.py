@@ -11,18 +11,18 @@ Process:
    - Runs on separate CPU core (core 1) using taskset
    - Generates top_gainers_nasdaq_amex.csv in ./historical_data/{YYYY-MM-DD}/premarket/
    - Monitors premarket top gainers continuously
-   - Runs on weekdays only (Monday-Friday)
+   - Runs on trading days only (skips weekends and NYSE holidays)
 2. Top Gainers (Alpaca API): Run alpaca.py --top-gainers from 04:00 to 20:00 ET every minute
    - Runs on separate CPU core (core 2) using taskset
    - Generates top_gainers_alpaca.csv in ./historical_data/{YYYY-MM-DD}/market/
    - Uses Alpaca screener API for real-time top gainers
-   - Runs on weekdays only (Monday-Friday)
+   - Runs on trading days only (skips weekends and NYSE holidays)
 3. Market Open Scanning: Run market_open_top_gainers.py starting at 9:40 ET, every 20 minutes
    - Generates gainers_nasdaq_amex.csv
    - Runs every day including weekends for continuous data collection
    - Automatically reschedules after each run
-4. Volume Surge: Run volume surge scanner every 10 minutes from 06:45 to 14:45 ET on weekdays only
-   - Runs at: 06:45, 06:55, 07:05, 07:15, 07:25, ... 14:25, 14:35, 14:45 ET (49 runs per weekday)
+4. Volume Surge: Run volume surge scanner every 10 minutes from 06:45 to 14:45 ET on trading days only
+   - Runs at: 06:45, 06:55, 07:05, 07:15, 07:25, ... 14:25, 14:35, 14:45 ET (49 runs per trading day)
    - Generates relative_volume_nasdaq_amex.csv
    - Automatically reschedules after each run
 5. Data Integration: Load symbols from all sources (premarket, market open, volume surge, Oracle, top gainers)
@@ -69,6 +69,7 @@ project_root = os.path.dirname(cgi_bin_dir)  # project root
 sys.path.insert(0, project_root)
 
 import alpaca_trade_api as tradeapi
+import holidays
 from atoms.api.init_alpaca_client import init_alpaca_client
 from atoms.api.stock_halt_detector import is_stock_halted, get_halt_status_emoji
 from atoms.api.fundamental_data import FundamentalDataFetcher
@@ -109,6 +110,9 @@ class MomentumAlertsSystem:
 
         # Eastern Time zone for all operations
         self.et_tz = pytz.timezone('US/Eastern')
+
+        # NYSE holidays for trading day checks (using python-holidays library)
+        self.nyse_holidays = holidays.financial_holidays('XNYS')
 
         # Get today's date for file monitoring
         self.today = datetime.now(self.et_tz).strftime('%Y-%m-%d')
@@ -239,11 +243,62 @@ class MomentumAlertsSystem:
 
         return logger
 
+    def is_trading_day(self, date_to_check: datetime = None) -> bool:
+        """
+        Check if a given date is a trading day (not a weekend or NYSE holiday).
+
+        Args:
+            date_to_check: The datetime to check. If None, uses current ET time.
+
+        Returns:
+            True if the date is a trading day, False if weekend or NYSE holiday.
+        """
+        if date_to_check is None:
+            date_to_check = datetime.now(self.et_tz)
+
+        # Check if weekend (Saturday=5, Sunday=6)
+        if date_to_check.weekday() >= 5:
+            return False
+
+        # Check if NYSE holiday
+        date_only = date_to_check.date()
+        if date_only in self.nyse_holidays:
+            holiday_name = self.nyse_holidays.get(date_only)
+            self.logger.debug(f"📅 {date_only} is an NYSE holiday: {holiday_name}")
+            return False
+
+        return True
+
+    def get_next_trading_day(self, from_date: datetime = None) -> datetime:
+        """
+        Get the next trading day from a given date.
+
+        Args:
+            from_date: The starting datetime. If None, uses current ET time.
+
+        Returns:
+            datetime of the next trading day.
+        """
+        if from_date is None:
+            from_date = datetime.now(self.et_tz)
+
+        next_day = from_date + timedelta(days=1)
+        max_lookforward = 10  # Safety limit
+
+        for _ in range(max_lookforward):
+            if self.is_trading_day(next_day):
+                return next_day
+            next_day = next_day + timedelta(days=1)
+
+        # Fallback: return next day if something went wrong
+        self.logger.warning("Could not determine next trading day, using tomorrow")
+        return from_date + timedelta(days=1)
+
     def _schedule_startup_runs(self):
         """
         Schedule the startup script to run starting at 9:40 ET, then every 20 minutes.
 
-        Runs on weekdays only (Monday-Friday) during market hours.
+        Runs on trading days only (skips weekends and NYSE holidays).
         Simple approach: Calculate next run time based on current time.
         """
         current_time = datetime.now(self.et_tz)
@@ -276,24 +331,23 @@ class MomentumAlertsSystem:
                 next_run_minute = next_interval_minutes % 60
                 next_run = current_time.replace(hour=next_run_hour, minute=next_run_minute, second=0, microsecond=0)
 
-        # If next_run is on a weekend, find next Monday at 9:40
-        if next_run.weekday() >= 5:  # Saturday=5, Sunday=6
-            days_until_monday = (7 - next_run.weekday()) % 7
-            if days_until_monday == 0:
-                days_until_monday = 7
-            next_run = (next_run + timedelta(days=days_until_monday)).replace(hour=9, minute=40, second=0, microsecond=0)
+        # Skip weekends and NYSE holidays to find next trading day
+        for _ in range(10):  # Safety limit
+            if self.is_trading_day(next_run):
+                break
+            next_run = (next_run + timedelta(days=1)).replace(hour=9, minute=40, second=0, microsecond=0)
 
         # Store the next scheduled run
         self.startup_schedule = [next_run]
 
         self.logger.info(f"📅 Next startup script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
-        self.logger.info(f"⏰ Runs every 20 minutes starting at 9:40 ET on weekdays only")
+        self.logger.info(f"⏰ Runs every 20 minutes starting at 9:40 ET on trading days only")
 
     def _schedule_premarket_runs(self):
         """
         Schedule the premarket script to run from 04:00 to 20:00 ET, every 10 minutes.
 
-        Runs on weekdays only (Monday-Friday) during market hours.
+        Runs on trading days only (skips weekends and NYSE holidays).
         Simple approach: Calculate next run time based on current time.
         """
         current_time = datetime.now(self.et_tz)
@@ -332,24 +386,24 @@ class MomentumAlertsSystem:
                 next_run_minute = next_interval_minutes % 60
                 next_run = current_time.replace(hour=next_run_hour, minute=next_run_minute, second=0, microsecond=0)
 
-        # If next_run is on a weekend, find next Monday at 04:00
-        if next_run.weekday() >= 5:  # Saturday=5, Sunday=6
-            days_until_monday = (7 - next_run.weekday()) % 7
-            if days_until_monday == 0:
-                days_until_monday = 7
-            next_run = (next_run + timedelta(days=days_until_monday)).replace(hour=4, minute=0, second=0, microsecond=0)
+        # Skip weekends and NYSE holidays to find next trading day
+        max_lookforward = 10  # Safety limit
+        for _ in range(max_lookforward):
+            if self.is_trading_day(next_run):
+                break
+            next_run = (next_run + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
 
         # Store the next scheduled run
         self.premarket_schedule = [next_run]
 
         self.logger.info(f"🌅 Next premarket script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
-        self.logger.info(f"⏰ Runs every 10 minutes from 04:00 to 20:00 ET on weekdays only")
+        self.logger.info(f"⏰ Runs every 10 minutes from 04:00 to 20:00 ET on trading days only")
 
     def _schedule_top_gainers_runs(self):
         """
         Schedule the top gainers script to run from 04:00 to 20:00 ET, every minute.
 
-        Runs on weekdays only (Monday-Friday) during market hours.
+        Runs on trading days only (skips weekends and NYSE holidays).
         """
         current_time = datetime.now(self.et_tz)
 
@@ -380,29 +434,28 @@ class MomentumAlertsSystem:
             if next_run.hour * 60 + next_run.minute >= last_run_minutes:
                 next_run = (next_run + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
 
-        # If next_run is on a weekend, find next Monday at 04:00
-        if next_run.weekday() >= 5:  # Saturday=5, Sunday=6
-            days_until_monday = (7 - next_run.weekday()) % 7
-            if days_until_monday == 0:
-                days_until_monday = 7
-            next_run = (next_run + timedelta(days=days_until_monday)).replace(hour=4, minute=0, second=0, microsecond=0)
+        # Skip weekends and NYSE holidays to find next trading day
+        for _ in range(10):  # Safety limit
+            if self.is_trading_day(next_run):
+                break
+            next_run = (next_run + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
 
         # Store the next scheduled run
         self.top_gainers_schedule = [next_run]
 
         self.logger.info(f"📈 Next top gainers script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
-        self.logger.info(f"⏰ Runs every minute from 04:00 to 20:00 ET on weekdays only")
+        self.logger.info(f"⏰ Runs every minute from 04:00 to 20:00 ET on trading days only")
 
     def _schedule_volume_surge_runs(self):
         """
-        Schedule the volume surge scanner to run every 10 minutes from 06:45 to 14:45 ET on weekdays only.
+        Schedule the volume surge scanner to run every 10 minutes from 06:45 to 14:45 ET on trading days only.
 
-        Runs: 06:45, 06:55, 07:05, 07:15, 07:25, ... 14:25, 14:35, 14:45 ET (49 runs per weekday)
+        Runs: 06:45, 06:55, 07:05, 07:15, 07:25, ... 14:25, 14:35, 14:45 ET (49 runs per trading day)
         """
         current_time = datetime.now(self.et_tz)
 
-        # Check if today is a weekday (Monday=0, Sunday=6)
-        is_weekday = current_time.weekday() < 5
+        # Check if today is a trading day (not weekend or NYSE holiday)
+        is_trading = self.is_trading_day(current_time)
 
         # Volume surge runs every 10 minutes from 06:45 to 14:45 ET
         # First run at 06:45 ET = 405 minutes since midnight (6*60 + 45)
@@ -415,31 +468,19 @@ class MomentumAlertsSystem:
         first_run_minutes = 6 * 60 + 45  # 06:45 (405)
         last_run_minutes = 14 * 60 + 45  # 14:45 (885)
 
-        if not is_weekday:
-            # If today is weekend, schedule for next Monday at 06:45
-            days_until_monday = (7 - current_time.weekday()) % 7
-            if days_until_monday == 0:  # Today is Sunday
-                days_until_monday = 1
-
-            next_run = (current_time + timedelta(days=days_until_monday)).replace(
+        if not is_trading:
+            # If today is not a trading day, schedule for next trading day at 06:45
+            next_run = (current_time + timedelta(days=1)).replace(
                 hour=6, minute=45, second=0, microsecond=0
             )
         elif current_minutes_since_midnight < first_run_minutes:
             # Before 06:45 today, schedule for 06:45 today
             next_run = current_time.replace(hour=6, minute=45, second=0, microsecond=0)
         elif current_minutes_since_midnight >= last_run_minutes:
-            # After 14:45 today, schedule for 06:45 tomorrow (if tomorrow is weekday)
-            tomorrow = current_time + timedelta(days=1)
-            if tomorrow.weekday() < 5:  # Tomorrow is weekday
-                next_run = tomorrow.replace(hour=6, minute=45, second=0, microsecond=0)
-            else:
-                # Tomorrow is weekend, find next Monday
-                days_until_monday = (7 - tomorrow.weekday()) % 7
-                if days_until_monday == 0:
-                    days_until_monday = 7
-                next_run = (tomorrow + timedelta(days=days_until_monday)).replace(
-                    hour=6, minute=45, second=0, microsecond=0
-                )
+            # After 14:45 today, schedule for 06:45 tomorrow
+            next_run = (current_time + timedelta(days=1)).replace(
+                hour=6, minute=45, second=0, microsecond=0
+            )
         else:
             # Between 06:45 and 14:45 - calculate next 10-minute interval
             minutes_since_0645 = current_minutes_since_midnight - first_run_minutes
@@ -450,16 +491,9 @@ class MomentumAlertsSystem:
 
             # If we've gone past 14:45, schedule for 06:45 tomorrow
             if next_interval_minutes > last_run_minutes:
-                tomorrow = current_time + timedelta(days=1)
-                if tomorrow.weekday() < 5:
-                    next_run = tomorrow.replace(hour=6, minute=45, second=0, microsecond=0)
-                else:
-                    days_until_monday = (7 - tomorrow.weekday()) % 7
-                    if days_until_monday == 0:
-                        days_until_monday = 7
-                    next_run = (tomorrow + timedelta(days=days_until_monday)).replace(
-                        hour=6, minute=45, second=0, microsecond=0
-                    )
+                next_run = (current_time + timedelta(days=1)).replace(
+                    hour=6, minute=45, second=0, microsecond=0
+                )
             else:
                 next_run_hour = next_interval_minutes // 60
                 next_run_minute = next_interval_minutes % 60
@@ -467,11 +501,17 @@ class MomentumAlertsSystem:
                     hour=next_run_hour, minute=next_run_minute, second=0, microsecond=0
                 )
 
+        # Skip weekends and NYSE holidays to find next trading day
+        for _ in range(10):  # Safety limit
+            if self.is_trading_day(next_run):
+                break
+            next_run = (next_run + timedelta(days=1)).replace(hour=6, minute=45, second=0, microsecond=0)
+
         # Store the next scheduled run
         self.volume_surge_schedule = [next_run]
 
         self.logger.info(f"📈 Next volume surge scanner run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
-        self.logger.info(f"⏰ Runs every 10 minutes from 06:45 to 14:45 ET on weekdays only")
+        self.logger.info(f"⏰ Runs every 10 minutes from 06:45 to 14:45 ET on trading days only")
 
     async def _run_startup_script(self) -> bool:
         """
@@ -651,8 +691,8 @@ class MomentumAlertsSystem:
 
         # Check if we have a scheduled run and it's time to execute
         if self.startup_schedule and current_time >= self.startup_schedule[0]:
-            # Check if today is a weekday before running
-            if current_time.weekday() < 5:  # Monday=0, Friday=4
+            # Check if today is a trading day before running (not weekend or NYSE holiday)
+            if self.is_trading_day(current_time):
                 # Run the script
                 asyncio.create_task(self._run_startup_script())
                 self.startup_runs_completed += 1
@@ -681,12 +721,11 @@ class MomentumAlertsSystem:
                     next_run_minute = next_interval_minutes % 60
                     next_run = next_run.replace(hour=next_run_hour, minute=next_run_minute, second=0, microsecond=0)
 
-            # If next_run is on a weekend, find next Monday at 9:40
-            if next_run.weekday() >= 5:  # Saturday=5, Sunday=6
-                days_until_monday = (7 - next_run.weekday()) % 7
-                if days_until_monday == 0:
-                    days_until_monday = 7
-                next_run = (next_run + timedelta(days=days_until_monday)).replace(hour=9, minute=40, second=0, microsecond=0)
+            # Skip weekends and NYSE holidays to find next trading day
+            for _ in range(10):  # Safety limit
+                if self.is_trading_day(next_run):
+                    break
+                next_run = (next_run + timedelta(days=1)).replace(hour=9, minute=40, second=0, microsecond=0)
 
             self.startup_schedule = [next_run]
             self.logger.info(f"⏰ Next startup script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
@@ -702,8 +741,8 @@ class MomentumAlertsSystem:
 
         # Check if we have a scheduled run and it's time to execute
         if self.premarket_schedule and current_time >= self.premarket_schedule[0]:
-            # Check if today is a weekday before running
-            if current_time.weekday() < 5:  # Monday=0, Friday=4
+            # Check if today is a trading day before running (not weekend or NYSE holiday)
+            if self.is_trading_day(current_time):
                 # Run the script
                 asyncio.create_task(self._run_premarket_script())
                 self.premarket_runs_completed += 1
@@ -736,12 +775,11 @@ class MomentumAlertsSystem:
                     next_run_minute = next_interval_minutes % 60
                     next_run = next_run.replace(hour=next_run_hour, minute=next_run_minute, second=0, microsecond=0)
 
-            # If next_run is on a weekend, find next Monday at 04:00
-            if next_run.weekday() >= 5:  # Saturday=5, Sunday=6
-                days_until_monday = (7 - next_run.weekday()) % 7
-                if days_until_monday == 0:
-                    days_until_monday = 7
-                next_run = (next_run + timedelta(days=days_until_monday)).replace(hour=4, minute=0, second=0, microsecond=0)
+            # Skip weekends and NYSE holidays to find next trading day
+            for _ in range(10):  # Safety limit
+                if self.is_trading_day(next_run):
+                    break
+                next_run = (next_run + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
 
             self.premarket_schedule = [next_run]
             self.logger.info(f"🌅 Next premarket script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
@@ -757,8 +795,8 @@ class MomentumAlertsSystem:
 
         # Check if we have a scheduled run and it's time to execute
         if self.top_gainers_schedule and current_time >= self.top_gainers_schedule[0]:
-            # Check if today is a weekday before running
-            if current_time.weekday() < 5:  # Monday=0, Friday=4
+            # Check if today is a trading day before running (not weekend or NYSE holiday)
+            if self.is_trading_day(current_time):
                 # Run the script
                 asyncio.create_task(self._run_top_gainers_script())
                 self.top_gainers_runs_completed += 1
@@ -778,12 +816,11 @@ class MomentumAlertsSystem:
                 # After 20:00, schedule for 04:00 tomorrow
                 next_run = (next_run + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
 
-            # If next_run is on a weekend, find next Monday at 04:00
-            if next_run.weekday() >= 5:  # Saturday=5, Sunday=6
-                days_until_monday = (7 - next_run.weekday()) % 7
-                if days_until_monday == 0:
-                    days_until_monday = 7
-                next_run = (next_run + timedelta(days=days_until_monday)).replace(hour=4, minute=0, second=0, microsecond=0)
+            # Skip weekends and NYSE holidays to find next trading day
+            for _ in range(10):  # Safety limit
+                if self.is_trading_day(next_run):
+                    break
+                next_run = (next_run + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
 
             self.top_gainers_schedule = [next_run]
             self.logger.info(f"📈 Next top gainers script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
@@ -793,15 +830,17 @@ class MomentumAlertsSystem:
         Check if it's time to run a volume surge scanner.
 
         After each run, automatically schedule the next one (every 10 minutes).
-        Only runs from 06:45 to 14:45 ET on weekdays.
+        Only runs from 06:45 to 14:45 ET on trading days.
         """
         current_time = datetime.now(self.et_tz)
 
         # Check if we have a scheduled run and it's time to execute
         if self.volume_surge_schedule and current_time >= self.volume_surge_schedule[0]:
-            # Run the script
-            asyncio.create_task(self._run_volume_surge_scanner())
-            self.volume_surge_runs_completed += 1
+            # Check if today is a trading day before running (not weekend or NYSE holiday)
+            if self.is_trading_day(current_time):
+                # Run the script
+                asyncio.create_task(self._run_volume_surge_scanner())
+                self.volume_surge_runs_completed += 1
 
             # Schedule the next run (every 10 minutes)
             # First and last run times
@@ -814,15 +853,11 @@ class MomentumAlertsSystem:
 
             current_minutes_since_midnight = next_run.hour * 60 + next_run.minute
 
-            # If next run is before 06:45 or after 14:45, schedule for next weekday at 06:45
+            # If next run is before 06:45 or after 14:45, schedule for next day at 06:45
             if current_minutes_since_midnight < first_run_minutes or current_minutes_since_midnight > last_run_minutes:
-                tomorrow = current_time + timedelta(days=1)
-
-                # Find next weekday
-                while tomorrow.weekday() >= 5:  # Skip weekends
-                    tomorrow += timedelta(days=1)
-
-                next_run = tomorrow.replace(hour=6, minute=45, second=0, microsecond=0)
+                next_run = (current_time + timedelta(days=1)).replace(
+                    hour=6, minute=45, second=0, microsecond=0
+                )
             else:
                 # Align to 10-minute intervals from 06:45
                 minutes_since_0645 = current_minutes_since_midnight - first_run_minutes
@@ -830,11 +865,10 @@ class MomentumAlertsSystem:
                 next_interval_minutes = first_run_minutes + (intervals_from_0645 * 10)
 
                 if next_interval_minutes > last_run_minutes:
-                    # Past 14:45, schedule for next weekday at 06:45
-                    tomorrow = current_time + timedelta(days=1)
-                    while tomorrow.weekday() >= 5:
-                        tomorrow += timedelta(days=1)
-                    next_run = tomorrow.replace(hour=6, minute=45, second=0, microsecond=0)
+                    # Past 14:45, schedule for next day at 06:45
+                    next_run = (current_time + timedelta(days=1)).replace(
+                        hour=6, minute=45, second=0, microsecond=0
+                    )
                 else:
                     next_run_hour = next_interval_minutes // 60
                     next_run_minute = next_interval_minutes % 60
@@ -842,14 +876,11 @@ class MomentumAlertsSystem:
                         hour=next_run_hour, minute=next_run_minute, second=0, microsecond=0
                     )
 
-            # Check if next_run is a weekday, if not, find next Monday
-            if next_run.weekday() >= 5:
-                days_until_monday = (7 - next_run.weekday()) % 7
-                if days_until_monday == 0:
-                    days_until_monday = 7
-                next_run = (next_run + timedelta(days=days_until_monday)).replace(
-                    hour=6, minute=45, second=0, microsecond=0
-                )
+            # Skip weekends and NYSE holidays to find next trading day
+            for _ in range(10):  # Safety limit
+                if self.is_trading_day(next_run):
+                    break
+                next_run = (next_run + timedelta(days=1)).replace(hour=6, minute=45, second=0, microsecond=0)
 
             self.volume_surge_schedule = [next_run]
             self.logger.info(f"📈 Next volume surge scanner run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
@@ -2686,7 +2717,7 @@ class MomentumAlertsSystem:
             # Schedule top gainers script runs (04:00-20:00 ET, every 10 minutes)
             self._schedule_top_gainers_runs()
 
-            # Schedule volume surge scanner runs (hourly at :45 from 06:45-12:45 ET, weekdays only)
+            # Schedule volume surge scanner runs (hourly at :45 from 06:45-12:45 ET, trading days only)
             self._schedule_volume_surge_runs()
 
             # Start the main monitoring loop

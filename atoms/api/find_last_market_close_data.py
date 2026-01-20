@@ -79,6 +79,33 @@ def find_last_market_close_data(
     while target_date.weekday() >= 5:  # Skip weekends
         target_date -= timedelta(days=1)
 
+    # Collect all unique dates that have data in bars_data
+    dates_with_data = set()
+    for symbol, bars_df in bars_data.items():
+        if not bars_df.empty:
+            for idx in bars_df.index:
+                dates_with_data.add(idx.date())
+            # Only check first few symbols for efficiency
+            if len(dates_with_data) > 10:
+                break
+
+    if verbose:
+        print(f"Initial target date: {target_date}")
+        if dates_with_data:
+            print(f"Dates with data in bars_data: {sorted(dates_with_data)[-5:]}")
+
+    # Keep going back until we find a date that has data (handles holidays)
+    max_lookback = 10  # Don't look back more than 10 days
+    days_checked = 0
+    while target_date not in dates_with_data and days_checked < max_lookback:
+        if verbose:
+            print(f"No data for {target_date}, checking previous day...")
+        target_date -= timedelta(days=1)
+        # Skip weekends
+        while target_date.weekday() >= 5:
+            target_date -= timedelta(days=1)
+        days_checked += 1
+
     if verbose:
         print(f"Looking for market close on: {target_date}")
 

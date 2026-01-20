@@ -288,18 +288,40 @@ distance_from_vwap_percent - Distance from VWAP
 
 ## Premarket Top Gainers
 
-- [ ] Premarket top gainers icon not working on public_html/index.html the day after a holiday.
+- [ ] Premarket top gainers icon not working in public_html/index.html the day after a holiday. Use the python-holidays submodule which is locally installed as "holidays".  There is accomadation in the code to deal with weekends.  Add accomadation for holidays. Specifically use:
+Using the NYSE Calendar
+
+```python
+  from datetime import date
+  import holidays
+
+  # Using the ISO 10383 MIC code
+  nyse_holidays = holidays.financial_holidays('XNYS')
+
+  # Example Usage
+  # Check if a date is a holiday
+  date(2025, 1, 9) in nyse_holidays  # True - Jimmy Carter mourning
+
+  # Get the holiday name
+  nyse_holidays.get('2025-01-09')  # "National Day of Mourning for former President Jimmy Carter"
+
+  # Get holidays for a specific year range
+  nyse_2025 = holidays.NYSE(years=2025)
+  for dt, name in sorted(nyse_2025.items()):
+      print(f"{dt}: {name}")
+
+```
 
 ## Bin Momentum Alerts
 
-Create a to do list.
+- [X] Create a to do list.
 Create cgi-bin/molecules/alpaca_molecules/momentum_charts.py.
 Add args --start-date and --end-date. The are to default to 2025-09-01 and today.
 for each date and for each symbol read all the momentum alters in historical_data/YYYY-MM-DD/momentum_alerts_sent/bullish/alert_<symbol>_*.json: using the "Price" field calculate max gain = max(prices) / min(prices)
 end for loops
 Bin the max gains by 10% and plot them.
 
-Create a to do list.
+- [X] Create a to do list.
 Change the script name to momentum-alerts-plots.py.
 Change y-axis title to quantity.
 Put the quantity above each column.
@@ -309,7 +331,6 @@ Put the plots in the historical data directory with the momentum alerts sent.
 Chart max gain per day.
 Plot time of day between min and max per stock day as a line with dots at the end for each pair of data.  The y-axis is to be a date.
 Plot the duration between the minimum and the maximum.
-
 
 ## Bin Prices
 

@@ -266,6 +266,31 @@ def collect_premarket_data(
         while target_date.weekday() >= 5:
             target_date -= timedelta(days=1)
 
+        # Collect all unique dates that have data in all_bars_data
+        dates_with_data = set()
+        for symbol, bars_df in all_bars_data.items():
+            if not bars_df.empty:
+                for idx in bars_df.index:
+                    dates_with_data.add(idx.date())
+                if len(dates_with_data) > 10:
+                    break
+
+        if verbose:
+            print(f"Fallback initial target: {target_date}")
+            if dates_with_data:
+                print(f"Dates with data: {sorted(dates_with_data)[-5:]}")
+
+        # Keep going back until we find a date with data (handles holidays)
+        max_lookback = 10
+        days_checked = 0
+        while target_date not in dates_with_data and days_checked < max_lookback:
+            if verbose:
+                print(f"No data for {target_date}, checking previous day...")
+            target_date -= timedelta(days=1)
+            while target_date.weekday() >= 5:
+                target_date -= timedelta(days=1)
+            days_checked += 1
+
         fallback_close_time = et_tz.localize(
             datetime.combine(target_date, market_close)
         )
