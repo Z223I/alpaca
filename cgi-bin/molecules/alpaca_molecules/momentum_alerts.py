@@ -2126,7 +2126,6 @@ class MomentumAlertsSystem:
                 'halt_emoji': halt_emoji,
                 'current_volume': current_volume,
                 'volume_emoji': volume_emoji,
-                'urgency': urgency,
                 'timestamp': datetime.now(self.et_tz),
                 'indicators': indicators,
                 'from_gainers': from_gainers,
@@ -2152,7 +2151,7 @@ class MomentumAlertsSystem:
             self.logger.info(f"   Momentum: {momentum:.2f}/min {momentum_emoji} | Raw: {raw_momentum_20:.2f}% ({time_diff:.1f}min)")
             self.logger.info(f"   Momentum Short: {momentum_short:.2f}/min {momentum_short_emoji} | Raw: {raw_momentum_5:.2f}% ({time_diff_short:.1f}min)")
             self.logger.info(f"   Squeezing: {momentum_squeeze:.2f}/min {squeeze_emoji} | Raw: {raw_momentum_squeeze:.2f}% ({actual_time_diff_squeeze:.1f}min)")
-            self.logger.info(f"   Volume: {current_volume:,} {volume_emoji} | Halt Status: {halt_emoji} | Urgency: {urgency}")
+            self.logger.info(f"   Volume: {current_volume:,} {volume_emoji} | Halt Status: {halt_emoji}")
 
             return alert_data
 
@@ -2183,7 +2182,6 @@ class MomentumAlertsSystem:
             halt_emoji = alert_data['halt_emoji']
             current_volume = alert_data['current_volume']
             volume_emoji = alert_data['volume_emoji']
-            urgency = alert_data['urgency']
             timestamp = alert_data['timestamp']
             volume_surge_detected = alert_data.get('volume_surge_detected', False)
             volume_surge_ratio = alert_data.get('volume_surge_ratio', None)
@@ -2221,7 +2219,6 @@ class MomentumAlertsSystem:
                 f"🔥 **Squeezing:** {momentum_squeeze:.2f}%/min {squeeze_emoji}",
                 f"📈 **Volume:** {current_volume:,} {volume_emoji}",
                 f"🚦 **Halt Status:** {halt_emoji}",
-                f"🎯 **Urgency:** {urgency.upper()}",
                 "",
             ])
 
@@ -2307,6 +2304,11 @@ class MomentumAlertsSystem:
             # Volume surge source indicator
             volume_indicator = "🟢" if from_volume_surge else "🔴"
             message_parts.append(f"   • **Volume Surge:** {volume_indicator}")
+
+            # Gain since open indicator: green if >30%, red otherwise
+            if percent_gain_since_market_open is not None:
+                gain_indicator = "🟢" if percent_gain_since_market_open > 30 else "🔴"
+                message_parts.append(f"   • **Gain >30%:** {gain_indicator}")
 
             message = "\n".join(message_parts)
 
@@ -2439,7 +2441,6 @@ class MomentumAlertsSystem:
                 'halt_emoji': str(alert_data['halt_emoji']),
                 'current_volume': int(alert_data['current_volume']),
                 'volume_emoji': str(alert_data['volume_emoji']),
-                'urgency': str(alert_data['urgency']),
                 'timestamp': timestamp.isoformat(),
                 'message': str(message),
                 'indicators': self._serialize_indicators(alert_data['indicators']),
@@ -2512,7 +2513,6 @@ class MomentumAlertsSystem:
                 'halt_emoji': str(alert_data['halt_emoji']),
                 'current_volume': int(alert_data['current_volume']),
                 'volume_emoji': str(alert_data['volume_emoji']),
-                'urgency': str(alert_data['urgency']),
                 'timestamp': timestamp.isoformat(),
                 'message': str(message),
                 'sent_to': sent_to_users,
@@ -2576,9 +2576,6 @@ class MomentumAlertsSystem:
         halt_emojis = ['✅', '⏸️']
         halt_emoji = random.choice(halt_emojis)
 
-        urgencies = ['low', 'medium', 'high', 'critical']
-        urgency = random.choice(urgencies)
-
         timestamp = datetime.now(self.et_tz)
 
         # Create debug alert data
@@ -2605,7 +2602,6 @@ class MomentumAlertsSystem:
             'halt_emoji': halt_emoji,
             'current_volume': volume,
             'volume_emoji': volume_emoji,
-            'urgency': urgency,
             'timestamp': timestamp,
             'indicators': {},
             'from_gainers': random.choice([True, False]),
