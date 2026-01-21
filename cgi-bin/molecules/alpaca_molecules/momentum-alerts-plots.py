@@ -296,6 +296,257 @@ def plot_duration(all_max_gains, start_date, end_date, base_path):
     print(f"Saved duration chart to {output_path}")
 
 
+def plot_duration_15min(all_max_gains, start_date, end_date, base_path):
+    """Plot histogram of duration between min and max price (15-minute bins, first 10 bins only)."""
+    if not all_max_gains:
+        return
+
+    # Calculate durations in minutes
+    durations = []
+    for g in all_max_gains:
+        duration = abs((g['max_time'] - g['min_time']).total_seconds() / 60)
+        durations.append(duration)
+
+    # Bin by 15 minute intervals, only first 10 bins (0-150 minutes)
+    bins = list(range(0, 165, 15))  # 0, 15, 30, ..., 150
+
+    plt.figure(figsize=(12, 6))
+    counts, bin_edges, patches = plt.hist(durations, bins=bins, edgecolor='black', alpha=0.7)
+
+    # Add quantity above each column
+    for count, patch in zip(counts, patches):
+        if count > 0:
+            x = patch.get_x() + patch.get_width() / 2
+            plt.text(x, count, f'{int(count)}', ha='center', va='bottom', fontsize=9)
+
+    plt.xlabel('Duration (minutes)')
+    plt.ylabel('Quantity')
+    plt.title(f'Duration Between Start and Max Price (15-min bins)\n{start_date} to {end_date}')
+    plt.xticks(bins, rotation=45)
+    plt.grid(axis='y', alpha=0.3)
+
+    stats_text = f'Count: {len(durations)}'
+    plt.text(0.95, 0.95, stats_text, transform=plt.gca().transAxes,
+             verticalalignment='top', horizontalalignment='right',
+             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+    plt.tight_layout()
+    output_path = os.path.join(get_output_dir(base_path), 'momo_duration_15min.png')
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+    print(f"Saved duration (15-min bins) chart to {output_path}")
+
+
+def plot_duration_5min(all_max_gains, start_date, end_date, base_path):
+    """Plot histogram of duration between min and max price (5-minute bins, first 10 bins only)."""
+    if not all_max_gains:
+        return
+
+    # Calculate durations in minutes
+    durations = []
+    for g in all_max_gains:
+        duration = abs((g['max_time'] - g['min_time']).total_seconds() / 60)
+        durations.append(duration)
+
+    # Bin by 5 minute intervals, only first 10 bins (0-50 minutes)
+    bins = list(range(0, 55, 5))  # 0, 5, 10, ..., 50
+
+    plt.figure(figsize=(12, 6))
+    counts, bin_edges, patches = plt.hist(durations, bins=bins, edgecolor='black', alpha=0.7)
+
+    # Add quantity above each column
+    for count, patch in zip(counts, patches):
+        if count > 0:
+            x = patch.get_x() + patch.get_width() / 2
+            plt.text(x, count, f'{int(count)}', ha='center', va='bottom', fontsize=9)
+
+    plt.xlabel('Duration (minutes)')
+    plt.ylabel('Quantity')
+    plt.title(f'Duration Between Start and Max Price (5-min bins)\n{start_date} to {end_date}')
+    plt.xticks(bins, rotation=45)
+    plt.grid(axis='y', alpha=0.3)
+
+    stats_text = f'Count: {len(durations)}'
+    plt.text(0.95, 0.95, stats_text, transform=plt.gca().transAxes,
+             verticalalignment='top', horizontalalignment='right',
+             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+    plt.tight_layout()
+    output_path = os.path.join(get_output_dir(base_path), 'momo_duration_5min.png')
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+    print(f"Saved duration (5-min bins) chart to {output_path}")
+
+
+def plot_duration_5min_top_gainers(all_max_gains, start_date, end_date, base_path):
+    """Plot histogram of duration (5-min bins, first 10 bins) for top gainer per day only."""
+    if not all_max_gains:
+        return
+
+    # Find the top gainer for each day
+    daily_top = {}
+    for g in all_max_gains:
+        date = g['date']
+        if date not in daily_top or g['max_gain'] > daily_top[date]['max_gain']:
+            daily_top[date] = g
+
+    top_gainers = list(daily_top.values())
+
+    # Calculate durations in minutes
+    durations = []
+    for g in top_gainers:
+        duration = abs((g['max_time'] - g['min_time']).total_seconds() / 60)
+        durations.append(duration)
+
+    # Bin by 5 minute intervals, only first 10 bins (0-50 minutes)
+    bins = list(range(0, 55, 5))  # 0, 5, 10, ..., 50
+
+    plt.figure(figsize=(12, 6))
+    counts, bin_edges, patches = plt.hist(durations, bins=bins, edgecolor='black', alpha=0.7)
+
+    # Add quantity above each column
+    for count, patch in zip(counts, patches):
+        if count > 0:
+            x = patch.get_x() + patch.get_width() / 2
+            plt.text(x, count, f'{int(count)}', ha='center', va='bottom', fontsize=9)
+
+    plt.xlabel('Duration (minutes)')
+    plt.ylabel('Quantity')
+    plt.title(f'Duration Between Start and Max Price (5-min bins, Top Gainer Per Day)\n{start_date} to {end_date}')
+    plt.xticks(bins, rotation=45)
+    plt.grid(axis='y', alpha=0.3)
+
+    stats_text = f'Count: {len(durations)}'
+    plt.text(0.95, 0.95, stats_text, transform=plt.gca().transAxes,
+             verticalalignment='top', horizontalalignment='right',
+             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+    plt.tight_layout()
+    output_path = os.path.join(get_output_dir(base_path), 'momo_duration_5min_top_gainers.png')
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+    print(f"Saved duration (5-min bins, top gainers) chart to {output_path}")
+
+
+def plot_duration_30min_top_gainers(all_max_gains, start_date, end_date, base_path):
+    """Plot histogram of duration (30-min bins, first 10 bins) for top gainer per day only."""
+    if not all_max_gains:
+        return
+
+    # Find the top gainer for each day
+    daily_top = {}
+    for g in all_max_gains:
+        date = g['date']
+        if date not in daily_top or g['max_gain'] > daily_top[date]['max_gain']:
+            daily_top[date] = g
+
+    top_gainers = list(daily_top.values())
+
+    # Calculate durations in minutes
+    durations = []
+    for g in top_gainers:
+        duration = abs((g['max_time'] - g['min_time']).total_seconds() / 60)
+        durations.append(duration)
+
+    # Bin by 30 minute intervals, only first 10 bins (0-300 minutes)
+    bins = list(range(0, 330, 30))  # 0, 30, 60, ..., 300
+
+    plt.figure(figsize=(12, 6))
+    counts, bin_edges, patches = plt.hist(durations, bins=bins, edgecolor='black', alpha=0.7)
+
+    # Add quantity above each column
+    for count, patch in zip(counts, patches):
+        if count > 0:
+            x = patch.get_x() + patch.get_width() / 2
+            plt.text(x, count, f'{int(count)}', ha='center', va='bottom', fontsize=9)
+
+    plt.xlabel('Duration (minutes)')
+    plt.ylabel('Quantity')
+    plt.title(f'Duration Between Start and Max Price (30-min bins, Top Gainer Per Day)\n{start_date} to {end_date}')
+    plt.xticks(bins, rotation=45)
+    plt.grid(axis='y', alpha=0.3)
+
+    stats_text = f'Count: {len(durations)}'
+    plt.text(0.95, 0.95, stats_text, transform=plt.gca().transAxes,
+             verticalalignment='top', horizontalalignment='right',
+             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+    plt.tight_layout()
+    output_path = os.path.join(get_output_dir(base_path), 'momo_duration_30min_top_gainers.png')
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+    print(f"Saved duration (30-min bins, top gainers) chart to {output_path}")
+
+
+def plot_duration_vs_gain_scatter(all_max_gains, start_date, end_date, base_path):
+    """Plot scatter chart of duration vs gain (duration 0-50 minutes)."""
+    if not all_max_gains:
+        return
+
+    # Calculate durations and gains, filter to 0-50 minutes
+    durations = []
+    gains = []
+    for g in all_max_gains:
+        duration = abs((g['max_time'] - g['min_time']).total_seconds() / 60)
+        if duration <= 50:
+            durations.append(duration)
+            gains.append((g['max_gain'] - 1) * 100)  # Convert to percentage
+
+    plt.figure(figsize=(12, 6))
+    plt.scatter(durations, gains, alpha=0.6, edgecolors='black', linewidths=0.5)
+
+    plt.xlabel('Duration (minutes)')
+    plt.ylabel('Gain (%)')
+    plt.title(f'Duration vs Gain (0-50 minutes)\n{start_date} to {end_date}')
+    plt.xlim(0, 50)
+    plt.grid(True, alpha=0.3)
+
+    stats_text = f'Count: {len(durations)}'
+    plt.text(0.95, 0.95, stats_text, transform=plt.gca().transAxes,
+             verticalalignment='top', horizontalalignment='right',
+             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+    plt.tight_layout()
+    output_path = os.path.join(get_output_dir(base_path), 'momo_duration_vs_gain_scatter.png')
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+    print(f"Saved duration vs gain scatter chart to {output_path}")
+
+
+def plot_duration_vs_gain_scatter_full(all_max_gains, start_date, end_date, base_path):
+    """Plot scatter chart of duration vs gain (full duration range)."""
+    if not all_max_gains:
+        return
+
+    # Calculate durations and gains
+    durations = []
+    gains = []
+    for g in all_max_gains:
+        duration = abs((g['max_time'] - g['min_time']).total_seconds() / 60)
+        durations.append(duration)
+        gains.append((g['max_gain'] - 1) * 100)  # Convert to percentage
+
+    plt.figure(figsize=(12, 6))
+    plt.scatter(durations, gains, alpha=0.6, edgecolors='black', linewidths=0.5)
+
+    plt.xlabel('Duration (minutes)')
+    plt.ylabel('Gain (%)')
+    plt.title(f'Duration vs Gain (Full Range)\n{start_date} to {end_date}')
+    plt.xlim(0, max(durations) + 10)
+    plt.grid(True, alpha=0.3)
+
+    stats_text = f'Count: {len(durations)}'
+    plt.text(0.95, 0.95, stats_text, transform=plt.gca().transAxes,
+             verticalalignment='top', horizontalalignment='right',
+             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+    plt.tight_layout()
+    output_path = os.path.join(get_output_dir(base_path), 'momo_duration_vs_gain_scatter_full.png')
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+    print(f"Saved duration vs gain scatter chart (full range) to {output_path}")
+
+
 def plot_time_distribution(all_max_gains, start_date, end_date, base_path):
     """Plot distribution of start (min price) and end (max price) times with smoothed curves."""
     if not all_max_gains:
@@ -393,6 +644,12 @@ def main():
         plot_max_gain_per_day(all_max_gains, args.start_date, args.end_date, base_path)
         plot_time_of_day(all_max_gains, args.start_date, args.end_date, base_path)
         plot_duration(all_max_gains, args.start_date, args.end_date, base_path)
+        plot_duration_15min(all_max_gains, args.start_date, args.end_date, base_path)
+        plot_duration_5min(all_max_gains, args.start_date, args.end_date, base_path)
+        plot_duration_5min_top_gainers(all_max_gains, args.start_date, args.end_date, base_path)
+        plot_duration_30min_top_gainers(all_max_gains, args.start_date, args.end_date, base_path)
+        plot_duration_vs_gain_scatter(all_max_gains, args.start_date, args.end_date, base_path)
+        plot_duration_vs_gain_scatter_full(all_max_gains, args.start_date, args.end_date, base_path)
         plot_time_distribution(all_max_gains, args.start_date, args.end_date, base_path)
 
 
