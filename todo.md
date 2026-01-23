@@ -286,9 +286,34 @@ distance_from_vwap_percent - Distance from VWAP
 
 - [ ]
 
+https://youtu.be/AcGuZY9XJf8
+
+I really need to get premarket top gainers faster.  Compare to how surge data is collected.
+
+Filter Price > Gain since market close?
+Use optional_vwap_flag = false
+Market open -> Market Close?
+Gain since open -> Gain since market close? ***
+Gain since market close > 30% is green light, < 20 is red light, else yellow
+
+## What Time
+
+- [ ] At what time are momentum alerts active?
+
+## Update Momentum Alerts
+
+- [ ] Remove Urgency field from Momentum alerts.
+- [ ] If gain since open > 30% is green light; else red light.
+
+## Momentum Data Dispay and Storage
+
+- [ ] ULTRATHINK.  I have created stock momentum alerts.  Example JSON: historical_data/2026-01-20/momentum_alerts_sent/bullish/alert_XAIR_2026-01-20_141440.json.  They are
+  currently sent on Telegram. I would like to market them in the future.  However, I want to display the data differently and on a web page or possibly a phone app. The data is
+  currently generated on my server at home. Create a .md file discussing how to display the data and where.  And should the data be stored in the cloud and how.
+
 ## Premarket Top Gainers
 
-- [ ] Premarket top gainers icon not working in public_html/index.html the day after a holiday. Use the python-holidays submodule which is locally installed as "holidays".  There is accomadation in the code to deal with weekends.  Add accomadation for holidays. Specifically use:
+- [X] Premarket top gainers icon not working in public_html/index.html the day after a holiday. Use the python-holidays submodule which is locally installed as "holidays".  There is accomadation in the code to deal with weekends.  Add accomadation for holidays. Specifically use:
 Using the NYSE Calendar
 
 ```python
