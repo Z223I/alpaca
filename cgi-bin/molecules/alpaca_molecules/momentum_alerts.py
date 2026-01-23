@@ -2165,6 +2165,36 @@ class MomentumAlertsSystem:
             float_rotation = alert_data.get('float_rotation')
             float_rotation_percent = alert_data.get('float_rotation_percent')
 
+            # Extract source indicators for filtering
+            from_gainers = alert_data.get('from_gainers', False)
+            from_volume_surge = alert_data.get('from_volume_surge', False)
+            percent_gain_since_market_open = alert_data.get('percent_gain_since_market_open')
+
+            # Count green lights for Sources filter (require 2 of 3)
+            green_light_count = 0
+            if from_gainers:
+                green_light_count += 1
+            if from_volume_surge:
+                green_light_count += 1
+            if percent_gain_since_market_open is not None and percent_gain_since_market_open > 30:
+                green_light_count += 1
+
+            # Determine if this alert will be filtered
+            is_filtered = green_light_count < 2
+
+            # STEP 1: Save ALL alerts to momentum_alerts/bullish/ (before filtering)
+            self._save_momentum_alert(
+                alert_data, message=None,
+                filtered=is_filtered, green_light_count=green_light_count)
+
+            # Filter: require at least 2 of 3 sources to be green
+            if is_filtered:
+                self.logger.info(
+                    f"🚫 {symbol}: Momentum alert filtered - only {green_light_count}/3 "
+                    f"sources green (Top Gainers: {from_gainers}, Volume Surge: {from_volume_surge}, "
+                    f"Gain >30%: {percent_gain_since_market_open is not None and percent_gain_since_market_open > 30})")
+                return
+
             # Create alert message
             message_parts = [
                 f"🚀 MOMENTUM ALERT - {symbol}",
@@ -2260,8 +2290,7 @@ class MomentumAlertsSystem:
                 message_parts.append(f"   • Market Cap: N/A")
 
             # Add Sources section with green/red light indicators
-            from_gainers = alert_data.get('from_gainers', False)
-            from_volume_surge = alert_data.get('from_volume_surge', False)
+            # (from_gainers, from_volume_surge, percent_gain_since_market_open already extracted above)
 
             message_parts.extend([
                 "",
@@ -2283,9 +2312,7 @@ class MomentumAlertsSystem:
 
             message = "\n".join(message_parts)
 
-            # Save momentum alert to historical data
-            self._save_momentum_alert(alert_data, message)
-
+            # STEP 2: Send alert and save to momentum_alerts_sent/bullish/
             if self.test_mode:
                 self.logger.info(f"[TEST MODE] {message}")
             else:
@@ -2369,13 +2396,16 @@ class MomentumAlertsSystem:
                 serialized[k] = str(v)
         return serialized
 
-    def _save_momentum_alert(self, alert_data: Dict, message: str) -> None:
+    def _save_momentum_alert(self, alert_data: Dict, message: Optional[str] = None,
+                              filtered: bool = False, green_light_count: int = 0) -> None:
         """
         Save momentum alert to historical data structure.
 
         Args:
             alert_data: Alert data dictionary
-            message: Formatted alert message
+            message: Formatted alert message (optional, None if filtered)
+            filtered: Whether the alert was filtered out (not sent)
+            green_light_count: Number of green light sources (0-3)
         """
         try:
             symbol = alert_data['symbol']
@@ -2412,7 +2442,9 @@ class MomentumAlertsSystem:
                 'current_volume': int(alert_data['current_volume']),
                 'volume_emoji': str(alert_data['volume_emoji']),
                 'timestamp': timestamp.isoformat(),
-                'message': str(message),
+                'message': str(message) if message else None,
+                'filtered': filtered,
+                'green_light_count': green_light_count,
                 'indicators': self._serialize_indicators(alert_data['indicators']),
                 'from_gainers': bool(alert_data.get('from_gainers', False)),
                 'from_volume_surge': bool(alert_data.get('from_volume_surge', False)),
