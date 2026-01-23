@@ -988,19 +988,19 @@ class MomentumAlertsSystem:
 
                 # Create message with file contents
                 message_parts = [
-                    "🌅 **PREMARKET TOP GAINERS FILE GENERATED**",
+                    "🌅 PREMARKET TOP GAINERS FILE GENERATED",
                     "",
-                    "📁 **File:** `top_gainers_nasdaq_amex.csv`",
-                    f"⏰ **Generated:** {file_time.strftime('%H:%M:%S ET')}",
-                    f"📅 **Date:** {file_time.strftime('%Y-%m-%d')}",
-                    f"📈 **Total Symbols:** {total_rows}",
+                    "📁 File: `top_gainers_nasdaq_amex.csv`",
+                    f"⏰ Generated: {file_time.strftime('%H:%M:%S ET')}",
+                    f"📅 Date: {file_time.strftime('%Y-%m-%d')}",
+                    f"📈 Total Symbols: {total_rows}",
                     "",
-                    "📋 **File Contents:**",
+                    "📋 File Contents:",
                     "```csv",
                     file_contents,
                     "```",
                     "",
-                    f"📂 **Path:** `{self.csv_file_path}`"
+                    f"📂 Path: `{self.csv_file_path}`"
                 ]
 
                 message = "\n".join(message_parts)
@@ -1023,11 +1023,11 @@ class MomentumAlertsSystem:
 
                 # Send basic notification even if file reading fails
                 basic_message = (
-                    "🌅 **PREMARKET TOP GAINERS FILE GENERATED**\n\n"
-                    "📁 **File:** `top_gainers_nasdaq_amex.csv`\n"
-                    f"⏰ **Time:** {datetime.now(self.et_tz).strftime('%H:%M:%S ET')}\n"
-                    f"📂 **Path:** `{self.csv_file_path}`\n\n"
-                    "⚠️ **Note:** Could not read file contents for sending"
+                    "🌅 PREMARKET TOP GAINERS FILE GENERATED\n\n"
+                    "📁 File: `top_gainers_nasdaq_amex.csv`\n"
+                    f"⏰ Time: {datetime.now(self.et_tz).strftime('%H:%M:%S ET')}\n"
+                    f"📂 Path: `{self.csv_file_path}`\n\n"
+                    "⚠️ Note: Could not read file contents for sending"
                 )
 
                 if not self.test_mode:
@@ -2167,40 +2167,40 @@ class MomentumAlertsSystem:
 
             # Create alert message
             message_parts = [
-                f"🚀 **MOMENTUM ALERT - {symbol}**",
+                f"🚀 MOMENTUM ALERT - {symbol}",
                 "",
-                f"📅 **Date:** {timestamp.strftime('%Y-%m-%d')}",
-                f"⏰ **Time:** {timestamp.strftime('%H:%M:%S ET')}",
+                f"📅 Date: {timestamp.strftime('%Y-%m-%d')}",
+                f"⏰ Time: {timestamp.strftime('%H:%M:%S ET')}",
                 "",
-                f"💰 **Price:** ${current_price:.2f}",
+                f"💰 Price: ${current_price:.2f}",
             ]
 
             # Add market open price and gain if available
             if market_open_price is not None and percent_gain_since_market_open is not None:
                 message_parts.extend([
-                    f"🌅 **Market Open:** ${market_open_price:.2f}",
-                    f"📈 **Gain Since Open:** {percent_gain_since_market_open:+.2f}%",
+                    f"🌅 Market Open: ${market_open_price:.2f}",
+                    f"📈 Gain Since Open: {percent_gain_since_market_open:+.2f}%",
                 ])
 
             # Add the rest of the alert info
             message_parts.extend([
-                f"📈 **EMA9:** ${ema_9:.2f} ✅",
-                f"⚡ **Momentum:** {momentum:.2f}%/min {momentum_emoji}",
-                f"⚡ **Momentum Short:** {momentum_short:.2f}%/min {momentum_short_emoji}",
-                f"🔥 **Squeezing:** {momentum_squeeze:.2f}%/min {squeeze_emoji}",
-                f"📈 **Volume:** {current_volume:,} {volume_emoji}",
-                f"🚦 **Halt Status:** {halt_emoji}",
+                f"📈 EMA9: ${ema_9:.2f} ✅",
+                f"⚡ Momentum: {momentum:.2f}%/min {momentum_emoji}",
+                f"⚡ Momentum Short: {momentum_short:.2f}%/min {momentum_short_emoji}",
+                f"🔥 Squeezing: {momentum_squeeze:.2f}%/min {squeeze_emoji}",
+                f"📈 Volume: {current_volume:,} {volume_emoji}",
+                f"🚦 Halt Status: {halt_emoji}",
                 "",
             ])
 
             # Add Volume section with surge data
-            message_parts.append("**📊 Volume:**")
+            message_parts.append("📊 Volume:")
             surge_detected_text = "✅ Yes" if volume_surge_detected else "❌ No"
-            message_parts.append(f"   • **Surge Detected:** {surge_detected_text}")
+            message_parts.append(f"   • Surge Detected: {surge_detected_text}")
             if volume_surge_ratio is not None:
-                message_parts.append(f"   • **Surge Ratio:** {volume_surge_ratio:.2f}x")
+                message_parts.append(f"   • Surge Ratio: {volume_surge_ratio:.2f}x")
             else:
-                message_parts.append(f"   • **Surge Ratio:** N/A")
+                message_parts.append(f"   • Surge Ratio: N/A")
 
             # Add float rotation data (calculated from hourly bars since 04:00 ET)
             if float_rotation is not None and total_volume_since_0400 is not None:
@@ -2212,15 +2212,15 @@ class MomentumAlertsSystem:
                 else:
                     float_emoji = "🟡"  # Yellow otherwise
 
-                message_parts.append(f"   • **Volume (since 04:00 ET):** {total_volume_since_0400:,}")
-                message_parts.append(f"   • **Float Rotation:** {float_rotation:.2f}x {float_emoji}")
+                message_parts.append(f"   • Volume (since 04:00 ET): {total_volume_since_0400:,}")
+                message_parts.append(f"   • Float Rotation: {float_rotation:.2f}x {float_emoji}")
             else:
-                message_parts.append(f"   • **Float Rotation:** N/A")
+                message_parts.append(f"   • Float Rotation: N/A")
 
             # Add Fundamentals section
             message_parts.extend([
                 "",
-                "**📈 Fundamentals:**"
+                "📈 Fundamentals:"
             ])
 
             # Format shares outstanding
@@ -2231,9 +2231,9 @@ class MomentumAlertsSystem:
                     shares_str = f"{shares_outstanding / 1_000_000:.2f}M"
                 else:
                     shares_str = f"{shares_outstanding:,.0f}"
-                message_parts.append(f"   • **Shares Outstanding:** {shares_str}")
+                message_parts.append(f"   • Shares Outstanding: {shares_str}")
             else:
-                message_parts.append(f"   • **Shares Outstanding:** N/A")
+                message_parts.append(f"   • Shares Outstanding: N/A")
 
             # Format float shares
             if float_shares is not None:
@@ -2243,9 +2243,9 @@ class MomentumAlertsSystem:
                     float_str = f"{float_shares / 1_000_000:.2f}M"
                 else:
                     float_str = f"{float_shares:,.0f}"
-                message_parts.append(f"   • **Float Shares:** {float_str}")
+                message_parts.append(f"   • Float Shares: {float_str}")
             else:
-                message_parts.append(f"   • **Float Shares:** N/A")
+                message_parts.append(f"   • Float Shares: N/A")
 
             # Format market cap
             if market_cap is not None:
@@ -2255,9 +2255,9 @@ class MomentumAlertsSystem:
                     cap_str = f"${market_cap / 1_000_000:.2f}M"
                 else:
                     cap_str = f"${market_cap:,.0f}"
-                message_parts.append(f"   • **Market Cap:** {cap_str}")
+                message_parts.append(f"   • Market Cap: {cap_str}")
             else:
-                message_parts.append(f"   • **Market Cap:** N/A")
+                message_parts.append(f"   • Market Cap: N/A")
 
             # Add Sources section with green/red light indicators
             from_gainers = alert_data.get('from_gainers', False)
@@ -2265,21 +2265,21 @@ class MomentumAlertsSystem:
 
             message_parts.extend([
                 "",
-                "**🔍 Sources:**"
+                "🔍 Sources:"
             ])
 
             # Gainers source indicator
             gainers_indicator = "🟢" if from_gainers else "🔴"
-            message_parts.append(f"   • **Top Gainers:** {gainers_indicator}")
+            message_parts.append(f"   • Top Gainers: {gainers_indicator}")
 
             # Volume surge source indicator
             volume_indicator = "🟢" if from_volume_surge else "🔴"
-            message_parts.append(f"   • **Volume Surge:** {volume_indicator}")
+            message_parts.append(f"   • Volume Surge: {volume_indicator}")
 
             # Gain since open indicator: green if >30%, red otherwise
             if percent_gain_since_market_open is not None:
                 gain_indicator = "🟢" if percent_gain_since_market_open > 30 else "🔴"
-                message_parts.append(f"   • **Gain >30%:** {gain_indicator}")
+                message_parts.append(f"   • Gain >30%: {gain_indicator}")
 
             message = "\n".join(message_parts)
 
