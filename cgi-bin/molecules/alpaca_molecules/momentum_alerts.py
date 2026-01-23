@@ -3,7 +3,7 @@
 Momentum Alerts System
 
 This system monitors stocks from multiple sources (market open gainers, premarket gainers,
-volume surge, Oracle data) and generates momentum alerts based on VWAP and EMA9 criteria.
+volume surge, Oracle data) and generates momentum alerts based on EMA9 criteria.
 It follows the specification in specs/momentum_alert.md.
 
 Process:
@@ -29,7 +29,7 @@ Process:
    - Track source with boolean fields: from_premarket, from_gainers, from_volume_surge, oracle, from_top_gainers
    - Merge and deduplicate symbols across all sources
 6. Stock Monitoring: Every minute, collect 30 minutes of 1-minute candlesticks for each stock
-7. Momentum Alerts: Check stocks above VWAP, above EMA9, and pass urgency filter
+7. Momentum Alerts: Check stocks above EMA9 and pass urgency filter
 8. Integration: Send alerts to all users with momentum_alerts=true via Telegram
 
 CSV Files Generated:
@@ -1279,9 +1279,11 @@ class MomentumAlertsSystem:
             if current_et.time() < market_open_time:
                 today = today - timedelta(days=1)
 
-            # Skip backwards to most recent weekday
-            while today.weekday() >= 5:  # Skip weekends
+            # Skip backwards to most recent trading day (handles weekends and NYSE holidays)
+            check_datetime = self.et_tz.localize(datetime.combine(today, market_open_time))
+            while not self.is_trading_day(check_datetime):
                 today = today - timedelta(days=1)
+                check_datetime = self.et_tz.localize(datetime.combine(today, market_open_time))
 
             # Create target time for market open (9:30 AM ET)
             market_open_datetime = self.et_tz.localize(
@@ -1771,8 +1773,7 @@ class MomentumAlertsSystem:
                                 'l': float(bar.l),
                                 'c': float(bar.c),
                                 'v': int(bar.v),
-                                'timestamp': bar.t,
-                                'vwap': getattr(bar, 'vw', None)  # Use VWAP from stock data only
+                                'timestamp': bar.t
                             }
                             bar_data.append(bar_dict)
 
@@ -1784,19 +1785,6 @@ class MomentumAlertsSystem:
                             if df.index.tz is None:
                                 df.index = df.index.tz_localize('UTC')
                             df.index = df.index.tz_convert(self.et_tz)
-
-                            # Check if VWAP data is available from stock data
-                            if 'vwap' not in df.columns or df['vwap'].isna().all():
-                                self.logger.debug(f"⚠️ {symbol}: VWAP not available in stock data, skipping")
-                                continue
-
-                            # CRITICAL: Verify the latest bar has valid VWAP from stock data
-                            latest_vwap = df.iloc[-1]['vwap']
-                            if pd.isna(latest_vwap) or latest_vwap is None:
-                                self.logger.debug(f"⚠️ {symbol}: Latest bar missing VWAP from stock data, skipping")
-                                continue
-
-                            self.logger.debug(f"✅ {symbol}: Using VWAP from stock data (vw attribute): ${latest_vwap:.2f}")
 
                             data_dict[symbol] = df
 
@@ -1920,13 +1908,6 @@ class MomentumAlertsSystem:
             # Get latest bar
             latest_bar = data.iloc[-1]
             current_price = float(latest_bar['c'])  # Use single letter attribute
-
-            # CRITICAL: Validate VWAP from stock data before using
-            if pd.isna(latest_bar['vwap']) or latest_bar['vwap'] is None:
-                self.logger.debug(f"❌ {symbol}: VWAP from stock data is invalid")
-                return None
-
-            current_vwap = float(latest_bar['vwap'])  # VWAP from stock data (bar.vw attribute)
             current_volume = int(latest_bar['v'])  # Get current volume
 
             # Calculate float rotation using hourly volume data (04:00 ET to now)
@@ -1948,16 +1929,9 @@ class MomentumAlertsSystem:
                     f"Float: {float_shares:,} | "
                     f"Float Rotation: {float_rotation:.4f}x ({float_rotation_percent:.2f}%)")
 
-            self.logger.debug(f"📊 {symbol}: Using VWAP from stock data: ${current_vwap:.2f}")
-
             # Filter out low volume alerts
             if current_volume < self.momentum_config.volume_low_threshold:
                 self.logger.debug(f"❌ {symbol}: Volume {current_volume:,} below threshold {self.momentum_config.volume_low_threshold:,}")
-                return None
-
-            # Check VWAP criteria
-            if current_price < current_vwap:
-                self.logger.debug(f"❌ {symbol}: Price ${current_price:.2f} below VWAP ${current_vwap:.2f}")
                 return None
 
             # Calculate technical indicators using breakout detector
@@ -2108,7 +2082,6 @@ class MomentumAlertsSystem:
                 'current_price': current_price,
                 'market_open_price': market_open_price,
                 'percent_gain_since_market_open': percent_gain_since_market_open,
-                'vwap': current_vwap,
                 'ema_9': ema_9,
                 'momentum': momentum,
                 'momentum_short': momentum_short,
@@ -2143,7 +2116,7 @@ class MomentumAlertsSystem:
             }
 
             self.logger.info(f"✅ {symbol}: Momentum alert criteria met!")
-            self.logger.info(f"   Price: ${current_price:.2f} | VWAP: ${current_vwap:.2f} (from stock data) | EMA9: ${ema_9:.2f}")
+            self.logger.info(f"   Price: ${current_price:.2f} | EMA9: ${ema_9:.2f}")
 
             # Show actual time periods used (handles halts/gaps)
             time_diff = actual_time_diff if 'actual_time_diff' in locals() else 0
@@ -2171,7 +2144,6 @@ class MomentumAlertsSystem:
             current_price = alert_data['current_price']
             market_open_price = alert_data.get('market_open_price')
             percent_gain_since_market_open = alert_data.get('percent_gain_since_market_open')
-            vwap = alert_data['vwap']
             ema_9 = alert_data['ema_9']
             momentum = alert_data['momentum']
             momentum_short = alert_data['momentum_short']
@@ -2193,7 +2165,7 @@ class MomentumAlertsSystem:
             float_rotation = alert_data.get('float_rotation')
             float_rotation_percent = alert_data.get('float_rotation_percent')
 
-            # Create alert message (VWAP is from stock data, not calculated)
+            # Create alert message
             message_parts = [
                 f"🚀 **MOMENTUM ALERT - {symbol}**",
                 "",
@@ -2212,7 +2184,6 @@ class MomentumAlertsSystem:
 
             # Add the rest of the alert info
             message_parts.extend([
-                f"📊 **VWAP (Stock Data):** ${vwap:.2f} ✅",
                 f"📈 **EMA9:** ${ema_9:.2f} ✅",
                 f"⚡ **Momentum:** {momentum:.2f}%/min {momentum_emoji}",
                 f"⚡ **Momentum Short:** {momentum_short:.2f}%/min {momentum_short_emoji}",
@@ -2423,7 +2394,6 @@ class MomentumAlertsSystem:
                 'current_price': float(alert_data['current_price']),
                 'market_open_price': float(market_open) if market_open is not None else None,
                 'percent_gain_since_market_open': float(percent_gain) if percent_gain is not None else None,
-                'vwap': float(alert_data['vwap']),
                 'ema_9': float(alert_data['ema_9']),
                 'momentum': float(alert_data['momentum']),
                 'momentum_short': float(alert_data['momentum_short']),
@@ -2495,7 +2465,6 @@ class MomentumAlertsSystem:
                 'current_price': float(alert_data['current_price']),
                 'market_open_price': float(market_open) if market_open is not None else None,
                 'percent_gain_since_market_open': float(percent_gain) if percent_gain is not None else None,
-                'vwap': float(alert_data['vwap']),
                 'ema_9': float(alert_data['ema_9']),
                 'momentum': float(alert_data['momentum']),
                 'momentum_short': float(alert_data['momentum_short']),
@@ -2556,7 +2525,6 @@ class MomentumAlertsSystem:
         market_open_price = round(current_price * random.uniform(0.85, 0.98), 2)
         percent_gain = ((current_price - market_open_price) / market_open_price) * 100
 
-        vwap = round(current_price * random.uniform(0.95, 1.00), 2)
         ema_9 = round(current_price * random.uniform(0.90, 0.98), 2)
 
         momentum = round(random.uniform(0.5, 3.0), 2)
@@ -2584,7 +2552,6 @@ class MomentumAlertsSystem:
             'current_price': current_price,
             'market_open_price': market_open_price,
             'percent_gain_since_market_open': percent_gain,
-            'vwap': vwap,
             'ema_9': ema_9,
             'momentum': momentum,
             'momentum_short': momentum_short,
