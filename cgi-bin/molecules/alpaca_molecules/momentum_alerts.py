@@ -2195,15 +2195,30 @@ class MomentumAlertsSystem:
                     f"Gain >30%: {percent_gain_since_market_open is not None and percent_gain_since_market_open > 30})")
                 return
 
+            # Check if this is the biggest gainer across all symbols
+            biggest_gainer_gain = self._update_and_check_biggest_gainer(
+                symbol, current_price, timestamp
+            )
+
             # Create alert message
             message_parts = [
                 f"🚀 MOMENTUM ALERT - {symbol}",
                 "",
                 f"📅 Date: {timestamp.strftime('%Y-%m-%d')}",
                 f"⏰ Time: {timestamp.strftime('%H:%M:%S ET')}",
-                "",
-                f"💰 Price: ${current_price:.2f}",
             ]
+
+            # Add BIGGEST GAINER field if applicable (between Time and Price with blank lines)
+            if biggest_gainer_gain is not None:
+                message_parts.extend([
+                    "",
+                    f"🏆 BIGGEST GAINER: +{biggest_gainer_gain:.2f}%",
+                    "",
+                ])
+            else:
+                message_parts.append("")
+
+            message_parts.append(f"💰 Price: ${current_price:.2f}")
 
             # Add market open price and gain if available
             if market_open_price is not None and percent_gain_since_market_open is not None:
@@ -2357,7 +2372,7 @@ class MomentumAlertsSystem:
                         f"for {symbol}: {', '.join(sent_to_users)}")
                     # Save sent alert to historical data with all recipients
                     self._save_momentum_alert_sent(
-                        alert_data, message, sent_to_users)
+                        alert_data, message, sent_to_users, biggest_gainer_gain)
 
                 if failed_count > 0:
                     self.logger.warning(
@@ -2471,7 +2486,8 @@ class MomentumAlertsSystem:
 
     def _save_momentum_alert_sent(
             self, alert_data: Dict, message: str,
-            sent_to_users: List[str]) -> None:
+            sent_to_users: List[str],
+            biggest_gainer_gain: Optional[float] = None) -> None:
         """
         Save sent momentum alert to historical data structure.
 
@@ -2479,6 +2495,7 @@ class MomentumAlertsSystem:
             alert_data: Alert data dictionary
             message: Formatted alert message
             sent_to_users: List of usernames that received the alert
+            biggest_gainer_gain: Gain percentage if biggest gainer, None otherwise
         """
         try:
             symbol = alert_data['symbol']
@@ -2530,7 +2547,8 @@ class MomentumAlertsSystem:
                 'fundamental_source': str(alert_data.get('fundamental_source', 'none')),
                 'total_volume_since_0400': int(alert_data['total_volume_since_0400']) if alert_data.get('total_volume_since_0400') is not None else None,
                 'float_rotation': float(alert_data['float_rotation']) if alert_data.get('float_rotation') is not None else None,
-                'float_rotation_percent': float(alert_data['float_rotation_percent']) if alert_data.get('float_rotation_percent') is not None else None
+                'float_rotation_percent': float(alert_data['float_rotation_percent']) if alert_data.get('float_rotation_percent') is not None else None,
+                'biggest_gainer': float(biggest_gainer_gain) if biggest_gainer_gain is not None else None
             }
 
             # Save to JSON file
@@ -2541,6 +2559,136 @@ class MomentumAlertsSystem:
 
         except Exception as e:
             self.logger.error(f"❌ Error saving sent momentum alert: {e}")
+
+    def _get_maximum_gain_filepath(self, symbol: str) -> Path:
+        """Get the filepath for a symbol's maximum gain tracking file."""
+        return self.momentum_alerts_sent_dir / f"maximum_{symbol}.json"
+
+    def _load_maximum_gain_data(self, symbol: str) -> Optional[Dict]:
+        """
+        Load maximum gain tracking data for a symbol.
+
+        Returns:
+            Dictionary with first_alert_price, first_alert_time, maximum_gain,
+            maximum_gain_time, or None if file doesn't exist.
+        """
+        filepath = self._get_maximum_gain_filepath(symbol)
+        try:
+            if filepath.exists():
+                with open(filepath, 'r') as f:
+                    return json.load(f)
+        except Exception as e:
+            self.logger.error(f"❌ Error loading maximum gain data for {symbol}: {e}")
+        return None
+
+    def _save_maximum_gain_data(
+            self, symbol: str, first_alert_price: float, first_alert_time: str,
+            maximum_gain: float, maximum_gain_time: str) -> None:
+        """Save maximum gain tracking data for a symbol."""
+        filepath = self._get_maximum_gain_filepath(symbol)
+        try:
+            data = {
+                'symbol': symbol,
+                'first_alert_price': first_alert_price,
+                'first_alert_time': first_alert_time,
+                'maximum_gain': maximum_gain,
+                'maximum_gain_time': maximum_gain_time
+            }
+            with open(filepath, 'w') as f:
+                json.dump(data, f, indent=2)
+            self.logger.debug(f"📝 Saved maximum gain data for {symbol}: {maximum_gain:.2f}%")
+        except Exception as e:
+            self.logger.error(f"❌ Error saving maximum gain data for {symbol}: {e}")
+
+    def _get_all_maximum_gains(self) -> Dict[str, float]:
+        """
+        Load all maximum gain values from all symbols.
+
+        Returns:
+            Dictionary mapping symbol to maximum_gain value.
+        """
+        maximum_gains = {}
+        try:
+            # Find all maximum_*.json files
+            for filepath in self.momentum_alerts_sent_dir.glob("maximum_*.json"):
+                try:
+                    with open(filepath, 'r') as f:
+                        data = json.load(f)
+                        symbol = data.get('symbol')
+                        max_gain = data.get('maximum_gain')
+                        if symbol and max_gain is not None:
+                            maximum_gains[symbol] = max_gain
+                except Exception as e:
+                    self.logger.error(f"❌ Error reading {filepath}: {e}")
+        except Exception as e:
+            self.logger.error(f"❌ Error getting all maximum gains: {e}")
+        return maximum_gains
+
+    def _update_and_check_biggest_gainer(
+            self, symbol: str, current_price: float,
+            timestamp: datetime) -> Optional[float]:
+        """
+        Update maximum gain tracking and check if this is the biggest gainer.
+
+        Args:
+            symbol: Stock symbol
+            current_price: Current stock price
+            timestamp: Alert timestamp
+
+        Returns:
+            Current gain percentage if this is the biggest gainer across all symbols,
+            None otherwise.
+        """
+        timestamp_str = timestamp.isoformat()
+
+        # Load existing data for this symbol
+        existing_data = self._load_maximum_gain_data(symbol)
+
+        if existing_data is None:
+            # First alert for this symbol today
+            first_alert_price = current_price
+            first_alert_time = timestamp_str
+            current_gain = 0.0  # No gain on first alert
+            maximum_gain = 0.0
+            maximum_gain_time = timestamp_str
+        else:
+            first_alert_price = existing_data['first_alert_price']
+            first_alert_time = existing_data['first_alert_time']
+            # Calculate current gain as percentage: (current / first - 1) * 100
+            current_gain = ((current_price / first_alert_price) - 1) * 100
+            maximum_gain = existing_data.get('maximum_gain', 0.0)
+            maximum_gain_time = existing_data.get('maximum_gain_time', timestamp_str)
+
+            # Update maximum if current is higher
+            if current_gain > maximum_gain:
+                maximum_gain = current_gain
+                maximum_gain_time = timestamp_str
+
+        # Save updated data
+        self._save_maximum_gain_data(
+            symbol, first_alert_price, first_alert_time,
+            maximum_gain, maximum_gain_time
+        )
+
+        # Check if this is the biggest gainer across all symbols
+        all_max_gains = self._get_all_maximum_gains()
+
+        # Find the highest maximum gain among all OTHER symbols
+        other_max_gain = 0.0
+        for sym, max_gain in all_max_gains.items():
+            if sym != symbol and max_gain > other_max_gain:
+                other_max_gain = max_gain
+
+        # This is the biggest gainer if current gain > all other maximum gains
+        # (and current gain > 0 to avoid showing on first alerts)
+        if current_gain > 0 and current_gain > other_max_gain:
+            self.logger.info(
+                f"🏆 {symbol}: BIGGEST GAINER with +{current_gain:.2f}% "
+                f"(beat {other_max_gain:.2f}%)"
+            )
+            return current_gain
+
+        return None
 
     async def _send_debug_alert(self):
         """

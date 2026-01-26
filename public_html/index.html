@@ -4738,9 +4738,12 @@
                 const sourceClass = alert.source === 'Squeeze' ? 'squeeze-source' : '';
                 const sourceDisplay = alert.source === 'Squeeze' ? '🚀 Squeeze' : '📈 Momentum';
 
-                // Determine background color based on HOD and premarket high indicators
+                // Determine background color based on biggest gainer, HOD, and premarket high indicators
                 let bgColor = '';
-                if (alert.regular_hours_hod_status && alert.regular_hours_hod_status.color === 'green') {
+                if (alert.biggest_gainer != null) {
+                    // Biggest gainer gets bright green highlight
+                    bgColor = 'background-color: #00FF00;';  // Bright green for biggest gainer
+                } else if (alert.regular_hours_hod_status && alert.regular_hours_hod_status.color === 'green') {
                     bgColor = 'background-color: green;';
                 } else if (alert.premarket_high_status && alert.premarket_high_status.color === 'green') {
                     bgColor = 'background-color: lime;';

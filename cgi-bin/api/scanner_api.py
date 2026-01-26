@@ -215,6 +215,9 @@ def get_momentum_alerts() -> List[Dict]:
 
             text = " | ".join(text_parts)
 
+            # Get biggest_gainer field (null if not biggest gainer)
+            biggest_gainer = alert_data.get('biggest_gainer')
+
             alert_obj = {
                 'symbol': symbol,
                 'source': 'Momentum',
@@ -223,7 +226,8 @@ def get_momentum_alerts() -> List[Dict]:
                 'gain': gain,
                 'volume': volume,
                 'text': text,
-                'timestamp': timestamp_str  # For sorting
+                'timestamp': timestamp_str,  # For sorting
+                'biggest_gainer': biggest_gainer  # null or gain percentage
             }
 
             alerts_list.append(alert_obj)
