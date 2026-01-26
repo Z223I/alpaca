@@ -343,7 +343,18 @@ filtered_trades = trades_df[
 
 ## Highlight Max gain
 
-- [ ] Add max gain field. Can the entire row be highlighted?
+- [X] ULTRATHINK.
+
+1) Update cgi-bin/molecules/alpaca_molecules/momentum_alerts.py
+
+  A) On a per day and per symbol track the maximum gain since the first momentum alert per symbol.  Use historical_data/YYYY-MM-DD/momentum_alerts_sent/bullish/maximum_{symbol}.json for persistant memory in JSON.  Use "Price" current / "Price" first alert to calculate the current gain.
+
+  B) If the current gain > the maximum gain for all symbols add a new field "BIGGEST GAINER" with the current gain to the momentum alert.  The new field is to be between the Time and Price fields with a blank line above and below.
+
+  C) In the log and json files, mark the "BIGGEST GAINER" as "N/A" or some other easy to parse JSON value.
+
+
+- [ ] Update public_html/index.html: When the "Scanner" panel is updated with a momentum alert, check the alert to see if it includes a "BIGGEST GAINER" field.  If so, highlight the row in the "Scanner" panel with green.
 
 
 
