@@ -1230,6 +1230,22 @@
             white-space: nowrap;
             position: relative;
             user-select: none;
+            cursor: pointer;
+        }
+
+        .scanner-table th:hover {
+            color: var(--text-primary);
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .scanner-table th.sort-asc::after {
+            content: ' ▲';
+            font-size: 10px;
+        }
+
+        .scanner-table th.sort-desc::after {
+            content: ' ▼';
+            font-size: 10px;
         }
 
         /* Column resize handle */
@@ -1493,12 +1509,12 @@
                 <table class="scanner-table">
                     <thead>
                         <tr>
-                            <th>Symbol<div class="resize-handle"></div></th>
-                            <th class="source-col">Source<div class="resize-handle"></div></th>
-                            <th class="time-col">Time<div class="resize-handle"></div></th>
-                            <th class="price-col">Price<div class="resize-handle"></div></th>
-                            <th class="gain-col">Gain<div class="resize-handle"></div></th>
-                            <th>Text<div class="resize-handle"></div></th>
+                            <th data-column="symbol" onclick="sortScanner('symbol')">Symbol<div class="resize-handle"></div></th>
+                            <th class="source-col" data-column="source" onclick="sortScanner('source')">Source<div class="resize-handle"></div></th>
+                            <th class="time-col" data-column="time" onclick="sortScanner('time')">Time<div class="resize-handle"></div></th>
+                            <th class="price-col" data-column="price" onclick="sortScanner('price')">Price<div class="resize-handle"></div></th>
+                            <th class="gain-col" data-column="gain" onclick="sortScanner('gain')">Gain<div class="resize-handle"></div></th>
+                            <th data-column="text" onclick="sortScanner('text')">Text<div class="resize-handle"></div></th>
                         </tr>
                     </thead>
                     <tbody id="scannerBody">
@@ -4651,6 +4667,10 @@
                 currentColumn: null,
                 startX: 0,
                 startWidth: 0
+            },
+            sorting: {
+                column: null,
+                ascending: true
             }
         };
 
@@ -4737,6 +4757,51 @@
                     </tr>
                 `;
             }).join('');
+        }
+
+        // Sort scanner table by column
+        function sortScanner(column) {
+            // Determine sort direction
+            // If clicking same column, toggle direction
+            // If new column, default to ascending except 'gain' which defaults to descending
+            if (scannerState.sorting.column === column) {
+                scannerState.sorting.ascending = !scannerState.sorting.ascending;
+            } else {
+                scannerState.sorting.column = column;
+                scannerState.sorting.ascending = column !== 'gain';  // Gain defaults to descending
+            }
+
+            // Sort the alerts
+            scannerState.alerts.sort((a, b) => {
+                let valA = a[column];
+                let valB = b[column];
+
+                // Handle null/undefined values
+                if (valA == null) valA = column === 'gain' || column === 'price' ? -Infinity : '';
+                if (valB == null) valB = column === 'gain' || column === 'price' ? -Infinity : '';
+
+                // Compare based on type
+                let comparison;
+                if (typeof valA === 'number' && typeof valB === 'number') {
+                    comparison = valA - valB;
+                } else {
+                    comparison = String(valA).localeCompare(String(valB));
+                }
+
+                return scannerState.sorting.ascending ? comparison : -comparison;
+            });
+
+            // Update header styling
+            const headers = document.querySelectorAll('.scanner-table th');
+            headers.forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+                if (th.dataset.column === column) {
+                    th.classList.add(scannerState.sorting.ascending ? 'sort-asc' : 'sort-desc');
+                }
+            });
+
+            // Re-render the table
+            renderScanner();
         }
 
         // Show scanner error
