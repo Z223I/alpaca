@@ -2673,18 +2673,16 @@ class MomentumAlertsSystem:
         # Check if this is the biggest gainer across all symbols
         all_max_gains = self._get_all_maximum_gains()
 
-        # Find the highest maximum gain among all OTHER symbols
-        other_max_gain = 0.0
-        for sym, max_gain in all_max_gains.items():
-            if sym != symbol and max_gain > other_max_gain:
-                other_max_gain = max_gain
+        # Find the highest maximum gain across ALL symbols (including this one)
+        highest_max_gain = max(all_max_gains.values()) if all_max_gains else 0.0
 
-        # This is the biggest gainer if current gain > all other maximum gains
-        # (and current gain > 0 to avoid showing on first alerts)
-        if current_gain > 0 and current_gain > other_max_gain:
+        # This is the biggest gainer ONLY if current gain equals the highest max
+        # (meaning we just set or tied the daily record)
+        # Must be > 0 to avoid showing on first alerts
+        if current_gain > 0 and current_gain >= highest_max_gain:
             self.logger.info(
                 f"🏆 {symbol}: BIGGEST GAINER with +{current_gain:.2f}% "
-                f"(beat {other_max_gain:.2f}%)"
+                f"(daily max: {highest_max_gain:.2f}%)"
             )
             return current_gain
 
