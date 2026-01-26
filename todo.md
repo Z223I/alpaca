@@ -305,9 +305,57 @@ Gain since market close > 30% is green light, < 20 is red light, else yellow
 - [ ] Remove Urgency field from Momentum alerts.
 - [ ] If gain since open > 30% is green light; else red light.
 
+## New Candlesticks
+
+```python
+from alpaca.data import StockHistoricalDataClient
+from alpaca.data.requests import StockTradesRequest
+
+# Get individual trades
+trades_request = StockTradesRequest(
+    symbol_or_symbols="YOUR_SYMBOL",
+    start=start_time,
+    end=end_time
+)
+
+trades = client.get_stock_trades(trades_request)
+
+# Filter on 'other'
+
+# Filter out problematic conditions
+filtered_trades = trades_df[
+    ~trades_df['conditions'].apply(
+        lambda x: any(cond in x for cond in ['I', 'Z', 'H', '4', 'B', 'W'])
+    )
+]
+
+# Now build your own OHLCV bars from filtered_trades
+
+```
+
+## T&S
+
+- [ ] Filter 'other' source.
+
+## Scanner Page
+
+- [ ] Create to do list.  Mirror public_html/index.html. Create separate scanner page that is mobile friendly.
+
+## Highlight Max gain
+
+- [ ] Add max gain field. Can the entire row be highlighted?
+
+
+
+
+
+## Update Scanner Panel
+
+- [X] Create to do list.  Update public_html/index.html. Update Scanner panel: make every column sortable. The first click should be ascending expcept the gain field which is descending.
+
 ## Momentum Data Dispay and Storage
 
-- [ ] ULTRATHINK.  I have created stock momentum alerts.  Example JSON: historical_data/2026-01-20/momentum_alerts_sent/bullish/alert_XAIR_2026-01-20_141440.json.  They are
+- [X] ULTRATHINK.  I have created stock momentum alerts.  Example JSON: historical_data/2026-01-20/momentum_alerts_sent/bullish/alert_XAIR_2026-01-20_141440.json.  They are
   currently sent on Telegram. I would like to market them in the future.  However, I want to display the data differently and on a web page or possibly a phone app. The data is
   currently generated on my server at home. Create a .md file discussing how to display the data and where.  And should the data be stored in the cloud and how.
 
