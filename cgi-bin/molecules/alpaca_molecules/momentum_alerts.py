@@ -2082,6 +2082,12 @@ class MomentumAlertsSystem:
                     f"📊 {symbol}: Market open: ${market_open_price:.2f}, "
                     f"Gain since open: {percent_gain_since_market_open:+.2f}%")
 
+            # Filter: Skip alerts when price is below market open (bearish, not momentum)
+            if market_open_price is not None and current_price < market_open_price:
+                self.logger.debug(
+                    f"❌ {symbol}: Filtered - Price ${current_price:.2f} below market open ${market_open_price:.2f}")
+                return None
+
             # If we get here, all criteria are met
             alert_data = {
                 'symbol': symbol,
