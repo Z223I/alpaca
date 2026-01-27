@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Scanner - Market Sentinel</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="alternate icon" href="favicon.ico">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-tertiary: #0f3460;
+            --text-primary: #e4e4e4;
+            --text-secondary: #a0a0a0;
+            --accent-green: #4ecca3;
+            --accent-red: #ff6b6b;
+            --accent-blue: #4dabf7;
+            --accent-orange: #ffa500;
+            --border-color: #2a2a3e;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            background-color: var(--bg-secondary);
+            padding: 15px 20px;
+            border-bottom: 2px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--accent-green);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .home-link {
+            color: var(--accent-blue);
+            text-decoration: none;
+            font-size: 14px;
+            padding: 8px 16px;
+            border: 1px solid var(--accent-blue);
+            border-radius: 5px;
+            transition: all 0.2s;
+        }
+
+        .home-link:hover {
+            background-color: var(--accent-blue);
+            color: var(--bg-primary);
+        }
+
+        .refresh-btn {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .refresh-btn:hover {
+            background-color: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        .refresh-btn:active {
+            transform: scale(0.95);
+        }
+
+        .status-indicator {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .status-indicator.connected {
+            color: var(--accent-green);
+        }
+
+        /* Scanner Container */
+        .scanner-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Scanner Header */
+        .scanner-header {
+            background-color: var(--bg-tertiary);
+            padding: 12px 20px;
+            border-bottom: 2px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .scanner-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--accent-green);
+            margin: 0;
+        }
+
+        .alert-count {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        /* Scanner Table Container */
+        .scanner-table-container {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Scanner Table */
+        .scanner-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 600px;
+        }
+
+        .scanner-table thead {
+            position: sticky;
+            top: 0;
+            background-color: var(--bg-tertiary);
+            z-index: 10;
+        }
+
+        .scanner-table th {
+            padding: 12px 8px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            border-bottom: 2px solid var(--border-color);
+            white-space: nowrap;
+            position: relative;
+            user-select: none;
+            cursor: pointer;
+            min-height: 44px;
+        }
+
+        .scanner-table th:hover {
+            color: var(--text-primary);
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .scanner-table th.sort-asc::after {
+            content: ' ▲';
+            font-size: 10px;
+        }
+
+        .scanner-table th.sort-desc::after {
+            content: ' ▼';
+            font-size: 10px;
+        }
+
+        /* Column resize handle */
+        .scanner-table th .resize-handle {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 8px;
+            height: 100%;
+            cursor: col-resize;
+            background-color: transparent;
+            z-index: 1;
+        }
+
+        .scanner-table th .resize-handle:hover {
+            background-color: var(--accent-blue);
+        }
+
+        .scanner-table th.resizing {
+            border-right: 2px solid var(--accent-blue);
+        }
+
+        .scanner-table th.source-col {
+            text-align: center;
+            width: 100px;
+        }
+
+        .scanner-table th.time-col {
+            width: 90px;
+        }
+
+        .scanner-table th.price-col {
+            text-align: right;
+            width: 80px;
+        }
+
+        .scanner-table th.gain-col {
+            text-align: right;
+            width: 80px;
+        }
+
+        .scanner-table tbody tr {
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background-color 0.2s;
+            min-height: 48px;
+        }
+
+        .scanner-table tbody tr:hover {
+            background-color: var(--bg-tertiary);
+        }
+
+        .scanner-table tbody tr:active {
+            background-color: var(--bg-secondary);
+        }
+
+        .scanner-table td {
+            padding: 10px 8px;
+            font-size: 14px;
+        }
+
+        .scanner-table td.symbol-cell {
+            font-weight: 600;
+            color: var(--accent-blue);
+            font-size: 15px;
+        }
+
+        .scanner-table td.source-cell {
+            text-align: center;
+            font-weight: 600;
+            color: var(--accent-green);
+        }
+
+        .scanner-table td.source-cell.squeeze-source {
+            color: var(--accent-orange);
+        }
+
+        .scanner-table td.time-cell {
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        .scanner-table td.price-cell {
+            text-align: right;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .scanner-table td.gain-cell {
+            text-align: right;
+            font-weight: 600;
+        }
+
+        .scanner-table td.gain-cell.positive {
+            color: var(--accent-green);
+        }
+
+        .scanner-table td.gain-cell.negative {
+            color: var(--accent-red);
+        }
+
+        .scanner-table td.text-cell {
+            font-size: 12px;
+            color: var(--text-secondary);
+            max-width: 250px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .scanner-empty {
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        .scanner-empty td {
+            padding: 60px 20px;
+        }
+
+        /* Pull to refresh indicator */
+        .pull-indicator {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            display: none;
+        }
+
+        .pull-indicator.visible {
+            display: block;
+        }
+
+        /* Footer */
+        .footer {
+            background-color: var(--bg-secondary);
+            padding: 10px 20px;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+        }
+
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            .header {
+                padding: 12px 15px;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .header h1 {
+                font-size: 20px;
+            }
+
+            .header-right {
+                gap: 10px;
+            }
+
+            .home-link, .refresh-btn {
+                padding: 6px 12px;
+                font-size: 13px;
+            }
+
+            .scanner-header {
+                padding: 10px 15px;
+            }
+
+            .scanner-header h2 {
+                font-size: 16px;
+            }
+
+            .scanner-table {
+                min-width: 500px;
+            }
+
+            .scanner-table th {
+                padding: 10px 6px;
+                font-size: 12px;
+            }
+
+            .scanner-table td {
+                padding: 8px 6px;
+                font-size: 13px;
+            }
+
+            .scanner-table td.symbol-cell {
+                font-size: 14px;
+            }
+
+            .scanner-table td.text-cell {
+                max-width: 150px;
+                font-size: 11px;
+            }
+
+            .scanner-table th.source-col {
+                width: 80px;
+            }
+
+            .scanner-table th.time-col {
+                width: 70px;
+            }
+
+            .scanner-table th.price-col,
+            .scanner-table th.gain-col {
+                width: 65px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header {
+                padding: 10px;
+            }
+
+            .header h1 {
+                font-size: 18px;
+                width: 100%;
+            }
+
+            .header-right {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .status-indicator {
+                display: none;
+            }
+
+            .scanner-header {
+                padding: 8px 10px;
+            }
+
+            .scanner-table {
+                min-width: 450px;
+            }
+
+            .scanner-table th {
+                padding: 8px 4px;
+                font-size: 11px;
+            }
+
+            .scanner-table td {
+                padding: 6px 4px;
+                font-size: 12px;
+            }
+
+            .scanner-table td.text-cell {
+                max-width: 100px;
+                font-size: 10px;
+            }
+
+            .footer {
+                padding: 8px 10px;
+                font-size: 11px;
+            }
+        }
+
+        /* Touch-friendly enhancements */
+        @media (hover: none) and (pointer: coarse) {
+            .scanner-table tbody tr {
+                min-height: 52px;
+            }
+
+            .scanner-table th,
+            .scanner-table td {
+                padding: 12px 8px;
+            }
+
+            .scanner-table th .resize-handle {
+                width: 16px;
+            }
+        }
+
+        /* Loading spinner */
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--text-secondary);
+            border-radius: 50%;
+            border-top-color: var(--accent-blue);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <h1>Scanner</h1>
+        <div class="header-right">
+            <span class="status-indicator" id="statusIndicator">Auto-refresh: 5s</span>
+            <button class="refresh-btn" onclick="loadScanner()" title="Refresh now">
+                Refresh
+            </button>
+            <a href="index.html" class="home-link">Dashboard</a>
+        </div>
+    </header>
+
+    <!-- Scanner Container -->
+    <div class="scanner-container">
+        <!-- Pull to refresh indicator -->
+        <div class="pull-indicator" id="pullIndicator">
+            Pull down to refresh...
+        </div>
+
+        <!-- Scanner Header -->
+        <div class="scanner-header">
+            <h2>Momentum Alerts</h2>
+            <span class="alert-count" id="alertCount">Loading...</span>
+        </div>
+
+        <!-- Scanner Table -->
+        <div class="scanner-table-container" id="tableContainer">
+            <table class="scanner-table">
+                <thead>
+                    <tr>
+                        <th data-column="symbol" onclick="sortScanner('symbol')">Symbol<div class="resize-handle"></div></th>
+                        <th class="source-col" data-column="source" onclick="sortScanner('source')">Source<div class="resize-handle"></div></th>
+                        <th class="time-col" data-column="time" onclick="sortScanner('time')">Time<div class="resize-handle"></div></th>
+                        <th class="price-col" data-column="price" onclick="sortScanner('price')">Price<div class="resize-handle"></div></th>
+                        <th class="gain-col" data-column="gain" onclick="sortScanner('gain')">Gain<div class="resize-handle"></div></th>
+                        <th data-column="text" onclick="sortScanner('text')">Text<div class="resize-handle"></div></th>
+                    </tr>
+                </thead>
+                <tbody id="scannerBody">
+                    <tr class="scanner-empty">
+                        <td colspan="6">
+                            <div class="loading-spinner"></div>
+                            <div style="margin-top: 10px;">Loading scanner...</div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <span id="lastUpdate">Last updated: --</span>
+    </footer>
+
+    <script>
+        // Scanner state
+        const scannerState = {
+            alerts: [],
+            refreshInterval: null,
+            resizing: {
+                isResizing: false,
+                currentColumn: null,
+                startX: 0,
+                startWidth: 0
+            },
+            sorting: {
+                column: 'time',
+                ascending: false
+            },
+            lastUpdate: null
+        };
+
+        // Initialize scanner on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadScanner();
+            // Refresh scanner every 5 seconds
+            scannerState.refreshInterval = setInterval(loadScanner, 5000);
+            // Initialize column resizing
+            initScannerColumnResize();
+            // Initialize pull to refresh on mobile
+            initPullToRefresh();
+        });
+
+        // Load scanner alerts from API
+        async function loadScanner() {
+            try {
+                const response = await fetch('cgi-bin/api/scanner_api.py');
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.success) {
+                    scannerState.alerts = data.data;
+                    scannerState.lastUpdate = new Date();
+
+                    // Apply current sort if any
+                    if (scannerState.sorting.column) {
+                        applySorting();
+                    }
+
+                    renderScanner();
+                    updateStatus();
+                } else {
+                    showScannerError(`Failed to load: ${data.error || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.error('Error loading scanner:', error);
+                showScannerError(`Error: ${error.message}`);
+            }
+        }
+
+        // Apply current sorting without re-rendering
+        function applySorting() {
+            const column = scannerState.sorting.column;
+            scannerState.alerts.sort((a, b) => {
+                let valA = a[column];
+                let valB = b[column];
+
+                if (valA == null) valA = column === 'gain' || column === 'price' ? -Infinity : '';
+                if (valB == null) valB = column === 'gain' || column === 'price' ? -Infinity : '';
+
+                let comparison;
+                if (typeof valA === 'number' && typeof valB === 'number') {
+                    comparison = valA - valB;
+                } else {
+                    comparison = String(valA).localeCompare(String(valB));
+                }
+
+                return scannerState.sorting.ascending ? comparison : -comparison;
+            });
+        }
+
+        // Render scanner table
+        function renderScanner() {
+            const tbody = document.getElementById('scannerBody');
+            const alertCount = document.getElementById('alertCount');
+
+            if (!scannerState.alerts || scannerState.alerts.length === 0) {
+                tbody.innerHTML = `
+                    <tr class="scanner-empty">
+                        <td colspan="6">No alerts</td>
+                    </tr>
+                `;
+                alertCount.textContent = '0 alerts';
+                return;
+            }
+
+            alertCount.textContent = `${scannerState.alerts.length} alert${scannerState.alerts.length !== 1 ? 's' : ''}`;
+
+            tbody.innerHTML = scannerState.alerts.map(alert => {
+                // Format gain with + sign for positive values
+                const gainStr = (alert.gain != null)
+                    ? (alert.gain >= 0 ? `+${alert.gain.toFixed(2)}%` : `${alert.gain.toFixed(2)}%`)
+                    : 'N/A';
+                const gainClass = (alert.gain != null && alert.gain >= 0) ? 'positive' : 'negative';
+
+                // Format price with 2 decimal places
+                const priceStr = alert.price ? `$${alert.price.toFixed(2)}` : 'N/A';
+
+                // Style source based on alert type
+                const sourceClass = alert.source === 'Squeeze' ? 'squeeze-source' : '';
+                const sourceDisplay = alert.source === 'Squeeze' ? 'Squeeze' : 'Momentum';
+
+                // Determine background color based on biggest gainer, HOD, and premarket high indicators
+                let bgColor = '';
+                if (alert.biggest_gainer != null) {
+                    bgColor = 'background-color: #00FF00;';
+                } else if (alert.regular_hours_hod_status && alert.regular_hours_hod_status.color === 'green') {
+                    bgColor = 'background-color: green;';
+                } else if (alert.premarket_high_status && alert.premarket_high_status.color === 'green') {
+                    bgColor = 'background-color: lime;';
+                }
+
+                return `
+                    <tr onclick="handleRowClick('${alert.symbol}')" style="${bgColor}">
+                        <td class="symbol-cell">${alert.symbol}</td>
+                        <td class="source-cell ${sourceClass}">${sourceDisplay}</td>
+                        <td class="time-cell">${alert.time}</td>
+                        <td class="price-cell">${priceStr}</td>
+                        <td class="gain-cell ${gainClass}">${gainStr}</td>
+                        <td class="text-cell" title="${alert.text || ''}">${alert.text || ''}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Update sort indicators
+            updateSortIndicators();
+        }
+
+        // Handle row click - open in main dashboard
+        function handleRowClick(symbol) {
+            if (!symbol) return;
+            // Navigate to main dashboard with symbol
+            window.location.href = `index.html?symbol=${encodeURIComponent(symbol)}`;
+        }
+
+        // Sort scanner table by column
+        function sortScanner(column) {
+            if (scannerState.sorting.column === column) {
+                scannerState.sorting.ascending = !scannerState.sorting.ascending;
+            } else {
+                scannerState.sorting.column = column;
+                scannerState.sorting.ascending = column !== 'gain';
+            }
+
+            applySorting();
+            renderScanner();
+        }
+
+        // Update sort indicators in headers
+        function updateSortIndicators() {
+            const headers = document.querySelectorAll('.scanner-table th');
+            headers.forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+                if (th.dataset.column === scannerState.sorting.column) {
+                    th.classList.add(scannerState.sorting.ascending ? 'sort-asc' : 'sort-desc');
+                }
+            });
+        }
+
+        // Show scanner error
+        function showScannerError(message) {
+            const tbody = document.getElementById('scannerBody');
+            tbody.innerHTML = `
+                <tr class="scanner-empty">
+                    <td colspan="6" style="color: var(--accent-red);">${message}</td>
+                </tr>
+            `;
+            document.getElementById('alertCount').textContent = 'Error';
+        }
+
+        // Update status display
+        function updateStatus() {
+            const lastUpdate = document.getElementById('lastUpdate');
+            if (scannerState.lastUpdate) {
+                const time = scannerState.lastUpdate.toLocaleTimeString();
+                lastUpdate.textContent = `Last updated: ${time}`;
+            }
+        }
+
+        // Initialize scanner column resizing
+        function initScannerColumnResize() {
+            const table = document.querySelector('.scanner-table');
+            if (!table) return;
+
+            const headers = table.querySelectorAll('th');
+
+            headers.forEach((header) => {
+                const resizeHandle = header.querySelector('.resize-handle');
+                if (!resizeHandle) return;
+
+                // Mouse events
+                resizeHandle.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    startResize(e.pageX, header);
+                });
+
+                // Touch events for mobile
+                resizeHandle.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const touch = e.touches[0];
+                    startResize(touch.pageX, header);
+                }, { passive: false });
+            });
+
+            // Global mouse move handler
+            document.addEventListener('mousemove', (e) => {
+                if (scannerState.resizing.isResizing) {
+                    handleResize(e.pageX);
+                }
+            });
+
+            // Global touch move handler
+            document.addEventListener('touchmove', (e) => {
+                if (scannerState.resizing.isResizing) {
+                    const touch = e.touches[0];
+                    handleResize(touch.pageX);
+                }
+            }, { passive: true });
+
+            // Global mouse/touch up handler
+            document.addEventListener('mouseup', endResize);
+            document.addEventListener('touchend', endResize);
+        }
+
+        function startResize(pageX, header) {
+            scannerState.resizing.isResizing = true;
+            scannerState.resizing.currentColumn = header;
+            scannerState.resizing.startX = pageX;
+            scannerState.resizing.startWidth = header.offsetWidth;
+            header.classList.add('resizing');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        }
+
+        function handleResize(pageX) {
+            if (!scannerState.resizing.isResizing) return;
+            const diff = pageX - scannerState.resizing.startX;
+            const newWidth = scannerState.resizing.startWidth + diff;
+            if (newWidth >= 50) {
+                scannerState.resizing.currentColumn.style.width = newWidth + 'px';
+                scannerState.resizing.currentColumn.style.minWidth = newWidth + 'px';
+            }
+        }
+
+        function endResize() {
+            if (scannerState.resizing.isResizing) {
+                scannerState.resizing.isResizing = false;
+                if (scannerState.resizing.currentColumn) {
+                    scannerState.resizing.currentColumn.classList.remove('resizing');
+                }
+                scannerState.resizing.currentColumn = null;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            }
+        }
+
+        // Pull to refresh for mobile
+        function initPullToRefresh() {
+            const container = document.getElementById('tableContainer');
+            const indicator = document.getElementById('pullIndicator');
+            let startY = 0;
+            let pulling = false;
+
+            container.addEventListener('touchstart', (e) => {
+                if (container.scrollTop === 0) {
+                    startY = e.touches[0].pageY;
+                    pulling = true;
+                }
+            }, { passive: true });
+
+            container.addEventListener('touchmove', (e) => {
+                if (!pulling) return;
+                const currentY = e.touches[0].pageY;
+                const diff = currentY - startY;
+
+                if (diff > 50 && container.scrollTop === 0) {
+                    indicator.classList.add('visible');
+                    indicator.textContent = diff > 100 ? 'Release to refresh...' : 'Pull down to refresh...';
+                }
+            }, { passive: true });
+
+            container.addEventListener('touchend', (e) => {
+                if (!pulling) return;
+                pulling = false;
+
+                if (indicator.classList.contains('visible')) {
+                    indicator.textContent = 'Refreshing...';
+                    loadScanner().then(() => {
+                        setTimeout(() => {
+                            indicator.classList.remove('visible');
+                        }, 500);
+                    });
+                }
+            }, { passive: true });
+        }
+    </script>
+</body>
+</html>
