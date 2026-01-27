@@ -358,7 +358,9 @@ filtered_trades = trades_df[
 
 
 
+## Momentum Cool Down
 
+- [X] Update cgi-bin/molecules/alpaca_molecules/momentum_alerts.py: Implement a 10 minute cool down period for momentum alerts if the current price is less than the price of the momentum alert at the start of the 10 minutes.
 
 ## Update Scanner Panel
 
