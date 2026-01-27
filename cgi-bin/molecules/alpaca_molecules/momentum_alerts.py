@@ -195,6 +195,12 @@ class MomentumAlertsSystem:
         self.debug_symbols = ['AAPL', 'TSLA', 'NVDA', 'AMD', 'GOOGL', 'MSFT', 'AMZN', 'META']
         self.last_debug_alert_time = None
 
+        # Cooldown tracking for momentum alerts
+        # Format: {symbol: {'timestamp': datetime, 'price': float}}
+        # 10-minute cooldown: if current price < cooldown start price, skip alert
+        self.cooldown_alerts: Dict[str, Dict] = {}
+        self.cooldown_period_minutes = 10
+
         self.logger.info(f"🔧 Momentum Alerts System initialized in {'TEST' if test_mode else 'LIVE'} mode")
         if self.debug_mode:
             self.logger.warning(f"⚠️ DEBUG MODE ENABLED - Will send random test alerts every minute")
@@ -2132,6 +2138,71 @@ class MomentumAlertsSystem:
             self.logger.error(f"❌ Error checking momentum criteria for {symbol}: {e}")
             return None
 
+    def _is_in_cooldown(self, symbol: str, current_price: float) -> bool:
+        """
+        Check if a symbol is in cooldown period for momentum alerts.
+
+        A symbol enters cooldown after an alert is sent. During the 10-minute cooldown:
+        - If current price >= cooldown start price: allow alert (price recovered)
+        - If current price < cooldown start price: skip alert (still cooling down)
+
+        Args:
+            symbol: Stock symbol to check
+            current_price: Current price of the stock
+
+        Returns:
+            True if the alert should be skipped (in cooldown with price below start price)
+            False if the alert should be allowed (not in cooldown or price recovered)
+        """
+        if symbol not in self.cooldown_alerts:
+            return False
+
+        cooldown_data = self.cooldown_alerts[symbol]
+        cooldown_start = cooldown_data['timestamp']
+        cooldown_price = cooldown_data['price']
+        current_time = datetime.now(self.et_tz)
+
+        # Check if cooldown period has expired
+        time_elapsed = (current_time - cooldown_start).total_seconds() / 60
+        if time_elapsed >= self.cooldown_period_minutes:
+            # Cooldown expired, remove tracking and allow alert
+            del self.cooldown_alerts[symbol]
+            self.logger.debug(f"⏰ {symbol}: Cooldown period expired after {time_elapsed:.1f} minutes")
+            return False
+
+        # Within cooldown period - check price condition
+        if current_price >= cooldown_price:
+            # Price recovered to or above cooldown start price - allow alert
+            self.logger.info(
+                f"✅ {symbol}: Price recovered during cooldown "
+                f"(${current_price:.2f} >= ${cooldown_price:.2f}), allowing alert"
+            )
+            return False
+        else:
+            # Price still below cooldown start price - skip alert
+            self.logger.info(
+                f"⏳ {symbol}: In {self.cooldown_period_minutes}-min cooldown "
+                f"({time_elapsed:.1f}min elapsed), price ${current_price:.2f} < "
+                f"cooldown start ${cooldown_price:.2f}, skipping alert"
+            )
+            return True
+
+    def _start_cooldown(self, symbol: str, price: float) -> None:
+        """
+        Start the cooldown period for a symbol after sending an alert.
+
+        Args:
+            symbol: Stock symbol
+            price: Price at which the alert was sent (cooldown start price)
+        """
+        self.cooldown_alerts[symbol] = {
+            'timestamp': datetime.now(self.et_tz),
+            'price': price
+        }
+        self.logger.debug(
+            f"⏱️ {symbol}: Started {self.cooldown_period_minutes}-min cooldown at ${price:.2f}"
+        )
+
     async def _send_momentum_alert(self, alert_data: Dict):
         """
         Send momentum alert to all users with momentum_alerts=true via Telegram.
@@ -2330,6 +2401,8 @@ class MomentumAlertsSystem:
             # STEP 2: Send alert and save to momentum_alerts_sent/bullish/
             if self.test_mode:
                 self.logger.info(f"[TEST MODE] {message}")
+                # Start cooldown period even in test mode
+                self._start_cooldown(symbol, current_price)
             else:
                 # Get all users with momentum_alerts=true
                 momentum_users = self.user_manager.get_momentum_alert_users()
@@ -2373,6 +2446,8 @@ class MomentumAlertsSystem:
                     # Save sent alert to historical data with all recipients
                     self._save_momentum_alert_sent(
                         alert_data, message, sent_to_users, biggest_gainer_gain)
+                    # Start cooldown period for this symbol
+                    self._start_cooldown(symbol, current_price)
 
                 if failed_count > 0:
                     self.logger.warning(
@@ -2804,7 +2879,10 @@ class MomentumAlertsSystem:
 
                             alert_data = self._check_momentum_criteria(symbol, stock_data[symbol], symbol_metadata, hourly_volume)
                             if alert_data:
-                                await self._send_momentum_alert(alert_data)
+                                # Check cooldown before sending alert
+                                current_price = alert_data['current_price']
+                                if not self._is_in_cooldown(symbol, current_price):
+                                    await self._send_momentum_alert(alert_data)
 
                 # Wait 60 seconds before next check
                 await asyncio.sleep(60)
