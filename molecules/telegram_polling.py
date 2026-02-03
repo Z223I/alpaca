@@ -243,6 +243,9 @@ class TelegramPollingService:
             elif text.lower() == 'top gainers':
                 # Handle top gainers trigger word (any user)
                 self._handle_top_gainers_command(chat_id, username, first_name, last_name, text)
+            elif text.lower() == 'max gainer':
+                # Handle max gainer trigger word (any user)
+                self._handle_max_gainer_command(chat_id, username, first_name, last_name, text)
             elif text.lower() == 'premarket top gainers':
                 # Handle premarket top gainers trigger word (any user)
                 self._handle_premarket_top_gainers_command(chat_id, username, first_name, last_name, text)
@@ -388,6 +391,12 @@ top gainers - Display top 40 market gainers from Alpaca
   • Shows top 40 gaining stocks with price, change, and % change
   • Real-time data from Alpaca's market screener API
   • Results returned instantly (under 1 minute)
+
+📈 Max Gainer:
+max gainer - Find today's top gainer from momentum alerts
+  • Analyzes momentum alert data to find highest gain
+  • Shows symbol, gain %, and price range
+  • Based on first alert price to maximum price
 
 🌅 Premarket Top Gainers Scanner:
 premarket top gainers - Find top 40 premarket gaining stocks on NASDAQ/AMEX
@@ -696,6 +705,26 @@ the prior trading day results will be given.
         except Exception as e:
             self._log(f"Error handling top gainers command: {e}", "ERROR")
             self._send_response(chat_id, f"❌ Error executing top gainers command: {str(e)}")
+
+    def _handle_max_gainer_command(self, chat_id: str, username: str, first_name: str, last_name: str, text: str):
+        """Handle 'max gainer' command to run max_gainer.py."""
+        try:
+            display_name = f"{first_name} {last_name}".strip() or username or f"User_{chat_id[-4:]}"
+            self._log(f"📈 Max gainer command from {display_name}: {text}")
+
+            # Send processing message
+            message = "📈 Finding today's max gainer from momentum alerts..."
+            self._send_response(chat_id, message)
+
+            # Execute max_gainer.py
+            result = self._execute_max_gainer_command()
+
+            # Send result back to user
+            self._send_response(chat_id, result)
+
+        except Exception as e:
+            self._log(f"Error handling max gainer command: {e}", "ERROR")
+            self._send_response(chat_id, f"❌ Error executing max gainer command: {str(e)}")
 
     def _is_authorized_user(self, username: str, first_name: str) -> bool:
         """Check if user is authorized for Alpaca commands."""
@@ -1212,6 +1241,50 @@ the prior trading day results will be given.
             return "❌ Top Gainers command timed out after 60 seconds"
         except Exception as e:
             return f"❌ Error executing Top Gainers command: {str(e)}"
+
+    def _execute_max_gainer_command(self) -> str:
+        """Execute max_gainer.py and return output."""
+        try:
+            import subprocess
+
+            # Get project root directory
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            max_gainer_script = os.path.join(
+                project_root, 'cgi-bin', 'molecules', 'alpaca_molecules', 'max_gainer.py'
+            )
+
+            # Use conda environment python to execute the script
+            python_path = os.path.expanduser('~/miniconda3/envs/alpaca/bin/python')
+
+            # Build command
+            cmd = [python_path, max_gainer_script]
+
+            # Execute command with 30 second timeout
+            result = subprocess.run(
+                cmd,
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
+            # Get output
+            output = result.stdout.strip()
+            error_output = result.stderr.strip()
+
+            if result.returncode == 0:
+                if output:
+                    return f"📈 Max Gainer Today:\n{output}"
+                else:
+                    return "📈 No max gainer data available"
+            else:
+                error_msg = error_output if error_output else output
+                return f"❌ Max gainer failed: {error_msg}"
+
+        except subprocess.TimeoutExpired:
+            return "❌ Max gainer command timed out after 30 seconds"
+        except Exception as e:
+            return f"❌ Error executing max gainer command: {str(e)}"
 
     def _execute_volume_surge_command(self) -> str:
         """Execute alpaca_screener.py command and return output with CSV file contents."""

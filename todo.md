@@ -337,9 +337,21 @@ filtered_trades = trades_df[
 
 - [ ] Filter 'other' source.
 
+## Telegram Interface
+
+Highest gain in the last n minutes
+highest gain for all symbols
+
+##
+
+- [X] Extract cgi-bin/molecules/alpaca_molecules/momentum-alerts-plots.py:collect_alerts_by_symbol and cgi-bin/molecules/alpaca_molecules/momentum-alerts-plots.py:calculate_max_gains to cgi-bin/atoms/alpaca_api/
+- [X] Create cgi-bin/molecules/alpaca_molecules/max_gainer.py: Using the two extracted methods, compute the symbol with the max gain for provided date.  The script is to accept two args: date and period.  Date is to default to today's date.  Period, if specified, is the latest window of time to be examined for the max gainer.  Output to stdout.
+- [ ] Update molecules/telegram_polling.py: add 'max gainer' command to call cgi-bin/molecules/alpaca_molecules/max_gainer.py
+
+
 ## Scanner Page
 
-- [ ] Create to do list.  Mirror public_html/index.html. Create separate scanner page that is mobile friendly.
+- [X] Create a to do list.  Mirror public_html/index.html. Create separate scanner page, public_html/scanner.html, that is also mobile friendly.
 
 ## Highlight Max gain
 
@@ -353,10 +365,9 @@ filtered_trades = trades_df[
 
   C) In the log and json files, mark the "BIGGEST GAINER" as "N/A" or some other easy to parse JSON value.
 
+## Highlight Biggest Gainer
 
-- [ ] Update public_html/index.html: When the "Scanner" panel is updated with a momentum alert, check the alert to see if it includes a "BIGGEST GAINER" field.  If so, highlight the row in the "Scanner" panel with green.
-
-
+- [X] Update public_html/index.html: When the "Scanner" panel is updated with a momentum alert, check the alert to see if it includes a "BIGGEST GAINER" field.  If so, highlight the row in the "Scanner" panel with green.
 
 ## Momentum Cool Down
 
