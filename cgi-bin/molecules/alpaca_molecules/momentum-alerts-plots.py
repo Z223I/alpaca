@@ -112,8 +112,8 @@ def calculate_max_gains(symbol_alerts):
                     'symbol': symbol,
                     'max_gain': max_gain,
                     'max_price': max_price,
-                    'min_price': first_price,  # Now represents first alert price
-                    'min_time': first_time,    # Now represents first alert time
+                    'first_price': first_price,
+                    'first_time': first_time,
                     'max_time': max_time,
                     'num_alerts': len(alerts)
                 })
@@ -212,7 +212,7 @@ def plot_max_gain_per_day(all_max_gains, start_date, end_date, base_path):
 
 
 def plot_time_of_day(all_max_gains, start_date, end_date, base_path):
-    """Plot time of day between min and max price for each stock-day (weekends excluded)."""
+    """Plot time of day between first alert and max price for each stock-day (weekends excluded)."""
     if not all_max_gains:
         return
 
@@ -227,21 +227,21 @@ def plot_time_of_day(all_max_gains, start_date, end_date, base_path):
 
     for g in sorted_gains:
         y_pos = date_to_y[g['date']]
-        min_time = g['min_time']
+        first_time = g['first_time']
         max_time = g['max_time']
 
         # Convert times to hours since midnight for x-axis
-        min_hour = min_time.hour + min_time.minute / 60
+        first_hour = first_time.hour + first_time.minute / 60
         max_hour = max_time.hour + max_time.minute / 60
 
         # Draw line with dots at ends
-        plt.plot([min_hour, max_hour], [y_pos, y_pos], 'b-', linewidth=1.5, alpha=0.7)
-        plt.plot(min_hour, y_pos, 'go', markersize=6)  # Green dot for min price time
+        plt.plot([first_hour, max_hour], [y_pos, y_pos], 'b-', linewidth=1.5, alpha=0.7)
+        plt.plot(first_hour, y_pos, 'go', markersize=6)  # Green dot for first alert time
         plt.plot(max_hour, y_pos, 'ro', markersize=6)  # Red dot for max price time
 
     plt.xlabel('Time of Day (Hour)')
     plt.ylabel('Date')
-    plt.title(f'Time Range Between Min and Max Price\n{start_date} to {end_date}\n(Green=Min Price, Red=Max Price)')
+    plt.title(f'Time Range Between First Alert and Max Price\n{start_date} to {end_date}\n(Green=First Alert, Red=Max Price)')
     plt.yticks(range(len(unique_dates)), unique_dates)
     plt.xlim(4, 16)  # Market hours roughly 4 AM to 4 PM ET
     plt.xticks(range(4, 17), [f'{h}:00' for h in range(4, 17)], rotation=45)
@@ -262,7 +262,7 @@ def plot_duration(all_max_gains, start_date, end_date, base_path):
     # Calculate durations in minutes
     durations = []
     for g in all_max_gains:
-        duration = abs((g['max_time'] - g['min_time']).total_seconds() / 60)
+        duration = abs((g['max_time'] - g['first_time']).total_seconds() / 60)
         durations.append(duration)
 
     # Bin by 30 minute intervals
@@ -304,7 +304,7 @@ def plot_duration_15min(all_max_gains, start_date, end_date, base_path):
     # Calculate durations in minutes
     durations = []
     for g in all_max_gains:
-        duration = abs((g['max_time'] - g['min_time']).total_seconds() / 60)
+        duration = abs((g['max_time'] - g['first_time']).total_seconds() / 60)
         durations.append(duration)
 
     # Bin by 15 minute intervals, only first 10 bins (0-150 minutes)
@@ -345,7 +345,7 @@ def plot_duration_5min(all_max_gains, start_date, end_date, base_path):
     # Calculate durations in minutes
     durations = []
     for g in all_max_gains:
-        duration = abs((g['max_time'] - g['min_time']).total_seconds() / 60)
+        duration = abs((g['max_time'] - g['first_time']).total_seconds() / 60)
         durations.append(duration)
 
     # Bin by 5 minute intervals, only first 10 bins (0-50 minutes)
@@ -395,7 +395,7 @@ def plot_duration_5min_top_gainers(all_max_gains, start_date, end_date, base_pat
     # Calculate durations in minutes
     durations = []
     for g in top_gainers:
-        duration = abs((g['max_time'] - g['min_time']).total_seconds() / 60)
+        duration = abs((g['max_time'] - g['first_time']).total_seconds() / 60)
         durations.append(duration)
 
     # Bin by 5 minute intervals, only first 10 bins (0-50 minutes)
@@ -445,7 +445,7 @@ def plot_duration_30min_top_gainers(all_max_gains, start_date, end_date, base_pa
     # Calculate durations in minutes
     durations = []
     for g in top_gainers:
-        duration = abs((g['max_time'] - g['min_time']).total_seconds() / 60)
+        duration = abs((g['max_time'] - g['first_time']).total_seconds() / 60)
         durations.append(duration)
 
     # Bin by 30 minute intervals, only first 10 bins (0-300 minutes)
@@ -487,7 +487,7 @@ def plot_duration_vs_gain_scatter(all_max_gains, start_date, end_date, base_path
     durations = []
     gains = []
     for g in all_max_gains:
-        duration = abs((g['max_time'] - g['min_time']).total_seconds() / 60)
+        duration = abs((g['max_time'] - g['first_time']).total_seconds() / 60)
         if duration <= 50:
             durations.append(duration)
             gains.append((g['max_gain'] - 1) * 100)  # Convert to percentage
@@ -522,7 +522,7 @@ def plot_duration_vs_gain_scatter_full(all_max_gains, start_date, end_date, base
     durations = []
     gains = []
     for g in all_max_gains:
-        duration = abs((g['max_time'] - g['min_time']).total_seconds() / 60)
+        duration = abs((g['max_time'] - g['first_time']).total_seconds() / 60)
         durations.append(duration)
         gains.append((g['max_gain'] - 1) * 100)  # Convert to percentage
 
@@ -548,17 +548,17 @@ def plot_duration_vs_gain_scatter_full(all_max_gains, start_date, end_date, base
 
 
 def plot_time_distribution(all_max_gains, start_date, end_date, base_path):
-    """Plot distribution of start (min price) and end (max price) times with smoothed curves."""
+    """Plot distribution of start (first alert) and end (max price) times with smoothed curves."""
     if not all_max_gains:
         return
 
-    # Collect start times (min price) and end times (max price)
+    # Collect start times (first alert) and end times (max price)
     start_times = []
     end_times = []
     for g in all_max_gains:
-        min_time = g['min_time']
+        first_time = g['first_time']
         max_time = g['max_time']
-        start_times.append(min_time.hour + min_time.minute / 60)
+        start_times.append(first_time.hour + first_time.minute / 60)
         end_times.append(max_time.hour + max_time.minute / 60)
 
     plt.figure(figsize=(12, 6))
@@ -577,7 +577,7 @@ def plot_time_distribution(all_max_gains, start_date, end_date, base_path):
     end_smooth = gaussian_filter1d(end_counts.astype(float), sigma)
 
     # Plot smoothed curves
-    plt.plot(bin_centers, start_smooth, 'g-', linewidth=2.5, label='Min Price Time (Start)')
+    plt.plot(bin_centers, start_smooth, 'g-', linewidth=2.5, label='First Alert Time (Start)')
     plt.plot(bin_centers, end_smooth, 'r-', linewidth=2.5, label='Max Price Time (End)')
 
     # Add shaded area under curves
@@ -586,7 +586,7 @@ def plot_time_distribution(all_max_gains, start_date, end_date, base_path):
 
     plt.xlabel('Time of Day (Hour)')
     plt.ylabel('Quantity')
-    plt.title(f'Distribution of Min/Max Price Times\n{start_date} to {end_date}')
+    plt.title(f'Distribution of First Alert/Max Price Times\n{start_date} to {end_date}')
     plt.xlim(4, 16)
     plt.xticks(range(4, 17), [f'{h}:00' for h in range(4, 17)], rotation=45)
     plt.legend(loc='upper right')
@@ -637,7 +637,7 @@ def main():
         for i, g in enumerate(sorted_gains[:10], 1):
             gain_pct = (g['max_gain'] - 1) * 100
             print(f"{i:2}. {g['symbol']:6} on {g['date']}: {gain_pct:6.1f}% "
-                  f"(${g['min_price']:.2f} -> ${g['max_price']:.2f})")
+                  f"(${g['first_price']:.2f} -> ${g['max_price']:.2f})")
 
         # Generate all plots
         plot_histogram(all_max_gains, args.start_date, args.end_date, base_path)
