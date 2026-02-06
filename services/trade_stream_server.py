@@ -69,7 +69,9 @@ class TradeStreamServer:
         self.alpaca_connected = False
         self.reconnect_delay = 1  # Start with 1 second delay
         self.last_data_received = None  # Track when we last received data for health monitoring
+        self.connection_established_at = None  # Track when connection was established
         self.connection_watchdog_task = None  # Watchdog task to monitor connection health
+        self.max_time_without_initial_data = 60  # Max seconds to wait for first data after subscribing
 
     async def start(self):
         """Start the WebSocket server and Alpaca stream."""
@@ -126,6 +128,8 @@ class TradeStreamServer:
                     raise Exception("Stream task completed unexpectedly during connection")
 
                 self.alpaca_connected = True
+                self.connection_established_at = datetime.now()
+                self.last_data_received = None  # Reset on new connection
                 self.reconnect_delay = 1  # Reset delay on successful connection
                 logger.info("✅ Alpaca stream connected successfully")
 
@@ -231,21 +235,50 @@ class TradeStreamServer:
             try:
                 await asyncio.sleep(10)  # Check every 10 seconds
 
-                # If we have subscriptions but haven't received data in a while, something is wrong
-                if self.subscriptions and self.last_data_received:
-                    time_since_data = (datetime.now() - self.last_data_received).total_seconds()
+                # Check if we have subscriptions
+                if self.subscriptions:
+                    now = datetime.now()
 
-                    if time_since_data > max_idle_time:
-                        logger.error(f"⚠️  Connection appears stuck! No data received for {time_since_data:.0f}s")
-                        logger.error(f"   Active subscriptions: {list(self.subscriptions.keys())}")
-                        logger.error(f"   Forcing reconnection...")
+                    # Case 1: We have received data before - check idle time
+                    if self.last_data_received:
+                        time_since_data = (now - self.last_data_received).total_seconds()
 
-                        # Cancel the stream task to trigger reconnection
-                        stream_task.cancel()
-                        return
-                    elif time_since_data > max_idle_time / 2:
-                        # Warning at half the timeout
-                        logger.warning(f"⚠️  No data received for {time_since_data:.0f}s (warning threshold)")
+                        if time_since_data > max_idle_time:
+                            logger.error(f"⚠️  Connection appears stuck! No data received for {time_since_data:.0f}s")
+                            logger.error(f"   Active subscriptions: {list(self.subscriptions.keys())}")
+                            logger.error(f"   Forcing reconnection...")
+
+                            # Cancel the stream task to trigger reconnection
+                            stream_task.cancel()
+                            return
+                        elif time_since_data > max_idle_time / 2:
+                            # Warning at half the timeout
+                            logger.warning(f"⚠️  No data received for {time_since_data:.0f}s (warning threshold)")
+
+                    # Case 2: Never received data since connection - check if waited too long
+                    elif self.connection_established_at:
+                        time_since_connection = (now - self.connection_established_at).total_seconds()
+
+                        if time_since_connection > self.max_time_without_initial_data:
+                            logger.error(f"⚠️  Never received any data since connection!")
+                            logger.error(f"   Connected for {time_since_connection:.0f}s with no data")
+                            logger.error(f"   Active subscriptions: {list(self.subscriptions.keys())}")
+                            logger.error(f"   Alpaca subscribed symbols: {self.alpaca_subscribed}")
+                            logger.error(f"   Forcing reconnection...")
+
+                            # Cancel the stream task to trigger reconnection
+                            stream_task.cancel()
+                            return
+                        elif time_since_connection > self.max_time_without_initial_data / 2:
+                            logger.warning(f"⚠️  No initial data received for {time_since_connection:.0f}s since connection")
+
+                # Also check if alpaca_connected flag is False but stream_task is still running
+                # This could indicate a silent disconnection
+                if not self.alpaca_connected:
+                    logger.warning("⚠️  alpaca_connected is False but watchdog is running - potential silent disconnect")
+                    logger.info("   Forcing reconnection due to inconsistent state...")
+                    stream_task.cancel()
+                    return
 
             except asyncio.CancelledError:
                 logger.info("Watchdog cancelled")
@@ -300,11 +333,35 @@ class TradeStreamServer:
                     'alpaca_connected': self.alpaca_connected
                 }))
             elif action == 'health':
+                # Check if alpaca_task is alive, restart if dead
+                alpaca_task_status = "running"
+                if self.alpaca_task is None:
+                    alpaca_task_status = "not_started"
+                elif self.alpaca_task.done():
+                    alpaca_task_status = "dead"
+                    # Auto-restart the alpaca task if it died and we have subscriptions
+                    if self.subscriptions:
+                        logger.warning("⚠️  Alpaca task died with active subscriptions - auto-restarting")
+                        self.alpaca_task = asyncio.create_task(self._run_alpaca_stream())
+                        alpaca_task_status = "restarting"
+
                 await websocket.send(json.dumps({
                     'type': 'health',
                     'alpaca_connected': self.alpaca_connected,
+                    'alpaca_task_status': alpaca_task_status,
                     'active_symbols': list(self.subscriptions.keys()),
-                    'total_clients': len(self.clients)
+                    'alpaca_subscribed': list(self.alpaca_subscribed),
+                    'total_clients': len(self.clients),
+                    'last_data_received': self.last_data_received.isoformat() if self.last_data_received else None,
+                    'connection_established_at': self.connection_established_at.isoformat() if self.connection_established_at else None
+                }))
+            elif action == 'reconnect':
+                # Force reconnection
+                logger.info("🔄 Force reconnection requested via health check")
+                await self._force_reconnect()
+                await websocket.send(json.dumps({
+                    'type': 'reconnect_initiated',
+                    'message': 'Alpaca stream reconnection initiated'
                 }))
             else:
                 logger.warning(f"Unknown action: {action}")
@@ -504,6 +561,43 @@ class TradeStreamServer:
                 logger.info(f"✅ Re-subscribed to {symbol}")
             except Exception as e:
                 logger.error(f"Failed to re-subscribe to {symbol}: {e}")
+
+    async def _force_reconnect(self):
+        """Force a reconnection to Alpaca stream."""
+        logger.info("🔄 Force reconnect initiated")
+
+        # Cancel existing alpaca task if running
+        if self.alpaca_task and not self.alpaca_task.done():
+            logger.info("   Cancelling existing alpaca task...")
+            self.alpaca_task.cancel()
+            try:
+                await self.alpaca_task
+            except asyncio.CancelledError:
+                pass
+
+        # Reset connection state
+        self.alpaca_connected = False
+        self.connection_established_at = None
+        self.last_data_received = None
+        self.alpaca_subscribed.clear()
+
+        # Recreate the stream object
+        logger.info("   Recreating Alpaca stream connection...")
+        self.alpaca_stream = StockDataStream(
+            api_key=ALPACA_API_KEY,
+            secret_key=ALPACA_SECRET_KEY,
+            feed=DataFeed.SIP
+        )
+
+        # Start new alpaca task if we have subscriptions
+        if self.subscriptions:
+            logger.info(f"   Restarting with {len(self.subscriptions)} active subscriptions")
+            self.alpaca_task = asyncio.create_task(self._run_alpaca_stream())
+        else:
+            logger.info("   No active subscriptions - will start on first subscription")
+            self.alpaca_task = None
+
+        logger.info("🔄 Force reconnect complete")
 
     async def broadcast_trade(self, symbol: str, trade: Trade):
         """Broadcast a trade to all subscribed clients."""
