@@ -945,8 +945,9 @@ class MomentumAlertsSystem:
 
                 if return_code == 0:
                     self.logger.info(f"✅ Premarket script completed successfully (Runtime: {runtime})")
-                    # Send the generated premarket file to Bruce
-                    await self._send_top_gainers_file_to_bruce()
+                    # NOTE: Automatic sending of premarket top gainers to Bruce is disabled
+                    # Users can request it manually via the Telegram bot 'premarket top gainers' command
+                    # await self._send_top_gainers_file_to_bruce()
                 else:
                     self.logger.error(f"❌ Premarket script failed with return code {return_code} (Runtime: {runtime})")
 
