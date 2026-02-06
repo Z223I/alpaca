@@ -337,6 +337,10 @@ filtered_trades = trades_df[
 
 - [ ] Filter 'other' source.
 
+## Stop Premarket Gainers
+
+- [X] Update molecules/telegram_polling.py: stop automatically sending premarket top gainers to Bruce.
+
 ## Telegram Interface
 
 - [X] Extract cgi-bin/molecules/alpaca_molecules/momentum-alerts-plots.py:collect_alerts_by_symbol and cgi-bin/molecules/alpaca_molecules/momentum-alerts-plots.py:calculate_max_gains to cgi-bin/atoms/alpaca_api/
