@@ -98,13 +98,15 @@ def main():
         print(f"No symbols with multiple alerts found for {args.date}")
         sys.exit(1)
 
-    # Find the top gainer
-    top_gainer = max(max_gains, key=lambda x: x['max_gain'])
+    # Sort by gain descending
+    sorted_gains = sorted(max_gains, key=lambda x: x['max_gain'], reverse=True)
 
-    # Output the result
-    gain_pct = (top_gainer['max_gain'] - 1) * 100
-    print(f"{top_gainer['symbol']} {gain_pct:.1f}% "
-          f"(${top_gainer['first_price']:.2f} -> ${top_gainer['max_price']:.2f})")
+    # Print symbols with gain >= 10% in descending order
+    for entry in sorted_gains:
+        gain_pct = (entry['max_gain'] - 1) * 100
+        if gain_pct >= 10:
+            print(f"{entry['symbol']} {gain_pct:.1f}% "
+                  f"(${entry['first_price']:.2f} -> ${entry['max_price']:.2f})")
 
 
 if __name__ == '__main__':

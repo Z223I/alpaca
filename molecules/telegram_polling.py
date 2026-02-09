@@ -713,7 +713,7 @@ the prior trading day results will be given.
             self._log(f"📈 Max gainer command from {display_name}: {text}")
 
             # Send processing message
-            message = "📈 Finding today's max gainer from momentum alerts..."
+            message = "📈 Finding today's max gainers from momentum alerts..."
             self._send_response(chat_id, message)
 
             # Execute max_gainer.py
@@ -1274,7 +1274,7 @@ the prior trading day results will be given.
 
             if result.returncode == 0:
                 if output:
-                    return f"📈 Max Gainer Today:\n{output}"
+                    return f"📈 Max Gainers Today:\n{output}"
                 else:
                     return "📈 No max gainer data available"
             else:
