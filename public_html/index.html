@@ -3538,10 +3538,17 @@
                 console.log(`Current time: ${now.toISOString()}`);
             }
 
+            // Filter out trades from 'other' exchange
+            const filtered = trades.filter(trade => getExchangeName(trade.exchange).toLowerCase() === 'other');
+            if (filtered.length > 0) {
+                console.log(`Filtered ${filtered.length} 'other' exchange trades for ${symbol}:`, filtered);
+            }
+            const filteredTrades = trades.filter(trade => getExchangeName(trade.exchange).toLowerCase() !== 'other');
+
             // Map trades with price comparison to PREVIOUS trade in chronological order
-            const tradeItems = trades.map((trade, index) => {
+            const tradeItems = filteredTrades.map((trade, index) => {
                 // Compare to previous trade in time sequence (not display sequence)
-                const prevPrice = index > 0 ? trades[index - 1].price : null;
+                const prevPrice = index > 0 ? filteredTrades[index - 1].price : null;
                 const priceClass = prevPrice && trade.price > prevPrice ? 'up' :
                                   prevPrice && trade.price < prevPrice ? 'down' : '';
 
@@ -3574,9 +3581,9 @@
             // Reverse so newest trades appear at the top
             container.innerHTML = tradeItems.reverse().join('');
 
-            if (trades.length > 0) {
+            if (filteredTrades.length > 0) {
                 // Use the most recent trade (last in original array, first in reversed)
-                chartData.lastPrice = trades[trades.length - 1].price;
+                chartData.lastPrice = filteredTrades[filteredTrades.length - 1].price;
             }
 
 
