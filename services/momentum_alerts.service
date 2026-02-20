@@ -18,4 +18,4 @@ MemoryMax=2G
 CPUQuota=50%
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target
