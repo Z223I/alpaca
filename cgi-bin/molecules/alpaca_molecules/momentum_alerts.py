@@ -2427,6 +2427,12 @@ class MomentumAlertsSystem:
 
                 for user in momentum_users:
                     username = user.get('username', 'Unknown')
+
+                    # Send urgent pre-message before the full alert
+                    if biggest_gainer_gain is not None:
+                        self.telegram_poster.send_message_to_user(
+                            f"BIGGEST GAINER: {symbol}", username, urgent=True)
+
                     result = self.telegram_poster.send_message_to_user(
                         message, username, urgent=False)
 
