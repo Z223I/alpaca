@@ -14,6 +14,7 @@ StandardError=journal
 
 # Environment
 Environment="PATH=/home/wilsonb/miniconda3/envs/alpaca/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="PYTHONPATH=/home/wilsonb/dl/github.com/Z223I/alpaca/cgi-bin:/home/wilsonb/dl/github.com/Z223I/alpaca/cgi-bin/molecules:/home/wilsonb/dl/github.com/Z223I/alpaca"
 
 [Install]
 WantedBy=multi-user.target

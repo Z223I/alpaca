@@ -360,12 +360,14 @@
           - "--exclude='*.pyc'"
       loop: "{{ app_dirs }}"
 
-    # Copy .env credentials
+    # Copy .env credentials — owner ubuntu, group www-data, no world read
     - name: Copy .env to VM home
       ansible.builtin.copy:
         src: "{{ project_root }}/.env"
         dest: "{{ vm_home }}/.env"
-        mode: "0600"
+        owner: "{{ vm_user }}"
+        group: www-data
+        mode: "0640"
 
     # Install python-holidays from the copied submodule
     - name: Install python-holidays from submodule
@@ -404,6 +406,13 @@
         path: "{{ vm_home }}/services/{{ item }}"
         regexp: "{{ host_conda_python }}"
         replace: "{{ conda_python }}"
+      loop: "{{ systemd_services }}"
+
+    - name: Fix miniconda base path in service Environment lines
+      ansible.builtin.replace:
+        path: "{{ vm_home }}/services/{{ item }}"
+        regexp: "/home/{{ host_user }}/miniconda3"
+        replace: "{{ miniconda_dir }}"
       loop: "{{ systemd_services }}"
 
     - name: Ensure User= line exists in momentum_alerts.service
@@ -472,10 +481,10 @@
       changed_when: "'already enabled' not in cgid_result.stdout"
       notify: Restart Apache
 
-    - name: Allow www-data to traverse /home/ubuntu (execute bit)
+    - name: Allow www-data to read and traverse /home/ubuntu
       ansible.builtin.file:
         path: "{{ vm_home }}"
-        mode: "o+x"
+        mode: "o+rx"
 
     - name: Make all cgi-bin Python scripts executable
       ansible.builtin.shell: find {{ vm_home }}/cgi-bin -name '*.py' -exec chmod +x {} \;
@@ -496,6 +505,9 @@
           <VirtualHost *:80>
               ServerAdmin webmaster@localhost
               DocumentRoot /var/www/html
+
+              # PYTHONPATH for CGI scripts — atoms/, molecules/ etc. live under vm_home
+              SetEnv PYTHONPATH {{ vm_home }}/cgi-bin:{{ vm_home }}/cgi-bin/molecules:{{ vm_home }}
 
               ScriptAlias /cgi-bin/ {{ vm_home }}/cgi-bin/
               <Directory {{ vm_home }}/cgi-bin>
@@ -572,7 +584,7 @@
       notify: Restart Apache
 
     - name: Disable unused Apache modules (autoindex, status)
-      ansible.builtin.command: a2dismod autoindex status
+      ansible.builtin.shell: echo y | a2dismod autoindex status
       register: dismod_result
       changed_when: "'already disabled' not in dismod_result.stdout"
       failed_when: false
@@ -587,6 +599,14 @@
         name: fail2ban
         enabled: true
         state: started
+
+    - name: Open UFW ports for market-data-api and WebSocket proxy
+      community.general.ufw:
+        rule: allow
+        port: "{{ item.port }}"
+        proto: "{{ item.proto }}"
+        comment: "{{ item.comment }}"
+      loop: "{{ ufw_extra_ports }}"
 
   handlers:
     - name: Restart SSH

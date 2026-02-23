@@ -1,0 +1,18 @@
+[Unit]
+Description=WebSocket Browser Proxy (port 8766 -> 8765)
+After=network.target market_sentinel_trade_stream.service
+Wants=market_sentinel_trade_stream.service
+
+[Service]
+Type=simple
+User=wilsonb
+WorkingDirectory=/home/wilsonb/dl/github.com/Z223I/alpaca
+Environment="PATH=/home/wilsonb/miniconda3/envs/alpaca/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/home/wilsonb/miniconda3/envs/alpaca/bin/python /home/wilsonb/dl/github.com/Z223I/alpaca/services/browser_proxy.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

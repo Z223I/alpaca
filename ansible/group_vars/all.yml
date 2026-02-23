@@ -79,7 +79,14 @@ pip_packages:
 systemd_services:
   - market-data-api.service
   - market_sentinel_trade_stream.service
+  - browser_proxy.service
   - momentum_alerts.service
+
+# UFW ports to open beyond the defaults (OpenSSH + Apache Full)
+ufw_extra_ports:
+  - { port: "5000", proto: "tcp", comment: "market-data-api Flask" }
+  - { port: "8765", proto: "tcp", comment: "trade stream backend" }
+  - { port: "8766", proto: "tcp", comment: "browser WebSocket proxy" }
 
 # Host paths used in service files (to be replaced with VM paths)
 host_repo_path: "/home/wilsonb/dl/github.com/Z223I/alpaca"
