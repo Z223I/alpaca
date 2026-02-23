@@ -1,0 +1,663 @@
+---
+# =============================================================
+# rebuild_vm.yml — Fully automated rebuild of the Apache web VM
+#
+# Test VM name  : apache-web-test   (defined in group_vars/all.yml)
+# Prod VM name  : apache-web        (change vm_name to switch)
+#
+# Usage:
+#   ansible-playbook -i inventory.ini rebuild_vm.yml
+#
+# To target only specific stages use tags:
+#   --tags host_setup     # Install KVM deps + create VM
+#   --tags vm_base        # Base packages, Miniconda, Python env
+#   --tags vm_files       # Copy project files into VM
+#   --tags vm_services    # Install + start systemd services
+#   --tags vm_apache      # Configure Apache virtual host + CGI
+#   --tags vm_security    # Apply hardening steps
+#   --tags vm_snapshot    # Take clean baseline snapshot
+# =============================================================
+
+
+# ─────────────────────────────────────────────────────────────
+# PLAY 1 — KVM host: install tooling and create the VM
+# ─────────────────────────────────────────────────────────────
+- name: "KVM host — create {{ vm_name }}"
+  hosts: kvm_host
+  become: true
+  tags: host_setup
+
+  tasks:
+
+    # ── 1.1 Install host packages ──────────────────────────────
+    - name: Install KVM and cloud-image tools
+      ansible.builtin.apt:
+        name:
+          - qemu-kvm
+          - libvirt-daemon-system
+          - virtinst
+          - cloud-image-utils
+          - python3-libvirt   # needed by Ansible community.libvirt collection
+        state: present
+        update_cache: true
+
+    - name: Enable and start libvirtd
+      ansible.builtin.systemd:
+        name: libvirtd
+        enabled: true
+        state: started
+
+    - name: Add invoking user to libvirt and kvm groups
+      ansible.builtin.user:
+        name: "{{ lookup('env', 'USER') }}"
+        groups: libvirt,kvm
+        append: true
+
+    # ── 1.2 SSH key ───────────────────────────────────────────
+    - name: Generate SSH key for VM access (if absent)
+      become: false
+      ansible.builtin.command:
+        cmd: "ssh-keygen -t ed25519 -f {{ ssh_key_path }} -N '' -C kvm-vm-access"
+        creates: "{{ ssh_key_path }}"
+
+    - name: Read public key
+      become: false
+      ansible.builtin.slurp:
+        src: "{{ ssh_pub_key_path }}"
+      register: pub_key_b64
+
+    - name: Set pub_key fact
+      ansible.builtin.set_fact:
+        pub_key: "{{ pub_key_b64['content'] | b64decode | trim }}"
+
+    # ── 1.3 Download Ubuntu 24.04 cloud image ─────────────────
+    - name: Download Ubuntu 24.04 cloud image (skipped if present)
+      ansible.builtin.get_url:
+        url: "{{ cloud_image_url }}"
+        dest: "{{ cloud_image_path }}"
+        mode: "0644"
+        timeout: 600
+
+    # ── 1.4 Cloud-init files ──────────────────────────────────
+    - name: Write cloud-init user-data
+      ansible.builtin.copy:
+        dest: "{{ user_data_path }}"
+        mode: "0644"
+        content: |
+          #cloud-config
+          hostname: {{ vm_hostname }}
+          users:
+            - name: ubuntu
+              groups: sudo
+              shell: /bin/bash
+              sudo: ALL=(ALL) NOPASSWD:ALL
+              ssh_authorized_keys:
+                - {{ pub_key }}
+          packages:
+            - apache2
+            - ufw
+            - fail2ban
+            - rsync
+            - unattended-upgrades
+            - libapache2-mod-security2
+          package_update: true
+          runcmd:
+            - systemctl enable apache2
+            - ufw allow OpenSSH
+            - ufw allow 'Apache Full'
+            - ufw --force enable
+            - sed -i 's/^#PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
+            - sed -i 's/^#PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+            - systemctl reload ssh
+
+    - name: Write cloud-init meta-data
+      ansible.builtin.copy:
+        dest: "{{ meta_data_path }}"
+        mode: "0644"
+        content: |
+          instance-id: {{ vm_instance_id }}
+          local-hostname: {{ vm_hostname }}
+
+    - name: Build seed ISO
+      ansible.builtin.command:
+        cmd: "cloud-localds {{ seed_tmp_path }} {{ user_data_path }} {{ meta_data_path }}"
+        creates: "{{ seed_tmp_path }}"
+
+    - name: Copy seed ISO to libvirt images dir
+      ansible.builtin.copy:
+        src: "{{ seed_tmp_path }}"
+        dest: "{{ vm_seed }}"
+        remote_src: true
+        mode: "0644"
+        force: false   # don't overwrite on re-runs
+
+    # ── 1.5 Create VM disk ────────────────────────────────────
+    - name: Check if VM disk already exists
+      ansible.builtin.stat:
+        path: "{{ vm_disk }}"
+      register: vm_disk_stat
+
+    - name: Copy base cloud image to VM disk
+      ansible.builtin.copy:
+        src: "{{ cloud_image_path }}"
+        dest: "{{ vm_disk }}"
+        remote_src: true
+        mode: "0644"
+      when: not vm_disk_stat.stat.exists
+
+    - name: Resize VM disk to {{ vm_disk_gb }}G
+      ansible.builtin.command:
+        cmd: "qemu-img resize {{ vm_disk }} {{ vm_disk_gb }}G"
+      when: not vm_disk_stat.stat.exists
+
+    # ── 1.6 Define and boot VM ────────────────────────────────
+    - name: Check if VM already defined
+      ansible.builtin.command: virsh dominfo {{ vm_name }}
+      register: vm_exists
+      failed_when: false
+      changed_when: false
+
+    - name: Install (define + start) the VM via virt-install
+      ansible.builtin.command: >
+        virt-install
+          --name {{ vm_name }}
+          --memory {{ vm_ram_mb }}
+          --vcpus {{ vm_vcpus }}
+          --disk {{ vm_disk }},format=qcow2
+          --disk {{ vm_seed }},device=cdrom
+          --os-variant ubuntu24.04
+          --network network=default
+          --graphics none
+          --noautoconsole
+          --import
+          --boot hd
+      when: vm_exists.rc != 0
+
+    # ── 1.7 Discover VM IP ────────────────────────────────────
+    - name: Wait up to 90s for VM to get a DHCP IP
+      ansible.builtin.shell: |
+        for i in $(seq 1 30); do
+          ip=$(virsh domifaddr {{ vm_name }} 2>/dev/null | awk '/ipv4/ {split($4,a,"/"); print a[1]}')
+          [ -n "$ip" ] && echo "$ip" && exit 0
+          sleep 3
+        done
+        exit 1
+      register: vm_ip_result
+      changed_when: false
+      retries: 0
+
+    - name: Set vm_ip fact
+      ansible.builtin.set_fact:
+        vm_ip: "{{ vm_ip_result.stdout | trim }}"
+
+    - name: Show discovered VM IP
+      ansible.builtin.debug:
+        msg: "VM {{ vm_name }} IP is {{ vm_ip }}"
+
+    - name: Persist VM IP into inventory.ini for subsequent plays
+      become: false
+      ansible.builtin.lineinfile:
+        path: "{{ playbook_dir }}/inventory.ini"
+        regexp: "^# apache-web-test ansible_host="
+        line: >-
+          {{ vm_name }} ansible_host={{ vm_ip }}
+          ansible_user={{ vm_user }}
+          ansible_ssh_private_key_file={{ ssh_key_path }}
+        insertafter: '^\[apache_vm\]'
+
+    # ── 1.8 Wait for SSH to be ready ──────────────────────────
+    - name: Wait for SSH on VM
+      ansible.builtin.wait_for:
+        host: "{{ vm_ip }}"
+        port: 22
+        timeout: 120
+        state: started
+
+    - name: Add VM to in-memory inventory
+      ansible.builtin.add_host:
+        name: "{{ vm_name }}"
+        groups: apache_vm
+        ansible_host: "{{ vm_ip }}"
+        ansible_user: "{{ vm_user }}"
+        ansible_ssh_private_key_file: "{{ ssh_key_path }}"
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+
+
+# ─────────────────────────────────────────────────────────────
+# PLAY 2 — VM: wait for cloud-init to finish
+# ─────────────────────────────────────────────────────────────
+- name: "VM — wait for cloud-init"
+  hosts: apache_vm
+  gather_facts: false
+  tags: vm_base
+
+  tasks:
+
+    - name: Wait for cloud-init to complete (installs packages)
+      ansible.builtin.command: cloud-init status --wait
+      register: ci_status
+      changed_when: false
+      timeout: 300
+
+    - name: Show cloud-init result
+      ansible.builtin.debug:
+        var: ci_status.stdout
+
+
+# ─────────────────────────────────────────────────────────────
+# PLAY 3 — VM: Miniconda + Python environment
+# ─────────────────────────────────────────────────────────────
+- name: "VM — install Miniconda and alpaca conda env"
+  hosts: apache_vm
+  tags: vm_base
+
+  tasks:
+
+    - name: Download Miniconda installer
+      ansible.builtin.get_url:
+        url: "{{ miniconda_installer }}"
+        dest: /tmp/miniconda.sh
+        mode: "0755"
+        timeout: 300
+
+    - name: Install Miniconda (skip if already installed)
+      ansible.builtin.command:
+        cmd: "bash /tmp/miniconda.sh -b -p {{ miniconda_dir }}"
+        creates: "{{ miniconda_dir }}/bin/conda"
+
+    - name: Init conda for bash
+      ansible.builtin.command:
+        cmd: "{{ miniconda_dir }}/bin/conda init bash"
+      changed_when: false
+
+    - name: Accept conda TOS (main channel)
+      ansible.builtin.command: >
+        {{ miniconda_dir }}/bin/conda tos accept
+        --override-channels
+        --channel https://repo.anaconda.com/pkgs/main
+      changed_when: false
+      failed_when: false
+
+    - name: Accept conda TOS (r channel)
+      ansible.builtin.command: >
+        {{ miniconda_dir }}/bin/conda tos accept
+        --override-channels
+        --channel https://repo.anaconda.com/pkgs/r
+      changed_when: false
+      failed_when: false
+
+    - name: Create alpaca conda environment (python 3.12)
+      ansible.builtin.command:
+        cmd: "{{ miniconda_dir }}/bin/conda create -n {{ conda_env }} python=3.12 -y"
+        creates: "{{ miniconda_dir }}/envs/{{ conda_env }}"
+
+    - name: Install Python packages into alpaca env
+      ansible.builtin.command: >
+        {{ conda_pip }} install --ignore-installed
+        {{ pip_packages | join(' ') }}
+      register: pip_result
+      changed_when: "'Successfully installed' in pip_result.stdout"
+
+    - name: Create logs directory
+      ansible.builtin.file:
+        path: "{{ vm_home }}/logs"
+        state: directory
+        mode: "0755"
+
+
+# ─────────────────────────────────────────────────────────────
+# PLAY 4 — VM: copy project files
+# ─────────────────────────────────────────────────────────────
+- name: "VM — copy project files from KVM host"
+  hosts: apache_vm
+  tags: vm_files
+
+  tasks:
+
+    # Copy public_html to a staging area, then move to web root
+    - name: Create public_html staging directory
+      ansible.builtin.file:
+        path: /tmp/public_html_staging
+        state: directory
+        mode: "0755"
+
+    - name: Sync public_html to VM staging area
+      ansible.posix.synchronize:
+        src: "{{ public_html_src }}/"
+        dest: /tmp/public_html_staging/
+        delete: true
+        rsync_opts:
+          - "--exclude='.git'"
+
+    - name: Copy staged public_html to Apache web root
+      become: true
+      ansible.builtin.shell: >
+        cp -r /tmp/public_html_staging/. /var/www/html/
+      changed_when: true
+
+    - name: Fix web root ownership
+      become: true
+      ansible.builtin.file:
+        path: /var/www/html
+        owner: root
+        group: www-data
+        recurse: true
+
+    - name: Fix web root permissions
+      become: true
+      ansible.builtin.shell: chmod -R 750 /var/www/html
+      changed_when: true
+
+    # Copy application directories
+    - name: Sync application directories to VM home
+      ansible.posix.synchronize:
+        src: "{{ project_root }}/{{ item }}/"
+        dest: "{{ vm_home }}/{{ item }}/"
+        delete: true
+        rsync_opts:
+          - "--exclude='.git'"
+          - "--exclude='__pycache__'"
+          - "--exclude='*.pyc'"
+      loop: "{{ app_dirs }}"
+
+    # Copy .env credentials
+    - name: Copy .env to VM home
+      ansible.builtin.copy:
+        src: "{{ project_root }}/.env"
+        dest: "{{ vm_home }}/.env"
+        mode: "0600"
+
+    # Install python-holidays from the copied submodule
+    - name: Install python-holidays from submodule
+      ansible.builtin.command: >
+        {{ conda_pip }} install {{ vm_home }}/python-holidays/
+      register: holidays_result
+      changed_when: "'Successfully installed' in holidays_result.stdout"
+
+
+# ─────────────────────────────────────────────────────────────
+# PLAY 5 — VM: configure and enable systemd services
+# ─────────────────────────────────────────────────────────────
+- name: "VM — install systemd services"
+  hosts: apache_vm
+  become: true
+  tags: vm_services
+
+  tasks:
+
+    - name: Fix repo path and user in service files
+      ansible.builtin.replace:
+        path: "{{ vm_home }}/services/{{ item }}"
+        regexp: "{{ host_repo_path }}"
+        replace: "{{ vm_home }}"
+      loop: "{{ systemd_services }}"
+
+    - name: Fix user in service files
+      ansible.builtin.replace:
+        path: "{{ vm_home }}/services/{{ item }}"
+        regexp: "User={{ host_user }}"
+        replace: "User={{ vm_user }}"
+      loop: "{{ systemd_services }}"
+
+    - name: Fix conda python path in service files
+      ansible.builtin.replace:
+        path: "{{ vm_home }}/services/{{ item }}"
+        regexp: "{{ host_conda_python }}"
+        replace: "{{ conda_python }}"
+      loop: "{{ systemd_services }}"
+
+    - name: Ensure User= line exists in momentum_alerts.service
+      ansible.builtin.lineinfile:
+        path: "{{ vm_home }}/services/momentum_alerts.service"
+        insertafter: "^WorkingDirectory="
+        line: "User={{ vm_user }}"
+        state: present
+
+    - name: Bypass conda activation in market_data_api_service.sh
+      ansible.builtin.replace:
+        path: "{{ vm_home }}/services/market_data_api_service.sh"
+        regexp: 'source "\$HOME/miniconda3/etc/profile.d/conda.sh"'
+        replace: "# conda not available via systemd"
+
+    - name: Bypass conda activate in market_data_api_service.sh
+      ansible.builtin.replace:
+        path: "{{ vm_home }}/services/market_data_api_service.sh"
+        regexp: "conda activate {{ conda_env }}"
+        replace: "# conda not available via systemd"
+
+    - name: Copy service files to /etc/systemd/system/
+      ansible.builtin.copy:
+        src: "{{ vm_home }}/services/{{ item }}"
+        dest: "/etc/systemd/system/{{ item }}"
+        remote_src: true
+        mode: "0644"
+      loop: "{{ systemd_services }}"
+
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Enable and start services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+      loop: "{{ systemd_services }}"
+
+    - name: Verify all services are running
+      ansible.builtin.command: >
+        systemctl is-active {{ systemd_services | join(' ') }}
+      register: svc_status
+      failed_when: false
+      changed_when: false
+
+    - name: Show service status
+      ansible.builtin.debug:
+        var: svc_status.stdout_lines
+
+
+# ─────────────────────────────────────────────────────────────
+# PLAY 6 — VM: configure Apache CGI
+# ─────────────────────────────────────────────────────────────
+- name: "VM — configure Apache CGI"
+  hosts: apache_vm
+  become: true
+  tags: vm_apache
+
+  tasks:
+
+    - name: Enable Apache CGI module
+      ansible.builtin.command: a2enmod cgid
+      register: cgid_result
+      changed_when: "'already enabled' not in cgid_result.stdout"
+      notify: Restart Apache
+
+    - name: Allow www-data to traverse /home/ubuntu (execute bit)
+      ansible.builtin.file:
+        path: "{{ vm_home }}"
+        mode: "o+x"
+
+    - name: Make all cgi-bin Python scripts executable
+      ansible.builtin.shell: find {{ vm_home }}/cgi-bin -name '*.py' -exec chmod +x {} \;
+      changed_when: true
+
+    - name: Fix shebangs in cgi-bin scripts to use VM conda python
+      ansible.builtin.shell: >
+        find {{ vm_home }}/cgi-bin -name '*.py' -exec sed -i
+        's|^#!.*python.*|#!{{ conda_python }}|'
+        {} \;
+      changed_when: true
+
+    - name: Write Apache virtual host config
+      ansible.builtin.copy:
+        dest: /etc/apache2/sites-available/000-default.conf
+        mode: "0644"
+        content: |
+          <VirtualHost *:80>
+              ServerAdmin webmaster@localhost
+              DocumentRoot /var/www/html
+
+              ScriptAlias /cgi-bin/ {{ vm_home }}/cgi-bin/
+              <Directory {{ vm_home }}/cgi-bin>
+                  Options +ExecCGI
+                  AddHandler cgi-script .py
+                  AllowOverride None
+                  Require all granted
+              </Directory>
+
+              <Directory /var/www/html>
+                  Options +FollowSymLinks
+                  AllowOverride None
+                  Require all granted
+              </Directory>
+
+              ErrorLog ${APACHE_LOG_DIR}/error.log
+              CustomLog ${APACHE_LOG_DIR}/access.log combined
+          </VirtualHost>
+      notify: Restart Apache
+
+  handlers:
+    - name: Restart Apache
+      ansible.builtin.systemd:
+        name: apache2
+        state: restarted
+
+
+# ─────────────────────────────────────────────────────────────
+# PLAY 7 — VM: security hardening
+# ─────────────────────────────────────────────────────────────
+- name: "VM — security hardening"
+  hosts: apache_vm
+  become: true
+  tags: vm_security
+
+  tasks:
+
+    - name: Harden SSH — disable root login
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "^#?PermitRootLogin"
+        line: "PermitRootLogin no"
+      notify: Restart SSH
+
+    - name: Harden SSH — disable password authentication
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "^#?PasswordAuthentication"
+        line: "PasswordAuthentication no"
+      notify: Restart SSH
+
+    - name: Disable Apache directory listing
+      ansible.builtin.replace:
+        path: /etc/apache2/apache2.conf
+        regexp: "Options Indexes FollowSymLinks"
+        replace: "Options -Indexes +FollowSymLinks"
+
+    - name: Hide Apache version — ServerTokens
+      ansible.builtin.lineinfile:
+        path: /etc/apache2/conf-available/security.conf
+        regexp: "^ServerTokens"
+        line: "ServerTokens Prod"
+
+    - name: Hide Apache version — ServerSignature
+      ansible.builtin.lineinfile:
+        path: /etc/apache2/conf-available/security.conf
+        regexp: "^ServerSignature"
+        line: "ServerSignature Off"
+
+    - name: Enable ModSecurity
+      ansible.builtin.command: a2enmod security2
+      register: modsec_result
+      changed_when: "'already enabled' not in modsec_result.stdout"
+      notify: Restart Apache
+
+    - name: Disable unused Apache modules (autoindex, status)
+      ansible.builtin.command: a2dismod autoindex status
+      register: dismod_result
+      changed_when: "'already disabled' not in dismod_result.stdout"
+      failed_when: false
+      notify: Restart Apache
+
+    - name: Enable unattended-upgrades
+      ansible.builtin.command: dpkg-reconfigure -f noninteractive unattended-upgrades
+      changed_when: false
+
+    - name: Ensure fail2ban is running
+      ansible.builtin.systemd:
+        name: fail2ban
+        enabled: true
+        state: started
+
+  handlers:
+    - name: Restart SSH
+      ansible.builtin.systemd:
+        name: ssh
+        state: restarted
+
+    - name: Restart Apache
+      ansible.builtin.systemd:
+        name: apache2
+        state: restarted
+
+
+# ─────────────────────────────────────────────────────────────
+# PLAY 8 — VM: sync historical_data and run smoke tests
+# ─────────────────────────────────────────────────────────────
+- name: "VM — sync historical_data and verify pages"
+  hosts: apache_vm
+  tags: vm_files
+
+  tasks:
+
+    - name: Sync historical_data from host
+      ansible.posix.synchronize:
+        src: "{{ historical_data_src }}/"
+        dest: "{{ vm_home }}/historical_data/"
+
+    - name: Fix historical_data ownership
+      become: true
+      ansible.builtin.file:
+        path: "{{ vm_home }}/historical_data"
+        owner: "{{ vm_user }}"
+        group: "{{ vm_user }}"
+        recurse: true
+
+    - name: Smoke test — check key pages return HTTP 200
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}/{{ item }}"
+        return_content: false
+        status_code: 200
+      loop:
+        - ""
+        - "index.html"
+        - "scanner.html"
+      failed_when: false
+      register: page_checks
+
+    - name: Show page check results
+      ansible.builtin.debug:
+        msg: "{{ item.url }} → {{ item.status }}"
+      loop: "{{ page_checks.results }}"
+
+
+# ─────────────────────────────────────────────────────────────
+# PLAY 9 — KVM host: take clean baseline snapshot
+# ─────────────────────────────────────────────────────────────
+- name: "KVM host — take clean baseline snapshot"
+  hosts: kvm_host
+  become: true
+  tags: vm_snapshot
+
+  tasks:
+
+    - name: Take clean baseline virsh snapshot
+      ansible.builtin.command: >
+        virsh snapshot-create-as {{ vm_name }} clean-baseline
+        --description "Post-provision baseline snapshot"
+      register: snapshot_result
+      changed_when: true
+      failed_when: snapshot_result.rc != 0 and 'already exists' not in snapshot_result.stderr
+
+    - name: Show snapshot result
+      ansible.builtin.debug:
+        msg: "Snapshot result: {{ snapshot_result.stdout | default(snapshot_result.stderr) }}"

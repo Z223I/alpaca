@@ -442,7 +442,7 @@ Running one VM per public-facing service is a security best practice.
   sudo apt install logwatch
   ```
 
-- [ ] **Automate re-provisioning**: A shell script or Ansible playbook to rebuild the VM from scratch if needed
+- [x] **Automate re-provisioning**: See [Ansible Automated Rebuild](#ansible-automated-rebuild) below — a full playbook that reproduces every step in this To-Do List from scratch
 
 ### Optional (Advanced)
 
@@ -450,6 +450,87 @@ Running one VM per public-facing service is a security best practice.
 - [ ] Deploy behind a **CDN/reverse proxy** (Cloudflare) to hide the origin IP
 - [ ] Enable **GeoIP blocking** if traffic should only come from specific countries
 - [ ] Set up **intrusion detection** (OSSEC or Wazuh)
+
+---
+
+## Ansible Automated Rebuild
+
+The playbook at `ansible/rebuild_vm.yml` automates every step in the To-Do List above — from creating the KVM VM through security hardening and taking a baseline snapshot. It is idempotent: safe to re-run after failures or changes.
+
+### File layout
+
+```text
+ansible/
+├── group_vars/
+│   └── all.yml          # All variables — edit vm_name here to switch test ↔ prod
+├── inventory.ini         # KVM host + VM inventory; VM IP is auto-populated at runtime
+└── rebuild_vm.yml        # Main playbook (9 plays, fully tagged)
+```
+
+### Test VM vs production VM
+
+The playbook defaults to a **test VM** so you can validate the build without touching the live instance.
+
+| Setting | Test (default) | Prod |
+| --- | --- | --- |
+| `vm_name` | `apache-web-test` | `apache-web` |
+| `vm_hostname` | `apache-web-test` | `apache-web` |
+| `vm_instance_id` | `apache-web-test-01` | `apache-web-01` |
+| Disk image | `apache-web-test.qcow2` | `apache-web.qcow2` |
+
+To target production, change one line in `ansible/group_vars/all.yml`:
+
+```yaml
+vm_name: apache-web   # was: apache-web-test
+vm_hostname: apache-web
+vm_instance_id: apache-web-01
+```
+
+### Prerequisites
+
+```bash
+# Install Ansible
+sudo apt install ansible
+
+# Install required collections
+ansible-galaxy collection install ansible.posix community.libvirt
+```
+
+### Usage
+
+```bash
+# Full rebuild (all 9 plays in order)
+ansible-playbook -i ansible/inventory.ini ansible/rebuild_vm.yml
+
+# Dry run — show what would change without doing anything
+ansible-playbook -i ansible/inventory.ini ansible/rebuild_vm.yml --check
+```
+
+Run only specific stages using tags:
+
+```bash
+ansible-playbook -i ansible/inventory.ini ansible/rebuild_vm.yml --tags host_setup   # Create VM on KVM host
+ansible-playbook -i ansible/inventory.ini ansible/rebuild_vm.yml --tags vm_base      # Miniconda + Python env
+ansible-playbook -i ansible/inventory.ini ansible/rebuild_vm.yml --tags vm_files     # Copy project files
+ansible-playbook -i ansible/inventory.ini ansible/rebuild_vm.yml --tags vm_services  # systemd services
+ansible-playbook -i ansible/inventory.ini ansible/rebuild_vm.yml --tags vm_apache    # Apache CGI config
+ansible-playbook -i ansible/inventory.ini ansible/rebuild_vm.yml --tags vm_security  # Hardening
+ansible-playbook -i ansible/inventory.ini ansible/rebuild_vm.yml --tags vm_snapshot  # Baseline snapshot
+```
+
+### What each play does
+
+| Play | Tag | Covers |
+| --- | --- | --- |
+| 1 — KVM host setup | `host_setup` | Install KVM tools, SSH key, download cloud image, cloud-init, create + boot VM, discover IP |
+| 2 — cloud-init wait | `vm_base` | Block until all packages from cloud-init finish installing |
+| 3 — Miniconda + env | `vm_base` | Install Miniconda, create `alpaca` conda env, install all pip packages |
+| 4 — Project files | `vm_files` | rsync `public_html` → web root, copy app dirs + `.env`, install `python-holidays` |
+| 5 — Services | `vm_services` | Patch service files (paths/user/conda), copy to `/etc/systemd/system/`, enable + start |
+| 6 — Apache CGI | `vm_apache` | `a2enmod cgid`, fix shebangs in `cgi-bin/`, write virtual host config |
+| 7 — Security | `vm_security` | SSH hardening, hide Apache version, ModSecurity, fail2ban, unattended-upgrades |
+| 8 — Data + smoke test | `vm_files` | rsync `historical_data`, verify key pages return HTTP 200 |
+| 9 — Snapshot | `vm_snapshot` | `virsh snapshot-create-as <vm-name> clean-baseline` |
 
 ---
 

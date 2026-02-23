@@ -1,0 +1,87 @@
+---
+# ============================================================
+# VM identity — change vm_name to test without touching prod
+# ============================================================
+vm_name: apache-web-test          # prod uses: apache-web
+vm_hostname: apache-web-test      # prod uses: apache-web
+vm_instance_id: apache-web-test-01
+
+# ============================================================
+# VM resources
+# ============================================================
+vm_ram_mb: 1024
+vm_vcpus: 2
+vm_disk_gb: 20
+
+# ============================================================
+# Host paths
+# ============================================================
+libvirt_images_dir: /var/lib/libvirt/images
+cloud_image_name: ubuntu-24.04-cloud.img
+cloud_image_url: "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
+
+vm_disk: "{{ libvirt_images_dir }}/{{ vm_name }}.qcow2"
+vm_seed: "{{ libvirt_images_dir }}/{{ vm_name }}-seed.iso"
+cloud_image_path: "{{ libvirt_images_dir }}/{{ cloud_image_name }}"
+
+# Cloud-init staging files (written to /tmp on the KVM host)
+user_data_path: "/tmp/{{ vm_name }}-user-data"
+meta_data_path: "/tmp/{{ vm_name }}-meta-data"
+seed_tmp_path:  "/tmp/{{ vm_name }}-seed.iso"
+
+# ============================================================
+# SSH key used to access the VM
+# ============================================================
+ssh_key_path: "{{ lookup('env', 'HOME') }}/.ssh/id_ed25519"
+ssh_pub_key_path: "{{ ssh_key_path }}.pub"
+
+# ============================================================
+# Project source paths on the KVM host
+# ============================================================
+project_root: "{{ lookup('env', 'HOME') }}/dl/github.com/Z223I/alpaca"
+public_html_src: "{{ project_root }}/public_html"
+historical_data_src: "{{ project_root }}/historical_data"
+app_dirs:
+  - cgi-bin
+  - analysis
+  - atoms
+  - code
+  - molecules
+  - services
+  - python-holidays
+  - historical_data
+
+# ============================================================
+# VM guest settings
+# ============================================================
+vm_user: ubuntu
+vm_home: "/home/ubuntu"
+miniconda_installer: "https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
+miniconda_dir: "{{ vm_home }}/miniconda3"
+conda_env: alpaca
+conda_python: "{{ miniconda_dir }}/envs/{{ conda_env }}/bin/python"
+conda_pip: "{{ miniconda_dir }}/envs/{{ conda_env }}/bin/pip"
+
+# Python packages for the alpaca conda environment
+pip_packages:
+  - websockets
+  - alpaca-py
+  - alpaca-trade-api
+  - python-dotenv
+  - flask
+  - flask-cors
+  - pandas
+  - pytz
+  - tzdata
+  - holidays
+
+# Systemd services to install on the VM
+systemd_services:
+  - market-data-api.service
+  - market_sentinel_trade_stream.service
+  - momentum_alerts.service
+
+# Host paths used in service files (to be replaced with VM paths)
+host_repo_path: "/home/wilsonb/dl/github.com/Z223I/alpaca"
+host_user: wilsonb
+host_conda_python: "/home/wilsonb/miniconda3/envs/alpaca/bin/python"
