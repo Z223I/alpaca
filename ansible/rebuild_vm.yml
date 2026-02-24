@@ -173,6 +173,12 @@
           --boot hd
       when: vm_exists.rc != 0
 
+    - name: Enable VM autostart at host boot
+      ansible.builtin.command: virsh autostart {{ vm_name }}
+      register: autostart_result
+      changed_when: "'marked as autostarted' in autostart_result.stdout"
+      failed_when: false
+
     # ── 1.7 Discover VM IP ────────────────────────────────────
     - name: Wait up to 90s for VM to get a DHCP IP
       ansible.builtin.shell: |
@@ -198,7 +204,7 @@
       become: false
       ansible.builtin.lineinfile:
         path: "{{ playbook_dir }}/inventory.ini"
-        regexp: "^# apache-web-test ansible_host="
+        regexp: "^{{ vm_name }}\\s+ansible_host="
         line: >-
           {{ vm_name }} ansible_host={{ vm_ip }}
           ansible_user={{ vm_user }}
@@ -221,6 +227,26 @@
         ansible_user: "{{ vm_user }}"
         ansible_ssh_private_key_file: "{{ ssh_key_path }}"
         ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+
+    # ── 1.9 Release Alpaca SIP connection on the KVM host ─────
+    # The VM's market_sentinel_trade_stream.service will own the
+    # Alpaca SIP WebSocket.  If the same service is also running
+    # on the host it will exhaust the per-account connection limit
+    # and cause "connection limit exceeded" in the VM.  Stop and
+    # disable it here so the VM is the sole holder.
+    - name: Stop host trade-stream service if running (frees Alpaca SIP slot)
+      ansible.builtin.systemd:
+        name: market_sentinel_trade_stream.service
+        state: stopped
+        enabled: false
+      failed_when: false   # unit may not be installed on every host
+
+    - name: Kill any orphan host trade-stream or browser-proxy processes
+      ansible.builtin.shell: |
+        pkill -f 'trade_stream_server.py' || true
+        pkill -f 'browser_proxy.py'       || true
+      changed_when: false
+      failed_when: false
 
 
 # ─────────────────────────────────────────────────────────────
