@@ -388,6 +388,7 @@
 
     # Copy .env credentials — owner ubuntu, group www-data, no world read
     - name: Copy .env to VM home
+      become: true
       ansible.builtin.copy:
         src: "{{ project_root }}/.env"
         dest: "{{ vm_home }}/.env"
