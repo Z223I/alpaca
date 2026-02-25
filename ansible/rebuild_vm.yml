@@ -324,11 +324,53 @@
       register: pip_result
       changed_when: "'Successfully installed' in pip_result.stdout"
 
-    - name: Create logs directory
+    - name: Create logs directory and subdirectories
       ansible.builtin.file:
-        path: "{{ vm_home }}/logs"
+        path: "{{ vm_home }}/logs/{{ item }}"
         state: directory
         mode: "0755"
+      loop:
+        - ""           # ~/logs itself
+        - alpaca       # alpaca.py --top-gainers log files
+        - premarket    # premarket_top_gainers.py log files
+        - volume_surge # volume surge scanner log files
+
+    # momentum_alerts needs more memory than the 1 GB VM provides.
+    # A 2 GB swap file lets the service survive bursts without OOM kills.
+    - name: Create 2 GB swap file (skip if already present)
+      become: true
+      ansible.builtin.command:
+        cmd: fallocate -l 2G /swapfile
+        creates: /swapfile
+
+    - name: Set swap file permissions
+      become: true
+      ansible.builtin.file:
+        path: /swapfile
+        mode: "0600"
+
+    - name: Format swap file
+      become: true
+      ansible.builtin.command:
+        cmd: mkswap /swapfile
+      register: mkswap_result
+      changed_when: "'Setting up swapspace' in mkswap_result.stdout"
+      failed_when: mkswap_result.rc != 0 and 'already' not in mkswap_result.stderr
+
+    - name: Enable swap file
+      become: true
+      ansible.builtin.command:
+        cmd: swapon /swapfile
+      register: swapon_result
+      changed_when: swapon_result.rc == 0
+      failed_when: swapon_result.rc != 0 and 'already' not in swapon_result.stderr
+
+    - name: Persist swap in /etc/fstab
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        line: "/swapfile none swap sw 0 0"
+        state: present
 
 
 # ─────────────────────────────────────────────────────────────
