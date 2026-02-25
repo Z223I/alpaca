@@ -173,6 +173,13 @@ class TradeStreamServer:
                     # Stream task completed - check for exceptions
                     try:
                         stream_task.result()
+                    except asyncio.CancelledError:
+                        # Stream task was cancelled internally (e.g., by the watchdog for
+                        # reconnection). Convert to a regular exception so the while loop
+                        # retries the connection instead of propagating CancelledError and
+                        # breaking out of the loop entirely.
+                        logger.info("Stream task cancelled internally (watchdog), will reconnect")
+                        raise Exception("Stream task cancelled by watchdog, reconnecting")
                     except Exception as e:
                         logger.error(f"Stream task failed: {e}")
                         raise

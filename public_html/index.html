@@ -2346,8 +2346,11 @@
             const updateInterval = setInterval(() => loadChartData(symbol), refreshInterval);
             state.updateIntervals.set(symbol, updateInterval);
 
-            // Subscribe to real-time trades via WebSocket only (no historical load)
+            // Subscribe to real-time trades via WebSocket
             subscribeToSymbol(symbol);
+
+            // Load initial trades from HTTP API so the panel shows data immediately
+            loadInitialTrades(symbol);
         }
 
         // Calculate float rotation based on current date's volume
@@ -3589,6 +3592,20 @@
 
             // Auto-scroll to top to show newest trades
             container.scrollTop = 0;
+        }
+
+        // Load initial recent trades from HTTP API for immediate Time & Sales display
+        async function loadInitialTrades(symbol) {
+            try {
+                const response = await fetch(`cgi-bin/api/market_data_api.py?action=trades&symbol=${symbol}&limit=100`);
+                const result = await response.json();
+                if (result.success && result.data && result.data.trades && result.data.trades.length > 0) {
+                    console.log(`Loaded ${result.data.trades.length} initial trades for ${symbol}`);
+                    renderTimeSales(symbol, result.data.trades);
+                }
+            } catch (error) {
+                console.error(`Failed to load initial trades for ${symbol}:`, error);
+            }
         }
 
         // Update status bar

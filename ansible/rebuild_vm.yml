@@ -403,6 +403,18 @@
       register: holidays_result
       changed_when: "'Successfully installed' in holidays_result.stdout"
 
+    # Restart the trade stream service so any updated service scripts take
+    # effect immediately (state: started would leave stale code running).
+    - name: Restart trade stream and browser proxy after file sync
+      become: true
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: restarted
+      loop:
+        - market_sentinel_trade_stream.service
+        - browser_proxy.service
+      failed_when: false   # services may not be installed yet on first run
+
 
 # ─────────────────────────────────────────────────────────────
 # PLAY 5 — VM: configure and enable systemd services
