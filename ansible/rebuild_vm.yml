@@ -355,7 +355,7 @@
         cmd: mkswap /swapfile
       register: mkswap_result
       changed_when: "'Setting up swapspace' in mkswap_result.stdout"
-      failed_when: mkswap_result.rc != 0 and 'already' not in mkswap_result.stderr
+      failed_when: mkswap_result.rc != 0 and 'already' not in mkswap_result.stderr and 'mounted' not in mkswap_result.stderr
 
     - name: Enable swap file
       become: true
@@ -363,7 +363,7 @@
         cmd: swapon /swapfile
       register: swapon_result
       changed_when: swapon_result.rc == 0
-      failed_when: swapon_result.rc != 0 and 'already' not in swapon_result.stderr
+      failed_when: swapon_result.rc != 0 and 'already' not in swapon_result.stderr and 'busy' not in swapon_result.stderr
 
     - name: Persist swap in /etc/fstab
       become: true
