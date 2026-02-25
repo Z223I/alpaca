@@ -13,7 +13,7 @@ Process:
    - Monitors premarket top gainers continuously
    - Runs on trading days only (skips weekends and NYSE holidays)
 2. Top Gainers (Alpaca API): Run alpaca.py --top-gainers from 04:00 to 20:00 ET every minute
-   - Runs on separate CPU core (core 2) using taskset
+   - Runs on separate CPU core (core 1) using taskset
    - Generates top_gainers_alpaca.csv in ./historical_data/{YYYY-MM-DD}/market/
    - Uses Alpaca screener API for real-time top gainers
    - Runs on trading days only (skips weekends and NYSE holidays)
@@ -550,12 +550,12 @@ class MomentumAlertsSystem:
             env = os.environ.copy()
             env['PYTHONPATH'] = project_root
 
-            # Create process with logging
+            # Create process — use DEVNULL to avoid pipe buffer deadlock
+            # (PIPE would block if the child writes > ~64 KB without the parent reading)
             process = subprocess.Popen(
                 cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
                 cwd=str(Path.cwd()),
                 env=env
             )
@@ -607,12 +607,11 @@ class MomentumAlertsSystem:
             env = os.environ.copy()
             env['PYTHONPATH'] = project_root
 
-            # Create process with logging
+            # Create process — use DEVNULL to avoid pipe buffer deadlock
             process = subprocess.Popen(
                 cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
                 cwd=str(Path.cwd()),
                 env=env
             )
@@ -647,7 +646,7 @@ class MomentumAlertsSystem:
         python_path = os.path.expanduser("~/miniconda3/envs/alpaca/bin/python")
 
         cmd = [
-            "taskset", "-c", "2",  # Run on CPU core 2 (separate from main process and premarket)
+            "taskset", "-c", "1",  # Run on CPU core 1 (VM has cores 0 and 1 only)
             python_path,
             str(script_path),
             "--top-gainers",
@@ -659,12 +658,11 @@ class MomentumAlertsSystem:
             env = os.environ.copy()
             env['PYTHONPATH'] = project_root
 
-            # Create process with logging
+            # Create process — use DEVNULL to avoid pipe buffer deadlock
             process = subprocess.Popen(
                 cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
                 cwd=str(Path.cwd()),
                 env=env
             )
@@ -677,7 +675,7 @@ class MomentumAlertsSystem:
                 'cmd': ' '.join(cmd)
             }
 
-            self.logger.info(f"📈 Started top gainers script on CPU core 2 (PID: {process.pid})")
+            self.logger.info(f"📈 Started top gainers script on CPU core 1 (PID: {process.pid})")
             self.logger.info("🕒 Expected completion: < 1 minute")
 
             return True
@@ -699,9 +697,14 @@ class MomentumAlertsSystem:
         if self.startup_schedule and current_time >= self.startup_schedule[0]:
             # Check if today is a trading day before running (not weekend or NYSE holiday)
             if self.is_trading_day(current_time):
-                # Run the script
-                asyncio.create_task(self._run_startup_script())
-                self.startup_runs_completed += 1
+                # Guard: skip if a startup process is already running
+                active_startup = any(k.startswith('startup_') for k in self.startup_processes)
+                if active_startup:
+                    self.logger.info("⏭️ Skipping startup run - previous run still in progress")
+                else:
+                    # Run the script
+                    asyncio.create_task(self._run_startup_script())
+                    self.startup_runs_completed += 1
 
             # Immediately schedule the next run (20 minutes from now)
             next_run = current_time + timedelta(minutes=20)
@@ -749,9 +752,13 @@ class MomentumAlertsSystem:
         if self.premarket_schedule and current_time >= self.premarket_schedule[0]:
             # Check if today is a trading day before running (not weekend or NYSE holiday)
             if self.is_trading_day(current_time):
-                # Run the script
-                asyncio.create_task(self._run_premarket_script())
-                self.premarket_runs_completed += 1
+                # Guard: skip if a premarket process is already running
+                if self.premarket_processes:
+                    self.logger.info("⏭️ Skipping premarket run - previous run still in progress")
+                else:
+                    # Run the script
+                    asyncio.create_task(self._run_premarket_script())
+                    self.premarket_runs_completed += 1
 
             # Immediately schedule the next run (10 minutes from now)
             next_run = current_time + timedelta(minutes=10)
@@ -844,9 +851,13 @@ class MomentumAlertsSystem:
         if self.volume_surge_schedule and current_time >= self.volume_surge_schedule[0]:
             # Check if today is a trading day before running (not weekend or NYSE holiday)
             if self.is_trading_day(current_time):
-                # Run the script
-                asyncio.create_task(self._run_volume_surge_scanner())
-                self.volume_surge_runs_completed += 1
+                # Guard: skip if a volume surge process is already running
+                if 'volume_surge' in self.startup_processes:
+                    self.logger.info("⏭️ Skipping volume surge run - previous run still in progress")
+                else:
+                    # Run the script
+                    asyncio.create_task(self._run_volume_surge_scanner())
+                    self.volume_surge_runs_completed += 1
 
             # Schedule the next run (every 10 minutes)
             # First and last run times
@@ -967,6 +978,32 @@ class MomentumAlertsSystem:
         for process_id in completed_processes:
             del self.premarket_processes[process_id]
 
+    async def _check_top_gainers_processes(self):
+        """Check the status of running top gainers processes and reap zombies."""
+        completed_processes = []
+
+        for process_id, process_info in self.top_gainers_processes.items():
+            process = process_info['process']
+
+            if process.poll() is not None:  # Process has completed
+                return_code = process.returncode
+                runtime = datetime.now(self.et_tz) - process_info['start_time']
+
+                if return_code != 0:
+                    self.logger.error(f"❌ Top gainers script failed with return code {return_code} (Runtime: {runtime})")
+
+                # Reap the zombie (communicate returns (None, None) with DEVNULL)
+                try:
+                    process.communicate(timeout=1)
+                except Exception:
+                    pass
+
+                completed_processes.append(process_id)
+
+        # Remove completed processes
+        for process_id in completed_processes:
+            del self.top_gainers_processes[process_id]
+
     async def _send_top_gainers_file_to_bruce(self):
         """
         Send the generated premarket top gainers file contents to Bruce via Telegram.
@@ -1078,12 +1115,11 @@ class MomentumAlertsSystem:
             env = os.environ.copy()
             env['PYTHONPATH'] = project_root
 
-            # Create process with logging
+            # Create process — use DEVNULL to avoid pipe buffer deadlock
             process = subprocess.Popen(
                 cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
                 cwd=str(Path.cwd()),
                 env=env
             )
@@ -2978,6 +3014,9 @@ class MomentumAlertsSystem:
 
                     # Check premarket processes
                     await self._check_premarket_processes()
+
+                    # Check top gainers processes (reap zombies)
+                    await self._check_top_gainers_processes()
 
                     # Monitor CSV file
                     self._monitor_csv_file()
