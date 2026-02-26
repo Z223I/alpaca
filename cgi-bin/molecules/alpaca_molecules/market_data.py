@@ -282,7 +282,7 @@ class AlpacaMarketData:
                 start=start_date,
                 end=end_date,
                 limit=10000,  # Max bars
-                feed='sip'  # Paid SIP feed for comprehensive real-time market data
+                feed='iex'  # IEX feed (free, no SIP subscription required)
             )
 
             bars = self.hist_client.get_stock_bars(request_params)
@@ -324,7 +324,7 @@ class AlpacaMarketData:
                 return pd.DataFrame()
 
         except Exception as e:
-            print(f"Error getting bar data: {e}")
+            print(f"Error getting bar data: {e}", file=sys.stderr)
             return pd.DataFrame()
 
     def get_chart_data(self, symbol: str, interval: str = '1m', range_str: str = '1d') -> Dict[str, Any]:
@@ -657,7 +657,7 @@ class AlpacaMarketData:
                 start=start_date,
                 end=end_date,
                 limit=limit,
-                feed='sip'  # Paid SIP feed - 100% market coverage, all exchanges
+                feed='iex'  # IEX feed (free, no SIP subscription required)
             )
 
             trades = self.hist_client.get_stock_trades(request_params)
@@ -692,7 +692,7 @@ class AlpacaMarketData:
             return trade_list
 
         except Exception as e:
-            print(f"Error getting time and sales data: {e}")
+            print(f"Error getting time and sales data: {e}", file=sys.stderr)
             return []
 
     def to_json(self, data: Any) -> str:

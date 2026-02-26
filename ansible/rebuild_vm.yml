@@ -454,6 +454,20 @@
       register: holidays_result
       changed_when: "'Successfully installed' in holidays_result.stdout"
 
+    # Re-apply executable bits and VM shebang after every file sync.
+    # rsync overwrites files from the host which have the host python shebang;
+    # without this step Apache cannot exec the CGI scripts.
+    - name: Make all cgi-bin Python scripts executable
+      ansible.builtin.shell: find {{ vm_home }}/cgi-bin -name '*.py' -exec chmod +x {} \;
+      changed_when: true
+
+    - name: Fix shebangs in cgi-bin scripts to use VM conda python
+      ansible.builtin.shell: >
+        find {{ vm_home }}/cgi-bin -name '*.py' -exec sed -i
+        's|^#!.*python.*|#!{{ conda_python }}|'
+        {} \;
+      changed_when: true
+
     # Restart services so any updated scripts and config files take effect
     # immediately (state: started would leave stale code running).
     - name: Restart services after file sync
