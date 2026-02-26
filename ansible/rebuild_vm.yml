@@ -438,6 +438,15 @@
         group: www-data
         mode: "0640"
 
+    # Copy Telegram user list — required for momentum_alerts to deliver notifications
+    - name: Copy .telegram_users.csv to VM home
+      ansible.builtin.copy:
+        src: "{{ project_root }}/.telegram_users.csv"
+        dest: "{{ vm_home }}/.telegram_users.csv"
+        owner: "{{ vm_user }}"
+        group: "{{ vm_user }}"
+        mode: "0640"
+
     # Install python-holidays from the copied submodule
     - name: Install python-holidays from submodule
       ansible.builtin.command: >
@@ -445,9 +454,9 @@
       register: holidays_result
       changed_when: "'Successfully installed' in holidays_result.stdout"
 
-    # Restart the trade stream service so any updated service scripts take
-    # effect immediately (state: started would leave stale code running).
-    - name: Restart trade stream and browser proxy after file sync
+    # Restart services so any updated scripts and config files take effect
+    # immediately (state: started would leave stale code running).
+    - name: Restart services after file sync
       become: true
       ansible.builtin.systemd:
         name: "{{ item }}"
@@ -455,6 +464,7 @@
       loop:
         - market_sentinel_trade_stream.service
         - browser_proxy.service
+        - momentum_alerts.service
       failed_when: false   # services may not be installed yet on first run
 
 
