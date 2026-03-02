@@ -54,6 +54,9 @@ from code.momentum_alerts_config import (
 class MomentumAlertsSystem:
     """Main momentum alerts system orchestrator."""
 
+    # Delay (minutes) applied to SIP feed queries for free-tier compliance
+    SIP_DELAY_MINUTES = 30
+
     def __init__(self, test_mode: bool = False, verbose: bool = False):
         """
         Initialize Momentum Alerts System.
@@ -672,8 +675,12 @@ class MomentumAlertsSystem:
             )
 
             # Get bars from 9:25 AM to 9:35 AM ET (10 minute window around market open)
+            # Cap end_time to now - SIP_DELAY_MINUTES for free-tier SIP compliance
             start_time = market_open_datetime - timedelta(minutes=5)
-            end_time = market_open_datetime + timedelta(minutes=5)
+            end_time = min(
+                market_open_datetime + timedelta(minutes=5),
+                datetime.now(self.et_tz) - timedelta(minutes=self.SIP_DELAY_MINUTES)
+            )
 
             # Fetch 1-minute bars
             bars = self.historical_client.get_bars(
@@ -1045,8 +1052,8 @@ class MomentumAlertsSystem:
         if not symbols or not self.historical_client:
             return {}
 
-        # Calculate time range (last 30 minutes)
-        end_time = datetime.now(self.et_tz)
+        # Calculate time range: apply SIP delay so end is at least SIP_DELAY_MINUTES in the past
+        end_time = datetime.now(self.et_tz) - timedelta(minutes=self.SIP_DELAY_MINUTES)
         start_time = end_time - timedelta(minutes=30)
 
         try:
@@ -1145,7 +1152,7 @@ class MomentumAlertsSystem:
             if current_et.hour < 4:
                 start_time = start_time - timedelta(days=1)
 
-            end_time = current_et
+            end_time = current_et - timedelta(minutes=self.SIP_DELAY_MINUTES)
 
             self.logger.debug(f"📊 Fetching hourly volume from {start_time.strftime('%H:%M ET')} to {end_time.strftime('%H:%M ET')}")
 
