@@ -2218,6 +2218,7 @@
                         <label>Interval:</label>
                         <select id="interval-select-${symbol}" class="ctrl-select" onchange="setChartInterval('${symbol}', this.value)">
                             <option value="1m" selected>1m</option>
+                            <option value="2m">2m</option>
                             <option value="5m">5m</option>
                             <option value="30m">30m</option>
                             <option value="1h">1h</option>
@@ -2671,19 +2672,22 @@
             const chartData = state.charts.get(symbol);
             chartData.interval = interval;
 
+            // Force chart recreation so TradingView remaps the time scale
+            chartData.forceRecreate = true;
+
             // Update the refresh interval based on new chart interval
             if (state.updateIntervals.has(symbol)) {
                 clearInterval(state.updateIntervals.get(symbol));
 
-                // Adaptive refresh rate based on interval
                 const getRefreshInterval = (interval) => {
                     switch(interval) {
-                        case '1m': return 30000;  // 30 seconds for 1-minute charts
-                        case '5m': return 30000;  // 30 seconds for 5-minute charts
-                        case '30m': return 30000; // 30 seconds for 30-minute charts
-                        case '1h': return 60000;  // 60 seconds for hourly charts
-                        case '1d': return 60000;  // 60 seconds for daily charts
-                        default: return 30000;    // Default 30 seconds
+                        case '1m': return 30000;
+                        case '2m': return 30000;
+                        case '5m': return 30000;
+                        case '30m': return 30000;
+                        case '1h': return 60000;
+                        case '1d': return 60000;
+                        default: return 30000;
                     }
                 };
 

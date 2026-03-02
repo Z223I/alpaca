@@ -57,6 +57,7 @@ class AlpacaMarketData:
     # Note: alpaca-py does not support second-level timeframes
     TIMEFRAME_MAP = {
         '1m': TimeFrame.Minute,
+        '2m': TimeFrame(2, TimeFrameUnit.Minute),
         '5m': TimeFrame(5, TimeFrameUnit.Minute),
         '15m': TimeFrame(15, TimeFrameUnit.Minute),
         '30m': TimeFrame(30, TimeFrameUnit.Minute),
