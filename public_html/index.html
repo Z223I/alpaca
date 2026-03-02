@@ -384,6 +384,34 @@
             cursor: pointer;
         }
 
+        .ctrl-select,
+        .ema-select {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: 5px;
+            font-size: 13px;
+            padding: 2px 4px;
+            cursor: pointer;
+        }
+
+        .ctrl-select {
+            min-width: 52px;
+        }
+
+        .ema-select {
+            min-width: 42px;
+        }
+
+        .ema-select option {
+            padding: 1px 4px;
+        }
+
+        .ema-select option:checked {
+            background-color: var(--accent-green);
+            color: white;
+        }
+
         .indicator-note {
             font-size: 0.75em;
             color: var(--text-secondary);
@@ -2188,32 +2216,31 @@
                 <div class="chart-controls">
                     <div class="control-group">
                         <label>Interval:</label>
-                        <button class="control-btn active" onclick="setChartInterval('${symbol}', '1m')">1m</button>
-                        <button class="control-btn" onclick="setChartInterval('${symbol}', '5m')">5m</button>
-                        <button class="control-btn" onclick="setChartInterval('${symbol}', '30m')">30m</button>
-                        <button class="control-btn" onclick="setChartInterval('${symbol}', '1h')">1h</button>
-                        <button class="control-btn" onclick="setChartInterval('${symbol}', '1d')">1d</button>
+                        <select id="interval-select-${symbol}" class="ctrl-select" onchange="setChartInterval('${symbol}', this.value)">
+                            <option value="1m" selected>1m</option>
+                            <option value="5m">5m</option>
+                            <option value="30m">30m</option>
+                            <option value="1h">1h</option>
+                            <option value="1d">1d</option>
+                        </select>
                     </div>
                     <div class="control-group">
                         <label>Range:</label>
-                        <button class="control-btn active" onclick="setRange('${symbol}', '1d')">1D</button>
-                        <button class="control-btn" onclick="setRange('${symbol}', '5d')">5D</button>
-                        <button class="control-btn" onclick="setRange('${symbol}', '1mo')">1M</button>
-                        <button class="control-btn" onclick="setRange('${symbol}', '1y')">1Y</button>
+                        <select id="range-select-${symbol}" class="ctrl-select" onchange="setRange('${symbol}', this.value)">
+                            <option value="1d" selected>1D</option>
+                            <option value="5d">5D</option>
+                            <option value="1mo">1M</option>
+                            <option value="1y">1Y</option>
+                        </select>
                     </div>
                     <div class="control-group">
-                        <label class="control-checkbox">
-                            <input type="checkbox" id="ema9-checkbox-${symbol}" onchange="toggleIndicator('${symbol}', 'ema9', this.checked)">
-                            EMA(9)
-                        </label>
-                        <label class="control-checkbox">
-                            <input type="checkbox" id="ema21-checkbox-${symbol}" onchange="toggleIndicator('${symbol}', 'ema21', this.checked)">
-                            EMA(21)
-                        </label>
-                        <label class="control-checkbox">
-                            <input type="checkbox" id="ema50-checkbox-${symbol}" onchange="toggleIndicator('${symbol}', 'ema50', this.checked)">
-                            EMA(50)
-                        </label>
+                        <label>EMA:</label>
+                        <select multiple id="ema-select-${symbol}" class="ema-select" size="4" onchange="toggleEmaSelect('${symbol}', this)" title="Ctrl+click to select multiple">
+                            <option value="9">9</option>
+                            <option value="21">21</option>
+                            <option value="50">50</option>
+                            <option value="200">200</option>
+                        </select>
                         <label class="control-checkbox" id="vwap-label-${symbol}">
                             <input type="checkbox" id="vwap-checkbox-${symbol}" onchange="toggleIndicator('${symbol}', 'vwap', this.checked)">
                             VWAP <span class="indicator-note">(1D only)</span>
@@ -2298,6 +2325,7 @@
                     ema9: false,
                     ema21: false,
                     ema50: false,
+                    ema200: false,
                     vwap: false,
                     macd: false,
                     volume: true
@@ -2620,13 +2648,8 @@
 
         // Control functions
         function setChartInterval(symbol, interval) {
-            const panel = document.getElementById(`panel-${symbol}`);
-            if (!panel) return;
-
-            panel.querySelectorAll('.control-group:nth-child(1) .control-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.classList.add('active');
+            const intervalSelect = document.getElementById(`interval-select-${symbol}`);
+            if (intervalSelect) intervalSelect.value = interval;
 
             const chartData = state.charts.get(symbol);
             chartData.interval = interval;
@@ -2657,20 +2680,8 @@
         }
 
         function setRange(symbol, range) {
-            const panel = document.getElementById(`panel-${symbol}`);
-            if (!panel) return;
-
-            // Update button active states
-            panel.querySelectorAll('.control-group:nth-child(2) .control-btn').forEach(btn => {
-                btn.classList.remove('active');
-                const btnText = btn.textContent;
-                if ((btnText === '1D' && range === '1d') ||
-                    (btnText === '5D' && range === '5d') ||
-                    (btnText === '1M' && range === '1mo') ||
-                    (btnText === '1Y' && range === '1y')) {
-                    btn.classList.add('active');
-                }
-            });
+            const rangeSelect = document.getElementById(`range-select-${symbol}`);
+            if (rangeSelect) rangeSelect.value = range;
 
             const chartData = state.charts.get(symbol);
             chartData.range = range;
@@ -2701,6 +2712,17 @@
             const chartData = state.charts.get(symbol);
             chartData.indicators[indicator] = enabled;
             // Force chart recreation when indicators change
+            chartData.forceRecreate = true;
+            loadChartData(symbol);
+        }
+
+        function toggleEmaSelect(symbol, selectEl) {
+            const selected = Array.from(selectEl.selectedOptions).map(o => parseInt(o.value));
+            const chartData = state.charts.get(symbol);
+            chartData.indicators.ema9 = selected.includes(9);
+            chartData.indicators.ema21 = selected.includes(21);
+            chartData.indicators.ema50 = selected.includes(50);
+            chartData.indicators.ema200 = selected.includes(200);
             chartData.forceRecreate = true;
             loadChartData(symbol);
         }
@@ -2766,28 +2788,15 @@
             // Apply interval
             if (settings.interval) {
                 chartData.interval = settings.interval;
-                panel.querySelectorAll('.control-group:nth-child(1) .control-btn').forEach(btn => {
-                    btn.classList.remove('active');
-                    if (btn.textContent === settings.interval) {
-                        btn.classList.add('active');
-                    }
-                });
+                const intervalSelect = document.getElementById(`interval-select-${symbol}`);
+                if (intervalSelect) intervalSelect.value = settings.interval;
             }
 
             // Apply range
             if (settings.range) {
                 chartData.range = settings.range;
-                panel.querySelectorAll('.control-group:nth-child(2) .control-btn').forEach(btn => {
-                    btn.classList.remove('active');
-                    const btnText = btn.textContent;
-                    if (btnText === settings.range ||
-                        (btnText === '1D' && settings.range === '1d') ||
-                        (btnText === '5D' && settings.range === '5d') ||
-                        (btnText === '1M' && settings.range === '1mo') ||
-                        (btnText === '1Y' && settings.range === '1y')) {
-                        btn.classList.add('active');
-                    }
-                });
+                const rangeSelect = document.getElementById(`range-select-${symbol}`);
+                if (rangeSelect) rangeSelect.value = settings.range;
             }
 
             // Apply indicators
@@ -2806,6 +2815,15 @@
                         checkbox.checked = settings.indicators[indicator];
                     }
                 });
+
+                // Sync EMA multi-select
+                const emaSelect = document.getElementById(`ema-select-${symbol}`);
+                if (emaSelect) {
+                    Array.from(emaSelect.options).forEach(opt => {
+                        const key = `ema${opt.value}`;
+                        opt.selected = !!settings.indicators[key];
+                    });
+                }
 
                 // Disable VWAP checkbox/label if not 1D range
                 const vwapCheckbox = document.getElementById(`vwap-checkbox-${symbol}`);

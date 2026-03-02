@@ -538,6 +538,7 @@ class MomentumAlertsSystem:
             "--max-price", "100.00",
             "--min-volume", "2500",
             "--top-gainers", "40",
+            "--feed", "iex",
             "--export-csv", "gainers_nasdaq_amex.csv",
             "--verbose"
         ]
@@ -1103,6 +1104,7 @@ class MomentumAlertsSystem:
             "--min-percent-change", "5.0",
             "--surge-days", "50",
             "--volume-surge", "5.0",
+            "--feed", "iex",
             "--export-csv", "relative_volume_nasdaq_amex.csv",
             "--verbose"
         ]
@@ -1168,6 +1170,7 @@ class MomentumAlertsSystem:
         cmd.extend([
             "--surge-days", "50",
             "--volume-surge", "5.0",
+            "--feed", "iex",
             "--export-csv", "symbol_list.csv",
             "--verbose"
         ])
