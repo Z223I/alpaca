@@ -179,17 +179,19 @@ def calculate_indicators(bars, indicators, range_str='1d'):
 
     result = {}
 
+    import re
+
     for indicator in indicators:
         indicator = indicator.strip().lower()
 
-        if indicator == 'ema9':
-            result['ema9'] = calculate_ema(df, 9)
-        elif indicator == 'ema21':
-            result['ema21'] = calculate_ema(df, 21)
-        elif indicator == 'ema50':
-            result['ema50'] = calculate_ema(df, 50)
-        elif indicator == 'ema200':
-            result['ema200'] = calculate_ema(df, 200)
+        ema_match = re.match(r'^ema(\d+)$', indicator)
+        sma_match = re.match(r'^sma(\d+)$', indicator)
+        if ema_match:
+            period = int(ema_match.group(1))
+            result[indicator] = calculate_ema(df, period)
+        elif sma_match:
+            period = int(sma_match.group(1))
+            result[indicator] = calculate_sma(df, period)
         elif indicator == 'vwap':
             result['vwap'] = calculate_vwap(df)
         elif indicator == 'macd':
@@ -214,6 +216,27 @@ def calculate_ema(df, period):
     result = []
     for i, (timestamp, value) in enumerate(zip(df['timestamp'], ema)):
         # Only include valid, finite, non-NaN values
+        if not pd.isna(value) and not np.isinf(value) and value > 0:
+            result.append({
+                'time': timestamp,
+                'value': float(value)
+            })
+
+    return result
+
+
+def calculate_sma(df, period):
+    """Calculate Simple Moving Average based on close price."""
+    import pandas as pd
+    import numpy as np
+
+    if len(df) < period:
+        return []
+
+    sma = df['close'].rolling(window=period).mean()
+
+    result = []
+    for timestamp, value in zip(df['timestamp'], sma):
         if not pd.isna(value) and not np.isinf(value) and value > 0:
             result.append({
                 'time': timestamp,

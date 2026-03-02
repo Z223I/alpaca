@@ -2241,6 +2241,16 @@
                             <option value="50">50</option>
                             <option value="200">200</option>
                         </select>
+                        <label>SMA:</label>
+                        <select multiple id="sma-select-${symbol}" class="ema-select" size="7" onchange="toggleSmaSelect('${symbol}', this)" title="Ctrl+click to select multiple">
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                            <option value="20">20</option>
+                            <option value="30">30</option>
+                            <option value="60">60</option>
+                            <option value="120">120</option>
+                            <option value="200">200</option>
+                        </select>
                         <label class="control-checkbox" id="vwap-label-${symbol}">
                             <input type="checkbox" id="vwap-checkbox-${symbol}" onchange="toggleIndicator('${symbol}', 'vwap', this.checked)">
                             VWAP <span class="indicator-note">(1D only)</span>
@@ -2326,6 +2336,13 @@
                     ema21: false,
                     ema50: false,
                     ema200: false,
+                    sma5: false,
+                    sma10: false,
+                    sma20: false,
+                    sma30: false,
+                    sma60: false,
+                    sma120: false,
+                    sma200: false,
                     vwap: false,
                     macd: false,
                     volume: true
@@ -2719,10 +2736,19 @@
         function toggleEmaSelect(symbol, selectEl) {
             const selected = Array.from(selectEl.selectedOptions).map(o => parseInt(o.value));
             const chartData = state.charts.get(symbol);
-            chartData.indicators.ema9 = selected.includes(9);
-            chartData.indicators.ema21 = selected.includes(21);
-            chartData.indicators.ema50 = selected.includes(50);
-            chartData.indicators.ema200 = selected.includes(200);
+            [9, 21, 50, 200].forEach(p => {
+                chartData.indicators[`ema${p}`] = selected.includes(p);
+            });
+            chartData.forceRecreate = true;
+            loadChartData(symbol);
+        }
+
+        function toggleSmaSelect(symbol, selectEl) {
+            const selected = Array.from(selectEl.selectedOptions).map(o => parseInt(o.value));
+            const chartData = state.charts.get(symbol);
+            [5, 10, 20, 30, 60, 120, 200].forEach(p => {
+                chartData.indicators[`sma${p}`] = selected.includes(p);
+            });
             chartData.forceRecreate = true;
             loadChartData(symbol);
         }
@@ -2821,6 +2847,15 @@
                 if (emaSelect) {
                     Array.from(emaSelect.options).forEach(opt => {
                         const key = `ema${opt.value}`;
+                        opt.selected = !!settings.indicators[key];
+                    });
+                }
+
+                // Sync SMA multi-select
+                const smaSelect = document.getElementById(`sma-select-${symbol}`);
+                if (smaSelect) {
+                    Array.from(smaSelect.options).forEach(opt => {
+                        const key = `sma${opt.value}`;
                         opt.selected = !!settings.indicators[key];
                     });
                 }
@@ -3040,35 +3075,26 @@
                 const indicators = data.indicators || {};
 
                 // Update EMA indicators
-                if (chartData.indicatorSeries.ema9 && indicators.ema9) {
-                    const ema9Data = indicators.ema9
-                        .filter(item => item.value != null && !isNaN(item.value) && isFinite(item.value))
-                        .map(item => ({
-                            time: convertTimestampToET(item.time),
-                            value: item.value
-                        }));
-                    chartData.indicatorSeries.ema9.setData(ema9Data);
-                }
+                ['ema9', 'ema21', 'ema50', 'ema200'].forEach(key => {
+                    if (chartData.indicatorSeries[key] && indicators[key]) {
+                        chartData.indicatorSeries[key].setData(
+                            indicators[key]
+                                .filter(item => item.value != null && !isNaN(item.value) && isFinite(item.value))
+                                .map(item => ({ time: convertTimestampToET(item.time), value: item.value }))
+                        );
+                    }
+                });
 
-                if (chartData.indicatorSeries.ema21 && indicators.ema21) {
-                    const ema21Data = indicators.ema21
-                        .filter(item => item.value != null && !isNaN(item.value) && isFinite(item.value))
-                        .map(item => ({
-                            time: convertTimestampToET(item.time),
-                            value: item.value
-                        }));
-                    chartData.indicatorSeries.ema21.setData(ema21Data);
-                }
-
-                if (chartData.indicatorSeries.ema50 && indicators.ema50) {
-                    const ema50Data = indicators.ema50
-                        .filter(item => item.value != null && !isNaN(item.value) && isFinite(item.value))
-                        .map(item => ({
-                            time: convertTimestampToET(item.time),
-                            value: item.value
-                        }));
-                    chartData.indicatorSeries.ema50.setData(ema50Data);
-                }
+                // Update SMA indicators
+                ['sma5', 'sma10', 'sma20', 'sma30', 'sma60', 'sma120', 'sma200'].forEach(key => {
+                    if (chartData.indicatorSeries[key] && indicators[key]) {
+                        chartData.indicatorSeries[key].setData(
+                            indicators[key]
+                                .filter(item => item.value != null && !isNaN(item.value) && isFinite(item.value))
+                                .map(item => ({ time: convertTimestampToET(item.time), value: item.value }))
+                        );
+                    }
+                });
 
                 if (chartData.indicatorSeries.vwap && indicators.vwap) {
                     const vwapData = indicators.vwap
@@ -3261,77 +3287,32 @@
             const indicators = data.indicators || {};
 
             // EMA indicators
-            if (indicators.ema9 && indicators.ema9.length > 0) {
-                const ema9Series = chart.addLineSeries({
-                    color: '#2962FF',
-                    lineWidth: 2,
-                    lastValueVisible: false,  // Hide the price label on right side
-                    priceLineVisible: false   // Hide the horizontal price line
-                });
-                const ema9Data = indicators.ema9
-                    .filter(item => item.value != null && !isNaN(item.value) && isFinite(item.value))
-                    .map(item => ({
-                        time: convertTimestampToET(item.time),
-                        value: item.value
-                    }));
-                console.log(`EMA(9): Filtered ${indicators.ema9.length} -> ${ema9Data.length} data points`);
-                if (ema9Data.length > 0) {
-                    console.log('EMA(9) first/last values:', ema9Data[0].value, ema9Data[ema9Data.length-1].value);
+            const emaColors = { ema9: '#2962FF', ema21: '#FF6D00', ema50: '#00E676', ema200: '#D500F9' };
+            Object.entries(emaColors).forEach(([key, color]) => {
+                if (indicators[key] && indicators[key].length > 0) {
+                    const series = chart.addLineSeries({ color, lineWidth: 2, lastValueVisible: false, priceLineVisible: false });
+                    series.setData(
+                        indicators[key]
+                            .filter(item => item.value != null && !isNaN(item.value) && isFinite(item.value))
+                            .map(item => ({ time: convertTimestampToET(item.time), value: item.value }))
+                    );
+                    chartData.indicatorSeries[key] = series;
                 }
-                ema9Series.setData(ema9Data);
-                chartData.indicatorSeries.ema9 = ema9Series;
-            }
+            });
 
-            if (indicators.ema21 && indicators.ema21.length > 0) {
-                const ema21Series = chart.addLineSeries({
-                    color: '#FF6D00',
-                    lineWidth: 2,
-                    lastValueVisible: false,  // Hide the price label on right side
-                    priceLineVisible: false   // Hide the horizontal price line
-                });
-                const ema21Data = indicators.ema21
-                    .filter(item => item.value != null && !isNaN(item.value) && isFinite(item.value))
-                    .map(item => ({
-                        time: convertTimestampToET(item.time),
-                        value: item.value
-                    }));
-                ema21Series.setData(ema21Data);
-                chartData.indicatorSeries.ema21 = ema21Series;
-            }
-
-            if (indicators.ema50 && indicators.ema50.length > 0) {
-                const ema50Series = chart.addLineSeries({
-                    color: '#00E676',
-                    lineWidth: 2,
-                    lastValueVisible: false,  // Hide the price label on right side
-                    priceLineVisible: false   // Hide the horizontal price line
-                });
-                const ema50Data = indicators.ema50
-                    .filter(item => item.value != null && !isNaN(item.value) && isFinite(item.value))
-                    .map(item => ({
-                        time: convertTimestampToET(item.time),
-                        value: item.value
-                    }));
-                ema50Series.setData(ema50Data);
-                chartData.indicatorSeries.ema50 = ema50Series;
-            }
-
-            if (indicators.ema200 && indicators.ema200.length > 0) {
-                const ema200Series = chart.addLineSeries({
-                    color: '#D500F9',
-                    lineWidth: 2,
-                    lastValueVisible: false,  // Hide the price label on right side
-                    priceLineVisible: false   // Hide the horizontal price line
-                });
-                const ema200Data = indicators.ema200
-                    .filter(item => item.value != null && !isNaN(item.value) && isFinite(item.value))
-                    .map(item => ({
-                        time: convertTimestampToET(item.time),
-                        value: item.value
-                    }));
-                ema200Series.setData(ema200Data);
-                chartData.indicatorSeries.ema200 = ema200Series;
-            }
+            // SMA indicators
+            const smaColors = { sma5: '#FF4444', sma10: '#FF8C00', sma20: '#FFD700', sma30: '#00CC44', sma60: '#00BFFF', sma120: '#7B68EE', sma200: '#DA70D6' };
+            Object.entries(smaColors).forEach(([key, color]) => {
+                if (indicators[key] && indicators[key].length > 0) {
+                    const series = chart.addLineSeries({ color, lineWidth: 1, lineStyle: 1, lastValueVisible: false, priceLineVisible: false });
+                    series.setData(
+                        indicators[key]
+                            .filter(item => item.value != null && !isNaN(item.value) && isFinite(item.value))
+                            .map(item => ({ time: convertTimestampToET(item.time), value: item.value }))
+                    );
+                    chartData.indicatorSeries[key] = series;
+                }
+            });
 
             // VWAP indicator
             if (indicators.vwap && indicators.vwap.length > 0) {
@@ -3677,6 +3658,13 @@
                 ema21: { label: 'EMA(21)', color: '#FF6D00' },
                 ema50: { label: 'EMA(50)', color: '#00E676' },
                 ema200: { label: 'EMA(200)', color: '#D500F9' },
+                sma5: { label: 'SMA(5)', color: '#FF4444' },
+                sma10: { label: 'SMA(10)', color: '#FF8C00' },
+                sma20: { label: 'SMA(20)', color: '#FFD700' },
+                sma30: { label: 'SMA(30)', color: '#00CC44' },
+                sma60: { label: 'SMA(60)', color: '#00BFFF' },
+                sma120: { label: 'SMA(120)', color: '#7B68EE' },
+                sma200: { label: 'SMA(200)', color: '#DA70D6' },
                 vwap: { label: 'VWAP', color: '#FFD600' }
             };
 
