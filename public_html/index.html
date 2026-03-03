@@ -399,17 +399,67 @@
             min-width: 52px;
         }
 
-        .ema-select {
-            min-width: 42px;
+        /* EMA / SMA popup dropdowns */
+        .ind-dropdown {
+            position: relative;
+            display: inline-block;
         }
 
-        .ema-select option {
-            padding: 1px 4px;
+        .ind-btn {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 4px 8px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 13px;
+            white-space: nowrap;
         }
 
-        .ema-select option:checked {
-            background-color: var(--accent-green);
-            color: white;
+        .ind-btn:hover {
+            border-color: var(--accent-green);
+        }
+
+        .ind-summary {
+            color: var(--accent-green);
+            font-size: 12px;
+        }
+
+        .ind-popup {
+            display: none;
+            position: absolute;
+            top: calc(100% + 3px);
+            left: 0;
+            z-index: 1000;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            padding: 6px 10px;
+            min-width: 70px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+
+        .ind-popup.open {
+            display: block;
+        }
+
+        .ind-popup label {
+            display: block;
+            color: var(--text-primary);
+            font-size: 13px;
+            padding: 2px 0;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .ind-popup label:hover {
+            color: var(--accent-green);
+        }
+
+        .ind-popup input[type=checkbox] {
+            margin-right: 5px;
+            cursor: pointer;
+            accent-color: var(--accent-green);
         }
 
         .indicator-note {
@@ -1668,6 +1718,11 @@
             }
         });
 
+        // Close all EMA/SMA popups when clicking anywhere outside them
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.ind-popup.open').forEach(p => p.classList.remove('open'));
+        });
+
         // Global keyboard handler - any keystroke focuses search bar
         document.addEventListener('keydown', (event) => {
             const searchInput = document.getElementById('symbolSearch');
@@ -2235,23 +2290,27 @@
                         </select>
                     </div>
                     <div class="control-group">
-                        <label>EMA:</label>
-                        <select multiple id="ema-select-${symbol}" class="ema-select" size="4" onchange="toggleEmaSelect('${symbol}', this)" title="Ctrl+click to select multiple">
-                            <option value="9">9</option>
-                            <option value="21">21</option>
-                            <option value="50">50</option>
-                            <option value="200">200</option>
-                        </select>
-                        <label>SMA:</label>
-                        <select multiple id="sma-select-${symbol}" class="ema-select" size="7" onchange="toggleSmaSelect('${symbol}', this)" title="Ctrl+click to select multiple">
-                            <option value="5">5</option>
-                            <option value="10">10</option>
-                            <option value="20">20</option>
-                            <option value="30">30</option>
-                            <option value="60">60</option>
-                            <option value="120">120</option>
-                            <option value="200">200</option>
-                        </select>
+                        <div class="ind-dropdown" id="ema-dropdown-${symbol}">
+                            <button class="ind-btn" onclick="toggleIndPopup(event,'${symbol}','ema')">EMA&nbsp;<span id="ema-summary-${symbol}" class="ind-summary">—</span>&nbsp;▾</button>
+                            <div class="ind-popup" id="ema-popup-${symbol}">
+                                <label><input type="checkbox" data-period="9"   onchange="handleIndCheckbox('${symbol}','ema',this)"> 9</label>
+                                <label><input type="checkbox" data-period="21"  onchange="handleIndCheckbox('${symbol}','ema',this)"> 21</label>
+                                <label><input type="checkbox" data-period="50"  onchange="handleIndCheckbox('${symbol}','ema',this)"> 50</label>
+                                <label><input type="checkbox" data-period="200" onchange="handleIndCheckbox('${symbol}','ema',this)"> 200</label>
+                            </div>
+                        </div>
+                        <div class="ind-dropdown" id="sma-dropdown-${symbol}">
+                            <button class="ind-btn" onclick="toggleIndPopup(event,'${symbol}','sma')">SMA&nbsp;<span id="sma-summary-${symbol}" class="ind-summary">—</span>&nbsp;▾</button>
+                            <div class="ind-popup" id="sma-popup-${symbol}">
+                                <label><input type="checkbox" data-period="5"   onchange="handleIndCheckbox('${symbol}','sma',this)"> 5</label>
+                                <label><input type="checkbox" data-period="10"  onchange="handleIndCheckbox('${symbol}','sma',this)"> 10</label>
+                                <label><input type="checkbox" data-period="20"  onchange="handleIndCheckbox('${symbol}','sma',this)"> 20</label>
+                                <label><input type="checkbox" data-period="30"  onchange="handleIndCheckbox('${symbol}','sma',this)"> 30</label>
+                                <label><input type="checkbox" data-period="60"  onchange="handleIndCheckbox('${symbol}','sma',this)"> 60</label>
+                                <label><input type="checkbox" data-period="120" onchange="handleIndCheckbox('${symbol}','sma',this)"> 120</label>
+                                <label><input type="checkbox" data-period="200" onchange="handleIndCheckbox('${symbol}','sma',this)"> 200</label>
+                            </div>
+                        </div>
                         <label class="control-checkbox" id="vwap-label-${symbol}">
                             <input type="checkbox" id="vwap-checkbox-${symbol}" onchange="toggleIndicator('${symbol}', 'vwap', this.checked)">
                             VWAP <span class="indicator-note">(1D only)</span>
@@ -2737,24 +2796,33 @@
             loadChartData(symbol);
         }
 
-        function toggleEmaSelect(symbol, selectEl) {
-            const selected = Array.from(selectEl.selectedOptions).map(o => parseInt(o.value));
+        // Toggle a specific EMA or SMA popup open/closed; close all others first
+        function toggleIndPopup(event, symbol, type) {
+            event.stopPropagation();
+            const popup = document.getElementById(`${type}-popup-${symbol}`);
+            const isOpen = popup.classList.contains('open');
+            document.querySelectorAll('.ind-popup.open').forEach(p => p.classList.remove('open'));
+            if (!isOpen) popup.classList.add('open');
+        }
+
+        // Called when a checkbox inside an EMA/SMA popup is toggled
+        function handleIndCheckbox(symbol, type, checkbox) {
+            const period = parseInt(checkbox.dataset.period);
             const chartData = state.charts.get(symbol);
-            [9, 21, 50, 200].forEach(p => {
-                chartData.indicators[`ema${p}`] = selected.includes(p);
-            });
+            chartData.indicators[`${type}${period}`] = checkbox.checked;
+            updateIndSummary(symbol, type);
             chartData.forceRecreate = true;
             loadChartData(symbol);
         }
 
-        function toggleSmaSelect(symbol, selectEl) {
-            const selected = Array.from(selectEl.selectedOptions).map(o => parseInt(o.value));
-            const chartData = state.charts.get(symbol);
-            [5, 10, 20, 30, 60, 120, 200].forEach(p => {
-                chartData.indicators[`sma${p}`] = selected.includes(p);
-            });
-            chartData.forceRecreate = true;
-            loadChartData(symbol);
+        // Refresh the summary text shown on the EMA/SMA button (e.g. "9,21" or "—")
+        function updateIndSummary(symbol, type) {
+            const popup = document.getElementById(`${type}-popup-${symbol}`);
+            if (!popup) return;
+            const checked = Array.from(popup.querySelectorAll('input[type=checkbox]:checked'))
+                .map(cb => cb.dataset.period);
+            const summary = document.getElementById(`${type}-summary-${symbol}`);
+            if (summary) summary.textContent = checked.length ? checked.join(',') : '—';
         }
 
         // Save chart settings to localStorage (global for all symbols)
@@ -2846,23 +2914,16 @@
                     }
                 });
 
-                // Sync EMA multi-select
-                const emaSelect = document.getElementById(`ema-select-${symbol}`);
-                if (emaSelect) {
-                    Array.from(emaSelect.options).forEach(opt => {
-                        const key = `ema${opt.value}`;
-                        opt.selected = !!settings.indicators[key];
-                    });
-                }
-
-                // Sync SMA multi-select
-                const smaSelect = document.getElementById(`sma-select-${symbol}`);
-                if (smaSelect) {
-                    Array.from(smaSelect.options).forEach(opt => {
-                        const key = `sma${opt.value}`;
-                        opt.selected = !!settings.indicators[key];
-                    });
-                }
+                // Sync EMA and SMA popup checkboxes
+                ['ema', 'sma'].forEach(type => {
+                    const popup = document.getElementById(`${type}-popup-${symbol}`);
+                    if (popup) {
+                        popup.querySelectorAll('input[type=checkbox]').forEach(cb => {
+                            cb.checked = !!settings.indicators[`${type}${cb.dataset.period}`];
+                        });
+                        updateIndSummary(symbol, type);
+                    }
+                });
 
                 // Disable VWAP checkbox/label if not 1D range
                 const vwapCheckbox = document.getElementById(`vwap-checkbox-${symbol}`);
