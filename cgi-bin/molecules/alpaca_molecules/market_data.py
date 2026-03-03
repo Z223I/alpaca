@@ -53,6 +53,10 @@ class AlpacaMarketData:
     No trading functionality is included.
     """
 
+    # Minutes to subtract from "now" when building end_date for SIP bar requests.
+    # Free-tier accounts receive SIP data delayed by ~15 min; using 30 min gives a safe margin.
+    SIP_DELAY_MINUTES = 30
+
     # Mapping of interval strings to Alpaca TimeFrame objects
     # Note: alpaca-py does not support second-level timeframes
     TIMEFRAME_MAP = {
@@ -276,14 +280,16 @@ class AlpacaMarketData:
             tf = self.TIMEFRAME_MAP[timeframe]
 
             # Request bar data
-            # IMPORTANT: Use SIP feed - this account has paid SIP subscription for real-time data
+            # Use SIP feed for full market coverage including extended hours (pre-market 4 AM,
+            # after-hours until 8 PM ET).  Free-tier accounts access delayed SIP data as long
+            # as end_date is capped at least 15 minutes in the past (callers enforce this).
             request_params = StockBarsRequest(
                 symbol_or_symbols=symbol,
                 timeframe=tf,
                 start=start_date,
                 end=end_date,
                 limit=10000,  # Max bars
-                feed='iex'  # IEX feed (free, no SIP subscription required)
+                feed='sip'  # SIP feed: all exchanges, includes extended hours
             )
 
             bars = self.hist_client.get_stock_bars(request_params)
@@ -347,10 +353,11 @@ class AlpacaMarketData:
                 - end_date: str (ISO format)
         """
         try:
-            # Calculate date range
-            # Note: Alpaca's historical bar data has a delay (typically 15-60 seconds)
-            # Request data up to "now" to get the most recent available bars
-            end_date = datetime.now(self.et_tz)
+            # Calculate date range.
+            # Cap end_date to now - SIP_DELAY_MINUTES so free-tier accounts can use the SIP
+            # feed (which provides extended-hours data).  Real-time SIP requires a paid sub;
+            # delayed SIP (≥15 min in the past) is available on free accounts.
+            end_date = datetime.now(self.et_tz) - timedelta(minutes=self.SIP_DELAY_MINUTES)
 
             if range_str not in self.DISPLAY_RANGE_MAP:
                 raise ValueError(f"Invalid range: {range_str}. Valid options: {list(self.DISPLAY_RANGE_MAP.keys())}")
