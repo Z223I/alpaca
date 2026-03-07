@@ -675,12 +675,9 @@ class MomentumAlertsSystem:
             )
 
             # Get bars from 9:25 AM to 9:35 AM ET (10 minute window around market open)
-            # Cap end_time to now - SIP_DELAY_MINUTES for free-tier SIP compliance
+            # No SIP delay cap here: 9:30 AM is always fixed historical data, accessible any time
             start_time = market_open_datetime - timedelta(minutes=5)
-            end_time = min(
-                market_open_datetime + timedelta(minutes=5),
-                datetime.now(self.et_tz) - timedelta(minutes=self.SIP_DELAY_MINUTES)
-            )
+            end_time = market_open_datetime + timedelta(minutes=5)
 
             # Fetch 1-minute bars
             bars = self.historical_client.get_bars(
@@ -1053,8 +1050,9 @@ class MomentumAlertsSystem:
             return {}
 
         # Calculate time range: apply SIP delay so end is at least SIP_DELAY_MINUTES in the past
+        # Use 60-minute window (was 30) so there are enough bars even early in the trading day
         end_time = datetime.now(self.et_tz) - timedelta(minutes=self.SIP_DELAY_MINUTES)
-        start_time = end_time - timedelta(minutes=30)
+        start_time = end_time - timedelta(minutes=60)
 
         try:
             data_dict = {}
