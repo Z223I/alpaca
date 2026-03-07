@@ -712,7 +712,7 @@ class MomentumAlertsSystem:
                     min_time_diff = time_diff
                     closest_bar = bar
 
-            if closest_bar and min_time_diff <= 300:  # Within 5 minutes
+            if closest_bar is not None and min_time_diff is not None and min_time_diff <= 300:  # Within 5 minutes
                 market_open_price = float(closest_bar.o)
                 self.logger.debug(
                     f"✅ {symbol}: Retrieved market open price ${market_open_price:.2f} "
@@ -1092,9 +1092,10 @@ class MomentumAlertsSystem:
                             df.set_index('timestamp', inplace=True)
 
                             # Ensure timezone-aware index and convert to ET
-                            if df.index.tz is None:
-                                df.index = df.index.tz_localize('UTC')
-                            df.index = df.index.tz_convert(self.et_tz)
+                            dt_index = pd.DatetimeIndex(df.index)
+                            if dt_index.tz is None:
+                                dt_index = dt_index.tz_localize('UTC')
+                            df.index = dt_index.tz_convert(self.et_tz)
 
                             # Check if VWAP data is available from stock data
                             if 'vwap' not in df.columns or df['vwap'].isna().all():
@@ -1300,6 +1301,7 @@ class MomentumAlertsSystem:
             raw_momentum_5 = 0
 
             # Calculate time-based momentum (configurable period in minutes)
+            actual_time_diff = 0.0
             momentum_period_minutes = self.momentum_config.momentum_period
             if len(data) >= 2:  # Need at least 2 data points
                 # Get current timestamp (latest data point)
@@ -1326,6 +1328,7 @@ class MomentumAlertsSystem:
                     momentum = raw_momentum_20 / actual_time_diff
 
             # Calculate time-based short momentum (configurable period)
+            actual_time_diff_short = 0.0
             momentum_short_period_minutes = (
                 self.momentum_config.momentum_short_period)
             if len(data) >= 2:  # Need at least 2 data points
