@@ -1,0 +1,21 @@
+[Unit]
+Description=Telegram Polling Watchdog - Monitors and Restarts telegram_polling.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/wilsonb/dl/github.com/Z223I/alpaca
+Environment="PATH=/home/wilsonb/miniconda3/envs/alpaca/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/home/wilsonb/miniconda3/envs/alpaca/bin/python molecules/telegram_polling_watchdog.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/wilsonb/dl/github.com/Z223I/alpaca/logs/telegram_polling_watchdog.log
+StandardError=append:/home/wilsonb/dl/github.com/Z223I/alpaca/logs/telegram_polling_watchdog_error.log
+
+# Resource limits
+MemoryMax=512M
+CPUQuota=25%
+
+[Install]
+WantedBy=multi-user.target

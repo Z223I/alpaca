@@ -76,6 +76,7 @@ pip_packages:
   - holidays
   - yfinance
   - matplotlib
+  - psutil
 
 # Systemd services to install on the VM
 systemd_services:
@@ -83,6 +84,7 @@ systemd_services:
   - market_sentinel_trade_stream.service
   - browser_proxy.service
   - momentum_alerts.service
+  - telegram_polling_watchdog.service
 
 # UFW ports to open beyond the defaults (OpenSSH + Apache Full)
 ufw_extra_ports:

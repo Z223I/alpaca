@@ -479,6 +479,7 @@
         - market_sentinel_trade_stream.service
         - browser_proxy.service
         - momentum_alerts.service
+        - telegram_polling_watchdog.service
       failed_when: false   # services may not be installed yet on first run
 
 
@@ -523,6 +524,13 @@
     - name: Ensure User= line exists in momentum_alerts.service
       ansible.builtin.lineinfile:
         path: "{{ vm_home }}/services/momentum_alerts.service"
+        insertafter: "^WorkingDirectory="
+        line: "User={{ vm_user }}"
+        state: present
+
+    - name: Ensure User= line exists in telegram_polling_watchdog.service
+      ansible.builtin.lineinfile:
+        path: "{{ vm_home }}/services/telegram_polling_watchdog.service"
         insertafter: "^WorkingDirectory="
         line: "User={{ vm_user }}"
         state: present
