@@ -94,7 +94,7 @@ class AlpacaMarketData:
         self.api = init_alpaca_client(provider, account_name, account)
 
         # Initialize historical data client
-        # Note: We specify feed='iex' in requests for real-time free data
+        # Note: We specify feed='sip' in requests for real-time SIP data (paid subscription)
         from alpaca_config import get_api_credentials
         api_key, secret_key, base_url = get_api_credentials(provider, account_name, account)
         self.hist_client = StockHistoricalDataClient(api_key, secret_key)
@@ -276,14 +276,13 @@ class AlpacaMarketData:
             tf = self.TIMEFRAME_MAP[timeframe]
 
             # Request bar data
-            # IMPORTANT: Use SIP feed - this account has paid SIP subscription for real-time data
             request_params = StockBarsRequest(
                 symbol_or_symbols=symbol,
                 timeframe=tf,
                 start=start_date,
                 end=end_date,
                 limit=10000,  # Max bars
-                feed='iex'  # IEX feed (free, no SIP subscription required)
+                feed='sip'
             )
 
             bars = self.hist_client.get_stock_bars(request_params)
@@ -651,14 +650,12 @@ class AlpacaMarketData:
 
             end_date = datetime.now(self.et_tz)
 
-            # Request trade data
-            # Use SIP feed for complete market coverage (all exchanges)
             request_params = StockTradesRequest(
                 symbol_or_symbols=symbol,
                 start=start_date,
                 end=end_date,
                 limit=limit,
-                feed='iex'  # IEX feed (free, no SIP subscription required)
+                feed='sip'
             )
 
             trades = self.hist_client.get_stock_trades(request_params)
@@ -669,19 +666,14 @@ class AlpacaMarketData:
             if hasattr(trades, 'data') and symbol in trades.data:
                 for trade in trades.data[symbol]:
                     # Alpaca returns timestamps in UTC - convert to ET
-                    # Note: IEX feed timestamps appear to be -1 hour off, so we add 1 hour
                     timestamp = trade.timestamp if hasattr(trade, 'timestamp') else datetime.now(self.et_tz)
 
                     # Convert to ET
                     if timestamp.tzinfo is not None:
                         timestamp_et = timestamp.astimezone(self.et_tz)
                     else:
-                        # If naive, assume UTC
                         import pytz
                         timestamp_et = pytz.UTC.localize(timestamp).astimezone(self.et_tz)
-
-                    # IEX feed appears to be 1 hour behind - add correction
-                    timestamp_et = timestamp_et + timedelta(hours=1)
 
                     trade_list.append({
                         'timestamp': timestamp_et.isoformat(),

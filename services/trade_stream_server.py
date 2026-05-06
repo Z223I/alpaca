@@ -77,13 +77,10 @@ class TradeStreamServer:
         """Start the WebSocket server and Alpaca stream."""
         logger.info(f"Starting Trade Stream Server on {WS_HOST}:{WS_PORT}")
 
-        # Initialize Alpaca data stream (but don't start it yet)
-        # Use DataFeed.IEX for free real-time data (paper/basic accounts)
-        # Use DataFeed.SIP for all exchanges (requires paid SIP subscription)
         self.alpaca_stream = StockDataStream(
             api_key=ALPACA_API_KEY,
             secret_key=ALPACA_SECRET_KEY,
-            feed=DataFeed.IEX  # IEX feed (free, no SIP subscription required)
+            feed=DataFeed.SIP
         )
 
         # DON'T start the stream yet - it will be started on first subscription
