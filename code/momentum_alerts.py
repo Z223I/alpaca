@@ -1,18 +1,43 @@
-#!/usr/bin/env python3
+#!/home/wilsonb/miniconda3/envs/alpaca/bin/python3
 """
 Momentum Alerts System
 
-This system monitors stocks from the market open top gainers CSV and generates momentum alerts
-based on VWAP and EMA9 criteria. It follows the specification in specs/momentum_alert.md.
+This system monitors stocks from multiple sources (market open gainers, premarket gainers,
+volume surge, Oracle data) and generates momentum alerts based on EMA9 criteria.
+It follows the specification in specs/momentum_alert.md.
 
 Process:
-1. Startup: Run market_open_top_gainers.py starting at 9:40 ET, then every 20 minutes continuously
+1. Premarket Scanning: Run premarket_top_gainers.py from 04:00 to 20:00 ET every 10 minutes
+   - Runs on separate CPU core (core 1) using taskset
+   - Generates top_gainers_nasdaq_amex.csv in ./historical_data/{YYYY-MM-DD}/premarket/
+   - Monitors premarket top gainers continuously
+   - Runs on trading days only (skips weekends and NYSE holidays)
+2. Top Gainers (Alpaca API): Run alpaca.py --top-gainers from 04:00 to 20:00 ET every minute
+   - Runs on separate CPU core (core 1) using taskset
+   - Generates top_gainers_alpaca.csv in ./historical_data/{YYYY-MM-DD}/market/
+   - Uses Alpaca screener API for real-time top gainers
+   - Runs on trading days only (skips weekends and NYSE holidays)
+3. Market Open Scanning: Run market_open_top_gainers.py starting at 9:40 ET, every 20 minutes
+   - Generates gainers_nasdaq_amex.csv
    - Runs every day including weekends for continuous data collection
    - Automatically reschedules after each run
-2. Monitor: Watch for CSV file creation in ./historical_data/{YYYY-MM-DD}/market/gainers_nasdaq_amex.csv
-3. Stock monitoring: Every minute, collect 30 minutes of 1-minute candlesticks for each stock
-4. Momentum alerts: Check stocks above VWAP, above EMA9, and pass urgency filter
-5. Integration: Send alerts to all users with momentum_alerts=true via Telegram
+4. Volume Surge: Run volume surge scanner every 10 minutes from 06:45 to 14:45 ET on trading days only
+   - Runs at: 06:45, 06:55, 07:05, 07:15, 07:25, ... 14:25, 14:35, 14:45 ET (49 runs per trading day)
+   - Generates relative_volume_nasdaq_amex.csv
+   - Automatically reschedules after each run
+5. Data Integration: Load symbols from all sources (premarket, market open, volume surge, Oracle, top gainers)
+   - Track source with boolean fields: from_premarket, from_gainers, from_volume_surge, oracle, from_top_gainers
+   - Merge and deduplicate symbols across all sources
+6. Stock Monitoring: Every minute, collect 30 minutes of 1-minute candlesticks for each stock
+7. Momentum Alerts: Check stocks above EMA9 and pass urgency filter
+8. Integration: Send alerts to all users with momentum_alerts=true via Telegram
+
+CSV Files Generated:
+- ./historical_data/{YYYY-MM-DD}/premarket/top_gainers_nasdaq_amex.csv (premarket)
+- ./historical_data/{YYYY-MM-DD}/market/top_gainers_alpaca.csv (top gainers from Alpaca API)
+- ./historical_data/{YYYY-MM-DD}/market/gainers_nasdaq_amex.csv (market open)
+- ./historical_data/{YYYY-MM-DD}/volume_surge/relative_volume_nasdaq_amex.csv
+- ./historical_data/{YYYY-MM-DD}/scanner/symbol_list.csv
 
 Usage:
     python3 code/momentum_alerts.py
@@ -35,15 +60,30 @@ import pandas as pd
 import pytz
 
 # Add project root to path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# This file is at: code/momentum_alerts.py
+# Need to go up 1 level to reach project root
+script_dir = os.path.dirname(os.path.abspath(__file__))  # code/
+project_root = os.path.dirname(script_dir)  # project root
+cgi_bin_dir = os.path.join(project_root, 'cgi-bin')
+sys.path.insert(0, project_root)
 
 import alpaca_trade_api as tradeapi
+import holidays
 from atoms.api.init_alpaca_client import init_alpaca_client
 from atoms.api.stock_halt_detector import is_stock_halted, get_halt_status_emoji
 from atoms.api.fundamental_data import FundamentalDataFetcher
 from atoms.alerts.breakout_detector import BreakoutDetector
 from atoms.telegram.telegram_post import TelegramPoster
 from atoms.telegram.user_manager import UserManager
+
+# Import yfinance-based fetcher using direct import to avoid namespace conflict
+import importlib.util
+cgi_api_atoms_dir = os.path.join(cgi_bin_dir, 'api', 'atoms', 'alpaca_api')
+yfinance_fetcher_path = os.path.join(cgi_api_atoms_dir, 'fundamental_data.py')
+spec = importlib.util.spec_from_file_location("yfinance_fundamental_data", yfinance_fetcher_path)
+yfinance_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(yfinance_module)
+YFinanceFetcher = yfinance_module.FundamentalDataFetcher
 from code.momentum_alerts_config import (
     get_momentum_alerts_config, get_volume_color_emoji,
     get_momentum_standard_color_emoji, get_momentum_short_color_emoji,
@@ -70,12 +110,15 @@ class MomentumAlertsSystem:
         # Eastern Time zone for all operations
         self.et_tz = pytz.timezone('US/Eastern')
 
+        # NYSE holidays for trading day checks (using python-holidays library)
+        self.nyse_holidays = holidays.financial_holidays('XNYS')
+
         # Get today's date for file monitoring
         self.today = datetime.now(self.et_tz).strftime('%Y-%m-%d')
 
-        # Historical data directory path
-        self.historical_data_dir = Path("historical_data") / self.today / "market"
-        self.csv_file_path = self.historical_data_dir / "gainers_nasdaq_amex.csv"
+        # Historical data directory path (using premarket subdirectory)
+        self.historical_data_dir = Path("historical_data") / self.today / "premarket"
+        self.csv_file_path = self.historical_data_dir / "top_gainers_nasdaq_amex.csv"
 
         # Momentum alerts data directories
         self.momentum_alerts_dir = Path("historical_data") / self.today / "momentum_alerts" / "bullish"
@@ -107,7 +150,9 @@ class MomentumAlertsSystem:
         self.telegram_poster = TelegramPoster()
         self.user_manager = UserManager()
         self.momentum_config = get_momentum_alerts_config()
-        self.fundamental_fetcher = FundamentalDataFetcher(verbose=verbose)
+
+        # Use yfinance-based fetcher for float shares (replaces Polygon/Yahoo fallback)
+        self.fundamental_fetcher = YFinanceFetcher(verbose=verbose)
 
         # Tracking - store dict with symbol metadata including market_open_price
         self.monitored_symbols: Dict[str, Dict] = {}
@@ -118,22 +163,48 @@ class MomentumAlertsSystem:
         # Volume surge data
         self.volume_surge_csv_path = self.volume_surge_dir / "relative_volume_nasdaq_amex.csv"
         self.volume_surge_completed = False
+        self.volume_surge_schedule = []  # List of scheduled volume surge times
+        self.volume_surge_runs_completed = 0
 
         # Scanner data directory
         self.scanner_dir = Path("historical_data") / self.today / "scanner"
         self.scanner_dir.mkdir(parents=True, exist_ok=True)
         self.symbol_list_csv_path = self.scanner_dir / "symbol_list.csv"
 
-        # Watch list export for web interface
-        self.watch_list_json_path = Path("historical_data") / self.today / "scanner" / "watch_list.json"
+        # Manual symbols data file (JSON)
+        self.manual_symbols_file = Path("data") / "manual_symbols.json"
+        self.last_manual_symbols_check = None
+
+        # Premarket data (now using self.csv_file_path for premarket CSV)
+        self.premarket_schedule = []  # List of scheduled premarket times
+        self.premarket_runs_completed = 0
+
+        # Top Gainers data (Alpaca screener API)
+        self.top_gainers_schedule = []  # List of scheduled top gainers times
+        self.top_gainers_runs_completed = 0
 
         # State
         self.running = False
         self.startup_processes = {}  # Track running startup scripts
+        self.premarket_processes = {}  # Track running premarket scripts
+        self.top_gainers_processes = {}  # Track running top gainers scripts
+
+        # Debug mode - send random alerts for testing
+        self.debug_mode = False  # Set to False to disable debug alerts
+        self.debug_symbols = ['AAPL', 'TSLA', 'NVDA', 'AMD', 'GOOGL', 'MSFT', 'AMZN', 'META']
+        self.last_debug_alert_time = None
+
+        # Cooldown tracking for momentum alerts
+        # Format: {symbol: {'timestamp': datetime, 'price': float}}
+        # 10-minute cooldown: if current price < cooldown start price, skip alert
+        self.cooldown_alerts: Dict[str, Dict] = {}
+        self.cooldown_period_minutes = 10
 
         self.logger.info(f"🔧 Momentum Alerts System initialized in {'TEST' if test_mode else 'LIVE'} mode")
+        if self.debug_mode:
+            self.logger.warning(f"⚠️ DEBUG MODE ENABLED - Will send random test alerts every minute")
         self.logger.info(f"📅 Monitoring date: {self.today}")
-        self.logger.info(f"📁 CSV file path: {self.csv_file_path}")
+        self.logger.info(f"🌅 Premarket CSV file path: {self.csv_file_path}")
         self.logger.info(f"📊 Historical data client: "
                          f"{'Available' if self.historical_client else 'Not available'}")
         self.logger.info(f"⚙️ Momentum periods: {self.momentum_config.momentum_period}min / "
@@ -177,11 +248,62 @@ class MomentumAlertsSystem:
 
         return logger
 
+    def is_trading_day(self, date_to_check: datetime = None) -> bool:
+        """
+        Check if a given date is a trading day (not a weekend or NYSE holiday).
+
+        Args:
+            date_to_check: The datetime to check. If None, uses current ET time.
+
+        Returns:
+            True if the date is a trading day, False if weekend or NYSE holiday.
+        """
+        if date_to_check is None:
+            date_to_check = datetime.now(self.et_tz)
+
+        # Check if weekend (Saturday=5, Sunday=6)
+        if date_to_check.weekday() >= 5:
+            return False
+
+        # Check if NYSE holiday
+        date_only = date_to_check.date()
+        if date_only in self.nyse_holidays:
+            holiday_name = self.nyse_holidays.get(date_only)
+            self.logger.debug(f"📅 {date_only} is an NYSE holiday: {holiday_name}")
+            return False
+
+        return True
+
+    def get_next_trading_day(self, from_date: datetime = None) -> datetime:
+        """
+        Get the next trading day from a given date.
+
+        Args:
+            from_date: The starting datetime. If None, uses current ET time.
+
+        Returns:
+            datetime of the next trading day.
+        """
+        if from_date is None:
+            from_date = datetime.now(self.et_tz)
+
+        next_day = from_date + timedelta(days=1)
+        max_lookforward = 10  # Safety limit
+
+        for _ in range(max_lookforward):
+            if self.is_trading_day(next_day):
+                return next_day
+            next_day = next_day + timedelta(days=1)
+
+        # Fallback: return next day if something went wrong
+        self.logger.warning("Could not determine next trading day, using tomorrow")
+        return from_date + timedelta(days=1)
+
     def _schedule_startup_runs(self):
         """
         Schedule the startup script to run starting at 9:40 ET, then every 20 minutes.
 
-        Runs every day (including weekends) for continuous data collection.
+        Runs on trading days only (skips weekends and NYSE holidays).
         Simple approach: Calculate next run time based on current time.
         """
         current_time = datetime.now(self.et_tz)
@@ -214,11 +336,187 @@ class MomentumAlertsSystem:
                 next_run_minute = next_interval_minutes % 60
                 next_run = current_time.replace(hour=next_run_hour, minute=next_run_minute, second=0, microsecond=0)
 
+        # Skip weekends and NYSE holidays to find next trading day
+        for _ in range(10):  # Safety limit
+            if self.is_trading_day(next_run):
+                break
+            next_run = (next_run + timedelta(days=1)).replace(hour=9, minute=40, second=0, microsecond=0)
+
         # Store the next scheduled run
         self.startup_schedule = [next_run]
 
         self.logger.info(f"📅 Next startup script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
-        self.logger.info(f"⏰ Runs every 20 minutes starting at 9:40 ET daily (including weekends)")
+        self.logger.info(f"⏰ Runs every 20 minutes starting at 9:40 ET on trading days only")
+
+    def _schedule_premarket_runs(self):
+        """
+        Schedule the premarket script to run from 04:00 to 20:00 ET, every 10 minutes.
+
+        Runs on trading days only (skips weekends and NYSE holidays).
+        Simple approach: Calculate next run time based on current time.
+        """
+        current_time = datetime.now(self.et_tz)
+
+        # Calculate next run time from 04:00 to 20:00 ET, every 10 minutes
+        # Base time is 04:00 ET (hour=4, minute=0)
+
+        # Get minutes since midnight
+        current_minutes_since_midnight = current_time.hour * 60 + current_time.minute
+
+        # First run at 04:00 ET = 240 minutes since midnight
+        first_run_minutes = 4 * 60  # 240 minutes
+
+        # Last run at 20:00 ET = 1200 minutes since midnight
+        last_run_minutes = 20 * 60  # 1200 minutes
+
+        # If before 04:00 today, schedule for 04:00 today
+        if current_minutes_since_midnight < first_run_minutes:
+            next_run = current_time.replace(hour=4, minute=0, second=0, microsecond=0)
+        elif current_minutes_since_midnight >= last_run_minutes:
+            # After 20:00 today, schedule for 04:00 tomorrow
+            next_run = (current_time + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
+        else:
+            # Between 04:00 and 20:00 - calculate how many 10-minute intervals have passed since 04:00 today
+            minutes_since_0400 = current_minutes_since_midnight - first_run_minutes
+            intervals_passed = minutes_since_0400 // 10
+
+            # Next run is the next 10-minute interval
+            next_interval_minutes = first_run_minutes + ((intervals_passed + 1) * 10)
+
+            # If we've gone past 20:00, schedule for 04:00 tomorrow
+            if next_interval_minutes >= last_run_minutes:
+                next_run = (current_time + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
+            else:
+                next_run_hour = next_interval_minutes // 60
+                next_run_minute = next_interval_minutes % 60
+                next_run = current_time.replace(hour=next_run_hour, minute=next_run_minute, second=0, microsecond=0)
+
+        # Skip weekends and NYSE holidays to find next trading day
+        max_lookforward = 10  # Safety limit
+        for _ in range(max_lookforward):
+            if self.is_trading_day(next_run):
+                break
+            next_run = (next_run + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
+
+        # Store the next scheduled run
+        self.premarket_schedule = [next_run]
+
+        self.logger.info(f"🌅 Next premarket script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
+        self.logger.info(f"⏰ Runs every 10 minutes from 04:00 to 20:00 ET on trading days only")
+
+    def _schedule_top_gainers_runs(self):
+        """
+        Schedule the top gainers script to run from 04:00 to 20:00 ET, every minute.
+
+        Runs on trading days only (skips weekends and NYSE holidays).
+        """
+        current_time = datetime.now(self.et_tz)
+
+        # Calculate next run time from 04:00 to 20:00 ET, every minute
+        # Base time is 04:00 ET (hour=4, minute=0)
+
+        # Get minutes since midnight
+        current_minutes_since_midnight = current_time.hour * 60 + current_time.minute
+
+        # First run at 04:00 ET = 240 minutes since midnight
+        first_run_minutes = 4 * 60  # 240 minutes
+
+        # Last run at 20:00 ET = 1200 minutes since midnight
+        last_run_minutes = 20 * 60  # 1200 minutes
+
+        # If before 04:00 today, schedule for 04:00 today
+        if current_minutes_since_midnight < first_run_minutes:
+            next_run = current_time.replace(hour=4, minute=0, second=0, microsecond=0)
+        elif current_minutes_since_midnight >= last_run_minutes:
+            # After 20:00 today, schedule for 04:00 tomorrow
+            next_run = (current_time + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
+        else:
+            # Between 04:00 and 20:00 - schedule for next minute
+            next_run = current_time + timedelta(minutes=1)
+            next_run = next_run.replace(second=0, microsecond=0)
+
+            # If we've gone past 20:00, schedule for 04:00 tomorrow
+            if next_run.hour * 60 + next_run.minute >= last_run_minutes:
+                next_run = (next_run + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
+
+        # Skip weekends and NYSE holidays to find next trading day
+        for _ in range(10):  # Safety limit
+            if self.is_trading_day(next_run):
+                break
+            next_run = (next_run + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
+
+        # Store the next scheduled run
+        self.top_gainers_schedule = [next_run]
+
+        self.logger.info(f"📈 Next top gainers script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
+        self.logger.info(f"⏰ Runs every minute from 04:00 to 20:00 ET on trading days only")
+
+    def _schedule_volume_surge_runs(self):
+        """
+        Schedule the volume surge scanner to run every 10 minutes from 06:45 to 14:45 ET on trading days only.
+
+        Runs: 06:45, 06:55, 07:05, 07:15, 07:25, ... 14:25, 14:35, 14:45 ET (49 runs per trading day)
+        """
+        current_time = datetime.now(self.et_tz)
+
+        # Check if today is a trading day (not weekend or NYSE holiday)
+        is_trading = self.is_trading_day(current_time)
+
+        # Volume surge runs every 10 minutes from 06:45 to 14:45 ET
+        # First run at 06:45 ET = 405 minutes since midnight (6*60 + 45)
+        # Last run at 14:45 ET = 885 minutes since midnight (14*60 + 45)
+
+        # Get minutes since midnight
+        current_minutes_since_midnight = current_time.hour * 60 + current_time.minute
+
+        # First and last run times
+        first_run_minutes = 6 * 60 + 45  # 06:45 (405)
+        last_run_minutes = 14 * 60 + 45  # 14:45 (885)
+
+        if not is_trading:
+            # If today is not a trading day, schedule for next trading day at 06:45
+            next_run = (current_time + timedelta(days=1)).replace(
+                hour=6, minute=45, second=0, microsecond=0
+            )
+        elif current_minutes_since_midnight < first_run_minutes:
+            # Before 06:45 today, schedule for 06:45 today
+            next_run = current_time.replace(hour=6, minute=45, second=0, microsecond=0)
+        elif current_minutes_since_midnight >= last_run_minutes:
+            # After 14:45 today, schedule for 06:45 tomorrow
+            next_run = (current_time + timedelta(days=1)).replace(
+                hour=6, minute=45, second=0, microsecond=0
+            )
+        else:
+            # Between 06:45 and 14:45 - calculate next 10-minute interval
+            minutes_since_0645 = current_minutes_since_midnight - first_run_minutes
+            intervals_passed = minutes_since_0645 // 10
+
+            # Next run is the next 10-minute interval
+            next_interval_minutes = first_run_minutes + ((intervals_passed + 1) * 10)
+
+            # If we've gone past 14:45, schedule for 06:45 tomorrow
+            if next_interval_minutes > last_run_minutes:
+                next_run = (current_time + timedelta(days=1)).replace(
+                    hour=6, minute=45, second=0, microsecond=0
+                )
+            else:
+                next_run_hour = next_interval_minutes // 60
+                next_run_minute = next_interval_minutes % 60
+                next_run = current_time.replace(
+                    hour=next_run_hour, minute=next_run_minute, second=0, microsecond=0
+                )
+
+        # Skip weekends and NYSE holidays to find next trading day
+        for _ in range(10):  # Safety limit
+            if self.is_trading_day(next_run):
+                break
+            next_run = (next_run + timedelta(days=1)).replace(hour=6, minute=45, second=0, microsecond=0)
+
+        # Store the next scheduled run
+        self.volume_surge_schedule = [next_run]
+
+        self.logger.info(f"📈 Next volume surge scanner run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
+        self.logger.info(f"⏰ Runs every 10 minutes from 06:45 to 14:45 ET on trading days only")
 
     async def _run_startup_script(self) -> bool:
         """
@@ -237,8 +535,9 @@ class MomentumAlertsSystem:
             "--max-symbols", "7000",
             "--min-price", "0.75",
             "--max-price", "100.00",
-            "--min-volume", "250000",
+            "--min-volume", "2500",
             "--top-gainers", "40",
+            "--feed", "iex",
             "--export-csv", "gainers_nasdaq_amex.csv",
             "--verbose"
         ]
@@ -247,13 +546,18 @@ class MomentumAlertsSystem:
             # Expand the tilde in the Python path
             cmd[0] = os.path.expanduser(cmd[0])
 
-            # Create process with logging
+            # Create environment with PYTHONPATH set to project root
+            env = os.environ.copy()
+            env['PYTHONPATH'] = project_root
+
+            # Create process — use DEVNULL to avoid pipe buffer deadlock
+            # (PIPE would block if the child writes > ~64 KB without the parent reading)
             process = subprocess.Popen(
                 cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                cwd=str(Path.cwd())
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                cwd=str(Path.cwd()),
+                env=env
             )
 
             # Store process for monitoring
@@ -273,19 +577,134 @@ class MomentumAlertsSystem:
             self.logger.error(f"❌ Failed to start startup script: {e}")
             return False
 
+    async def _run_premarket_script(self) -> bool:
+        """
+        Run the premarket_top_gainers.py script on a separate CPU core.
+
+        Returns:
+            True if script ran successfully, False otherwise
+        """
+        self.logger.info("🌅 Running premarket script: premarket_top_gainers.py")
+
+        script_path = Path("code") / "premarket_top_gainers.py"
+        cmd = [
+            "taskset", "-c", "1",  # Run on CPU core 1 (separate from main process)
+            os.path.expanduser("~/miniconda3/envs/alpaca/bin/python"),
+            str(script_path),
+            "--account", "live",  # Use live account with SIP feed access
+            "--exchanges", "NASDAQ", "AMEX",
+            "--max-symbols", "9000",
+            "--min-price", "0.75",
+            "--max-price", "40.00",
+            "--min-volume", "2500",
+            "--top-gainers", "40",
+            "--export-csv", "top_gainers_nasdaq_amex.csv",
+            "--verbose"
+        ]
+
+        try:
+            # Create environment with PYTHONPATH set to project root
+            env = os.environ.copy()
+            env['PYTHONPATH'] = project_root
+
+            # Create process — use DEVNULL to avoid pipe buffer deadlock
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                cwd=str(Path.cwd()),
+                env=env
+            )
+
+            # Store process for monitoring
+            process_id = f"premarket_{self.premarket_runs_completed + 1}"
+            self.premarket_processes[process_id] = {
+                'process': process,
+                'start_time': datetime.now(self.et_tz),
+                'cmd': ' '.join(cmd)
+            }
+
+            self.logger.info(f"🌅 Started premarket script on CPU core 1 (PID: {process.pid})")
+            self.logger.info("🕒 Expected completion: up to 20 minutes")
+
+            return True
+
+        except Exception as e:
+            self.logger.error(f"❌ Failed to start premarket script: {e}")
+            return False
+
+    async def _run_top_gainers_script(self) -> bool:
+        """
+        Run the alpaca.py --top-gainers script on a separate CPU core.
+
+        Returns:
+            True if script ran successfully, False otherwise
+        """
+        self.logger.info("📈 Running top gainers script: alpaca.py --top-gainers")
+
+        script_path = Path("code") / "alpaca.py"
+        python_path = os.path.expanduser("~/miniconda3/envs/alpaca/bin/python")
+
+        cmd = [
+            "taskset", "-c", "1",  # Run on CPU core 1 (VM has cores 0 and 1 only)
+            python_path,
+            str(script_path),
+            "--top-gainers",
+            "--limit", "40"
+        ]
+
+        try:
+            # Create environment with PYTHONPATH set to project root
+            env = os.environ.copy()
+            env['PYTHONPATH'] = project_root
+
+            # Create process — use DEVNULL to avoid pipe buffer deadlock
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                cwd=str(Path.cwd()),
+                env=env
+            )
+
+            # Store process for monitoring
+            process_id = f"top_gainers_{self.top_gainers_runs_completed + 1}"
+            self.top_gainers_processes[process_id] = {
+                'process': process,
+                'start_time': datetime.now(self.et_tz),
+                'cmd': ' '.join(cmd)
+            }
+
+            self.logger.info(f"📈 Started top gainers script on CPU core 1 (PID: {process.pid})")
+            self.logger.info("🕒 Expected completion: < 1 minute")
+
+            return True
+
+        except Exception as e:
+            self.logger.error(f"❌ Failed to start top gainers script: {e}")
+            return False
+
     def _check_startup_schedule(self):
         """
         Check if it's time to run a startup script.
 
         After each run, automatically schedule the next one (every 20 minutes).
+        Only runs on weekdays (Monday-Friday).
         """
         current_time = datetime.now(self.et_tz)
 
         # Check if we have a scheduled run and it's time to execute
         if self.startup_schedule and current_time >= self.startup_schedule[0]:
-            # Run the script
-            asyncio.create_task(self._run_startup_script())
-            self.startup_runs_completed += 1
+            # Check if today is a trading day before running (not weekend or NYSE holiday)
+            if self.is_trading_day(current_time):
+                # Guard: skip if a startup process is already running
+                active_startup = any(k.startswith('startup_') for k in self.startup_processes)
+                if active_startup:
+                    self.logger.info("⏭️ Skipping startup run - previous run still in progress")
+                else:
+                    # Run the script
+                    asyncio.create_task(self._run_startup_script())
+                    self.startup_runs_completed += 1
 
             # Immediately schedule the next run (20 minutes from now)
             next_run = current_time + timedelta(minutes=20)
@@ -311,8 +730,177 @@ class MomentumAlertsSystem:
                     next_run_minute = next_interval_minutes % 60
                     next_run = next_run.replace(hour=next_run_hour, minute=next_run_minute, second=0, microsecond=0)
 
+            # Skip weekends and NYSE holidays to find next trading day
+            for _ in range(10):  # Safety limit
+                if self.is_trading_day(next_run):
+                    break
+                next_run = (next_run + timedelta(days=1)).replace(hour=9, minute=40, second=0, microsecond=0)
+
             self.startup_schedule = [next_run]
             self.logger.info(f"⏰ Next startup script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
+
+    def _check_premarket_schedule(self):
+        """
+        Check if it's time to run a premarket script.
+
+        After each run, automatically schedule the next one (every 10 minutes).
+        Only runs between 04:00 and 20:00 ET on weekdays (Monday-Friday).
+        """
+        current_time = datetime.now(self.et_tz)
+
+        # Check if we have a scheduled run and it's time to execute
+        if self.premarket_schedule and current_time >= self.premarket_schedule[0]:
+            # Check if today is a trading day before running (not weekend or NYSE holiday)
+            if self.is_trading_day(current_time):
+                # Guard: skip if a premarket process is already running
+                if self.premarket_processes:
+                    self.logger.info("⏭️ Skipping premarket run - previous run still in progress")
+                else:
+                    # Run the script
+                    asyncio.create_task(self._run_premarket_script())
+                    self.premarket_runs_completed += 1
+
+            # Immediately schedule the next run (10 minutes from now)
+            next_run = current_time + timedelta(minutes=10)
+            # Align to the next 10-minute boundary based on 04:00 start
+            # Round to nearest 10-minute mark: 04:00, 04:10, 04:20, 04:30, etc.
+            minutes_since_midnight = next_run.hour * 60 + next_run.minute
+            first_run_minutes = 4 * 60  # 240 minutes (04:00)
+            last_run_minutes = 20 * 60  # 1200 minutes (20:00)
+
+            if minutes_since_midnight < first_run_minutes:
+                # Before 04:00, schedule for 04:00
+                next_run = next_run.replace(hour=4, minute=0, second=0, microsecond=0)
+            elif minutes_since_midnight >= last_run_minutes:
+                # After 20:00, schedule for 04:00 tomorrow
+                next_run = (next_run + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
+            else:
+                # Between 04:00 and 20:00, round to next 10-minute interval from 04:00
+                minutes_since_0400 = minutes_since_midnight - first_run_minutes
+                intervals_from_0400 = (minutes_since_0400 // 10) + 1
+                next_interval_minutes = first_run_minutes + (intervals_from_0400 * 10)
+
+                if next_interval_minutes >= last_run_minutes:
+                    # Past 20:00, schedule for 04:00 tomorrow
+                    next_run = (next_run + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
+                else:
+                    next_run_hour = next_interval_minutes // 60
+                    next_run_minute = next_interval_minutes % 60
+                    next_run = next_run.replace(hour=next_run_hour, minute=next_run_minute, second=0, microsecond=0)
+
+            # Skip weekends and NYSE holidays to find next trading day
+            for _ in range(10):  # Safety limit
+                if self.is_trading_day(next_run):
+                    break
+                next_run = (next_run + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
+
+            self.premarket_schedule = [next_run]
+            self.logger.info(f"🌅 Next premarket script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
+
+    def _check_top_gainers_schedule(self):
+        """
+        Check if it's time to run a top gainers script.
+
+        After each run, automatically schedule the next one (every minute).
+        Only runs between 04:00 and 20:00 ET on weekdays (Monday-Friday).
+        """
+        current_time = datetime.now(self.et_tz)
+
+        # Check if we have a scheduled run and it's time to execute
+        if self.top_gainers_schedule and current_time >= self.top_gainers_schedule[0]:
+            # Check if today is a trading day before running (not weekend or NYSE holiday)
+            if self.is_trading_day(current_time):
+                # Run the script
+                asyncio.create_task(self._run_top_gainers_script())
+                self.top_gainers_runs_completed += 1
+
+            # Immediately schedule the next run (1 minute from now)
+            next_run = current_time + timedelta(minutes=1)
+            next_run = next_run.replace(second=0, microsecond=0)
+
+            minutes_since_midnight = next_run.hour * 60 + next_run.minute
+            first_run_minutes = 4 * 60  # 240 minutes (04:00)
+            last_run_minutes = 20 * 60  # 1200 minutes (20:00)
+
+            if minutes_since_midnight < first_run_minutes:
+                # Before 04:00, schedule for 04:00
+                next_run = next_run.replace(hour=4, minute=0, second=0, microsecond=0)
+            elif minutes_since_midnight >= last_run_minutes:
+                # After 20:00, schedule for 04:00 tomorrow
+                next_run = (next_run + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
+
+            # Skip weekends and NYSE holidays to find next trading day
+            for _ in range(10):  # Safety limit
+                if self.is_trading_day(next_run):
+                    break
+                next_run = (next_run + timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
+
+            self.top_gainers_schedule = [next_run]
+            self.logger.info(f"📈 Next top gainers script run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
+
+    def _check_volume_surge_schedule(self):
+        """
+        Check if it's time to run a volume surge scanner.
+
+        After each run, automatically schedule the next one (every 10 minutes).
+        Only runs from 06:45 to 14:45 ET on trading days.
+        """
+        current_time = datetime.now(self.et_tz)
+
+        # Check if we have a scheduled run and it's time to execute
+        if self.volume_surge_schedule and current_time >= self.volume_surge_schedule[0]:
+            # Check if today is a trading day before running (not weekend or NYSE holiday)
+            if self.is_trading_day(current_time):
+                # Guard: skip if a volume surge process is already running
+                if 'volume_surge' in self.startup_processes:
+                    self.logger.info("⏭️ Skipping volume surge run - previous run still in progress")
+                else:
+                    # Run the script
+                    asyncio.create_task(self._run_volume_surge_scanner())
+                    self.volume_surge_runs_completed += 1
+
+            # Schedule the next run (every 10 minutes)
+            # First and last run times
+            first_run_minutes = 6 * 60 + 45  # 06:45 (405)
+            last_run_minutes = 14 * 60 + 45  # 14:45 (885)
+
+            # Calculate next 10-minute interval
+            next_run = current_time + timedelta(minutes=10)
+            next_run = next_run.replace(second=0, microsecond=0)
+
+            current_minutes_since_midnight = next_run.hour * 60 + next_run.minute
+
+            # If next run is before 06:45 or after 14:45, schedule for next day at 06:45
+            if current_minutes_since_midnight < first_run_minutes or current_minutes_since_midnight > last_run_minutes:
+                next_run = (current_time + timedelta(days=1)).replace(
+                    hour=6, minute=45, second=0, microsecond=0
+                )
+            else:
+                # Align to 10-minute intervals from 06:45
+                minutes_since_0645 = current_minutes_since_midnight - first_run_minutes
+                intervals_from_0645 = (minutes_since_0645 // 10) + 1
+                next_interval_minutes = first_run_minutes + (intervals_from_0645 * 10)
+
+                if next_interval_minutes > last_run_minutes:
+                    # Past 14:45, schedule for next day at 06:45
+                    next_run = (current_time + timedelta(days=1)).replace(
+                        hour=6, minute=45, second=0, microsecond=0
+                    )
+                else:
+                    next_run_hour = next_interval_minutes // 60
+                    next_run_minute = next_interval_minutes % 60
+                    next_run = current_time.replace(
+                        hour=next_run_hour, minute=next_run_minute, second=0, microsecond=0
+                    )
+
+            # Skip weekends and NYSE holidays to find next trading day
+            for _ in range(10):  # Safety limit
+                if self.is_trading_day(next_run):
+                    break
+                next_run = (next_run + timedelta(days=1)).replace(hour=6, minute=45, second=0, microsecond=0)
+
+            self.volume_surge_schedule = [next_run]
+            self.logger.info(f"📈 Next volume surge scanner run scheduled for: {next_run.strftime('%Y-%m-%d %H:%M:%S ET')}")
 
     async def _check_startup_processes(self):
         """Check the status of running startup processes."""
@@ -331,8 +919,8 @@ class MomentumAlertsSystem:
                         self.volume_surge_completed = True
                     else:
                         self.logger.info(f"✅ Startup script completed successfully (Runtime: {runtime})")
-                        # Send the generated top gainers file to Bruce
-                        await self._send_top_gainers_file_to_bruce()
+                        # NOTE: Market open CSV is no longer sent to Bruce since we switched to premarket scanner
+                        # await self._send_top_gainers_file_to_bruce()
                 else:
                     if process_id == 'volume_surge':
                         self.logger.error(f"❌ Volume surge scanner failed with return code {return_code} (Runtime: {runtime})")
@@ -355,14 +943,75 @@ class MomentumAlertsSystem:
         for process_id in completed_processes:
             del self.startup_processes[process_id]
 
+    async def _check_premarket_processes(self):
+        """Check the status of running premarket processes."""
+        completed_processes = []
+
+        for process_id, process_info in self.premarket_processes.items():
+            process = process_info['process']
+
+            if process.poll() is not None:  # Process has completed
+                return_code = process.returncode
+                runtime = datetime.now(self.et_tz) - process_info['start_time']
+
+                if return_code == 0:
+                    self.logger.info(f"✅ Premarket script completed successfully (Runtime: {runtime})")
+                    # NOTE: Automatic sending of premarket top gainers to Bruce is disabled
+                    # Users can request it manually via the Telegram bot 'premarket top gainers' command
+                    # await self._send_top_gainers_file_to_bruce()
+                else:
+                    self.logger.error(f"❌ Premarket script failed with return code {return_code} (Runtime: {runtime})")
+
+                # Log any output
+                try:
+                    stdout, stderr = process.communicate(timeout=1)
+                    if stdout:
+                        self.logger.debug(f"Premarket script output: {stdout[-500:]}")  # Last 500 chars
+                    if stderr:
+                        self.logger.debug(f"Premarket script stderr: {stderr[-500:]}")  # Last 500 chars
+                except Exception:
+                    pass
+
+                completed_processes.append(process_id)
+
+        # Remove completed processes
+        for process_id in completed_processes:
+            del self.premarket_processes[process_id]
+
+    async def _check_top_gainers_processes(self):
+        """Check the status of running top gainers processes and reap zombies."""
+        completed_processes = []
+
+        for process_id, process_info in self.top_gainers_processes.items():
+            process = process_info['process']
+
+            if process.poll() is not None:  # Process has completed
+                return_code = process.returncode
+                runtime = datetime.now(self.et_tz) - process_info['start_time']
+
+                if return_code != 0:
+                    self.logger.error(f"❌ Top gainers script failed with return code {return_code} (Runtime: {runtime})")
+
+                # Reap the zombie (communicate returns (None, None) with DEVNULL)
+                try:
+                    process.communicate(timeout=1)
+                except Exception:
+                    pass
+
+                completed_processes.append(process_id)
+
+        # Remove completed processes
+        for process_id in completed_processes:
+            del self.top_gainers_processes[process_id]
+
     async def _send_top_gainers_file_to_bruce(self):
         """
-        Send the generated top gainers file contents to Bruce via Telegram.
+        Send the generated premarket top gainers file contents to Bruce via Telegram.
         """
         try:
             # Check if the CSV file exists
             if not self.csv_file_path.exists():
-                self.logger.warning(f"⚠️ Top gainers file not found: {self.csv_file_path}")
+                self.logger.warning(f"⚠️ Premarket top gainers file not found: {self.csv_file_path}")
                 return
 
             # Read the CSV file contents
@@ -371,7 +1020,7 @@ class MomentumAlertsSystem:
                     file_contents = f.read().strip()
 
                 if not file_contents:
-                    self.logger.warning(f"⚠️ Top gainers file is empty: {self.csv_file_path}")
+                    self.logger.warning(f"⚠️ Premarket top gainers file is empty: {self.csv_file_path}")
                     return
 
                 # Get file metadata
@@ -383,53 +1032,57 @@ class MomentumAlertsSystem:
 
                 # Create message with file contents
                 message_parts = [
-                    "📊 **TOP GAINERS FILE GENERATED**",
+                    "🌅 PREMARKET TOP GAINERS FILE GENERATED",
                     "",
-                    "📁 **File:** `gainers_nasdaq_amex.csv`",
-                    f"⏰ **Generated:** {file_time.strftime('%H:%M:%S ET')}",
-                    f"📅 **Date:** {file_time.strftime('%Y-%m-%d')}",
-                    f"📈 **Total Symbols:** {total_rows}",
+                    "📁 File: `top_gainers_nasdaq_amex.csv`",
+                    f"⏰ Generated: {file_time.strftime('%H:%M:%S ET')}",
+                    f"📅 Date: {file_time.strftime('%Y-%m-%d')}",
+                    f"📈 Total Symbols: {total_rows}",
                     "",
-                    "📋 **File Contents:**",
+                    "📋 File Contents:",
                     "```csv",
                     file_contents,
                     "```",
                     "",
-                    f"📂 **Path:** `{self.csv_file_path}`"
+                    f"📂 Path: `{self.csv_file_path}`"
                 ]
 
                 message = "\n".join(message_parts)
 
                 if self.test_mode:
-                    self.logger.info(f"[TEST MODE] Top gainers file contents: {len(file_contents)} characters")
+                    self.logger.info(f"[TEST MODE] Premarket top gainers file contents: {len(file_contents)} characters")
                 else:
                     # Send to Bruce
                     result = self.telegram_poster.send_message_to_user(message, "bruce", urgent=False)
 
                     if result['success']:
-                        self.logger.info(f"✅ Top gainers file contents sent to Bruce ({len(file_contents)} characters)")
+                        self.logger.info(f"✅ Premarket top gainers file contents sent to Bruce ({len(file_contents)} characters)")
                     else:
                         errors = result.get('errors', ['Unknown error'])
                         error_msg = ', '.join(errors) if isinstance(errors, list) else str(errors)
-                        self.logger.error(f"❌ Failed to send top gainers file contents to Bruce: {error_msg}")
+                        self.logger.error(f"❌ Failed to send premarket top gainers file contents to Bruce: {error_msg}")
 
             except Exception as file_error:
-                self.logger.error(f"❌ Error reading top gainers file: {file_error}")
+                self.logger.error(f"❌ Error reading premarket top gainers file: {file_error}")
 
                 # Send basic notification even if file reading fails
                 basic_message = (
-                    "📊 **TOP GAINERS FILE GENERATED**\n\n"
-                    "📁 **File:** `gainers_nasdaq_amex.csv`\n"
-                    f"⏰ **Time:** {datetime.now(self.et_tz).strftime('%H:%M:%S ET')}\n"
-                    f"📂 **Path:** `{self.csv_file_path}`\n\n"
-                    "⚠️ **Note:** Could not read file contents for sending"
+                    "🌅 PREMARKET TOP GAINERS FILE GENERATED\n\n"
+                    "📁 File: `top_gainers_nasdaq_amex.csv`\n"
+                    f"⏰ Time: {datetime.now(self.et_tz).strftime('%H:%M:%S ET')}\n"
+                    f"📂 Path: `{self.csv_file_path}`\n\n"
+                    "⚠️ Note: Could not read file contents for sending"
                 )
 
                 if not self.test_mode:
                     self.telegram_poster.send_message_to_user(basic_message, "bruce", urgent=False)
 
         except Exception as e:
-            self.logger.error(f"❌ Error sending top gainers file contents: {e}")
+            self.logger.error(f"❌ Error sending premarket top gainers file contents: {e}")
+
+    # REMOVED: _send_premarket_file_to_bruce() is now redundant
+    # The premarket CSV is now the main CSV file (self.csv_file_path)
+    # and is sent via _send_top_gainers_file_to_bruce()
 
     async def _run_volume_surge_scanner(self) -> bool:
         """
@@ -446,12 +1099,11 @@ class MomentumAlertsSystem:
             str(script_path),
             "--exchanges", "NASDAQ", "AMEX",
             "--max-symbols", "7000",
-            "--min-price", "0.75",
-            "--max-price", "100.00",
             "--min-volume", "250000",
             "--min-percent-change", "5.0",
             "--surge-days", "50",
-            "--volume-surge", "2.2",
+            "--volume-surge", "5.0",
+            "--feed", "iex",
             "--export-csv", "relative_volume_nasdaq_amex.csv",
             "--verbose"
         ]
@@ -460,13 +1112,17 @@ class MomentumAlertsSystem:
             # Expand the tilde in the Python path
             cmd[0] = os.path.expanduser(cmd[0])
 
-            # Create process with logging
+            # Create environment with PYTHONPATH set to project root
+            env = os.environ.copy()
+            env['PYTHONPATH'] = project_root
+
+            # Create process — use DEVNULL to avoid pipe buffer deadlock
             process = subprocess.Popen(
                 cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                cwd=str(Path.cwd())
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                cwd=str(Path.cwd()),
+                env=env
             )
 
             # Store process for monitoring
@@ -512,7 +1168,8 @@ class MomentumAlertsSystem:
         cmd.extend(symbols)
         cmd.extend([
             "--surge-days", "50",
-            "--volume-surge", "2.2",
+            "--volume-surge", "5.0",
+            "--feed", "iex",
             "--export-csv", "symbol_list.csv",
             "--verbose"
         ])
@@ -521,6 +1178,10 @@ class MomentumAlertsSystem:
             # Expand the tilde in the Python path
             cmd[0] = os.path.expanduser(cmd[0])
 
+            # Create environment with PYTHONPATH set to project root
+            env = os.environ.copy()
+            env['PYTHONPATH'] = project_root
+
             # Run synchronously with timeout
             result = subprocess.run(
                 cmd,
@@ -528,7 +1189,8 @@ class MomentumAlertsSystem:
                 stderr=subprocess.STDOUT,
                 text=True,
                 timeout=300,  # 5 minute timeout
-                cwd=str(Path.cwd())
+                cwd=str(Path.cwd()),
+                env=env
             )
 
             if result.returncode == 0:
@@ -634,8 +1296,8 @@ class MomentumAlertsSystem:
                 f"✅ Retrieved fundamental data for {len(fundamental_data)}/{len(symbols)} symbols")
         else:
             self.logger.warning(
-                "⚠️ No fundamental data retrieved. Configure POLYGON_API_KEY in .env "
-                "or install yfinance library")
+                "⚠️ No fundamental data retrieved. Ensure yfinance library is installed "
+                "(pip install yfinance)")
 
         return fundamental_data
 
@@ -662,9 +1324,11 @@ class MomentumAlertsSystem:
             if current_et.time() < market_open_time:
                 today = today - timedelta(days=1)
 
-            # Skip backwards to most recent weekday
-            while today.weekday() >= 5:  # Skip weekends
+            # Skip backwards to most recent trading day (handles weekends and NYSE holidays)
+            check_datetime = self.et_tz.localize(datetime.combine(today, market_open_time))
+            while not self.is_trading_day(check_datetime):
                 today = today - timedelta(days=1)
+                check_datetime = self.et_tz.localize(datetime.combine(today, market_open_time))
 
             # Create target time for market open (9:30 AM ET)
             market_open_datetime = self.et_tz.localize(
@@ -722,7 +1386,7 @@ class MomentumAlertsSystem:
 
     def _load_csv_symbols(self) -> Dict[str, Dict]:
         """
-        Load symbols from the gainers CSV file, volume surge CSV file, and additional data/{YYYYMMDD}.csv file.
+        Load symbols from the premarket top gainers CSV file, volume surge CSV file, and additional data/{YYYYMMDD}.csv file.
 
         Limits to first 40 symbols from each source that don't end in 'W'.
         Tracks source with boolean fields: from_gainers, from_volume_surge, oracle.
@@ -732,7 +1396,7 @@ class MomentumAlertsSystem:
         """
         symbols_dict = {}  # Use dict to store symbol metadata
 
-        # Load from gainers CSV file - keep first 40 symbols that don't end in 'W'
+        # Load from premarket top gainers CSV file - keep first 40 symbols that don't end in 'W'
         if self.csv_file_path.exists():
             try:
                 gainers_count = 0
@@ -740,26 +1404,28 @@ class MomentumAlertsSystem:
                     reader = csv.DictReader(f)
                     for row in reader:
                         symbol = row.get('symbol', '').strip().upper()
+
                         # Filter: must have symbol and not end in 'W'
                         if symbol and not symbol.endswith('W'):
-                            if gainers_count < 40:  # Only keep first 40
+                            if gainers_count < 40:  # Only keep first 40 symbols
                                 # Store symbol with market open price from CSV
-                                market_open_price = row.get('market_open_price', None)
+                                market_open_price = row.get('market_open_price', row.get('premarket_price', None))
                                 symbols_dict[symbol] = {
-                                    'source': 'gainers_csv',
+                                    'source': 'premarket_csv',
                                     'market_open_price': float(market_open_price) if market_open_price else None,
                                     'from_gainers': True,
                                     'from_volume_surge': False,
-                                    'oracle': False
+                                    'oracle': False,
+                                    'from_premarket': True
                                 }
                                 gainers_count += 1
                             else:
                                 break  # Stop after first 40
 
-                self.logger.info(f"📊 Loaded {gainers_count} symbols from gainers CSV (first 40 non-W symbols)")
+                self.logger.info(f"🌅 Loaded {gainers_count} symbols from premarket top gainers CSV (first 40 non-W symbols)")
 
             except Exception as e:
-                self.logger.error(f"❌ Error loading gainers CSV file: {e}")
+                self.logger.error(f"❌ Error loading premarket top gainers CSV file: {e}")
 
         # Load from volume surge CSV file - keep first 40 symbols that don't end in 'W'
         if self.volume_surge_csv_path.exists():
@@ -838,6 +1504,11 @@ class MomentumAlertsSystem:
                 self.logger.error(f"❌ Error loading data CSV file {data_csv_path}: {e}")
         else:
             self.logger.debug(f"📄 Data CSV file not found: {data_csv_path}")
+
+        # Initialize from_premarket field for symbols that don't have it
+        for symbol in symbols_dict:
+            if 'from_premarket' not in symbols_dict[symbol]:
+                symbols_dict[symbol]['from_premarket'] = False
 
         # Fetch market open prices for symbols that don't have them
         if symbols_dict and self.historical_client:
@@ -938,6 +1609,80 @@ class MomentumAlertsSystem:
 
         return symbols_dict
 
+    def _load_manual_symbols(self) -> Dict[str, Dict]:
+        """
+        Load manually added symbols from JSON file.
+
+        Returns:
+            Dictionary mapping symbols to their metadata
+        """
+        manual_symbols_dict = {}
+
+        if not self.manual_symbols_file.exists():
+            self.logger.debug(f"📝 Manual symbols file not found: {self.manual_symbols_file}")
+            return manual_symbols_dict
+
+        try:
+            with open(self.manual_symbols_file, 'r') as f:
+                data = json.load(f)
+
+            symbols = data.get('symbols', [])
+
+            if not symbols:
+                self.logger.debug("📝 No manual symbols found in file")
+                return manual_symbols_dict
+
+            # Add each manual symbol with appropriate metadata
+            for symbol in symbols:
+                symbol = symbol.strip().upper()
+                if symbol and not symbol.endswith('W'):
+                    manual_symbols_dict[symbol] = {
+                        'source': 'manual',
+                        'market_open_price': None,  # Will be fetched if needed
+                        'from_gainers': False,
+                        'from_volume_surge': False,
+                        'oracle': False,
+                        'manual': True
+                    }
+
+            self.logger.info(f"📝 Loaded {len(manual_symbols_dict)} manual symbols for monitoring")
+
+            # Update last check timestamp
+            self.last_manual_symbols_check = datetime.now(self.et_tz)
+
+        except Exception as e:
+            self.logger.error(f"❌ Error loading manual symbols file {self.manual_symbols_file}: {e}")
+
+        return manual_symbols_dict
+
+    def _merge_manual_symbols(self, symbols_dict: Dict[str, Dict]) -> Dict[str, Dict]:
+        """
+        Merge manual symbols into the existing symbols dictionary.
+
+        Args:
+            symbols_dict: Existing dictionary of symbols
+
+        Returns:
+            Updated dictionary with manual symbols merged in
+        """
+        manual_symbols = self._load_manual_symbols()
+
+        if not manual_symbols:
+            return symbols_dict
+
+        # Merge manual symbols into existing dict
+        for symbol, metadata in manual_symbols.items():
+            if symbol in symbols_dict:
+                # Symbol already exists - just add the manual flag
+                symbols_dict[symbol]['manual'] = True
+                self.logger.debug(f"📝 Symbol {symbol} already monitored, marking as manual")
+            else:
+                # Add new manual symbol
+                symbols_dict[symbol] = metadata
+                self.logger.debug(f"📝 Added manual symbol {symbol} to monitoring")
+
+        return symbols_dict
+
     def get_current_symbol_list(self) -> List[Dict]:
         """
         Get the current monitored symbol list with metadata for web interface.
@@ -946,7 +1691,7 @@ class MomentumAlertsSystem:
             List of dictionaries containing symbol information with fields:
             - symbol: Stock symbol
             - oracle: Boolean - from Oracle data source
-            - manual: Boolean - manually added (always False in this implementation)
+            - manual: Boolean - manually added
             - top_gainers: Boolean - from top gainers list
             - surge: Boolean - from volume surge list
         """
@@ -956,9 +1701,10 @@ class MomentumAlertsSystem:
             symbol_info = {
                 'symbol': symbol,
                 'oracle': metadata.get('oracle', False),
-                'manual': False,  # Manual additions not yet implemented
+                'manual': metadata.get('manual', False),
                 'top_gainers': metadata.get('from_gainers', False),
-                'surge': metadata.get('from_volume_surge', False)
+                'surge': metadata.get('from_volume_surge', False),
+                'premarket': metadata.get('from_premarket', False)
             }
             symbol_list.append(symbol_info)
 
@@ -966,40 +1712,6 @@ class MomentumAlertsSystem:
         symbol_list.sort(key=lambda x: x['symbol'])
 
         return symbol_list
-
-    def _export_symbol_list_to_json(self) -> None:
-        """
-        Export the current symbol list to JSON file for web interface consumption.
-
-        Creates a JSON file with timestamp and symbol list data that can be
-        efficiently checked by the watch_list_api.py endpoint.
-
-        File location: historical_data/{YYYY-MM-DD}/scanner/watch_list.json
-        """
-        try:
-            # Get current symbol list
-            symbol_list = self.get_current_symbol_list()
-
-            # Create export data with timestamp
-            export_data = {
-                'success': True,
-                'timestamp': datetime.now(self.et_tz).isoformat(),
-                'count': len(symbol_list),
-                'symbols': symbol_list
-            }
-
-            # Write to JSON file (atomic write using temp file)
-            temp_path = self.watch_list_json_path.with_suffix('.tmp')
-            with open(temp_path, 'w') as f:
-                json.dump(export_data, f, indent=2)
-
-            # Atomic rename
-            temp_path.replace(self.watch_list_json_path)
-
-            self.logger.debug(f"📝 Exported {len(symbol_list)} symbols to {self.watch_list_json_path}")
-
-        except Exception as e:
-            self.logger.error(f"❌ Error exporting symbol list to JSON: {e}")
 
     def _monitor_csv_file(self):
         """Monitor the CSV file for creation/updates."""
@@ -1016,6 +1728,10 @@ class MomentumAlertsSystem:
 
         if should_reload:
             new_symbols_dict = self._load_csv_symbols()
+
+            # Merge manual symbols
+            new_symbols_dict = self._merge_manual_symbols(new_symbols_dict)
+
             new_symbols = set(new_symbols_dict.keys())
             current_symbols = set(self.monitored_symbols.keys())
 
@@ -1029,8 +1745,35 @@ class MomentumAlertsSystem:
 
             self.monitored_symbols = new_symbols_dict
 
-            # Export updated symbol list to JSON for web interface
-            self._export_symbol_list_to_json()
+    def _monitor_manual_symbols_file(self):
+        """Monitor the manual symbols JSON file for updates."""
+        # Check if we should reload manual symbols
+        should_reload = False
+
+        if self.manual_symbols_file.exists():
+            file_mtime = datetime.fromtimestamp(self.manual_symbols_file.stat().st_mtime, self.et_tz)
+
+            if self.last_manual_symbols_check is None or file_mtime > self.last_manual_symbols_check:
+                should_reload = True
+                self.logger.info(f"📝 Manual symbols file detected/updated: {file_mtime.strftime('%H:%M:%S ET')}")
+
+        if should_reload:
+            # Reload all symbols (CSV + manual)
+            csv_symbols = self._load_csv_symbols()
+            new_symbols_dict = self._merge_manual_symbols(csv_symbols)
+
+            new_symbols = set(new_symbols_dict.keys())
+            current_symbols = set(self.monitored_symbols.keys())
+
+            added_symbols = new_symbols - current_symbols
+            removed_symbols = current_symbols - new_symbols
+
+            if added_symbols:
+                self.logger.info(f"📝 ➕ Added manual symbols: {sorted(added_symbols)}")
+            if removed_symbols:
+                self.logger.info(f"📝 ➖ Removed manual symbols: {sorted(removed_symbols)}")
+
+            self.monitored_symbols = new_symbols_dict
 
     async def _collect_stock_data(self, symbols: List[str]) -> Dict[str, pd.DataFrame]:
         """
@@ -1075,8 +1818,7 @@ class MomentumAlertsSystem:
                                 'l': float(bar.l),
                                 'c': float(bar.c),
                                 'v': int(bar.v),
-                                'timestamp': bar.t,
-                                'vwap': getattr(bar, 'vw', None)  # Use VWAP from stock data only
+                                'timestamp': bar.t
                             }
                             bar_data.append(bar_dict)
 
@@ -1088,19 +1830,6 @@ class MomentumAlertsSystem:
                             if df.index.tz is None:
                                 df.index = df.index.tz_localize('UTC')
                             df.index = df.index.tz_convert(self.et_tz)
-
-                            # Check if VWAP data is available from stock data
-                            if 'vwap' not in df.columns or df['vwap'].isna().all():
-                                self.logger.debug(f"⚠️ {symbol}: VWAP not available in stock data, skipping")
-                                continue
-
-                            # CRITICAL: Verify the latest bar has valid VWAP from stock data
-                            latest_vwap = df.iloc[-1]['vwap']
-                            if pd.isna(latest_vwap) or latest_vwap is None:
-                                self.logger.debug(f"⚠️ {symbol}: Latest bar missing VWAP from stock data, skipping")
-                                continue
-
-                            self.logger.debug(f"✅ {symbol}: Using VWAP from stock data (vw attribute): ${latest_vwap:.2f}")
 
                             data_dict[symbol] = df
 
@@ -1224,13 +1953,6 @@ class MomentumAlertsSystem:
             # Get latest bar
             latest_bar = data.iloc[-1]
             current_price = float(latest_bar['c'])  # Use single letter attribute
-
-            # CRITICAL: Validate VWAP from stock data before using
-            if pd.isna(latest_bar['vwap']) or latest_bar['vwap'] is None:
-                self.logger.debug(f"❌ {symbol}: VWAP from stock data is invalid")
-                return None
-
-            current_vwap = float(latest_bar['vwap'])  # VWAP from stock data (bar.vw attribute)
             current_volume = int(latest_bar['v'])  # Get current volume
 
             # Calculate float rotation using hourly volume data (04:00 ET to now)
@@ -1252,16 +1974,9 @@ class MomentumAlertsSystem:
                     f"Float: {float_shares:,} | "
                     f"Float Rotation: {float_rotation:.4f}x ({float_rotation_percent:.2f}%)")
 
-            self.logger.debug(f"📊 {symbol}: Using VWAP from stock data: ${current_vwap:.2f}")
-
             # Filter out low volume alerts
             if current_volume < self.momentum_config.volume_low_threshold:
                 self.logger.debug(f"❌ {symbol}: Volume {current_volume:,} below threshold {self.momentum_config.volume_low_threshold:,}")
-                return None
-
-            # Check VWAP criteria
-            if current_price < current_vwap:
-                self.logger.debug(f"❌ {symbol}: Price ${current_price:.2f} below VWAP ${current_vwap:.2f}")
                 return None
 
             # Calculate technical indicators using breakout detector
@@ -1406,13 +2121,18 @@ class MomentumAlertsSystem:
                     f"📊 {symbol}: Market open: ${market_open_price:.2f}, "
                     f"Gain since open: {percent_gain_since_market_open:+.2f}%")
 
+            # Filter: Skip alerts when price is below market open (bearish, not momentum)
+            if market_open_price is not None and current_price < market_open_price:
+                self.logger.debug(
+                    f"❌ {symbol}: Filtered - Price ${current_price:.2f} below market open ${market_open_price:.2f}")
+                return None
+
             # If we get here, all criteria are met
             alert_data = {
                 'symbol': symbol,
                 'current_price': current_price,
                 'market_open_price': market_open_price,
                 'percent_gain_since_market_open': percent_gain_since_market_open,
-                'vwap': current_vwap,
                 'ema_9': ema_9,
                 'momentum': momentum,
                 'momentum_short': momentum_short,
@@ -1430,7 +2150,6 @@ class MomentumAlertsSystem:
                 'halt_emoji': halt_emoji,
                 'current_volume': current_volume,
                 'volume_emoji': volume_emoji,
-                'urgency': urgency,
                 'timestamp': datetime.now(self.et_tz),
                 'indicators': indicators,
                 'from_gainers': from_gainers,
@@ -1448,7 +2167,7 @@ class MomentumAlertsSystem:
             }
 
             self.logger.info(f"✅ {symbol}: Momentum alert criteria met!")
-            self.logger.info(f"   Price: ${current_price:.2f} | VWAP: ${current_vwap:.2f} (from stock data) | EMA9: ${ema_9:.2f}")
+            self.logger.info(f"   Price: ${current_price:.2f} | EMA9: ${ema_9:.2f}")
 
             # Show actual time periods used (handles halts/gaps)
             time_diff = actual_time_diff if 'actual_time_diff' in locals() else 0
@@ -1456,13 +2175,78 @@ class MomentumAlertsSystem:
             self.logger.info(f"   Momentum: {momentum:.2f}/min {momentum_emoji} | Raw: {raw_momentum_20:.2f}% ({time_diff:.1f}min)")
             self.logger.info(f"   Momentum Short: {momentum_short:.2f}/min {momentum_short_emoji} | Raw: {raw_momentum_5:.2f}% ({time_diff_short:.1f}min)")
             self.logger.info(f"   Squeezing: {momentum_squeeze:.2f}/min {squeeze_emoji} | Raw: {raw_momentum_squeeze:.2f}% ({actual_time_diff_squeeze:.1f}min)")
-            self.logger.info(f"   Volume: {current_volume:,} {volume_emoji} | Halt Status: {halt_emoji} | Urgency: {urgency}")
+            self.logger.info(f"   Volume: {current_volume:,} {volume_emoji} | Halt Status: {halt_emoji}")
 
             return alert_data
 
         except Exception as e:
             self.logger.error(f"❌ Error checking momentum criteria for {symbol}: {e}")
             return None
+
+    def _is_in_cooldown(self, symbol: str, current_price: float) -> bool:
+        """
+        Check if a symbol is in cooldown period for momentum alerts.
+
+        A symbol enters cooldown after an alert is sent. During the 10-minute cooldown:
+        - If current price >= cooldown start price: allow alert (price recovered)
+        - If current price < cooldown start price: skip alert (still cooling down)
+
+        Args:
+            symbol: Stock symbol to check
+            current_price: Current price of the stock
+
+        Returns:
+            True if the alert should be skipped (in cooldown with price below start price)
+            False if the alert should be allowed (not in cooldown or price recovered)
+        """
+        if symbol not in self.cooldown_alerts:
+            return False
+
+        cooldown_data = self.cooldown_alerts[symbol]
+        cooldown_start = cooldown_data['timestamp']
+        cooldown_price = cooldown_data['price']
+        current_time = datetime.now(self.et_tz)
+
+        # Check if cooldown period has expired
+        time_elapsed = (current_time - cooldown_start).total_seconds() / 60
+        if time_elapsed >= self.cooldown_period_minutes:
+            # Cooldown expired, remove tracking and allow alert
+            del self.cooldown_alerts[symbol]
+            self.logger.debug(f"⏰ {symbol}: Cooldown period expired after {time_elapsed:.1f} minutes")
+            return False
+
+        # Within cooldown period - check price condition
+        if current_price >= cooldown_price:
+            # Price recovered to or above cooldown start price - allow alert
+            self.logger.info(
+                f"✅ {symbol}: Price recovered during cooldown "
+                f"(${current_price:.2f} >= ${cooldown_price:.2f}), allowing alert"
+            )
+            return False
+        else:
+            # Price still below cooldown start price - skip alert
+            self.logger.info(
+                f"⏳ {symbol}: In {self.cooldown_period_minutes}-min cooldown "
+                f"({time_elapsed:.1f}min elapsed), price ${current_price:.2f} < "
+                f"cooldown start ${cooldown_price:.2f}, skipping alert"
+            )
+            return True
+
+    def _start_cooldown(self, symbol: str, price: float) -> None:
+        """
+        Start the cooldown period for a symbol after sending an alert.
+
+        Args:
+            symbol: Stock symbol
+            price: Price at which the alert was sent (cooldown start price)
+        """
+        self.cooldown_alerts[symbol] = {
+            'timestamp': datetime.now(self.et_tz),
+            'price': price
+        }
+        self.logger.debug(
+            f"⏱️ {symbol}: Started {self.cooldown_period_minutes}-min cooldown at ${price:.2f}"
+        )
 
     async def _send_momentum_alert(self, alert_data: Dict):
         """
@@ -1476,7 +2260,6 @@ class MomentumAlertsSystem:
             current_price = alert_data['current_price']
             market_open_price = alert_data.get('market_open_price')
             percent_gain_since_market_open = alert_data.get('percent_gain_since_market_open')
-            vwap = alert_data['vwap']
             ema_9 = alert_data['ema_9']
             momentum = alert_data['momentum']
             momentum_short = alert_data['momentum_short']
@@ -1487,7 +2270,6 @@ class MomentumAlertsSystem:
             halt_emoji = alert_data['halt_emoji']
             current_volume = alert_data['current_volume']
             volume_emoji = alert_data['volume_emoji']
-            urgency = alert_data['urgency']
             timestamp = alert_data['timestamp']
             volume_surge_detected = alert_data.get('volume_surge_detected', False)
             volume_surge_ratio = alert_data.get('volume_surge_ratio', None)
@@ -1499,53 +2281,107 @@ class MomentumAlertsSystem:
             float_rotation = alert_data.get('float_rotation')
             float_rotation_percent = alert_data.get('float_rotation_percent')
 
-            # Create alert message (VWAP is from stock data, not calculated)
+            # Extract source indicators for filtering
+            from_gainers = alert_data.get('from_gainers', False)
+            from_volume_surge = alert_data.get('from_volume_surge', False)
+            percent_gain_since_market_open = alert_data.get('percent_gain_since_market_open')
+
+            # Count green lights for Sources filter (require 2 of 3)
+            green_light_count = 0
+            if from_gainers:
+                green_light_count += 1
+            if from_volume_surge:
+                green_light_count += 1
+            if percent_gain_since_market_open is not None and percent_gain_since_market_open > 30:
+                green_light_count += 1
+
+            # Determine if this alert will be filtered
+            is_filtered = green_light_count < 2
+
+            # STEP 1: Save ALL alerts to momentum_alerts/bullish/ (before filtering)
+            self._save_momentum_alert(
+                alert_data, message=None,
+                filtered=is_filtered, green_light_count=green_light_count)
+
+            # Filter: require at least 2 of 3 sources to be green
+            if is_filtered:
+                self.logger.info(
+                    f"🚫 {symbol}: Momentum alert filtered - only {green_light_count}/3 "
+                    f"sources green (Top Gainers: {from_gainers}, Volume Surge: {from_volume_surge}, "
+                    f"Gain >30%: {percent_gain_since_market_open is not None and percent_gain_since_market_open > 30})")
+                return
+
+            # Check if this is the biggest gainer across all symbols
+            biggest_gainer_gain = self._update_and_check_biggest_gainer(
+                symbol, current_price, timestamp
+            )
+
+            # Create alert message
             message_parts = [
-                f"🚀 **MOMENTUM ALERT - {symbol}**",
+                f"🚀 MOMENTUM ALERT - {symbol}",
                 "",
-                f"💰 **Price:** ${current_price:.2f}",
+                f"📅 Date: {timestamp.strftime('%Y-%m-%d')}",
+                f"⏰ Time: {timestamp.strftime('%H:%M:%S ET')}",
             ]
+
+            # Add BIGGEST GAINER field if applicable (between Time and Price with blank lines)
+            if biggest_gainer_gain is not None:
+                message_parts.extend([
+                    "",
+                    f"🏆 BIGGEST GAINER: +{biggest_gainer_gain:.2f}%",
+                    "",
+                ])
+            else:
+                message_parts.append("")
+
+            message_parts.append(f"💰 Price: ${current_price:.2f}")
 
             # Add market open price and gain if available
             if market_open_price is not None and percent_gain_since_market_open is not None:
                 message_parts.extend([
-                    f"🌅 **Market Open:** ${market_open_price:.2f}",
-                    f"📈 **Gain Since Open:** {percent_gain_since_market_open:+.2f}%",
+                    f"🌅 Market Open: ${market_open_price:.2f}",
+                    f"📈 Gain Since Open: {percent_gain_since_market_open:+.2f}%",
                 ])
 
             # Add the rest of the alert info
             message_parts.extend([
-                f"📊 **VWAP (Stock Data):** ${vwap:.2f} ✅",
-                f"📈 **EMA9:** ${ema_9:.2f} ✅",
-                f"⚡ **Momentum:** {momentum:.2f}%/min {momentum_emoji}",
-                f"⚡ **Momentum Short:** {momentum_short:.2f}%/min {momentum_short_emoji}",
-                f"🔥 **Squeezing:** {momentum_squeeze:.2f}%/min {squeeze_emoji}",
-                f"📈 **Volume:** {current_volume:,} {volume_emoji}",
-                f"🚦 **Halt Status:** {halt_emoji}",
-                f"🎯 **Urgency:** {urgency.upper()}",
+                f"📈 EMA9: ${ema_9:.2f} ✅",
+                f"⚡ Momentum: {momentum:.2f}%/min {momentum_emoji}",
+                f"⚡ Momentum Short: {momentum_short:.2f}%/min {momentum_short_emoji}",
+                f"🔥 Squeezing: {momentum_squeeze:.2f}%/min {squeeze_emoji}",
+                f"📈 Volume: {current_volume:,} {volume_emoji}",
+                f"🚦 Halt Status: {halt_emoji}",
                 "",
             ])
 
             # Add Volume section with surge data
-            message_parts.append("**📊 Volume:**")
+            message_parts.append("📊 Volume:")
             surge_detected_text = "✅ Yes" if volume_surge_detected else "❌ No"
-            message_parts.append(f"   • **Surge Detected:** {surge_detected_text}")
+            message_parts.append(f"   • Surge Detected: {surge_detected_text}")
             if volume_surge_ratio is not None:
-                message_parts.append(f"   • **Surge Ratio:** {volume_surge_ratio:.2f}x")
+                message_parts.append(f"   • Surge Ratio: {volume_surge_ratio:.2f}x")
             else:
-                message_parts.append(f"   • **Surge Ratio:** N/A")
+                message_parts.append(f"   • Surge Ratio: N/A")
 
             # Add float rotation data (calculated from hourly bars since 04:00 ET)
             if float_rotation is not None and total_volume_since_0400 is not None:
-                message_parts.append(f"   • **Volume (since 04:00 ET):** {total_volume_since_0400:,}")
-                message_parts.append(f"   • **Float Rotation:** {float_rotation:.2f}x")
+                # Determine emoji based on float rotation value
+                if float_rotation > 1:
+                    float_emoji = "🟢"  # Green if > 1
+                elif float_rotation < 0.8:
+                    float_emoji = "🔴"  # Red if < 0.8
+                else:
+                    float_emoji = "🟡"  # Yellow otherwise
+
+                message_parts.append(f"   • Volume (since 04:00 ET): {total_volume_since_0400:,}")
+                message_parts.append(f"   • Float Rotation: {float_rotation:.2f}x {float_emoji}")
             else:
-                message_parts.append(f"   • **Float Rotation:** N/A")
+                message_parts.append(f"   • Float Rotation: N/A")
 
             # Add Fundamentals section
             message_parts.extend([
                 "",
-                "**📈 Fundamentals:**"
+                "📈 Fundamentals:"
             ])
 
             # Format shares outstanding
@@ -1556,9 +2392,9 @@ class MomentumAlertsSystem:
                     shares_str = f"{shares_outstanding / 1_000_000:.2f}M"
                 else:
                     shares_str = f"{shares_outstanding:,.0f}"
-                message_parts.append(f"   • **Shares Outstanding:** {shares_str}")
+                message_parts.append(f"   • Shares Outstanding: {shares_str}")
             else:
-                message_parts.append(f"   • **Shares Outstanding:** N/A")
+                message_parts.append(f"   • Shares Outstanding: N/A")
 
             # Format float shares
             if float_shares is not None:
@@ -1568,9 +2404,9 @@ class MomentumAlertsSystem:
                     float_str = f"{float_shares / 1_000_000:.2f}M"
                 else:
                     float_str = f"{float_shares:,.0f}"
-                message_parts.append(f"   • **Float Shares:** {float_str}")
+                message_parts.append(f"   • Float Shares: {float_str}")
             else:
-                message_parts.append(f"   • **Float Shares:** N/A")
+                message_parts.append(f"   • Float Shares: N/A")
 
             # Format market cap
             if market_cap is not None:
@@ -1580,46 +2416,38 @@ class MomentumAlertsSystem:
                     cap_str = f"${market_cap / 1_000_000:.2f}M"
                 else:
                     cap_str = f"${market_cap:,.0f}"
-                message_parts.append(f"   • **Market Cap:** {cap_str}")
+                message_parts.append(f"   • Market Cap: {cap_str}")
             else:
-                message_parts.append(f"   • **Market Cap:** N/A")
+                message_parts.append(f"   • Market Cap: N/A")
 
             # Add Sources section with green/red light indicators
-            from_gainers = alert_data.get('from_gainers', False)
-            from_volume_surge = alert_data.get('from_volume_surge', False)
-            oracle = alert_data.get('oracle', False)
+            # (from_gainers, from_volume_surge, percent_gain_since_market_open already extracted above)
 
             message_parts.extend([
                 "",
-                "**🔍 Sources:**"
+                "🔍 Sources:"
             ])
 
             # Gainers source indicator
             gainers_indicator = "🟢" if from_gainers else "🔴"
-            message_parts.append(f"   • **Top Gainers:** {gainers_indicator}")
+            message_parts.append(f"   • Top Gainers: {gainers_indicator}")
 
             # Volume surge source indicator
             volume_indicator = "🟢" if from_volume_surge else "🔴"
-            message_parts.append(f"   • **Volume Surge:** {volume_indicator}")
+            message_parts.append(f"   • Volume Surge: {volume_indicator}")
 
-            # Oracle source indicator
-            oracle_indicator = "🟢" if oracle else "🔴"
-            message_parts.append(f"   • **Oracle:** {oracle_indicator}")
-
-            # Add timestamp
-            message_parts.extend([
-                "",
-                f"⏰ **Time:** {timestamp.strftime('%H:%M:%S ET')}",
-                f"📅 **Date:** {timestamp.strftime('%Y-%m-%d')}"
-            ])
+            # Gain since open indicator: green if >30%, red otherwise
+            if percent_gain_since_market_open is not None:
+                gain_indicator = "🟢" if percent_gain_since_market_open > 30 else "🔴"
+                message_parts.append(f"   • Gain >30%: {gain_indicator}")
 
             message = "\n".join(message_parts)
 
-            # Save momentum alert to historical data
-            self._save_momentum_alert(alert_data, message)
-
+            # STEP 2: Send alert and save to momentum_alerts_sent/bullish/
             if self.test_mode:
                 self.logger.info(f"[TEST MODE] {message}")
+                # Start cooldown period even in test mode
+                self._start_cooldown(symbol, current_price)
             else:
                 # Get all users with momentum_alerts=true
                 momentum_users = self.user_manager.get_momentum_alert_users()
@@ -1637,6 +2465,12 @@ class MomentumAlertsSystem:
 
                 for user in momentum_users:
                     username = user.get('username', 'Unknown')
+
+                    # Send urgent pre-message before the full alert
+                    if biggest_gainer_gain is not None:
+                        self.telegram_poster.send_message_to_user(
+                            f"BIGGEST GAINER: {symbol}", username, urgent=True)
+
                     result = self.telegram_poster.send_message_to_user(
                         message, username, urgent=False)
 
@@ -1662,7 +2496,9 @@ class MomentumAlertsSystem:
                         f"for {symbol}: {', '.join(sent_to_users)}")
                     # Save sent alert to historical data with all recipients
                     self._save_momentum_alert_sent(
-                        alert_data, message, sent_to_users)
+                        alert_data, message, sent_to_users, biggest_gainer_gain)
+                    # Start cooldown period for this symbol
+                    self._start_cooldown(symbol, current_price)
 
                 if failed_count > 0:
                     self.logger.warning(
@@ -1701,13 +2537,16 @@ class MomentumAlertsSystem:
                 serialized[k] = str(v)
         return serialized
 
-    def _save_momentum_alert(self, alert_data: Dict, message: str) -> None:
+    def _save_momentum_alert(self, alert_data: Dict, message: Optional[str] = None,
+                              filtered: bool = False, green_light_count: int = 0) -> None:
         """
         Save momentum alert to historical data structure.
 
         Args:
             alert_data: Alert data dictionary
-            message: Formatted alert message
+            message: Formatted alert message (optional, None if filtered)
+            filtered: Whether the alert was filtered out (not sent)
+            green_light_count: Number of green light sources (0-3)
         """
         try:
             symbol = alert_data['symbol']
@@ -1726,7 +2565,6 @@ class MomentumAlertsSystem:
                 'current_price': float(alert_data['current_price']),
                 'market_open_price': float(market_open) if market_open is not None else None,
                 'percent_gain_since_market_open': float(percent_gain) if percent_gain is not None else None,
-                'vwap': float(alert_data['vwap']),
                 'ema_9': float(alert_data['ema_9']),
                 'momentum': float(alert_data['momentum']),
                 'momentum_short': float(alert_data['momentum_short']),
@@ -1744,9 +2582,10 @@ class MomentumAlertsSystem:
                 'halt_emoji': str(alert_data['halt_emoji']),
                 'current_volume': int(alert_data['current_volume']),
                 'volume_emoji': str(alert_data['volume_emoji']),
-                'urgency': str(alert_data['urgency']),
                 'timestamp': timestamp.isoformat(),
-                'message': str(message),
+                'message': str(message) if message else None,
+                'filtered': filtered,
+                'green_light_count': green_light_count,
                 'indicators': self._serialize_indicators(alert_data['indicators']),
                 'from_gainers': bool(alert_data.get('from_gainers', False)),
                 'from_volume_surge': bool(alert_data.get('from_volume_surge', False)),
@@ -1773,7 +2612,8 @@ class MomentumAlertsSystem:
 
     def _save_momentum_alert_sent(
             self, alert_data: Dict, message: str,
-            sent_to_users: List[str]) -> None:
+            sent_to_users: List[str],
+            biggest_gainer_gain: Optional[float] = None) -> None:
         """
         Save sent momentum alert to historical data structure.
 
@@ -1781,6 +2621,7 @@ class MomentumAlertsSystem:
             alert_data: Alert data dictionary
             message: Formatted alert message
             sent_to_users: List of usernames that received the alert
+            biggest_gainer_gain: Gain percentage if biggest gainer, None otherwise
         """
         try:
             symbol = alert_data['symbol']
@@ -1799,7 +2640,6 @@ class MomentumAlertsSystem:
                 'current_price': float(alert_data['current_price']),
                 'market_open_price': float(market_open) if market_open is not None else None,
                 'percent_gain_since_market_open': float(percent_gain) if percent_gain is not None else None,
-                'vwap': float(alert_data['vwap']),
                 'ema_9': float(alert_data['ema_9']),
                 'momentum': float(alert_data['momentum']),
                 'momentum_short': float(alert_data['momentum_short']),
@@ -1817,7 +2657,6 @@ class MomentumAlertsSystem:
                 'halt_emoji': str(alert_data['halt_emoji']),
                 'current_volume': int(alert_data['current_volume']),
                 'volume_emoji': str(alert_data['volume_emoji']),
-                'urgency': str(alert_data['urgency']),
                 'timestamp': timestamp.isoformat(),
                 'message': str(message),
                 'sent_to': sent_to_users,
@@ -1834,7 +2673,8 @@ class MomentumAlertsSystem:
                 'fundamental_source': str(alert_data.get('fundamental_source', 'none')),
                 'total_volume_since_0400': int(alert_data['total_volume_since_0400']) if alert_data.get('total_volume_since_0400') is not None else None,
                 'float_rotation': float(alert_data['float_rotation']) if alert_data.get('float_rotation') is not None else None,
-                'float_rotation_percent': float(alert_data['float_rotation_percent']) if alert_data.get('float_rotation_percent') is not None else None
+                'float_rotation_percent': float(alert_data['float_rotation_percent']) if alert_data.get('float_rotation_percent') is not None else None,
+                'biggest_gainer': float(biggest_gainer_gain) if biggest_gainer_gain is not None else None
             }
 
             # Save to JSON file
@@ -1846,10 +2686,229 @@ class MomentumAlertsSystem:
         except Exception as e:
             self.logger.error(f"❌ Error saving sent momentum alert: {e}")
 
+    def _get_maximum_gain_filepath(self, symbol: str) -> Path:
+        """Get the filepath for a symbol's maximum gain tracking file."""
+        return self.momentum_alerts_sent_dir / f"maximum_{symbol}.json"
+
+    def _load_maximum_gain_data(self, symbol: str) -> Optional[Dict]:
+        """
+        Load maximum gain tracking data for a symbol.
+
+        Returns:
+            Dictionary with first_alert_price, first_alert_time, maximum_gain,
+            maximum_gain_time, or None if file doesn't exist.
+        """
+        filepath = self._get_maximum_gain_filepath(symbol)
+        try:
+            if filepath.exists():
+                with open(filepath, 'r') as f:
+                    return json.load(f)
+        except Exception as e:
+            self.logger.error(f"❌ Error loading maximum gain data for {symbol}: {e}")
+        return None
+
+    def _save_maximum_gain_data(
+            self, symbol: str, first_alert_price: float, first_alert_time: str,
+            maximum_gain: float, maximum_gain_time: str) -> None:
+        """Save maximum gain tracking data for a symbol."""
+        filepath = self._get_maximum_gain_filepath(symbol)
+        try:
+            data = {
+                'symbol': symbol,
+                'first_alert_price': first_alert_price,
+                'first_alert_time': first_alert_time,
+                'maximum_gain': maximum_gain,
+                'maximum_gain_time': maximum_gain_time
+            }
+            with open(filepath, 'w') as f:
+                json.dump(data, f, indent=2)
+            self.logger.debug(f"📝 Saved maximum gain data for {symbol}: {maximum_gain:.2f}%")
+        except Exception as e:
+            self.logger.error(f"❌ Error saving maximum gain data for {symbol}: {e}")
+
+    def _get_all_maximum_gains(self) -> Dict[str, float]:
+        """
+        Load all maximum gain values from all symbols.
+
+        Returns:
+            Dictionary mapping symbol to maximum_gain value.
+        """
+        maximum_gains = {}
+        try:
+            # Find all maximum_*.json files
+            for filepath in self.momentum_alerts_sent_dir.glob("maximum_*.json"):
+                try:
+                    with open(filepath, 'r') as f:
+                        data = json.load(f)
+                        symbol = data.get('symbol')
+                        max_gain = data.get('maximum_gain')
+                        if symbol and max_gain is not None:
+                            maximum_gains[symbol] = max_gain
+                except Exception as e:
+                    self.logger.error(f"❌ Error reading {filepath}: {e}")
+        except Exception as e:
+            self.logger.error(f"❌ Error getting all maximum gains: {e}")
+        return maximum_gains
+
+    def _update_and_check_biggest_gainer(
+            self, symbol: str, current_price: float,
+            timestamp: datetime) -> Optional[float]:
+        """
+        Update maximum gain tracking and check if this is the biggest gainer.
+
+        Args:
+            symbol: Stock symbol
+            current_price: Current stock price
+            timestamp: Alert timestamp
+
+        Returns:
+            Current gain percentage if this is the biggest gainer across all symbols,
+            None otherwise.
+        """
+        timestamp_str = timestamp.isoformat()
+
+        # Load existing data for this symbol
+        existing_data = self._load_maximum_gain_data(symbol)
+
+        if existing_data is None:
+            # First alert for this symbol today
+            first_alert_price = current_price
+            first_alert_time = timestamp_str
+            current_gain = 0.0  # No gain on first alert
+            maximum_gain = 0.0
+            maximum_gain_time = timestamp_str
+        else:
+            first_alert_price = existing_data['first_alert_price']
+            first_alert_time = existing_data['first_alert_time']
+            # Calculate current gain as percentage: (current / first - 1) * 100
+            current_gain = ((current_price / first_alert_price) - 1) * 100
+            maximum_gain = existing_data.get('maximum_gain', 0.0)
+            maximum_gain_time = existing_data.get('maximum_gain_time', timestamp_str)
+
+            # Update maximum if current is higher
+            if current_gain > maximum_gain:
+                maximum_gain = current_gain
+                maximum_gain_time = timestamp_str
+
+        # Save updated data
+        self._save_maximum_gain_data(
+            symbol, first_alert_price, first_alert_time,
+            maximum_gain, maximum_gain_time
+        )
+
+        # Check if this is the biggest gainer across all symbols
+        all_max_gains = self._get_all_maximum_gains()
+
+        # Find the highest maximum gain across ALL symbols (including this one)
+        highest_max_gain = max(all_max_gains.values()) if all_max_gains else 0.0
+
+        # This is the biggest gainer ONLY if current gain equals the highest max
+        # (meaning we just set or tied the daily record)
+        # Must be > 0 to avoid showing on first alerts
+        if current_gain > 0 and current_gain >= highest_max_gain:
+            self.logger.info(
+                f"🏆 {symbol}: BIGGEST GAINER with +{current_gain:.2f}% "
+                f"(daily max: {highest_max_gain:.2f}%)"
+            )
+            return current_gain
+
+        return None
+
+    async def _send_debug_alert(self):
+        """
+        Send a random debug alert for testing purposes.
+        Only active when debug_mode is True.
+        """
+        import random
+
+        # Pick a random symbol
+        symbol = random.choice(self.debug_symbols)
+
+        # Generate random but realistic alert data
+        current_price = round(random.uniform(50.0, 500.0), 2)
+        market_open_price = round(current_price * random.uniform(0.85, 0.98), 2)
+        percent_gain = ((current_price - market_open_price) / market_open_price) * 100
+
+        ema_9 = round(current_price * random.uniform(0.90, 0.98), 2)
+
+        momentum = round(random.uniform(0.5, 3.0), 2)
+        momentum_short = round(random.uniform(0.5, 4.0), 2)
+        momentum_squeeze = round(random.uniform(0.3, 2.5), 2)
+
+        # Pick random emojis for momentum
+        momentum_emojis = ['🟢', '🟡', '🔴']
+        momentum_emoji = random.choice(momentum_emojis)
+        momentum_short_emoji = random.choice(momentum_emojis)
+        squeeze_emoji = random.choice(momentum_emojis)
+
+        volume = random.randint(100000, 5000000)
+        volume_emojis = ['🟢', '🟡', '🔴']
+        volume_emoji = random.choice(volume_emojis)
+
+        halt_emojis = ['✅', '⏸️']
+        halt_emoji = random.choice(halt_emojis)
+
+        timestamp = datetime.now(self.et_tz)
+
+        # Create debug alert data
+        alert_data = {
+            'symbol': symbol,
+            'current_price': current_price,
+            'market_open_price': market_open_price,
+            'percent_gain_since_market_open': percent_gain,
+            'ema_9': ema_9,
+            'momentum': momentum,
+            'momentum_short': momentum_short,
+            'momentum_squeeze': momentum_squeeze,
+            'raw_momentum_20': momentum * 20,
+            'raw_momentum_5': momentum_short * 5,
+            'raw_momentum_squeeze': momentum_squeeze * 3,
+            'actual_time_diff': 20.0,
+            'actual_time_diff_short': 5.0,
+            'actual_time_diff_squeeze': 3.0,
+            'momentum_emoji': momentum_emoji,
+            'momentum_short_emoji': momentum_short_emoji,
+            'squeeze_emoji': squeeze_emoji,
+            'is_halted': halt_emoji == '⏸️',
+            'halt_emoji': halt_emoji,
+            'current_volume': volume,
+            'volume_emoji': volume_emoji,
+            'timestamp': timestamp,
+            'indicators': {},
+            'from_gainers': random.choice([True, False]),
+            'from_volume_surge': random.choice([True, False]),
+            'oracle': random.choice([True, False]),
+            'volume_surge_detected': random.choice([True, False]),
+            'volume_surge_ratio': round(random.uniform(1.0, 10.0), 2) if random.choice([True, False]) else None,
+            'shares_outstanding': random.randint(10000000, 1000000000),
+            'float_shares': random.randint(5000000, 500000000),
+            'market_cap': random.randint(1000000000, 100000000000),
+            'fundamental_source': 'debug',
+            'total_volume_since_0400': random.randint(500000, 10000000),
+            'float_rotation': round(random.uniform(0.1, 5.0), 2),
+            'float_rotation_percent': round(random.uniform(10.0, 500.0), 2)
+        }
+
+        self.logger.info(f"🧪 DEBUG: Sending random test alert for {symbol}")
+        await self._send_momentum_alert(alert_data)
+
     async def _stock_monitoring_loop(self):
         """Main stock monitoring loop - runs every minute."""
         while self.running:
             try:
+                # Debug mode: Send random alert every minute
+                if self.debug_mode:
+                    current_time = datetime.now(self.et_tz)
+
+                    # Check if a minute has passed since last debug alert
+                    if (self.last_debug_alert_time is None or
+                        (current_time - self.last_debug_alert_time).total_seconds() >= 60):
+
+                        self.logger.debug(f"🧪 DEBUG: Triggering test alert (1 minute elapsed)")
+                        await self._send_debug_alert()
+                        self.last_debug_alert_time = current_time
+
+                # Normal monitoring logic
                 if self.monitored_symbols:
                     self.logger.debug(f"🔍 Monitoring {len(self.monitored_symbols)} symbols for momentum alerts")
 
@@ -1871,7 +2930,10 @@ class MomentumAlertsSystem:
 
                             alert_data = self._check_momentum_criteria(symbol, stock_data[symbol], symbol_metadata, hourly_volume)
                             if alert_data:
-                                await self._send_momentum_alert(alert_data)
+                                # Check cooldown before sending alert
+                                current_price = alert_data['current_price']
+                                if not self._is_in_cooldown(symbol, current_price):
+                                    await self._send_momentum_alert(alert_data)
 
                 # Wait 60 seconds before next check
                 await asyncio.sleep(60)
@@ -1887,11 +2949,46 @@ class MomentumAlertsSystem:
         self.running = True
 
         try:
-            # Run volume surge scanner once at startup
-            await self._run_volume_surge_scanner()
+            # Load existing symbols from CSV files immediately at startup
+            self.logger.info("📂 Loading existing symbols from CSV files at startup...")
+            if self.csv_file_path.exists() or (self.volume_surge_dir / "relative_volume_nasdaq_amex.csv").exists():
+                existing_symbols = self._load_csv_symbols()
 
-            # Schedule startup script runs
+                # Merge manual symbols
+                existing_symbols = self._merge_manual_symbols(existing_symbols)
+
+                if existing_symbols:
+                    self.monitored_symbols = existing_symbols
+                    self.logger.info(f"✅ Loaded {len(existing_symbols)} symbols from existing CSV files")
+                else:
+                    self.logger.info("📋 No existing symbols found, will collect fresh data")
+            else:
+                self.logger.info("📋 No existing CSV files, will generate fresh data")
+                # Still load manual symbols even if no CSV files exist
+                manual_symbols = self._load_manual_symbols()
+                if manual_symbols:
+                    self.monitored_symbols = manual_symbols
+                    self.logger.info(f"✅ Loaded {len(manual_symbols)} manual symbols")
+
+            # Run startup script immediately to collect fresh symbols from all sources
+            self.logger.info("📊 Running startup script immediately to collect fresh data...")
+            await self._run_startup_script()
+
+            # Run premarket script immediately to collect premarket data
+            self.logger.info("🌅 Running premarket script immediately to collect fresh data...")
+            await self._run_premarket_script()
+
+            # Schedule next startup script runs (will start scheduling from next 20-min interval)
             self._schedule_startup_runs()
+
+            # Schedule premarket script runs (04:00-20:00 ET, every 10 minutes)
+            self._schedule_premarket_runs()
+
+            # Schedule top gainers script runs (04:00-20:00 ET, every 10 minutes)
+            self._schedule_top_gainers_runs()
+
+            # Schedule volume surge scanner runs (hourly at :45 from 06:45-12:45 ET, trading days only)
+            self._schedule_volume_surge_runs()
 
             # Start the main monitoring loop
             monitoring_task = asyncio.create_task(self._stock_monitoring_loop())
@@ -1899,14 +2996,35 @@ class MomentumAlertsSystem:
             # Main control loop
             while self.running:
                 try:
+                    # Check if date has changed (e.g., past midnight)
+                    self._check_date_change()
+
                     # Check startup schedule
                     self._check_startup_schedule()
+
+                    # Check premarket schedule
+                    self._check_premarket_schedule()
+
+                    # Check top gainers schedule
+                    self._check_top_gainers_schedule()
+
+                    # Check volume surge schedule
+                    self._check_volume_surge_schedule()
 
                     # Check startup processes
                     await self._check_startup_processes()
 
+                    # Check premarket processes
+                    await self._check_premarket_processes()
+
+                    # Check top gainers processes (reap zombies)
+                    await self._check_top_gainers_processes()
+
                     # Monitor CSV file
                     self._monitor_csv_file()
+
+                    # Monitor manual symbols file
+                    self._monitor_manual_symbols_file()
 
                     # Sleep for 30 seconds before next check
                     await asyncio.sleep(30)
@@ -1929,6 +3047,59 @@ class MomentumAlertsSystem:
         finally:
             await self.stop()
 
+    def _check_date_change(self):
+        """
+        Check if the date has changed and update directories if needed.
+
+        This handles the case where the system runs past midnight and needs
+        to update from one day's directories to the next day's directories.
+        """
+        current_date = datetime.now(self.et_tz).strftime('%Y-%m-%d')
+
+        if current_date != self.today:
+            old_date = self.today
+            self.logger.info(f"📅 Date changed from {old_date} to {current_date}")
+            self._update_date_directories(current_date)
+
+    def _update_date_directories(self, new_date: str):
+        """
+        Update all date-dependent directory paths to use the new date.
+
+        Args:
+            new_date: New date string in YYYY-MM-DD format
+        """
+        try:
+            self.logger.info(f"🔄 Updating directory paths for new date: {new_date}")
+
+            # Update the date
+            self.today = new_date
+
+            # Update all directory paths
+            self.historical_data_dir = Path("historical_data") / self.today / "premarket"
+            self.momentum_alerts_dir = Path("historical_data") / self.today / "momentum_alerts" / "bullish"
+            self.momentum_alerts_sent_dir = Path("historical_data") / self.today / "momentum_alerts_sent" / "bullish"
+            self.volume_surge_dir = Path("historical_data") / self.today / "volume_surge"
+            self.scanner_dir = Path("historical_data") / self.today / "scanner"
+
+            # Create new directories
+            self.momentum_alerts_dir.mkdir(parents=True, exist_ok=True)
+            self.momentum_alerts_sent_dir.mkdir(parents=True, exist_ok=True)
+            self.volume_surge_dir.mkdir(parents=True, exist_ok=True)
+            self.scanner_dir.mkdir(parents=True, exist_ok=True)
+
+            # Update CSV file path
+            self.csv_file_path = self.historical_data_dir / "top_gainers_nasdaq_amex.csv"
+
+            # Reset CSV file monitoring state
+            self.csv_last_modified = None
+
+            self.logger.info(f"✅ Directory paths updated successfully for {new_date}")
+            self.logger.info(f"📁 Momentum alerts dir: {self.momentum_alerts_sent_dir}")
+            self.logger.info(f"📁 Scanner dir: {self.scanner_dir}")
+
+        except Exception as e:
+            self.logger.error(f"❌ Error updating directory paths: {e}")
+
     async def stop(self):
         """Stop the momentum alerts system."""
         self.logger.info("🛑 Stopping Momentum Alerts System...")
@@ -1948,6 +3119,20 @@ class MomentumAlertsSystem:
                         process.kill()
             except Exception as e:
                 self.logger.error(f"❌ Error stopping process {process_id}: {e}")
+
+        # Stop any running premarket processes
+        for process_id, process_info in self.premarket_processes.items():
+            try:
+                process = process_info['process']
+                if process.poll() is None:
+                    self.logger.info(f"🛑 Terminating premarket process {process_id}")
+                    process.terminate()
+                    try:
+                        process.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+            except Exception as e:
+                self.logger.error(f"❌ Error stopping premarket process {process_id}: {e}")
 
         self.logger.info("✅ Momentum Alerts System stopped")
 
