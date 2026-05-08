@@ -1,0 +1,23 @@
+[Unit]
+Description=Momentum Alerts Local - code/momentum_alerts.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wilsonb
+WorkingDirectory=/home/wilsonb/dl/github.com/Z223I/alpaca
+Environment="PATH=/home/wilsonb/miniconda3/envs/alpaca/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="PYTHONPATH=/home/wilsonb/dl/github.com/Z223I/alpaca"
+ExecStart=/home/wilsonb/miniconda3/envs/alpaca/bin/python code/momentum_alerts.py
+Restart=on-failure
+RestartSec=30
+StandardOutput=append:/home/wilsonb/dl/github.com/Z223I/alpaca/logs/momentum_alerts_local.log
+StandardError=append:/home/wilsonb/dl/github.com/Z223I/alpaca/logs/momentum_alerts_local_error.log
+
+# Resource limits
+MemoryMax=2G
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target
