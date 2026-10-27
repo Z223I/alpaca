@@ -157,6 +157,20 @@
       failed_when: false
       changed_when: false
 
+    - name: Check for DHCP reservation for {{ vm_name }}
+      ansible.builtin.shell: virsh net-dumpxml default | grep -q "mac='{{ vm_lease.mac }}'"
+      register: lease_exists
+      failed_when: false
+      changed_when: false
+      when: vm_lease.mac is defined
+
+    - name: Reserve {{ vm_lease.ip | default('') }} for {{ vm_name }} in libvirt DHCP
+      ansible.builtin.command: >
+        virsh net-update default add ip-dhcp-host
+        "<host mac='{{ vm_lease.mac }}' name='{{ vm_name }}' ip='{{ vm_lease.ip }}'/>"
+        --live --config
+      when: vm_lease.mac is defined and lease_exists.rc != 0
+
     - name: Install (define + start) the VM via virt-install
       ansible.builtin.command: >
         virt-install
@@ -166,7 +180,7 @@
           --disk {{ vm_disk }},format=qcow2
           --disk {{ vm_seed }},device=cdrom
           --os-variant ubuntu24.04
-          --network network=default
+          --network network=default{{ (',mac=' ~ vm_lease.mac) if vm_lease.mac is defined else '' }}
           --graphics none
           --noautoconsole
           --import

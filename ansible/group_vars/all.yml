@@ -6,6 +6,14 @@ vm_name: apache-web-test          # prod uses: apache-web
 vm_hostname: apache-web-test      # prod uses: apache-web
 vm_instance_id: apache-web-test-01
 
+# Fixed MAC + DHCP reservation per VM name. The host's iptables port
+# forward (8080 -> apache-web:80 in /etc/iptables/rules.v4) depends on
+# apache-web keeping this address across rebuilds. VMs not listed here
+# get a random MAC and a dynamic address.
+vm_static_leases:
+  apache-web: { mac: "52:54:00:e5:c3:fa", ip: "192.168.122.128" }
+vm_lease: "{{ vm_static_leases[vm_name] | default({}) }}"
+
 # ============================================================
 # VM resources
 # ============================================================
